@@ -1,0 +1,223 @@
+"""Pannello di modifica dei tag (singolo brano o più brani insieme). Le modifiche non toccano i file sul PC: restano
+in sospeso e valgono per le copie inviate all'iPhone (vedi overlay.py)."""
+
+from pathlib import Path
+from typing import Optional
+
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QIntValidator, QPixmap
+from PySide6.QtWidgets import (
+    QFileDialog, QFormLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit, QMessageBox,
+    QPushButton, QVBoxLayout, QWidget,
+)
+
+from ..tags import COVER_EXTENSIONS, INT_FIELDS, TAG_FIELDS, read_cover
+
+MIXED = "(valori diversi)"
+COVER_SIZE = 180
+
+
+def _as_text(value) -> str:
+    if value is None:
+        result = ""
+    else:
+        result = str(value)
+    return result
+
+
+class TagEditor(QWidget):
+    # {campo: nuovo valore}, copertina (bytes o None)
+    apply_requested = Signal(dict, object)
+    renumber_requested = Signal()
+    revert_requested = Signal()
+
+    def __init__(self, parent: Optional[QWidget] = None) -> None:
+        super().__init__(parent)
+        self._tracks = []
+        self.cover_provider = None   # track -> bytes della copertina da mostrare (anche quella in sospeso)
+        self.edited_check = None     # track -> True se ha modifiche in sospeso
+        self._dirty = set()
+        self._new_cover: Optional[bytes] = None
+        self._editors = {}
+
+        self._header = QLabel("Seleziona uno o più brani")
+        self._header.setWordWrap(True)
+        self._header.setStyleSheet("font-weight: bold;")
+
+        form = QFormLayout()
+        for name, label in TAG_FIELDS:
+            editor = QLineEdit()
+            if name in INT_FIELDS:
+                editor.setValidator(QIntValidator(0, 999, editor))
+                editor.setMaximumWidth(80)
+            editor.textEdited.connect(lambda _text, field=name: self._mark_dirty(field))
+            self._editors[name] = editor
+            form.addRow(label + ":", editor)
+        tags_box = QGroupBox("Tag")
+        tags_box.setLayout(form)
+
+        self._cover_label = QLabel("Nessuna\ncopertina")
+        self._cover_label.setAlignment(Qt.AlignCenter)
+        self._cover_label.setFixedSize(COVER_SIZE, COVER_SIZE)
+        self._cover_label.setStyleSheet("border: 1px solid palette(mid);")
+        self._cover_button = QPushButton("Cambia copertina…")
+        self._cover_button.clicked.connect(self._choose_cover)
+        cover_layout = QVBoxLayout()
+        cover_layout.addWidget(self._cover_label, alignment=Qt.AlignHCenter)
+        cover_layout.addWidget(self._cover_button)
+        cover_box = QGroupBox("Copertina")
+        cover_box.setLayout(cover_layout)
+
+        self._save_button = QPushButton("Salva modifiche")
+        self._save_button.setToolTip("Salva le modifiche per l'iPhone: il file sul PC non cambia")
+        self._save_button.setDefault(True)
+        self._save_button.clicked.connect(self._apply)
+        self._revert_button = QPushButton("Annulla")
+        self._revert_button.clicked.connect(self._reload)
+        self._renumber_button = QPushButton("Numera in ordine")
+        self._renumber_button.setToolTip(
+            "Assegna i numeri di traccia 1, 2, 3… ai brani selezionati, nell'ordine mostrato in tabella")
+        self._renumber_button.clicked.connect(self.renumber_requested.emit)
+        self._restore_button = QPushButton("Torna ai tag del file")
+        self._restore_button.setToolTip("Annulla le modifiche in sospeso dei brani selezionati")
+        self._restore_button.clicked.connect(self.revert_requested.emit)
+        note = QLabel("I file sul PC sono in sola lettura: le modifiche restano in sospeso e valgono per le copie "
+                      "inviate all'iPhone (ed esportate).")
+        note.setWordWrap(True)
+        note.setStyleSheet("color: gray")
+        buttons = QHBoxLayout()
+        buttons.addWidget(self._save_button)
+        buttons.addWidget(self._revert_button)
+
+        layout = QVBoxLayout(self)
+        layout.addWidget(self._header)
+        layout.addWidget(tags_box)
+        layout.addLayout(buttons)
+        layout.addWidget(self._renumber_button)
+        layout.addWidget(self._restore_button)
+        layout.addWidget(note)
+        layout.addWidget(cover_box)
+        layout.addStretch(1)
+        self.set_tracks([])
+
+    # ------------------------------------------------------------------ stato
+
+    def set_tracks(self, tracks: list) -> None:
+        self._tracks = list(tracks)
+        self._reload()
+
+    def has_unsaved_changes(self) -> bool:
+        result = bool(self._dirty) or self._new_cover is not None
+        return result
+
+    def _reload(self) -> None:
+        self._dirty = set()
+        self._new_cover = None
+        count = len(self._tracks)
+        enabled = count > 0
+        for name, editor in self._editors.items():
+            editor.setEnabled(enabled)
+            values = set()
+            for track in self._tracks:
+                values.add(_as_text(getattr(track.tags, name)))
+            if len(values) == 1:
+                editor.setText(values.pop())
+                editor.setPlaceholderText("")
+            else:
+                editor.setText("")
+                editor.setPlaceholderText(MIXED if count > 1 else "")
+        if count == 0:
+            self._header.setText("Seleziona uno o più brani")
+        elif count == 1:
+            self._header.setText(self._tracks[0].path.name)
+        else:
+            self._header.setText(f"{count} brani selezionati: i campi modificati verranno applicati a tutti")
+        self._cover_button.setEnabled(enabled and self._cover_supported())
+        self._renumber_button.setEnabled(count > 1)
+        edited = False
+        for track in self._tracks:
+            if self.edited_check is not None and self.edited_check(track):
+                edited = True
+        self._restore_button.setEnabled(edited)
+        self._update_buttons()
+        self._show_cover(self._current_cover())
+
+    def _mark_dirty(self, field: str) -> None:
+        self._dirty.add(field)
+        self._update_buttons()
+
+    def _update_buttons(self) -> None:
+        changed = self.has_unsaved_changes()
+        self._save_button.setEnabled(changed)
+        self._revert_button.setEnabled(changed)
+
+    def _cover_supported(self) -> bool:
+        result = True
+        for track in self._tracks:
+            if track.path.suffix.lower() not in COVER_EXTENSIONS:
+                result = False
+        return result
+
+    # ------------------------------------------------------------------ copertina
+
+    def _cover_of(self, track) -> Optional[bytes]:
+        if self.cover_provider is not None:
+            result = self.cover_provider(track)
+        else:
+            result = read_cover(track.path)
+        return result
+
+    def _current_cover(self) -> Optional[bytes]:
+        result = None
+        if len(self._tracks) == 1:
+            result = self._cover_of(self._tracks[0])
+        elif len(self._tracks) > 1:
+            result = self._cover_of(self._tracks[0])
+            if result is not None:
+                same_album = len({track.album_key for track in self._tracks}) == 1
+                if not same_album:
+                    result = None
+        return result
+
+    def _show_cover(self, data: Optional[bytes]) -> None:
+        pixmap = QPixmap()
+        if data is not None and pixmap.loadFromData(data):
+            scaled = pixmap.scaled(COVER_SIZE, COVER_SIZE, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            self._cover_label.setPixmap(scaled)
+        else:
+            self._cover_label.setPixmap(QPixmap())
+            self._cover_label.setText("Nessuna\ncopertina")
+
+    def _choose_cover(self) -> None:
+        path, _filter = QFileDialog.getOpenFileName(
+            self, "Scegli l'immagine di copertina", "", "Immagini (*.jpg *.jpeg *.png)")
+        if path:
+            data = Path(path).read_bytes()
+            pixmap = QPixmap()
+            if pixmap.loadFromData(data):
+                self._new_cover = data
+                self._show_cover(data)
+                self._update_buttons()
+            else:
+                QMessageBox.warning(self, "Copertina", "Il file scelto non è un'immagine valida.")
+
+    # ------------------------------------------------------------------ salvataggio
+
+    def _apply(self) -> None:
+        changes = {}
+        valid = True
+        for name in sorted(self._dirty):
+            text = self._editors[name].text().strip()
+            if name in INT_FIELDS:
+                if text == "":
+                    changes[name] = None
+                elif text.isdigit():
+                    changes[name] = int(text)
+                else:
+                    valid = False
+            else:
+                changes[name] = text
+        if valid:
+            self.apply_requested.emit(changes, self._new_cover)
+        else:
+            QMessageBox.warning(self, "Tag", "I campi numerici devono contenere solo numeri.")

@@ -1,0 +1,38 @@
+myEasyMP3toIPhone
+=================
+
+Musica sul PC e sull'iPhone: importa ed esporta cartelle ordinate per Artista/Album, modifica i tag (ID3 e altri),
+verifica che gli album siano completi su MusicBrainz, scansiona la libreria o l'iPhone per trovare i problemi (anche
+con l'AI), invia la musica all'iPhone. README.md (in questa cartella) spiega tutto.
+
+I file della tua musica sono in sola lettura: il programma non li modifica, non li sposta e non li cancella; le
+modifiche dei tag vanno solo sulle copie (iPhone, iTunes, esportazione). Nessuna garanzia (vedi LICENSE).
+
+Serve
+-----
+- Windows 10 o 11. Nient'altro per la musica sul PC: Python è incluso.
+- Per l'iPhone: l'app gratuita "Dispositivi Apple" dal Microsoft Store (oppure iTunes).
+
+Installazione
+-------------
+1. Scompatta in una cartella scrivibile, per esempio
+   %LOCALAPPDATA%\Programs\myEasyMP3toIPhone   (non in Programmi).
+2. Fai doppio clic su "Create shortcuts.cmd": mette myEasyMP3toIPhone nel menu Start e, se vuoi, sul desktop.
+3. Avvia myEasyMP3toIPhone.
+
+La prima volta Windows può dire "PC protetto da Windows": il programma non è firmato.
+Fai clic su "Ulteriori informazioni", poi "Esegui comunque".
+
+Impostazioni, profili AI, rapporti delle scansioni e log sono in %USERPROFILE%\.myEasyMP3toIPhone, non in questa cartella.
+Le chiavi API si scrivono nelle Impostazioni (vanno nella Gestione credenziali di Windows) oppure nel file
+%USERPROFILE%\.myEasyMP3toIPhone\myEasyMP3toIPhone.env (creato al primo avvio, con la spiegazione in testa).
+
+Aggiornamento
+-------------
+Chiudi il programma, cancella questa cartella, scompatta la nuova versione al suo posto ed esegui di nuovo
+"Create shortcuts.cmd". Le impostazioni restano.
+
+Disinstallazione
+----------------
+Doppio clic su "Remove shortcuts.cmd", poi cancella questa cartella. Per togliere anche le impostazioni cancella
+%USERPROFILE%\.myEasyMP3toIPhone (le chiavi salvate restano nella Gestione credenziali di Windows, voci "myEasyMP3toIPhone").

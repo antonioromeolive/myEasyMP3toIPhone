@@ -1,0 +1,16 @@
+# Copyright (c) 2026 Antonio Romeo <antonioromeo@ilve.it>
+# SPDX-License-Identifier: MIT (see the LICENSE file for the full terms)
+
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+build/
+dist/
+# il file delle variabili vero (con le chiavi) sta nella cartella dati, mai qui; il modello invece è tracciato
+*.env
+!*.TEMPLATE.env
+secrets.json
+myeasymp3toiphone/_version.txt
+myeasymp3toiphone/_version_*.tmp

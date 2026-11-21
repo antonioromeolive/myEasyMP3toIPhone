@@ -1,0 +1,6 @@
+# Copyright (c) 2026 Antonio Romeo <antonioromeo@ilve.it>
+# SPDX-License-Identifier: MIT (see the LICENSE file for the full terms)
+
+# La build della distribuzione (build_dist.py), installata insieme a requirements.txt
+pyinstaller==6.22.3
+pyinstaller-hooks-contrib==2026.9
