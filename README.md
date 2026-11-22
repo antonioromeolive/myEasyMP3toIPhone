@@ -191,8 +191,8 @@ CopyTrans Manager (*AirTrafficControl*), senza iTunes e senza sincronizzare tutt
   tutti i suoi brani. Si cambiano nella scheda PC, poi *Rimpiazza*.
 - Si possono aggiornare ed eliminare solo i brani messi sull'iPhone da un computer (iTunes, CopyTrans, questo
   programma), non quelli acquistati o scaricati sul telefono.
-- Serve l'iPhone collegato e sbloccato, con la gestione manuale della musica attiva (in iTunes: *Riepilogo →
-  Gestisci manualmente musica e video*) e senza *Sincronizza libreria* di Apple Music. Se manca qualcosa il programma
+- Serve l'iPhone collegato e sbloccato, con la gestione manuale della musica attiva (in *Dispositivi Apple* o in
+  iTunes, con l'iPhone collegato: *Gestisci manualmente musica e video*) e senza *Sincronizza libreria* di Apple Music. Se manca qualcosa il programma
   lo dice e non scrive niente.
 
 **Da dove viene un brano.** Il programma tiene un **registro della provenienza**: per ogni brano dell'iPhone
@@ -255,8 +255,9 @@ Il protocollo non è documentato da Apple: il programma segue la ricostruzione d
 [rustunes](https://github.com/fbiba/rustunes) (licenza MIT, vedi `THIRD_PARTY_NOTICES.md`), provata su iOS 26.7 e 27.0
 - 27.2.1. Un aggiornamento di iOS può cambiarlo: in quel caso il programma si ferma con un errore invece di scrivere.
 
-Il vecchio invio tramite iTunes (riquadro *Invio all'app Musica dell'iPhone (tramite iTunes)*) non è più nella scheda
-iPhone: con un iPhone caricato da un altro programma poteva far cancellare la musica del telefono.
+**iTunes non serve.** Il programma parla con l'iPhone da solo; basta il driver USB di Apple, che installa l'app
+gratuita *Dispositivi Apple* (o iTunes, se c'è già). Il vecchio invio tramite iTunes è stato tolto: con un iPhone
+caricato da un altro programma poteva far cancellare la musica del telefono.
 
 ## L'AI: profili e chiavi
 
@@ -373,7 +374,7 @@ programma. La musica invece sta nella Libreria.
 | `iphone_musica.json` | la musica dell'app Musica dell'iPhone all'ultimo collegamento (tag, durata, file sul telefono), per la scheda iPhone, la colonna *iPhone* e la scansione a telefono scollegato |
 | `registro_iphone.json` | il registro della provenienza: per ogni brano dell'iPhone, il computer e il file da cui viene (vedi *Da dove viene un brano*); una copia sta sull'iPhone |
 | `impronte_iphone.json` | le impronte dell'audio dei file dell'iPhone già lette, per non rileggerle |
-| `itunes_aggiunti.json` | per ogni file inviato a iTunes: la sua copia, le modifiche applicate e il brano di iTunes (ID permanente) |
+| `itunes_aggiunti.json` | della versione 0.1.1 (invio tramite iTunes): non più usato, si può cancellare |
 | `iphone_files.json`, `iphone_inviati.json` | delle versioni precedenti (invio alle app come VLC): non più usati, si possono cancellare |
 | `cache_tag.json` | i tag già letti di ogni file (con dimensione e data), per riaprire in fretta le cartelle grandi; si può cancellare |
 | `modifiche_tag.json`, `copertine\` | le modifiche dei tag in sospeso, per percorso del file, e le copertine nuove: i file sul PC non cambiano |
@@ -389,9 +390,8 @@ Al primo avvio le impostazioni della prima versione (CopiaStiMP3, nel registro d
 la cartella `%USERPROFILE%\.myCopiaStiMP3` diventa `%USERPROFILE%\.myEasyMP3toIPhone` (se la versione vecchia è ancora
 aperta, si usa quella vecchia e si riprova al prossimo avvio); `myCopiaStiMP3.env` diventa `myEasyMP3toIPhone.env`, con
 le variabili `MYCOPIASTIMP3_…` rinominate `MYEASYMP3TOIPHONE_…`; le chiavi salvate nella Gestione credenziali passano
-dalle voci `myCopiaStiMP3` a `myEasyMP3toIPhone`; la Libreria e la cartella delle copie per iTunes restano dove sono
-(`Musica\myCopiaStiMP3…`, ora scritte in `settings.json`); la playlist di iTunes `myCopiaStiMP3` si rinomina al primo
-invio. Una variabile di sistema `MYCOPIASTIMP3_HOME` non vale più: va rinominata `MYEASYMP3TOIPHONE_HOME`.
+dalle voci `myCopiaStiMP3` a `myEasyMP3toIPhone`; la Libreria resta dov'è (`Musica\myCopiaStiMP3`, ora scritta in
+`settings.json`). Una variabile di sistema `MYCOPIASTIMP3_HOME` non vale più: va rinominata `MYEASYMP3TOIPHONE_HOME`.
 
 ### Tornare a una versione precedente
 
@@ -451,9 +451,8 @@ predefinita resta su questo computer.
 - L'invio diretto (tasto destro → *Invia all'iPhone*) non ha impostazioni: l'identità della libreria e l'ancora
   vengono sempre dall'iPhone (`iTunesPrefs` e il database dell'app Musica); il nome del computer che l'iPhone registra
   è quello di Windows.
-- Il vecchio invio tramite iTunes non è più nella scheda iPhone. Le sue impostazioni restano in `settings.json` ma non
-  si usano: `itunes_dir` (*Impostazioni → Generale → Cartella delle copie per iTunes*; senza valore
-  `%USERPROFILE%\Music\myEasyMP3toIPhone per iTunes`) e `itunes_sync` (predefinito sì).
+- Il vecchio invio tramite iTunes è stato tolto, con le sue impostazioni `itunes_dir` e `itunes_sync`: in un
+  `settings.json` vecchio restano scritte ma non si leggono più.
 
 ### L'AI della scansione
 

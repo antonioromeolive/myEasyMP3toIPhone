@@ -29,7 +29,7 @@ LOG_BACKUPS = 3
 # Le impostazioni della prima versione (CopiaStiMP3), nel registro di Windows: QSettings(organizzazione, programma)
 OLD_QSETTINGS = ("CopiaStiMP3", "CopiaStiMP3")
 OLD_QSETTINGS_KEYS = {"library_dir": "library_dir", "last_folder": "last_folder", "last_import": "last_import",
-                      "last_export": "last_export", "iphone/last_app": "iphone_last_app"}
+                      "last_export": "last_export"}
 
 log = logging.getLogger(__name__)
 _notices: list = []
@@ -65,10 +65,6 @@ def migrate_from_old_name(home: Path) -> None:
     old_library = Path.home() / "Music" / OLD_PRODUCT
     if not settings.library_dir and old_library.is_dir():
         settings.library_dir = str(old_library)
-        changed = True
-    old_copies = Path.home() / "Music" / f"{OLD_PRODUCT} per iTunes"
-    if not settings.itunes_dir and old_copies.is_dir():
-        settings.itunes_dir = str(old_copies)   # iTunes usa le copie dove sono: non si spostano
         changed = True
     if changed:
         settings.save(home)

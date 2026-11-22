@@ -68,12 +68,6 @@ class SettingsDialog(QDialog):
         library_row = QHBoxLayout()
         library_row.addWidget(self.g_library, 1)
         library_row.addWidget(browse)
-        self.g_itunes = QLineEdit(str(self.settings.itunes_path()))
-        itunes_browse = QPushButton("Sfoglia…")
-        itunes_browse.clicked.connect(self._browse_itunes)
-        itunes_row = QHBoxLayout()
-        itunes_row.addWidget(self.g_itunes, 1)
-        itunes_row.addWidget(itunes_browse)
         self.g_scan_profile = QComboBox()
         note = QLabel("La scansione usa sempre le regole locali (gratuite). Con un profilo AI, l'AI riceve una tabella "
                       "degli album (artisti, titoli, numeri di traccia, nomi delle cartelle) e propone altri problemi e "
@@ -82,7 +76,6 @@ class SettingsDialog(QDialog):
         note.setStyleSheet("color: gray")
         form = QFormLayout()
         form.addRow("Cartella della Libreria", library_row)
-        form.addRow("Cartella delle copie per iTunes", itunes_row)
         form.addRow("AI della scansione", self.g_scan_profile)
         form.addRow(note)
         widget = QWidget()
@@ -93,11 +86,6 @@ class SettingsDialog(QDialog):
         folder = QFileDialog.getExistingDirectory(self, "Cartella della Libreria", self.g_library.text())
         if folder:
             self.g_library.setText(folder)
-
-    def _browse_itunes(self) -> None:
-        folder = QFileDialog.getExistingDirectory(self, "Cartella delle copie per iTunes", self.g_itunes.text())
-        if folder:
-            self.g_itunes.setText(folder)
 
     def _fill_scan_profiles(self) -> None:
         chosen = self.g_scan_profile.currentText() or self.settings.scan_profile
@@ -443,7 +431,6 @@ class SettingsDialog(QDialog):
                 set_secret(name, "")
         library = self.g_library.text().strip()
         self.settings.library_dir = library
-        self.settings.itunes_dir = self.g_itunes.text().strip()
         chosen = self.g_scan_profile.currentText()
         if chosen == NO_AI:
             self.settings.scan_profile = ""

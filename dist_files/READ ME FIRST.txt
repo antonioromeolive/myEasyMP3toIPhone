@@ -6,7 +6,7 @@ verifica che gli album siano completi su MusicBrainz, scansiona la libreria o l'
 con l'AI), invia la musica all'iPhone. README.md (in questa cartella) spiega tutto.
 
 I file della tua musica sono in sola lettura: il programma non li modifica, non li sposta e non li cancella; le
-modifiche dei tag vanno solo sulle copie (iPhone, iTunes, esportazione). Nessuna garanzia (vedi LICENSE).
+modifiche dei tag vanno solo sulle copie (iPhone, esportazione). Nessuna garanzia (vedi LICENSE).
 
 Serve
 -----

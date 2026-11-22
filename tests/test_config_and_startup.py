@@ -234,8 +234,6 @@ def test_migration_from_old_name(tmp_path, monkeypatch, isolated):
                                                                     "base_url": config.ANTHROPIC_SERVER}]}),
                                           encoding="utf-8")
     (old / "settings.json").write_text(json.dumps({"last_opened": "X:/musica"}), encoding="utf-8")
-    copies = fake_home / "Music" / "myCopiaStiMP3 per iTunes"
-    copies.mkdir(parents=True)
     isolated.store[(config.OLD_KEYRING_SERVICE, "Claude")] = "chiave-finta-vecchia"
     startup.prepare()
     new = fake_home / ".myEasyMP3toIPhone"
@@ -248,7 +246,7 @@ def test_migration_from_old_name(tmp_path, monkeypatch, isolated):
     assert env_text.startswith("MYEASYMP3TOIPHONE_LOG_LEVEL=WARNING") and not (new / "myCopiaStiMP3.env").exists()
     assert environment.log_level() == logging.WARNING
     saved = config.AppSettings.load(new)
-    assert saved.itunes_dir == str(copies) and saved.last_opened == "X:/musica"
+    assert saved.last_opened == "X:/musica"
     assert isolated.store[(config.KEYRING_SERVICE, "Claude")] == "chiave-finta-vecchia"
     assert (config.OLD_KEYRING_SERVICE, "Claude") not in isolated.store
     assert home_backup.read_record(new)["data_format"] == str(home_backup.DATA_FORMAT)

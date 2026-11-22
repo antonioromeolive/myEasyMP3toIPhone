@@ -68,15 +68,11 @@ Segnalarli (scheda iPhone, scansione) e proporre di eliminarli (`delete_track`).
 Sui dati veri restano 44 proposte non spuntate (regole senza un candidato chiaro). Controllare cosa ne dice l'AI
 della scansione e se i candidati sono giusti (versioni dal vivo, remaster).
 
-## Il vecchio invio tramite iTunes
-
-Non è più nella scheda iPhone. Decidere se togliere del tutto `itunes.py`, i suoi test, le impostazioni `itunes_dir`
-e `itunes_sync`, il campo in *Impostazioni*, la migrazione in `startup.py` e il pulsante per installare ffmpeg.
-
-## Invio di M4A in Apple Lossless (ALAC)
+## Invio di M4A in Apple Lossless (ALAC) — solo se servirà
 
 Oggi si inviano MP3, FLAC e AAC. ALAC vuole il suo formato di inserimento (rustunes `protocol/alac.rs`: tra
-l'altro `gapless_heuristic_info`, `analysis_inhibit_flags`).
+l'altro `gapless_heuristic_info`, `analysis_inhibit_flags`). Per ora non serve: i 20 M4A della musica dell'utente
+sono tutti AAC.
 
 ## L'app Musica che non si aggiorna da sola
 

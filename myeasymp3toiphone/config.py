@@ -523,20 +523,10 @@ class AppSettings:
     last_opened: str = ""           # l'ultima cartella mostrata (anche la Libreria): riaperta all'avvio
     last_import: str = ""
     last_export: str = ""
-    iphone_last_app: str = ""
-    itunes_dir: str = ""            # dove stanno le copie per iTunes; "" = Musica\myEasyMP3toIPhone per iTunes
-    itunes_sync: bool = True        # dopo l'invio a iTunes, sincronizzare l'iPhone
     scan_profile: str = ""          # il profilo AI della scansione; "" = senza AI
     scan_use_ai: bool = True
     window_geometry: str = ""       # base64 di QMainWindow.saveGeometry
     extra: dict = field(default_factory=dict)
-
-    def itunes_path(self) -> Path:
-        if self.itunes_dir:
-            result = Path(_expanded(self.itunes_dir))
-        else:
-            result = Path.home() / "Music" / f"{PRODUCT} per iTunes"
-        return result
 
     def library_path(self) -> Path:
         if self.library_dir:

@@ -8,7 +8,7 @@ pymobiledevice3>=11.0
 requests>=2.31
 keyring>=24          # le chiavi API nella Gestione credenziali di Windows
 anthropic>=2.12      # i profili AI di tipo Anthropic (Claude)
-pywin32>=306         # l'invio all'app Musica: l'interfaccia di automazione di iTunes (COM)
+cryptography>=42     # la firma dei file di sincronizzazione dell'app Musica (phone_sync)
 
 # Test
 pytest>=8
