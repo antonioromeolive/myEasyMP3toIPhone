@@ -541,6 +541,13 @@ def write_tags(path: Path, tags: TrackTags, new_copy: bool = False) -> None:
         raise TagError(f"Impossibile salvare {path.name}: {exc}") from exc
 
 
+def write_tags_approved(path: Path, tags: TrackTags) -> None:
+    """Scrive i tag nel file ORIGINALE del PC, anche dentro una cartella aperta. Solo per Allinea i tag verso il PC
+    (vale l'iPhone), dopo che l'utente ha visto e approvato l'elenco dei file e dei campi che cambiano. Ogni altra
+    modifica dei tag resta in sospeso e va solo sulle copie."""
+    write_tags(path, tags, new_copy=True)
+
+
 def save_as_id3v23(path: Path, new_copy: bool = False) -> None:
     """Riscrive il tag ID3 in versione 2.3, la più letta da Windows, autoradio e app dell'iPhone. mutagen converte i
     frame (per esempio l'anno TDRC -> TYER) solo con update_to_v23: un save(v2_version=3) da solo lascia frame 2.4

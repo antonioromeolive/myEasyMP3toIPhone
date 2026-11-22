@@ -393,7 +393,7 @@ def test_sync_finished_notice_never_fails(monkeypatch):
     assert iphone.post_sync_finished() is False
 
 
-def test_pc_column_states_source_outside_open_folder_and_probable(tmp_path):
+def test_pc_column_states_source_outside_open_folder_and_probable(tmp_path, monkeypatch):
     """✔/⟳ dalla sorgente del registro anche fuori dalla cartella aperta, ✖ se il file non c'è più, ≈ per i tag;
     il filtro "Da rivedere", la colonna File della sorgente e Associa le probabili."""
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -460,8 +460,26 @@ def test_pc_column_states_source_outside_open_folder_and_probable(tmp_path):
         panel.pc_changed()
         panel._refresh_pc_column()
         assert panel._with_proposal(phone) == []                 # associata: non è più una proposta
-        panel._align_to_pc(panel._aligned_pairs(phone))          # vale l'iPhone: l'anno 1990 va sul PC (in sospeso)
-        assert window.overlay.is_edited(outside)
+        import time
+        from myeasymp3toiphone.tags import read_tags
+
+        def wait_idle():
+            deadline = time.monotonic() + 10
+            while window.runner.is_busy and time.monotonic() < deadline:
+                app.processEvents()
+                time.sleep(0.01)
+            app.processEvents()
+
+        wait_idle()
+        shown = []
+        monkeypatch.setattr(iphone_panel.AlignToPcDialog, "exec", lambda dialog: shown.append(dialog) or False)
+        panel._align_to_pc(panel._aligned_pairs(phone))          # l'elenco dei file, Annulla: niente cambia
+        wait_idle()
+        assert len(shown) == 1 and read_tags(outside)[0].year == "1991"
+        monkeypatch.setattr(iphone_panel.AlignToPcDialog, "exec", lambda dialog: True)
+        panel._align_to_pc(panel._aligned_pairs(phone))          # vale l'iPhone: l'anno 1990 si scrive nel file
+        wait_idle()
+        assert read_tags(outside)[0].year == "1990" and not window.overlay.is_edited(outside)
     finally:
         window.close()
         app.processEvents()

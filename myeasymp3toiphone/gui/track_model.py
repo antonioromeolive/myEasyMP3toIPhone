@@ -30,6 +30,7 @@ PROBABLE_COLOR = QColor(130, 130, 130)
 PROBABLE_ORDER = 2
 ERROR_COLOR = QColor(200, 40, 40)
 EDITED_COLOR = QColor(60, 130, 230)
+DIFFERENT_COLOR = QColor(230, 180, 0)    # il file è la sorgente di un brano dell'iPhone, ma i tag sono diversi
 
 
 def format_length(seconds: float) -> str:
@@ -132,6 +133,8 @@ class TrackTableModel(QAbstractTableModel):
             result = QBrush(ERROR_COLOR)
         elif column == COL_TITLE and self.owner.overlay.is_edited(track.path):
             result = QBrush(EDITED_COLOR)
+        elif column in (COL_FILE, COL_FOLDER) and self._linked_but_different(track):
+            result = QBrush(DIFFERENT_COLOR)
         elif column == COL_DEVICE:
             action = self._action(track)
             status, _phone_track, linked = self.owner.device_state(track)
@@ -144,10 +147,21 @@ class TrackTableModel(QAbstractTableModel):
                 result = QBrush(color) if color is not None else None
         return result
 
+    def _linked_but_different(self, track) -> bool:
+        """Il file è la sorgente certa di un brano dell'iPhone (registro) e i tag sono diversi (⟳)."""
+        result = False
+        if self.owner.phone_known() and not track.error:
+            status, _phone_track, linked = self.owner.device_state(track)
+            result = linked and status == DEVICE_STALE
+        return result
+
     def _tooltip(self, track, column: int):
         result = None
         if track.error:
             result = tr(track.error)
+        elif column in (COL_FILE, COL_FOLDER) and self._linked_but_different(track):
+            result = tr(f"{track.path}\nSull'iPhone questo brano ha tag diversi: Allinea i tag (scheda iPhone, "
+                        "tasto destro) sceglie quali tenere")
         elif column in (COL_FILE, COL_FOLDER):
             result = str(track.path)
         elif column == COL_TITLE and self.owner.overlay.is_edited(track.path):

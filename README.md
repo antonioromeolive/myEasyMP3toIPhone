@@ -31,10 +31,15 @@ Per l'iPhone serve l'app gratuita **Dispositivi Apple** dal Microsoft Store (opp
 
 ## Funzioni
 
-> **I file sul PC sono in sola lettura.** Il programma non modifica, sposta o cancella mai i file delle cartelle che
-> apri (compresa la Libreria). Le modifiche dei tag, fatte a mano, dalla scansione o da *Verifica album online*, restano **in
-> sospeso** nella cartella dati e valgono per le **copie**: quelle inviate all'iPhone, esportate o importate. Le
-> operazioni sull'iPhone non toccano mai i file del PC; quelle sul PC si riflettono sull'iPhone al prossimo invio.
+> **I file sul PC cambiano solo se lo approvi.** Il programma non sposta e non cancella mai i file delle cartelle che
+> apri (compresa la Libreria). Le modifiche dei tag, fatte a mano, dalla scansione o da *Verifica album online*, restano
+> **in sospeso** nella cartella dati e valgono per le **copie**: quelle inviate all'iPhone, esportate o importate.
+> L'unica scrittura in un file del PC è **Allinea i tag → Usa i tag dell'iPhone** (scheda iPhone), dopo una finestra
+> che elenca ogni file e ogni campo che cambia (*Modifica N file*; non si può annullare).
+>
+> **PC e iPhone non si allineano da soli.** Cancellare o cambiare un brano sull'iPhone non cambia niente sul PC, e
+> cambiare i tag sul PC non cambia niente sull'iPhone: la differenza si vede (⟳, il nome del file in giallo) e il
+> brano resta associato alla sua sorgente. Per allinearli scegli tu la direzione con *Allinea i tag*.
 
 Due schede: **PC** (i brani della cartella aperta) e **iPhone** (la musica dell'app *Musica* dell'iPhone, vedi
 [L'iPhone](#liphone)).
@@ -101,7 +106,7 @@ quelli delle cose fatte e la riga appena colorata:
 | ≈ grigio | forse c'è: abbinato solo per i tag, da rivedere |
 | **＋ blu** | in attesa: da inviare |
 | **－ rosso** | in attesa: da togliere dall'iPhone |
-| **⟳ blu** | in attesa: da aggiornare (anche quando cambi i tag a iPhone disconnesso, o con il tasto destro → *Aggiorna più tardi*) |
+| **⟳ blu** | in attesa: da aggiornare (tasto destro → *Aggiorna più tardi*) |
 
 - Una spunta cambiata su una riga selezionata vale per tutte le righe selezionate. Anche **artisti e album** negli
   elenchi in alto hanno la spunta, a tre stati (tutti i brani sull'iPhone, alcuni, nessuno), in corsivo blu se
@@ -270,9 +275,11 @@ accenti non sono evidenziati: sull'iPhone sono lo stesso gruppo.
   **Associa le probabili ≈** rende certi i brani ≈ scelti (li collega al file con gli stessi tag, dopo una conferma).
   **Associa questa sorgente, proposta in rosso** collega i brani scelti alla loro proposta (come *cartella*).
   **Allinea i tag** (per i brani con la sorgente certa e tag diversi, ⟳) sceglie quale parte vale: *Usa i tag
-  dell'iPhone: aggiorna il PC* li copia sui file del PC come modifiche in sospeso (i file non cambiano, valgono per le
-  copie); *Usa i tag del PC: aggiorna l'iPhone* li scrive sull'iPhone (iPhone connesso), con *Cambia tag* dove basta
-  (restano ascolti e playlist) e *Rimpiazza* per artista e artista dell'album.
+  dell'iPhone: modifica i file del PC…* mostra l'elenco dei file e, per ognuno, i campi che cambiano (*ora sul PC →
+  diventa*); con **Modifica N file** li scrive nei file (MP3 in ID3v2.3; WMA, WAV e AIFF no), senza annullamento. Le
+  modifiche in sospeso di quei file entrano nel file insieme; una copertina in sospeso resta in sospeso. *Usa i tag del
+  PC: aggiorna l'iPhone* li scrive sull'iPhone (iPhone connesso), con *Cambia tag* dove basta (restano ascolti e
+  playlist) e *Rimpiazza* per artista e artista dell'album; anche qui una conferma.
   **File della sorgente** → *Copia nome file*, *Copia percorso completo*, *Copia cartella*, *Apri la cartella in
   Esplora risorse*, come nella scheda PC.
 - L'elenco letto resta in `iphone_musica.json` nella cartella dati: scheda iPhone, colonna *iPhone* e scansione
@@ -308,16 +315,11 @@ CopyTrans Manager (*AirTrafficControl*), senza iTunes e senza sincronizzare tutt
   rimpiazzato perde il conteggio degli ascolti e la presenza nelle playlist fatte sull'iPhone: prima di confermare e
   alla fine il programma dice in quali playlist era ciascun brano, così lo rimetti a mano (le playlist smart si
   aggiornano da sole).
-- **Una modifica da una parte si propone anche dall'altra**, per i brani che hanno la sorgente su questo PC (colonna
-  *Sorgente*), e si chiede ogni volta:
-  - cambiando i tag nella scheda **PC** (editor dei tag, correzioni della scansione, *Verifica album online*, *Torna ai tag
-    del file*), se i brani collegati sull'iPhone ora sono diversi: *Aggiornarli anche lì?* Titolo, album, genere,
-    anno, numeri e compilation con *Cambia tag* (restano ascolti e playlist); artista, artista dell'album, una
-    copertina nuova o un campo da svuotare con *Rimpiazza*. Senza iPhone connesso lo dice la barra di stato e i brani
-    restano ⟳;
-  - con **Cambia tag** nella scheda **iPhone**, se i brani vengono da file di questo PC: *Salvare le stesse modifiche
-    anche per quei file?* Sul PC vanno in sospeso, come ogni modifica (i file non cambiano), anche per i file fuori
-    dalla cartella aperta.
+- **Una modifica da una parte non cambia l'altra.** Cambiando i tag nella scheda **PC** (editor, scansione,
+  *Verifica album online*, *Torna ai tag del file*) l'iPhone resta com'è; con **Cambia tag** nella scheda **iPhone** i
+  file del PC restano come sono. I brani con la sorgente su questo PC diventano ⟳, con il nome del file **in giallo**
+  (scheda iPhone, colonne della sorgente; scheda PC, colonne Cartella e File), e restano associati. Si allineano a mano:
+  scheda iPhone, tasto destro → **Allinea i tag**, oppure *Rimpiazza* / *Aggiorna più tardi* dalla scheda PC.
 - **Artista e artista dell'album** non si cambiano con *Cambia tag*: sull'iPhone cambiarli rinominerebbe l'artista per
   tutti i suoi brani. Si cambiano nella scheda PC, poi *Rimpiazza*.
 - La spunta **Compilation** di *Cambia tag* cambia solo il brano. Una compilation vuole anche l'artista dell'album

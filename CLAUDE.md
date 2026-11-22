@@ -11,14 +11,23 @@ Test: `.venv\Scripts\python -m pytest` dalla cartella del repository. I test non
 (`tests/conftest.py`: cartella temporanea, credential store finto in memoria, niente rete verso Ollama) e non fanno mai
 una build vera. Nomi e valori inventati.
 
-## I file sul PC sono in sola lettura
+## I file sul PC cambiano solo con l'approvazione dell'utente
 
-Il programma non modifica, sposta o cancella mai i file delle cartelle aperte (compresa la Libreria). Le modifiche dei
-tag vanno in `overlay.TagOverlay` (cartella dati) e si applicano solo alle copie: invio all'iPhone
+Il programma non sposta e non cancella mai i file delle cartelle aperte (compresa la Libreria). Le modifiche dei tag
+vanno in `overlay.TagOverlay` (cartella dati) e si applicano solo alle copie: invio all'iPhone
 (`iphone.UploadItem.prepare`), esportazione e importazione (`copy_organized(prepare=…)`), con
 `tags.prepare_copy` / `write_tags(..., new_copy=True)`. `tags.protect_folder` blocca le scritture dentro le cartelle
-aperte: non aggirarlo. Le operazioni sull'iPhone non toccano mai i file del PC (l'importazione dall'iPhone crea solo
-file nuovi, `overwrite=False`).
+aperte: non aggirarlo.
+
+L'unica eccezione: **Allinea i tag → Usa i tag dell'iPhone** (scheda iPhone) scrive i tag nei file originali con
+`tags.write_tags_approved`, solo dopo `AlignToPcDialog`, che elenca ogni file e ogni campo che cambia (ora → diventa) e
+dice che non si può annullare. Ogni nuova scrittura nei file del PC deve passare da una finestra così: chiara e
+approvata, mai automatica.
+
+PC e iPhone non si allineano da soli: cancellare o cambiare sull'iPhone non cambia il PC, cambiare sul PC non cambia
+l'iPhone (niente domande "aggiorna anche l'altra parte"). La differenza si vede (⟳, nome del file in giallo) e il
+brano resta associato; si allinea solo con un'azione esplicita (Allinea i tag, Rimpiazza, Applica). L'importazione
+dall'iPhone crea solo file nuovi (`overwrite=False`).
 
 ## Regole per ogni commit
 

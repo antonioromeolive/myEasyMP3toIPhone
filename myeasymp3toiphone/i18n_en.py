@@ -2079,4 +2079,34 @@ CATALOG = {
         'Folder columns',
     'Cartella':
         'Folder',
+    "I tag di {0} brani del PC diventano quelli dell'iPhone. Continuare?\n\n(Si annulla con Torna ai tag del file, nella scheda PC.)":
+        'The tags of {0} PC tracks become those of the iPhone. Continue?\n\n(Undo with Back to the file tags, in the PC tab.)',
+    "I tag di {0} brani dell'iPhone diventano quelli del PC. Continuare?":
+        'The tags of {0} iPhone tracks become those of the PC. Continue?',
+    '\n\nAttenzione: {0} hanno un artista diverso e vanno rimpiazzati: perdono ascolti e playlist.':
+        '\n\nWarning: {0} have a different artist and must be replaced: they lose plays and playlists.',
+    'Allinea i tag: modifica dei file del PC':
+        'Align the tags: changing the PC files',
+    "<b>Questi {0} file del PC verranno modificati</b>: si scrivono nel file i tag dell'iPhone. Non si può annullare.":
+        '<b>These {0} PC files will be changed</b>: the iPhone tags are written into the file. It cannot be undone.',
+    'Campo':
+        'Field',
+    'Ora sul PC':
+        'Now on the PC',
+    'Diventa':
+        'Becomes',
+    'Modifica {0} file':
+        'Change {0} files',
+    "\nI tag sono diversi da quelli dell'iPhone: il file resta la sorgente. Tasto destro → Allinea i tag per scegliere quali tenere.":
+        '\nThe tags differ from the iPhone ones: the file stays the source. Right click → Align the tags to choose which to keep.',
+    "Sul PC non c'è niente da cambiare.":
+        'Nothing to change on the PC.',
+    'Tag scritti in {0} file del PC':
+        'Tags written in {0} PC files',
+    "Usa i tag dell'iPhone: modifica i file del PC…":
+        'Use the iPhone tags: change the PC files…',
+    "{0}\nSull'iPhone questo brano ha tag diversi: Allinea i tag (scheda iPhone, tasto destro) sceglie quali tenere":
+        '{0}\nOn the iPhone this track has different tags: Align the tags (iPhone tab, right click) chooses which to keep',
+    "<b>Come funziona.</b> Qui vedi la musica dell'app <b>Musica</b> dell'iPhone, con i titoli, gli artisti e gli album che mostra l'app. La colonna <b>Sul PC</b> la confronta con il PC: ✔ la sorgente, stessi tag; ⟳ la sorgente, tag diversi; ≈ da rivedere (un brano con gli stessi tag nella cartella aperta, non certo); ✖ la sorgente non c'è più; vuoto = non trovato. <b>Sorgente</b>: il file da cui viene il brano (questo PC, un altro computer, nessuna, telefono); <b>Associa sorgenti</b> la ritrova, <b>Mostra</b> filtra.<br>Tasto destro su uno o più brani: <b>Salva su PC</b>, <b>Mostra nella scheda PC</b>, <b>Rimpiazza con la versione del PC</b> (per i ⟳), <b>Cambia tag</b>, <b>Associa sorgente</b>, <b>Togli sorgente</b>, <b>Elimina dall'iPhone</b>. Per mandare brani nuovi: tasto destro nella scheda PC → <b>Invia all'iPhone</b>. PC e iPhone non si allineano da soli: <b>Allinea i tag</b> sceglie la direzione (i file del PC cambiano solo dopo la tua conferma).<br><b>Attenzione:</b> {0}":
+        '<b>How it works.</b> Here you see the music of the iPhone <b>Music</b> app, with the titles, artists and albums the app shows. The <b>On the PC</b> column compares it with the PC: ✔ the source, same tags; ⟳ the source, different tags; ≈ to review (a track with the same tags in the open folder, not certain); ✖ the source is gone; empty = not found. <b>Source</b>: the file the track comes from (this PC, another computer, none, phone); <b>Link sources</b> finds it, <b>Show</b> filters.<br>Right click on one or more tracks: <b>Save to PC</b>, <b>Show in the PC tab</b>, <b>Replace with the PC version</b> (for ⟳), <b>Change tags</b>, <b>Link source</b>, <b>Remove source</b>, <b>Delete from the iPhone</b>. To send new tracks: right click in the PC tab → <b>Send to iPhone</b>. PC and iPhone do not align by themselves: <b>Align the tags</b> chooses the direction (the PC files change only after you confirm).<br><b>Warning:</b> {0}',
 }
