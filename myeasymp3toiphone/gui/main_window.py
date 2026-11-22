@@ -11,8 +11,8 @@ from typing import Optional
 from PySide6.QtCore import QByteArray, QItemSelectionModel, QSize, Qt, QTimer
 from PySide6.QtGui import QAction, QBrush, QColor, QFont, QKeySequence
 from PySide6.QtWidgets import (
-    QAbstractItemView, QComboBox, QFileDialog, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMainWindow, QMenu,
-    QMessageBox, QScrollArea, QSplitter, QStyle, QTableWidget, QTableWidgetItem, QTabWidget,
+    QAbstractItemView, QComboBox, QFileDialog, QFrame, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMainWindow,
+    QMenu, QMessageBox, QPushButton, QScrollArea, QSplitter, QStyle, QTableWidget, QTableWidgetItem, QTabWidget,
     QToolBar, QVBoxLayout, QWidget,
 )
 
@@ -25,6 +25,7 @@ from ..phone_library import (
     save_listing,
 )
 from ..overlay import TagOverlay
+from ..pending import REMOVE, SEND, UPDATE, Pending, toggled, wanted
 from ..tag_cache import TagCache
 from ..tags import prepare_copy, protect_folder, read_cover
 from ..version import app_version
@@ -50,6 +51,13 @@ DEVICE_TEXT = {DEVICE_SAME: "✔", DEVICE_STALE: "⟳", DEVICE_ABSENT: ""}
 DEVICE_TIP = {DEVICE_SAME: "Nell'app Musica dell'iPhone c'è questo brano, con gli stessi tag",
               DEVICE_STALE: "Nell'app Musica dell'iPhone c'è questo brano, ma con tag diversi:",
               DEVICE_ABSENT: "Non è nell'app Musica dell'iPhone"}
+# le modifiche in attesa (passo 5): segno, colore del segno, tinta della riga; diversi da quelli "fatti"
+PENDING_LOOK = {SEND: ("＋", QColor(40, 110, 230), QColor(40, 110, 230, 40)),
+                REMOVE: ("－", QColor(210, 50, 50), QColor(230, 60, 90, 40)),
+                UPDATE: ("⟳", QColor(40, 110, 230), QColor(40, 110, 230, 40))}
+PENDING_TIP = {SEND: "In attesa: da inviare all'iPhone (Applica)",
+               REMOVE: "In attesa: da togliere dall'iPhone (Applica)",
+               UPDATE: "In attesa: da aggiornare sull'iPhone (Applica)"}
 
 
 
@@ -79,6 +87,8 @@ class MainWindow(QMainWindow):
         self.registry = provenance.Registry.load(config_dir())   # da dove viene ogni brano dell'iPhone
         self.overlay = TagOverlay(config_dir())
         self.tag_cache = TagCache(config_dir())
+        self.pending = Pending(config_dir())   # le spunte della colonna iPhone non ancora applicate
+        self._states = {}                      # id(brano) -> (stato, PhoneTrack, collegato): rifatto quando serve
         self.open_on_start: Optional[Path] = None   # --open CARTELLA: aperta all'avvio al posto della Libreria
         if self.app_settings.window_geometry:
             self.restoreGeometry(QByteArray.fromBase64(self.app_settings.window_geometry.encode("ascii")))
@@ -162,6 +172,8 @@ class MainWindow(QMainWindow):
 
         self.browser = LibraryBrowser()
         self.browser.filter_changed.connect(self._fill_table)
+        self.browser.phone_state = self._browser_phone_state
+        self.browser.phone_toggled.connect(self.set_wanted)
 
         self._table = QTableWidget(0, len(COLUMNS))
         self._table.setHorizontalHeaderLabels(COLUMNS)
@@ -182,6 +194,7 @@ class MainWindow(QMainWindow):
         for column, width in enumerate(widths):
             self._table.setColumnWidth(column, width)
         self._table.itemSelectionChanged.connect(self._selection_changed)
+        self._table.itemChanged.connect(self._device_changed)
         self._table.setContextMenuPolicy(Qt.CustomContextMenu)
         self._table.customContextMenuRequested.connect(self._table_menu)
         self._table.viewport().installEventFilter(self)    # il suggerimento della colonna iPhone, al passaggio
@@ -213,7 +226,26 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout(tab)
         layout.addLayout(top)
         layout.addWidget(splitter, 1)
+        layout.addWidget(self._build_pending_bar())
         return tab
+
+    def _build_pending_bar(self) -> QFrame:
+        """La barra delle modifiche all'iPhone in attesa: si vede solo quando ce ne sono."""
+        self._pending_bar = QFrame()
+        self._pending_bar.setStyleSheet("QFrame { background: rgba(40, 110, 230, 30); border-radius: 4px; }")
+        self._pending_label = QLabel()
+        undo = QPushButton("Annulla le modifiche")
+        undo.clicked.connect(self._undo_pending)
+        self._apply_button = QPushButton("Applica…")
+        self._apply_button.setProperty("role", "go")
+        self._apply_button.clicked.connect(self._apply_pending)
+        row = QHBoxLayout(self._pending_bar)
+        row.setContentsMargins(8, 4, 8, 4)
+        row.addWidget(self._pending_label, 1)
+        row.addWidget(undo)
+        row.addWidget(self._apply_button)
+        self._pending_bar.setVisible(False)
+        return self._pending_bar
 
     # ================================================================== avvio e cartelle
 
@@ -231,12 +263,16 @@ class MainWindow(QMainWindow):
             self._tabs.setTabText(index, "iPhone ●" if connected else "iPhone")
             self._tabs.tabBar().setTabTextColor(index, QColor(60, 180, 100) if connected else QColor())
             self._tabs.setTabToolTip(index, "iPhone connesso" if connected else "iPhone non connesso")
+            QTimer.singleShot(0, self._update_pending_bar)   # Applica si può premere solo a iPhone connesso
 
     def set_registry(self, registry) -> None:
         """Il registro della provenienza è cambiato (collegamenti nuovi o tolti): confronti e viste da rifare."""
         self.registry = registry
         self._phone_index = PhoneIndex(self.phone_tracks, registry.links_here())
+        self._states = {}
         self._fill_table()
+        self.browser.refresh_phone_states()
+        self._update_pending_bar()
         self.iphone_panel.pc_changed()
 
     def set_phone_tracks(self, tracks: list, device: str) -> None:
@@ -251,12 +287,17 @@ class MainWindow(QMainWindow):
         self.phone_tracks = list(tracks)
         self.phone_label = label
         self._phone_index = PhoneIndex(tracks, self.registry.links_here())
+        self._states = {}
+        if self.pending.reconcile(self.tracks, lambda track: self._device_state(track)[0]):
+            self._save_pending()
         header = self._table.horizontalHeaderItem(COL_DEVICE)
         if header is not None:
             header.setToolTip(f"Nell'app Musica dell'iPhone ({label}): ✔ stesso brano, ⟳ stesso brano con tag "
                               "diversi, vuoto = non c'è")
         self.iphone_panel.set_phone_tracks(tracks, label)
         self._fill_table()
+        self.browser.refresh_phone_states()
+        self._update_pending_bar()
 
     def _startup(self) -> None:
         """All'avvio: --open, altrimenti l'ultima cartella usata (se c'è ancora), altrimenti la Libreria."""
@@ -364,6 +405,7 @@ class MainWindow(QMainWindow):
             self._format.setItemText(index, f"{label} ({total})")
 
     def _rebuild_views(self, keep_tracks: Optional[set] = None) -> None:
+        self._states = {}
         assign_groups(self.tracks)
         self._update_format_counts()
         self.browser.set_data(group_by_album(self.format_tracks()), self.check_results)
@@ -425,9 +467,7 @@ class MainWindow(QMainWindow):
                 COL_LENGTH: _format_length(track.length),
                 COL_FILE: track.path.name,
             }
-            status = DEVICE_ABSENT
-            if self._phone_index is not None:
-                status, _phone_track, _found = device_status(track, self._phone_index)
+            status = self._device_state(track)[0]
             values[COL_DEVICE] = DEVICE_TEXT[status]
             self._table.setItem(row, COL_NUMBER, number)
             for column, text in values.items():
@@ -445,12 +485,7 @@ class MainWindow(QMainWindow):
                 title_item.setForeground(QBrush(QColor(60, 130, 230)))
                 title_item.setToolTip("Modificato per l'iPhone (il file sul PC non cambia):\n"
                                       + self.overlay.describe(track))
-            device_item = self._table.item(row, COL_DEVICE)
-            device_item.setTextAlignment(Qt.AlignCenter)
-            if status == DEVICE_STALE:
-                device_item.setForeground(QBrush(QColor(220, 140, 0)))
-            elif status == DEVICE_SAME:
-                device_item.setForeground(QBrush(QColor(30, 140, 60)))
+            self._style_device_cell(row, track)
         self._table.setSortingEnabled(True)
         selection = self._table.selectionModel()
         for row in range(self._table.rowCount()):
@@ -459,6 +494,192 @@ class MainWindow(QMainWindow):
                                  QItemSelectionModel.Select | QItemSelectionModel.Rows)
         self._table.blockSignals(False)
         self._selection_changed()
+
+    # ================================================================== passo 5: spunte e modifiche in attesa
+
+    def _device_state(self, track) -> tuple:
+        """(stato, PhoneTrack o None, collegato dal registro) del brano rispetto all'iPhone, ricordato fino al prossimo
+        cambio di brani, tag, registro o musica dell'iPhone."""
+        key = id(track)
+        result = self._states.get(key)
+        if result is None:
+            status = DEVICE_ABSENT
+            phone_track = None
+            linked = False
+            if self._phone_index is not None and not track.error:
+                status, phone_track, _found = device_status(track, self._phone_index)
+                linked = phone_track is not None and self._phone_index.via_registry(track)
+            result = (status, phone_track, linked)
+            self._states[key] = result
+        return result
+
+    def _style_device_cell(self, row: int, track) -> None:
+        """La cella iPhone: la spunta (voglio il brano sull'iPhone), il segno fatto (✔ ⟳) o in attesa (＋ － ⟳ blu) e
+        la tinta della riga per le modifiche in attesa."""
+        status, phone_track, linked = self._device_state(track)
+        item = self._table.item(row, COL_DEVICE)
+        action = self.pending.get(track.path) if self._phone_index is not None else ""
+        item.setTextAlignment(Qt.AlignCenter)
+        tint = QBrush()
+        if self._phone_index is None or track.error:
+            item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
+        else:
+            flags = Qt.ItemIsEnabled | Qt.ItemIsSelectable
+            if status == DEVICE_ABSENT or linked or action:
+                flags |= Qt.ItemIsUserCheckable
+            item.setFlags(flags)
+            item.setCheckState(Qt.Checked if wanted(status, action) else Qt.Unchecked)
+        if action:
+            text, color, background = PENDING_LOOK[action]
+            item.setText(text)
+            item.setForeground(QBrush(color))
+            tint = QBrush(background)
+        else:
+            item.setText(DEVICE_TEXT[status])
+            if status == DEVICE_STALE:
+                item.setForeground(QBrush(QColor(220, 140, 0)))
+            elif status == DEVICE_SAME:
+                item.setForeground(QBrush(QColor(30, 140, 60)))
+            else:
+                item.setForeground(QBrush())
+        for column in range(len(COLUMNS)):
+            cell = self._table.item(row, column)
+            if cell is not None:
+                cell.setBackground(tint)
+
+    def _device_changed(self, item) -> None:
+        """Una spunta della colonna iPhone cambiata a mano: vale per tutte le righe selezionate, se la riga lo è."""
+        if item.column() == COL_DEVICE and self._phone_index is not None:
+            checked = item.checkState() == Qt.Checked
+            rows = self._selected_rows()
+            if item.row() not in rows:
+                rows = [item.row()]
+            tracks = []
+            for row in rows:
+                tracks.append(self._track_at_row(row))
+            self.set_wanted(tracks, checked)
+
+    def set_wanted(self, tracks: list, checked: bool) -> None:
+        """Mette o toglie la spunta "voglio questi brani sull'iPhone": le modifiche restano in attesa fino ad Applica."""
+        if self._phone_index is not None:
+            kept = 0
+            for track in tracks:
+                if not track.error:
+                    status, _phone_track, linked = self._device_state(track)
+                    action = self.pending.get(track.path)
+                    new_action = toggled(status, linked, action, checked)
+                    if not checked and status != DEVICE_ABSENT and not linked:
+                        kept += 1
+                    self.pending.set(track.path, new_action)
+            self._save_pending()
+            self._restyle_rows(tracks)
+            self.browser.refresh_phone_states()
+            self._update_pending_bar()
+            if kept:
+                self.statusBar().showMessage(
+                    f"{kept} brani restano sull'iPhone: sono abbinati solo per i tag. Per toglierli da qui associa "
+                    "prima la sorgente (scheda iPhone, tasto destro), oppure eliminali dalla scheda iPhone.", 15000)
+
+    def mark_for_update(self, tracks: list) -> None:
+        """I brani ⟳ (sull'iPhone con tag diversi) in attesa di aggiornamento."""
+        for track in tracks:
+            if self._device_state(track)[0] == DEVICE_STALE:
+                self.pending.set(track.path, UPDATE)
+        self._save_pending()
+        self._restyle_rows(tracks)
+        self.browser.refresh_phone_states()
+        self._update_pending_bar()
+
+    def _restyle_rows(self, tracks: list) -> None:
+        wanted_ids = set()
+        for track in tracks:
+            wanted_ids.add(id(track))
+        self._table.blockSignals(True)
+        for row in range(self._table.rowCount()):
+            track = self._track_at_row(row)
+            if id(track) in wanted_ids:
+                self._style_device_cell(row, track)
+        self._table.blockSignals(False)
+
+    def _save_pending(self) -> None:
+        try:
+            self.pending.save()
+        except OSError as exc:
+            self.statusBar().showMessage(f"Modifiche in attesa non salvate nella cartella dati: {exc}", 10000)
+
+    def _browser_phone_state(self, tracks: list):
+        """(spunta di un artista o album negli elenchi, c'è qualcosa in attesa) o None senza la musica dell'iPhone."""
+        result = None
+        if self._phone_index is not None:
+            on = 0
+            usable = 0
+            waiting = False
+            for track in tracks:
+                if not track.error:
+                    usable += 1
+                    action = self.pending.get(track.path)
+                    waiting = waiting or bool(action)
+                    if wanted(self._device_state(track)[0], action):
+                        on += 1
+            if usable and on == usable:
+                state = Qt.Checked
+            elif on:
+                state = Qt.PartiallyChecked
+            else:
+                state = Qt.Unchecked
+            result = (state, waiting)
+        return result
+
+    def pending_work(self) -> tuple:
+        """(da inviare [Track], da togliere [PhoneTrack], da aggiornare [(PhoneTrack, Track)]) tra i brani aperti."""
+        sends = []
+        removes = []
+        updates = []
+        for track in self.tracks:
+            action = self.pending.get(track.path)
+            if action and not track.error:
+                status, phone_track, linked = self._device_state(track)
+                if action == SEND and status == DEVICE_ABSENT:
+                    sends.append(track)
+                elif action == REMOVE and phone_track is not None and linked and phone_track.from_computer:
+                    removes.append(phone_track)
+                elif action == UPDATE and status == DEVICE_STALE and phone_track.from_computer:
+                    updates.append((phone_track, track))
+        result = (sends, removes, updates)
+        return result
+
+    def _update_pending_bar(self) -> None:
+        counts = self.pending.counts()
+        total = counts[SEND] + counts[REMOVE] + counts[UPDATE]
+        self._pending_bar.setVisible(total > 0)
+        if total:
+            self._pending_label.setText(
+                f"<b>In attesa per l'iPhone:</b> {counts[SEND]} da inviare, {counts[REMOVE]} da togliere, "
+                f"{counts[UPDATE]} da aggiornare")
+            ready = self.iphone_panel.connected and not self.runner.is_busy
+            self._apply_button.setEnabled(ready)
+            self._apply_button.setToolTip("" if ready else "Connetti l'iPhone")
+
+    def _undo_pending(self) -> None:
+        counts = self.pending.counts()
+        total = counts[SEND] + counts[REMOVE] + counts[UPDATE]
+        answer = QMessageBox.question(self, "Annulla le modifiche",
+                                      f"Annullare le {total} modifiche all'iPhone in attesa? Le spunte tornano come "
+                                      "sono sull'iPhone.")
+        if answer == QMessageBox.Yes:
+            self.pending.clear()
+            self._save_pending()
+            self._fill_table()
+            self.browser.refresh_phone_states()
+            self._update_pending_bar()
+
+    def _apply_pending(self) -> None:
+        sends, removes, updates = self.pending_work()
+        if sends or removes or updates:
+            self.iphone_panel.apply_pending(sends, removes, updates)
+        else:
+            QMessageBox.information(self, "Applica", "Nessuna modifica da fare tra i brani della cartella aperta: le "
+                                    "altre restano in attesa finché apri la cartella dei loro file.")
 
     def _track_at_row(self, row: int):
         index = self._table.item(row, COL_NUMBER).data(Qt.UserRole)
@@ -543,6 +764,12 @@ class MainWindow(QMainWindow):
             replace = menu.addAction(f"Rimpiazza sull'iPhone ({len(stale)} brani con tag diversi ⟳)")
             replace.setEnabled(ready and bool(stale))
             replace.triggered.connect(lambda: self.iphone_panel.replace_pairs(stale))
+            later_tracks = []
+            for _phone_track, track in stale:
+                later_tracks.append(track)
+            later = menu.addAction(f"Aggiorna più tardi: in attesa ({len(stale)} brani ⟳)")
+            later.setEnabled(bool(stale) and not self.runner.is_busy)
+            later.triggered.connect(lambda: self.mark_for_update(later_tracks))
             if present:
                 note = menu.addAction(f"{present} brani già sull'iPhone uguali ✔")
                 note.setEnabled(False)
@@ -589,6 +816,7 @@ class MainWindow(QMainWindow):
         for action in self._task_actions:
             action.setEnabled(not busy)
         self.editor.setEnabled(not busy)
+        QTimer.singleShot(0, self._update_pending_bar)
 
     # ================================================================== modifica tag
 

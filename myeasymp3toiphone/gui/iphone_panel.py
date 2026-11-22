@@ -709,6 +709,43 @@ class IPhonePanel(QWidget):
 
             self._write("Rimpiazzo sull'iPhone", "rimpiazzati", action, _playlist_note(phone_tracks))
 
+    def apply_pending(self, sends: list, removes: list, updates: list) -> None:
+        """Le modifiche in attesa della scheda PC (passo 5) tutte insieme: invia (Track), togli (PhoneTrack), aggiorna
+        ((PhoneTrack, Track): Cambia tag o Rimpiazza, come per una modifica dei tag)."""
+        edits, replacements = phone_actions.plan_updates(updates)
+        lines = []
+        if sends:
+            lines.append(f"• {len(sends)} brani da inviare")
+        if removes:
+            lines.append(f"• {len(removes)} brani da togliere dall'iPhone (sul PC non cambia niente)")
+        if edits:
+            lines.append(f"• {len(edits)} brani da aggiornare con Cambia tag (restano ascolti e playlist)")
+        if replacements:
+            lines.append(f"• {len(replacements)} brani da rimpiazzare (artista, artista dell'album o un campo da "
+                         "svuotare: perdono ascolti e playlist)")
+        replaced = []
+        for phone_track, _track in replacements:
+            replaced.append(phone_track)
+        text = "Applicare all'iPhone le modifiche in attesa?\n\n" + "\n".join(lines)
+        reminder = playlist_reminder(replaced)
+        if reminder:
+            text += "\n\nI brani da rimpiazzare sono nelle playlist (alla fine te le ricordo):\n" + reminder
+        if lines and self._confirm("Applica", text):
+            overlay = self._window.overlay
+
+            def action(progress, cancel):
+                report = phone_actions.ActionReport()
+                if sends:
+                    report.add(phone_actions.send_tracks(sends, overlay, progress, cancel, config_dir()))
+                if removes and not cancel.is_set():
+                    report.add(phone_actions.delete_tracks(removes, progress, config_dir()))
+                if (edits or replacements) and not cancel.is_set():
+                    report.add(phone_actions.update_from_pc(edits, replacements, overlay, progress, cancel,
+                                                            config_dir()))
+                return report
+
+            self._write("Applica all'iPhone", "sistemati sull'iPhone", action, _playlist_note(replaced))
+
     def offer_phone_update(self, tracks: list, cover: bool) -> None:
         """Dopo una modifica dei tag sul PC: i brani dell'iPhone che vengono da questi file (registro della
         provenienza) e ora sono diversi si aggiornano anche lì? I campi sicuri con Cambia tag, artisti e copertina
@@ -732,9 +769,17 @@ class IPhonePanel(QWidget):
         edits, replacements = phone_actions.plan_updates(pairs, frozenset(covers))
         total = len(edits) + len(replacements)
         if total and not (self._connected and not window.runner.is_busy):
-            window.statusBar().showMessage(f"{total} brani sull'iPhone vengono da questi file e ora sono diversi (⟳): "
-                                           "per aggiornarli connetti l'iPhone e usa Rimpiazza con la versione del "
-                                           "PC", 15000)
+            changed = set()
+            for phone_track, _detail in edits + replacements:
+                changed.add(id(phone_track))
+            stale_tracks = []
+            for phone_track, track in pairs:
+                if id(phone_track) in changed:
+                    stale_tracks.append(track)
+            window.mark_for_update(stale_tracks)
+            window.statusBar().showMessage(f"{total} brani sull'iPhone vengono da questi file e ora sono diversi: "
+                                           "sono in attesa di aggiornamento (⟳ blu), premi Applica quando l'iPhone "
+                                           "è connesso", 15000)
         elif total:
             if total == 1 and len(tracks) == 1:
                 text = "Il brano modificato è anche sull'iPhone. Aggiornarlo anche lì?\n"

@@ -1,19 +1,5 @@
 # TODO
 
-## Passo 5: spunte, stato "in attesa" e barra Applica
-
-Già deciso: nella colonna *iPhone* della scheda PC una spunta = "voglio questo brano sull'iPhone".
-- Stati: ✔ verde (c'è, uguale), ⟳ arancio (c'è, diverso), vuoto (non c'è); **in attesa**: ＋ blu (da inviare),
-  － rosso (da togliere), ⟳ blu (da aggiornare), con la riga in leggera tinta azzurra o rosa. Forma e colore
-  diversi da quelli "fatti".
-- Spunta anche su artisti e album interi negli elenchi in alto, a tre stati (tutti, alcuni ◐, nessuno), con il
-  segno "in attesa" se dentro c'è qualcosa da applicare.
-- Una barra in fondo quando c'è qualcosa in attesa: "In attesa: N da inviare, N da togliere, N da aggiornare —
-  [Annulla le modifiche] [Applica…]"; *Applica* mostra l'elenco e chiede conferma, poi fa tutto in poche sessioni.
-- Le modifiche in attesa si salvano nella cartella dati (non si perdono chiudendo il programma).
-- Togliere una spunta agisce solo sui brani **collegati** (registro della provenienza); i brani di origine
-  sconosciuta non si toccano mai per una spunta.
-
 ## Varianti dei nomi degli artisti (dopo il passo 5)
 
 "Battiato", "Franco Battiato", "Battiato Franco", "F. Battiato", accenti, errori di battitura, duetti. Decisioni già

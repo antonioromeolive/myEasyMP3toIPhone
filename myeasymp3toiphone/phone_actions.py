@@ -48,6 +48,14 @@ class ActionReport:
     cancelled: bool = False
     sessions: int = 0
 
+    def add(self, other: "ActionReport") -> None:
+        """Somma l'esito di un'altra azione (più azioni in un'operazione sola)."""
+        self.done += other.done
+        self.skipped += other.skipped
+        self.errors += other.errors
+        self.cancelled = self.cancelled or other.cancelled
+        self.sessions += other.sessions
+
     def summary(self, verb: str) -> str:
         parts = [f"{self.done} brani {verb}"]
         if self.skipped:
@@ -590,9 +598,5 @@ def update_from_pc(edits: list, replacements: list, overlay, progress: Optional[
     """Le modifiche fatte sul PC anche sull'iPhone: prima i campi sicuri (edit_each), poi i rimpiazzi."""
     report = edit_each(edits, progress) if edits else ActionReport()
     if replacements and not is_cancelled(cancel):
-        replaced = replace_tracks(replacements, overlay, progress, cancel, home)
-        report.done += replaced.done
-        report.skipped += replaced.skipped
-        report.errors += replaced.errors
-        report.cancelled = report.cancelled or replaced.cancelled
+        report.add(replace_tracks(replacements, overlay, progress, cancel, home))
     return report

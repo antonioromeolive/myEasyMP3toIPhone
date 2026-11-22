@@ -76,6 +76,30 @@ artista in comune; un brano con modifiche in sospeso si ritrova anche con i tag 
 dell'iPhone letta all'ultima connessione e salvata nella cartella dati, quindi si vede anche a iPhone disconnesso (il
 suggerimento sull'intestazione dice di quando è l'elenco).
 
+**Spunte e modifiche in attesa.** Nella colonna *iPhone* la spunta vuol dire "voglio questo brano sull'iPhone".
+Mettere o togliere una spunta non fa niente subito: il brano resta **in attesa**, con un segno e un colore diversi da
+quelli delle cose fatte e la riga appena colorata:
+
+| Segno | Vuol dire |
+|---|---|
+| ✔ verde | c'è, uguale |
+| ⟳ arancio | c'è, con tag diversi |
+| **＋ blu** | in attesa: da inviare |
+| **－ rosso** | in attesa: da togliere dall'iPhone |
+| **⟳ blu** | in attesa: da aggiornare (anche quando cambi i tag a iPhone disconnesso, o con il tasto destro → *Aggiorna più tardi*) |
+
+- Una spunta cambiata su una riga selezionata vale per tutte le righe selezionate. Anche **artisti e album** negli
+  elenchi in alto hanno la spunta, a tre stati (tutti i brani sull'iPhone, alcuni, nessuno), in corsivo blu se
+  dentro c'è qualcosa in attesa: cliccarla mette o toglie tutti i loro brani.
+- **Togliere** una spunta vale solo per i brani che sull'iPhone vengono da quel file (colonna *Sorgente* della scheda
+  iPhone): un brano abbinato solo per i tag non si toglie mai così (la sua spunta non si può togliere).
+- Quando c'è qualcosa in attesa compare una barra in fondo: *In attesa per l'iPhone: N da inviare, N da togliere,
+  N da aggiornare* con **Annulla le modifiche** e **Applica…** (a iPhone connesso). *Applica* mostra il riepilogo,
+  chiede conferma e fa tutto insieme: invio, eliminazione, aggiornamento (con *Cambia tag* o *Rimpiazza*, come per
+  una modifica dei tag; alla fine ricorda le playlist dei brani rimpiazzati).
+- Le modifiche in attesa restano nella cartella dati (`iphone_in_attesa.json`) anche chiudendo il programma; quelle
+  già fatte si tolgono da sole a ogni lettura dell'iPhone. *Applica* fa quelle dei brani della cartella aperta.
+
 **Tag.** A destra si modificano titolo, artista, artista album, album, numero di traccia e di disco, anno, genere,
 la spunta **Compilation** e la copertina (MP3, M4A, FLAC, OGG, Opus; copertina per MP3, M4A, FLAC). Con più brani
 selezionati, solo i campi modificati valgono per tutti; la spunta mostra un quadratino pieno a metà quando i brani
@@ -427,6 +451,7 @@ programma. La musica invece sta nella Libreria.
 | `secrets.json` | solo senza credential store: le chiavi |
 | `scansioni\scansione_<data>.txt` | il rapporto di ogni scansione |
 | `iphone_musica.json` | la musica dell'app Musica dell'iPhone all'ultima connessione (tag, durata, file sul telefono), per la scheda iPhone, la colonna *iPhone* e la scansione a telefono disconnesso |
+| `iphone_in_attesa.json` | le modifiche all'iPhone in attesa (spunte della colonna *iPhone*): da inviare, togliere o aggiornare, per percorso del file del PC |
 | `registro_iphone.json` | il registro della provenienza: per ogni brano dell'iPhone, il computer e il file da cui viene (vedi *Da dove viene un brano*); una copia sta sull'iPhone |
 | `impronte_iphone.json` | le impronte dell'audio dei file dell'iPhone già lette, per non rileggerle |
 | `itunes_aggiunti.json` | della versione 0.1.1 (invio tramite iTunes): non più usato, si può cancellare |

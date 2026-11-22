@@ -8,6 +8,10 @@ sull'intestazione, che filtrano i brani mostrati in tabella.
     Artisti: un artista (o più, con Ctrl/Maiusc) -> l'elenco Album mostra solo i suoi album, la tabella i suoi brani
     Album:   un album (o più) -> la tabella mostra solo quei brani
     "(Tutti …)", sempre in cima, toglie il filtro di quell'elenco.
+
+Con la musica dell'iPhone nota, ogni artista e album ha la spunta "sull'iPhone" a tre stati (tutti i brani, alcuni,
+nessuno), in corsivo blu se dentro c'è una modifica in attesa; cliccarla mette o toglie tutti i suoi brani
+(phone_toggled, poi in attesa fino ad Applica).
 """
 
 from __future__ import annotations
@@ -15,6 +19,7 @@ from __future__ import annotations
 from typing import Optional
 
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QBrush, QColor
 from PySide6.QtWidgets import (
     QAbstractItemView, QHBoxLayout, QHeaderView, QLabel, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget,
 )
@@ -76,15 +81,19 @@ def _make_list(headers: list) -> QTreeWidget:
 
 class LibraryBrowser(QWidget):
     filter_changed = Signal()
+    phone_toggled = Signal(list, bool)     # (brani, spunta messa): l'artista o l'album intero sull'iPhone o no
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self._groups = {}
         self._check_results = {}
+        self.phone_state = None            # brani -> (Qt.CheckState, in attesa) o None; lo imposta la finestra
         self.artists = _make_list(["Artista", "Album", "Brani"])
         self.albums = _make_list(["Album", "Artista", "Anno", "Brani"])
         self.artists.itemSelectionChanged.connect(self._artists_changed)
         self.albums.itemSelectionChanged.connect(self.filter_changed.emit)
+        self.artists.itemChanged.connect(self._item_changed)
+        self.albums.itemChanged.connect(self._item_changed)
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         for title, widget in (("Artisti", self.artists), ("Album", self.albums)):
@@ -118,6 +127,7 @@ class LibraryBrowser(QWidget):
         for artist, (album_count, count) in by_artist.items():
             item = SortableItem([artist, str(album_count), str(count)], [artist.lower(), album_count, count])
             item.setData(0, KEY_ROLE, artist)
+            self._show_phone_state(item)
             self.artists.addTopLevelItem(item)
             if artist in chosen_artists:
                 item.setSelected(True)
@@ -149,11 +159,58 @@ class LibraryBrowser(QWidget):
             if result is not None:
                 item.setIcon(0, status_icon(self, result.status))
                 item.setToolTip(0, result.status_text())
+            self._show_phone_state(item)
             self.albums.addTopLevelItem(item)
             if key in keep:
                 item.setSelected(True)
         self.albums.setSortingEnabled(True)
         self.albums.blockSignals(False)
+
+    # ------------------------------------------------------------------ spunte "sull'iPhone"
+
+    def tracks_of(self, item) -> list:
+        """I brani di una riga: un artista (tutti i suoi album) o un album."""
+        key = item.data(0, KEY_ROLE)
+        result = []
+        if isinstance(key, tuple):
+            result = list(self._groups.get(key, []))
+        elif key is not None:
+            for (artist, _album), tracks in self._groups.items():
+                if artist == key:
+                    result += tracks
+        return result
+
+    def _show_phone_state(self, item) -> None:
+        state = self.phone_state(self.tracks_of(item)) if self.phone_state is not None else None
+        font = item.font(0)
+        if state is None:
+            item.setFlags(item.flags() & ~Qt.ItemIsUserCheckable)
+            item.setData(0, Qt.CheckStateRole, None)
+            font.setItalic(False)
+            item.setForeground(0, QBrush())
+        else:
+            check, waiting = state
+            item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+            item.setCheckState(0, check)
+            font.setItalic(waiting)
+            item.setForeground(0, QBrush(QColor(40, 110, 230)) if waiting else QBrush())
+        item.setFont(0, font)
+
+    def refresh_phone_states(self) -> None:
+        """Le spunte dopo un cambio (spunte in tabella, musica dell'iPhone letta, modifiche applicate)."""
+        for widget in (self.artists, self.albums):
+            widget.blockSignals(True)
+            for index in range(widget.topLevelItemCount()):
+                item = widget.topLevelItem(index)
+                if not getattr(item, "pinned", False):
+                    self._show_phone_state(item)
+            widget.blockSignals(False)
+
+    def _item_changed(self, item, column: int) -> None:
+        if column == 0 and self.phone_state is not None and not getattr(item, "pinned", False):
+            tracks = self.tracks_of(item)
+            if tracks:
+                self.phone_toggled.emit(tracks, item.checkState(0) == Qt.Checked)
 
     # ------------------------------------------------------------------ selezione
 
