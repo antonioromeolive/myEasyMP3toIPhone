@@ -232,6 +232,24 @@ def list_music_app() -> list:
     return result
 
 
+async def _sync_registry(home: Path, sync_ids: set):
+    from .provenance import synchronize
+    lockdown = await _open_lockdown()
+    try:
+        async with AfcService(lockdown) as afc:
+            result = await synchronize(afc, home, sync_ids)
+    finally:
+        await lockdown.close()
+    return result
+
+
+def sync_registry(home: Path, sync_ids: set):
+    """Il registro della provenienza (provenance.Registry), unito a quello sull'iPhone e ripulito dei brani che non
+    ci sono più."""
+    result = _run(_sync_registry(home, sync_ids))
+    return result
+
+
 def download_music(items: list, local_dir: Path, progress: Optional[ProgressFn] = None,
                    cancel: Optional[threading.Event] = None) -> tuple:
     """Copia sul PC i file dei brani (PhoneTrack). Restituisce (TransferReport, [(PhoneTrack, file locale)])."""

@@ -25,7 +25,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Optional
 
-from . import iphone, phone_sync
+from . import iphone, phone_sync, provenance
 from .library import UNKNOWN_ALBUM, UNKNOWN_ARTIST, group_name, is_cancelled
 from .phone_sync import PhoneSyncError
 from .scan import VARIOUS_ARTISTS
@@ -180,6 +180,29 @@ def _label(tags, fallback: str) -> str:
     return result
 
 
+async def _store_registry(lockdown, home: Optional[Path], registry) -> None:
+    """Il registro della provenienza, dopo un'azione: nella cartella dati e sull'iPhone. Un errore qui non annulla
+    l'azione già fatta: lo si scrive nel registro del programma e si rimedia al prossimo collegamento."""
+    from pymobiledevice3.services.afc import AfcService
+    if home is not None and registry is not None:
+        try:
+            registry.save(home)
+            async with AfcService(lockdown) as afc:
+                await provenance.write_phone_registry(afc, registry)
+        except Exception as exc:  # noqa: BLE001 - il registro è un aiuto, non deve far fallire l'azione
+            log.warning("Registro della provenienza non salvato sull'iPhone: %s", exc)
+
+
+async def _link_for(sync_id: int, item, overlay):
+    path = item.track.path
+    info = path.stat()
+    printed = await provenance.file_fingerprint(path)
+    result = provenance.Link(sync_id=sync_id, pc=provenance.computer_name(), path=str(path), size=info.st_size,
+                             mtime=info.st_mtime, signature=overlay.signature(path) if overlay is not None else "",
+                             fingerprint=printed, how=provenance.HOW_SENT)
+    return result
+
+
 async def _run(lockdown, snapshot: _Snapshot, operations: list, uploads: list, report: ActionReport):
     session = await phone_sync.run_session(lockdown, snapshot.identity, snapshot.state, socket.gethostname(),
                                            operations, uploads, _now())
@@ -197,10 +220,12 @@ class _Pending:
     track: object             # library.Track (tag con le modifiche in sospeso)
     cover: Optional[bytes]
     replaces: int = 0         # sync_id del brano dell'iPhone da togliere dopo l'invio (rimpiazzo)
+    sent_as: int = 0          # il sync_id che ha preso sull'iPhone
 
 
-async def _send_batches(pending: list, progress: Optional[ProgressFn], cancel, report: ActionReport) -> list:
-    """Invia i brani a gruppi. Restituisce i _Pending inviati davvero."""
+async def _send_batches(pending: list, progress: Optional[ProgressFn], cancel, report: ActionReport,
+                        registry=None, overlay=None, home: Optional[Path] = None) -> list:
+    """Invia i brani a gruppi. Restituisce i _Pending inviati davvero; con un registro, ne registra la provenienza."""
     sent = []
     work = Path(tempfile.mkdtemp(prefix="myEasyMP3toIPhone_invio_"))
     lockdown = await iphone._open_lockdown()
@@ -243,6 +268,7 @@ async def _send_batches(pending: list, progress: Optional[ProgressFn], cancel, r
                     else:
                         album_pid = new_albums.setdefault(album_key, snapshot.new_album_id())
                     pid = snapshot.new_track_id()
+                    item.sent_as = pid
                     cover = item.cover if item.cover is not None else read_cover(track.path)
                     cache_id = 0
                     checksum = 0
@@ -264,6 +290,12 @@ async def _send_batches(pending: list, progress: Optional[ProgressFn], cancel, r
                     await _run(lockdown, snapshot, operations, uploads, report)
                     report.done += len(included)
                     sent += included
+                    if registry is not None:
+                        for item in included:
+                            try:
+                                registry.record(await _link_for(item.sent_as, item, overlay))
+                            except Exception as exc:  # noqa: BLE001 - l'invio è fatto: il registro non lo annulla
+                                log.warning("Provenienza non registrata per %s: %s", item.track.path, exc)
                 except PhoneSyncError as exc:
                     failed = True
                     for item in included:
@@ -273,13 +305,16 @@ async def _send_batches(pending: list, progress: Optional[ProgressFn], cancel, r
                     leftover.unlink()
             start += BATCH_INSERTS
         report.cancelled = is_cancelled(cancel)
+        if sent:
+            await _store_registry(lockdown, home, registry)
     finally:
         await lockdown.close()
         shutil.rmtree(work, ignore_errors=True)
     return sent
 
 
-async def _delete_batches(sync_ids: list, progress: Optional[ProgressFn], report: ActionReport) -> None:
+async def _delete_batches(sync_ids: list, progress: Optional[ProgressFn], report: ActionReport, registry=None,
+                          home: Optional[Path] = None) -> None:
     work = Path(tempfile.mkdtemp(prefix="myEasyMP3toIPhone_elimina_"))
     lockdown = await iphone._open_lockdown()
     try:
@@ -303,18 +338,24 @@ async def _delete_batches(sync_ids: list, progress: Optional[ProgressFn], report
                 try:
                     await _run(lockdown, snapshot, operations, [], report)
                     report.done += len(operations)
+                    if registry is not None:
+                        for sync_id in present:
+                            registry.forget(sync_id)
                 except PhoneSyncError as exc:
                     failed = True
                     report.errors.append((f"{len(operations)} brani", str(exc)))
             start += BATCH_CHANGES
+        if report.done:
+            await _store_registry(lockdown, home, registry)
     finally:
         await lockdown.close()
         shutil.rmtree(work, ignore_errors=True)
 
 
 def send_tracks(tracks: list, overlay, progress: Optional[ProgressFn] = None,
-                cancel: Optional[threading.Event] = None) -> ActionReport:
-    """I brani del PC (con le modifiche in sospeso già in track.tags) nell'app Musica dell'iPhone."""
+                cancel: Optional[threading.Event] = None, home: Optional[Path] = None) -> ActionReport:
+    """I brani del PC (con le modifiche in sospeso già in track.tags) nell'app Musica dell'iPhone. Con home (la
+    cartella dati), la provenienza di ogni brano inviato va nel registro, sul PC e sull'iPhone."""
     report = ActionReport()
     pending = []
     for track in tracks:
@@ -323,12 +364,13 @@ def send_tracks(tracks: list, overlay, progress: Optional[ProgressFn] = None,
         else:
             pending.append(_Pending(track, overlay.cover_for(track.path) if overlay is not None else None))
     if pending:
-        iphone._run(_send_batches(pending, progress, cancel, report))
+        registry = provenance.Registry.load(home) if home is not None else None
+        iphone._run(_send_batches(pending, progress, cancel, report, registry, overlay, home))
     return report
 
 
 def replace_tracks(pairs: list, overlay, progress: Optional[ProgressFn] = None,
-                   cancel: Optional[threading.Event] = None) -> ActionReport:
+                   cancel: Optional[threading.Event] = None, home: Optional[Path] = None) -> ActionReport:
     """pairs: (PhoneTrack, Track del PC). Prima si invia la versione del PC; solo per i brani inviati davvero si toglie
     la versione vecchia. Si perdono i conteggi degli ascolti e la presenza nelle playlist del brano vecchio."""
     report = ActionReport()
@@ -342,14 +384,16 @@ def replace_tracks(pairs: list, overlay, progress: Optional[ProgressFn] = None,
             cover = overlay.cover_for(track.path) if overlay is not None else None
             pending.append(_Pending(track, cover, phone_track.sync_id))
 
+    registry = provenance.Registry.load(home) if home is not None else None
+
     async def work():
-        sent = await _send_batches(pending, progress, cancel, report)
+        sent = await _send_batches(pending, progress, cancel, report, registry, overlay, home)
         old = []
         for item in sent:
             old.append(item.replaces)
         if old:
             removal = ActionReport()
-            await _delete_batches(old, progress, removal)
+            await _delete_batches(old, progress, removal, registry, home)
             for name, message in removal.errors:
                 report.errors.append((name, "versione vecchia non tolta: " + message))
 
@@ -358,7 +402,8 @@ def replace_tracks(pairs: list, overlay, progress: Optional[ProgressFn] = None,
     return report
 
 
-def delete_tracks(phone_tracks: list, progress: Optional[ProgressFn] = None) -> ActionReport:
+def delete_tracks(phone_tracks: list, progress: Optional[ProgressFn] = None,
+                  home: Optional[Path] = None) -> ActionReport:
     report = ActionReport()
     sync_ids = []
     for item in phone_tracks:
@@ -367,7 +412,8 @@ def delete_tracks(phone_tracks: list, progress: Optional[ProgressFn] = None) -> 
         else:
             report.skipped.append((_label(item.tags, ""), "non è stato messo da un computer"))
     if sync_ids:
-        iphone._run(_delete_batches(sync_ids, progress, report))
+        registry = provenance.Registry.load(home) if home is not None else None
+        iphone._run(_delete_batches(sync_ids, progress, report, registry, home))
     return report
 
 

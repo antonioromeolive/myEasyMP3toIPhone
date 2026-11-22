@@ -12,7 +12,8 @@ from PySide6.QtWidgets import (
     QLabel, QLineEdit, QMenu, QMessageBox, QPushButton, QTreeWidget, QVBoxLayout, QWidget,
 )
 
-from .. import iphone, phone_actions
+from .. import iphone, phone_actions, provenance
+from ..config import config_dir
 from ..library import Track, copy_organized
 from ..phone_library import DEVICE_SAME, DEVICE_STALE, describe_differences, pc_matches
 from .browser import SORT_ROLE, SortableItem
@@ -254,12 +255,25 @@ class IPhonePanel(QWidget):
                 keys.append(key)
             row = SortableItem(texts, keys)
             row.setData(COL_TITLE, PID_ROLE, item.pid)
-            row.setToolTip(COL_TITLE, item.remote_path)
+            row.setToolTip(COL_TITLE, self._origin_text(item))
             self._set_pc_cell(row, item.pid)
             rows.append(row)
         view.addTopLevelItems(rows)
         view.setSortingEnabled(True)
         self._apply_search()
+
+    def _origin_text(self, item) -> str:
+        """Da dove viene il brano, secondo il registro della provenienza."""
+        link = self._window.registry.get(item.sync_id) if item.sync_id else None
+        if not item.from_computer:
+            result = "Messo sull'iPhone dal telefono stesso (acquisto o download): non si gestisce da un computer"
+        elif link is None:
+            result = "Origine sconosciuta: messo sull'iPhone da un altro programma o da un altro computer"
+        else:
+            where = "questo PC" if link.here else link.pc
+            result = f"Da {where} ({link.how}, {link.date}):\n{link.path}"
+        result += "\n" + item.remote_path
+        return result
 
     def _set_pc_cell(self, row, pid: int) -> None:
         match = self._matches.get(pid)
@@ -398,11 +412,13 @@ class IPhonePanel(QWidget):
             report = action(progress, cancel)
             progress(0, 0, "rilettura della musica dell'iPhone")
             tracks = iphone.list_music_app()
-            value = (report, tracks)
+            registry = provenance.Registry.load(config_dir())
+            value = (report, tracks, registry)
             return value
 
         def done(value):
-            report, tracks = value
+            report, tracks, registry = value
+            self._window.registry = registry
             self._window.set_phone_tracks(tracks, self._device_name)
             message = _report_text(report, verb)
             if report.done:
@@ -429,7 +445,7 @@ class IPhonePanel(QWidget):
             overlay = self._window.overlay
 
             def action(progress, cancel):
-                value = phone_actions.send_tracks(tracks, overlay, progress, cancel)
+                value = phone_actions.send_tracks(tracks, overlay, progress, cancel, config_dir())
                 return value
 
             self._write("Invio all'iPhone", "inviati", action)
@@ -443,7 +459,7 @@ class IPhonePanel(QWidget):
             overlay = self._window.overlay
 
             def action(progress, cancel):
-                value = phone_actions.replace_tracks(pairs, overlay, progress, cancel)
+                value = phone_actions.replace_tracks(pairs, overlay, progress, cancel, config_dir())
                 return value
 
             self._write("Rimpiazzo sull'iPhone", "rimpiazzati", action)
@@ -485,7 +501,7 @@ class IPhonePanel(QWidget):
                     + phone_actions.DELETE_WAIT_NOTE)
             if self._confirm("Elimina dall'iPhone", text):
                 def action(progress, _cancel):
-                    value = phone_actions.delete_tracks(items, progress)
+                    value = phone_actions.delete_tracks(items, progress, config_dir())
                     return value
 
                 self._write("Eliminazione dall'iPhone", "eliminati", action)
@@ -594,7 +610,13 @@ class IPhonePanel(QWidget):
             info = iphone.get_device_info()
             progress(0, 0, "lettura della musica dell'app Musica")
             tracks = iphone.list_music_app()
-            value = (info, tracks)
+            progress(0, 0, "registro della provenienza")
+            sync_ids = set()
+            for track in tracks:
+                if track.sync_id:
+                    sync_ids.add(track.sync_id)
+            registry = iphone.sync_registry(config_dir(), sync_ids)
+            value = (info, tracks, registry)
             return value
 
         if auto:
@@ -604,7 +626,8 @@ class IPhonePanel(QWidget):
         self._window.runner.run("Collegamento iPhone", work, self._connected_ok, on_error)
 
     def _connected_ok(self, value) -> None:
-        info, tracks = value
+        info, tracks, registry = value
+        self._window.registry = registry
         self._connected = True
         self._device_name = info.name
         self._status.setText("Collegato: " + info.label())

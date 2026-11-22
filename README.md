@@ -195,6 +195,20 @@ CopyTrans Manager (*AirTrafficControl*), senza iTunes e senza sincronizzare tutt
   Gestisci manualmente musica e video*) e senza *Sincronizza libreria* di Apple Music. Se manca qualcosa il programma
   lo dice e non scrive niente.
 
+**Da dove viene un brano.** Il programma tiene un **registro della provenienza**: per ogni brano dell'iPhone
+(il suo identificativo fisso, `sync_id`), il computer e il file da cui viene, con dimensione, data, le modifiche in
+sospeso al momento dell'invio e l'**impronta dell'audio**, e come è nato il collegamento (*inviato*, *impronta*,
+*regole*, *ai*, *a mano*, *salvato*). Ogni invio lo registra; un'eliminazione toglie la riga. Il registro sta nella
+cartella dati (`registro_iphone.json`) e sull'iPhone (`myEasyMP3toIPhone/registro.json`, un file che l'iPhone non
+legge): così ogni computer con il programma vede anche le righe degli altri. Al collegamento le due copie si
+uniscono (per lo stesso brano vince la più recente) e le righe dei brani che non sono più sull'iPhone si tolgono.
+Nella scheda iPhone il suggerimento sul titolo dice da dove viene il brano.
+
+L'**impronta** riassume l'audio e non cambia quando cambiano i tag: per gli MP3 i primi 64 KB dopo il tag ID3, per i
+FLAC l'impronta dell'audio che il file porta nella sua intestazione, per gli M4A l'inizio del blocco audio. Così un
+brano dell'iPhone si riconosce anche se titolo, album o artista sono diversi da quelli del PC (le compilation, i
+brani "sciolti"): su 40 brani messi sull'iPhone da CopyTrans, 40 sono stati ritrovati così sul PC.
+
 **Sicurezza.** Prima di scrivere il programma copia il database dell'app Musica e controlla l'identità della libreria
 (quella già sul telefono, mai una nuova) e l'"ancora" della sincronizzazione, che l'iPhone deve confermare. Il file
 delle operazioni viene firmato, scritto e riletto; solo allora l'iPhone lo applica. Se qualcosa non torna prima di
@@ -324,6 +338,8 @@ programma. La musica invece sta nella Libreria.
 | `secrets.json` | solo senza credential store: le chiavi |
 | `scansioni\scansione_<data>.txt` | il rapporto di ogni scansione |
 | `iphone_musica.json` | la musica dell'app Musica dell'iPhone all'ultimo collegamento (tag, durata, file sul telefono), per la scheda iPhone, la colonna *iPhone* e la scansione a telefono scollegato |
+| `registro_iphone.json` | il registro della provenienza: per ogni brano dell'iPhone, il computer e il file da cui viene (vedi *Da dove viene un brano*); una copia sta sull'iPhone |
+| `impronte_iphone.json` | le impronte dell'audio dei file dell'iPhone già lette, per non rileggerle |
 | `itunes_aggiunti.json` | per ogni file inviato a iTunes: la sua copia, le modifiche applicate e il brano di iTunes (ID permanente) |
 | `iphone_files.json`, `iphone_inviati.json` | delle versioni precedenti (invio alle app come VLC): non più usati, si possono cancellare |
 | `cache_tag.json` | i tag già letti di ogni file (con dimensione e data), per riaprire in fretta le cartelle grandi; si può cancellare |

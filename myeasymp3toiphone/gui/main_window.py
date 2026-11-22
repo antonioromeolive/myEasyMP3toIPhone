@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
 from ..albumcheck import MusicBrainzClient, check_album
 from ..config import PRODUCT, AppSettings, config_dir
 from ..library import assign_groups, copy_organized, group_by_album, scan_folder, track_sort_key
+from .. import provenance
 from ..phone_library import (
     DEVICE_ABSENT, DEVICE_SAME, DEVICE_STALE, PhoneIndex, describe_differences, device_status, load_listing,
     save_listing,
@@ -74,6 +75,7 @@ class MainWindow(QMainWindow):
         self._phone_index: Optional[PhoneIndex] = None   # la musica dell'app Musica, per la colonna "iPhone"
         self.phone_tracks = []     # la musica dell'app Musica (phone_library.PhoneTrack), letta o ricordata
         self.phone_label = ""      # di quale iPhone e quando
+        self.registry = provenance.Registry.load(config_dir())   # da dove viene ogni brano dell'iPhone
         self.overlay = TagOverlay(config_dir())
         self.tag_cache = TagCache(config_dir())
         self.open_on_start: Optional[Path] = None   # --open CARTELLA: aperta all'avvio al posto della Libreria
