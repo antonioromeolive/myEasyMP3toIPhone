@@ -38,6 +38,7 @@ from .artist_names import (
     candidate_pairs, clusters, duet_parts, duet_proposal, musicbrainz_keys, variant_key, with_guests,
 )
 from .artist_names import ask_ai as ask_ai_names
+from .i18n import tr
 from .phone_library import DEVICE_ABSENT, DEVICE_STALE, PhoneIndex, device_status
 from .tags import TrackTags
 
@@ -1411,7 +1412,10 @@ def report_text(report: ScanReport) -> str:
             lines.append(f"    - {path}")
         if len(issue.files) > 50:
             lines.append(f"    … e altri {len(issue.files) - 50}")
-    result = "\n".join(lines) + "\n"
+    translated = []
+    for line in lines:
+        translated.append(tr(line))
+    result = "\n".join(translated) + "\n"
     return result
 
 

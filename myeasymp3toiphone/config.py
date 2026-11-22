@@ -528,6 +528,7 @@ class AppSettings:
     scan_checks_off: list = field(default_factory=list)   # i controlli tolti in "Controlla la musica"
     scan_musicbrainz: bool = False  # i nomi d'artista dubbi anche su MusicBrainz (lento)
     window_geometry: str = ""       # base64 di QMainWindow.saveGeometry
+    language: str = "it"            # la lingua dell'interfaccia (i18n.LANGUAGES), dal prossimo avvio
     extra: dict = field(default_factory=dict)
 
     def library_path(self) -> Path:

@@ -1,10 +1,10 @@
 # TODO
 
-## Le proposte dubbie di "Collega al PC"
+## Le proposte dubbie di "Associa sorgenti"
 
 Sui dati veri restano 44 proposte non spuntate (regole senza un candidato chiaro). Controllare cosa ne dice l'AI
 della scansione e se i candidati sono giusti (versioni dal vivo, remaster). In attesa: l'utente non ha ancora fatto
-*Collega al PC* con la build nuova.
+*Associa sorgenti* con la build nuova.
 
 ## Invio di M4A in Apple Lossless (ALAC) — solo se servirà
 
@@ -12,17 +12,24 @@ Oggi si inviano MP3, FLAC e AAC. ALAC vuole il suo formato di inserimento (rustu
 l'altro `gapless_heuristic_info`, `analysis_inhibit_flags`). Per ora non serve: i 20 M4A della musica dell'utente
 sono tutti AAC.
 
-## L'app Musica che non si aggiorna da sola — da provare sul telefono
+## Da provare con l'iPhone attaccato (solo brani PROVA, poi tolti)
 
-Dopo ogni scrittura il programma ora manda all'iPhone l'avviso di fine sincronizzazione di iTunes
-(`com.apple.itunes-mobdev.syncDidFinish`, notification proxy; `iphone.post_sync_finished`). Da provare con l'app
-Musica aperta su un brano PROVA: se si aggiorna da sola, togliere dal messaggio finale l'invito a chiuderla e
-riaprirla; se no, provare anche `syncWillStart` all'inizio della sessione.
+Fatto e provato senza telefono (test e finestre di prova); da confermare sul telefono vero:
+- **Compilation in Cambia tag**: `update_track` con `is_compilation` (rustunes lo accetta ma non l'ha verificato):
+  il brano cambia spunta? L'album nell'app Musica si raccoglie? Se no, la finestra lo spiega già (Rimpiazza).
+- **Brani fantasma**: la lettura delle cartelle F00… (`iphone._music_files`) e il brano `F05/W0084007.mp3` segnato
+  *senza file* (lo elimina l'utente).
+- **Applica** (passo 5): invio, eliminazione e aggiornamento in una volta, poi le spunte in attesa che spariscono.
+- **Modifica dei tag dal PC** su un brano collegato: Cambia tag per titolo e album, Rimpiazza per l'artista, il
+  promemoria delle playlist.
+- **App Musica che non si aggiorna da sola**: dopo ogni scrittura il programma manda l'avviso di fine
+  sincronizzazione di iTunes (`com.apple.itunes-mobdev.syncDidFinish`, `iphone.post_sync_finished`). Con l'app
+  Musica aperta: se si aggiorna da sola, togliere dal messaggio finale l'invito a chiuderla e riaprirla; se no,
+  provare anche `syncWillStart` all'inizio della sessione.
 
-## Interfaccia anche in inglese
+## Da provare con l'AI locale (Ollama acceso)
 
-Un'opzione in *Impostazioni* per la lingua dell'interfaccia: italiano (oggi l'unica) o inglese. Tutti i testi
-dell'interfaccia e i messaggi oggi sono scritti in italiano dentro il codice: vanno raccolti in un catalogo (le
-traduzioni di Qt, `tr()`/`.ts`, o un dizionario del programma), con la traduzione italiana di Qt già caricata
-(`theme.install_italian`) scelta in base alla lingua. Nuova impostazione: va nella sezione "Quale valore vince" del
-README. Da decidere: se anche README, rapporti della scansione e prompt per l'AI cambiano lingua.
+- *Controlla la musica* → **Brani duplicati**: le 368 coppie dubbie (versioni live, remix…) sulla collezione vera;
+  controllare qualche risposta.
+- **Artisti scritti in modi diversi**: i 22 gruppi dubbi, con e senza MusicBrainz.
+- In inglese, i motivi dell'AI devono arrivare in inglese.

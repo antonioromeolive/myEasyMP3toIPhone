@@ -69,7 +69,8 @@ class Provider:
     def ask_json(self, system: str, user: str, schema: dict) -> dict:
         log.info("Richiesta AI: profilo=%s tipo=%s modello=%s caratteri=%d", self.profile.name, self.profile.kind,
                  self.profile.model or "(predefinito)", len(user))
-        reply = self._ask(system, user, schema)
+        from .i18n import prompt
+        reply = self._ask(prompt(system), user, schema)
         log.debug("Risposta AI:\n%s", reply)
         result = parse_json_reply(reply)
         return result

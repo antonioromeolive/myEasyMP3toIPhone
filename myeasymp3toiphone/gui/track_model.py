@@ -14,6 +14,7 @@ from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt
 from PySide6.QtGui import QBrush, QColor, QFont
 
 from ..library import track_sort_key
+from ..i18n import tr
 from ..pending import wanted
 from ..phone_library import DEVICE_ABSENT, DEVICE_SAME, DEVICE_STALE
 
@@ -70,9 +71,9 @@ class TrackTableModel(QAbstractTableModel):
     def headerData(self, section: int, orientation, role=Qt.DisplayRole):
         result = None
         if orientation == Qt.Horizontal and role == Qt.DisplayRole:
-            result = COLUMNS[section]
+            result = tr(COLUMNS[section])
         elif orientation == Qt.Horizontal and role == Qt.ToolTipRole and section == COL_DEVICE:
-            result = self.device_header_tip or None
+            result = tr(self.device_header_tip) or None
         return result
 
     def _action(self, track) -> str:
@@ -123,11 +124,11 @@ class TrackTableModel(QAbstractTableModel):
     def _tooltip(self, track, column: int):
         result = None
         if track.error:
-            result = track.error
+            result = tr(track.error)
         elif column == COL_FILE:
             result = str(track.path)
         elif column == COL_TITLE and self.owner.overlay.is_edited(track.path):
-            result = "Modificato per l'iPhone (il file sul PC non cambia):\n" + self.owner.overlay.describe(track)
+            result = tr("Modificato per l'iPhone (il file sul PC non cambia):\n" + self.owner.overlay.describe(track))
         return result
 
     def checkable(self, track) -> bool:

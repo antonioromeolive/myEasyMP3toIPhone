@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
 )
 
 from .album_check_dialog import status_icon
+from ..i18n import tr
 
 SORT_ROLE = Qt.UserRole + 1    # il valore con cui si ordina una colonna (testo minuscolo o numero)
 KEY_ROLE = Qt.UserRole         # l'artista, o la coppia (artista, album)
@@ -122,7 +123,7 @@ class LibraryBrowser(QWidget):
         total = 0
         for _artist, (_albums, count) in by_artist.items():
             total += count
-        self.artists.addTopLevelItem(SortableItem([f"(Tutti gli artisti: {len(by_artist)})", str(len(groups)), str(total)],
+        self.artists.addTopLevelItem(SortableItem([tr(f"(Tutti gli artisti: {len(by_artist)})"), str(len(groups)), str(total)],
                                            ["", len(groups), total], pinned=True))
         for artist, (album_count, count) in by_artist.items():
             item = SortableItem([artist, str(album_count), str(count)], [artist.lower(), album_count, count])
@@ -147,7 +148,7 @@ class LibraryBrowser(QWidget):
         shown_tracks = 0
         for _key, tracks in rows:
             shown_tracks += len(tracks)
-        label = "(Tutti gli album" + (" degli artisti scelti" if artists else "") + f": {len(rows)})"
+        label = tr("(Tutti gli album") + (tr(" degli artisti scelti") if artists else "") + f": {len(rows)})"
         self.albums.addTopLevelItem(SortableItem([label, "", "", str(shown_tracks)], ["", "", "", shown_tracks], pinned=True))
         for key, tracks in rows:
             artist, album = key

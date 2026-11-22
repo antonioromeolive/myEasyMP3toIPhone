@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 
 from ..ai import make_provider
 from ..config import config_dir, load_profiles
+from ..i18n import tr
 from ..library import scan_folder
 from ..phone_library import tracks_for_scan
 from ..scan import (
@@ -308,7 +309,7 @@ class ScanDialog(QDialog):
         for kind in KIND_LABELS:
             issues = by_kind.get(kind, [])
             if issues:
-                top = QTreeWidgetItem([f"{KIND_LABELS[kind]} ({len(issues)})", "", "", ""])
+                top = QTreeWidgetItem([f"{tr(KIND_LABELS[kind])} ({len(issues)})", "", "", ""])
                 font = top.font(0)
                 font.setBold(True)
                 top.setFont(0, font)
@@ -316,7 +317,7 @@ class ScanDialog(QDialog):
                 self.tree.addTopLevelItem(top)
                 for issue in issues:
                     fix_text = "sì" if issue.fix is not None else ""
-                    child = QTreeWidgetItem([issue.title, issue.severity, issue.origin, fix_text])
+                    child = QTreeWidgetItem([tr(issue.title), tr(issue.severity), tr(issue.origin), tr(fix_text)])
                     child.setIcon(0, self._icon(issue.severity))
                     child.setData(0, Qt.UserRole, self.report.issues.index(issue))
                     if issue.ai_note:
@@ -338,8 +339,8 @@ class ScanDialog(QDialog):
         selected = self._selected_issues()
         if selected:
             index, issue = selected[0]
-            detail = escape(issue.detail).replace("\n", "<br>")
-            html = f"<h3>{escape(issue.title)}</h3><p>{detail}</p>"
+            detail = escape(tr(issue.detail)).replace("\n", "<br>")
+            html = f"<h3>{escape(tr(issue.title))}</h3><p>{detail}</p>"
             if issue.origin == ORIGIN_AI:
                 html += "<p><i>Trovato dall'AI.</i></p>"
             if issue.ai_note:
@@ -347,7 +348,7 @@ class ScanDialog(QDialog):
             if index in self.fixed:
                 html += "<p style='color:#1e8c3c'><b>Correzione applicata.</b></p>"
             elif issue.fix is not None:
-                html += f"<p><b>Correzione proposta:</b> {escape(issue.fix.description)}</p>"
+                html += f"<p><b>Correzione proposta:</b> {escape(tr(issue.fix.description))}</p>"
             files = "".join(f"<li>{escape(str(path))}</li>" for path in issue.files[:200])
             more = f"<p>… e altri {len(issue.files) - 200}</p>" if len(issue.files) > 200 else ""
             html += f"<p><b>{len(issue.files)} file:</b></p><ul>{files}</ul>{more}"

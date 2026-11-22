@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
 
 from .. import adoption, iphone, phone_actions, provenance
 from ..config import config_dir
+from ..i18n import tr
 from ..library import Track, copy_organized, scan_folder
 from ..phone_library import DEVICE_SAME, DEVICE_STALE, comparison, pc_matches, playlist_reminder
 from .compare_tip import comparison_html, show_on_tooltip
@@ -33,6 +34,7 @@ ORIGIN_HERE = "questo PC"
 ORIGIN_UNKNOWN = "nessuna"
 ORIGIN_PHONE = "telefono"
 ORIGIN_MISSING = "file non trovato"
+ORIGIN_ROLE = Qt.UserRole + 7     # l'origine com'è nel codice (il testo della cella può essere tradotto)
 ORIGIN_NO_FILE = "senza file"     # brano "fantasma": il suo file sull'iPhone non c'è
 # il filtro "Mostra": (testo, funzione origine -> visibile)
 SHOW_FILTERS = [
@@ -245,7 +247,7 @@ class IPhonePanel(QWidget):
         self._count = QLabel()
         self._show = QComboBox()
         for text, _rule in SHOW_FILTERS:
-            self._show.addItem(text)
+            self._show.addItem(tr(text))
         self._show.setToolTip("Quali brani mostrare, secondo la loro origine (il registro della provenienza)")
         self._show.currentIndexChanged.connect(lambda _index: self._apply_search())
         search_row = QHBoxLayout()
@@ -387,6 +389,7 @@ class IPhonePanel(QWidget):
     def _set_origin_cell(self, row, item) -> None:
         origin = self._origin(item)
         row.setText(COL_ORIGIN, origin)
+        row.setData(COL_ORIGIN, ORIGIN_ROLE, origin)     # il filtro Mostra usa questo, non il testo (tradotto)
         row.setData(COL_ORIGIN, SORT_ROLE, origin.lower())
         tip = self._origin_text(item)
         row.setToolTip(COL_ORIGIN, tip)
@@ -486,7 +489,7 @@ class IPhonePanel(QWidget):
         for index in range(view.topLevelItemCount()):
             row = view.topLevelItem(index)
             text = " ".join([row.text(COL_TITLE), row.text(COL_ARTIST), row.text(COL_ALBUM)]).casefold()
-            visible = rule(row.text(COL_ORIGIN))
+            visible = rule(row.data(COL_ORIGIN, ORIGIN_ROLE))
             for word in words:
                 if word not in text:
                     visible = False
@@ -1291,7 +1294,7 @@ class IPhonePanel(QWidget):
                 self._status.setText("iPhone disconnesso (cavo staccato)")
                 self._update_enabled()
                 self._window.statusBar().showMessage("iPhone disconnesso", 5000)
-            elif self._driver_warned or self._status.text() in (NOT_CONNECTED, ""):
+            elif self._driver_warned or self._status.text() in (NOT_CONNECTED, tr(NOT_CONNECTED), ""):
                 self._driver_warned = False
                 self._status.setText("Attacca l'iPhone con il cavo USB e sbloccalo")
         elif (not self._connected and not self._auto_tried and not self._manual_off

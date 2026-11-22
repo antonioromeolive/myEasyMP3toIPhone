@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
 )
 
 from .. import environment
+from ..i18n import DEFAULT_LANGUAGE, LANGUAGES, tr
 from ..ai import AIError, connection_test, make_provider
 from ..config import (
     ANTHROPIC, ANTHROPIC_SERVER, AZURE, DEFAULT_MODELS, KINDS, OLLAMA, OLLAMA_LOCAL_SERVER, OPENAI, OPENAI_SERVER,
@@ -69,6 +70,11 @@ class SettingsDialog(QDialog):
         library_row.addWidget(self.g_library, 1)
         library_row.addWidget(browse)
         self.g_scan_profile = QComboBox()
+        self.g_language = QComboBox()
+        for code, label in LANGUAGES.items():
+            self.g_language.addItem(label, code)
+        self.g_language.setCurrentIndex(max(0, self.g_language.findData(self.settings.language)))
+        self.g_language.setToolTip("Vale dal prossimo avvio del programma. Il README resta in italiano.")
         note = QLabel("La scansione usa sempre le regole locali (gratuite). Con un profilo AI, l'AI riceve una tabella "
                       "degli album (artisti, titoli, numeri di traccia, nomi delle cartelle) e propone altri problemi e "
                       "le correzioni. Con un'AI nel cloud questi dati escono dal computer; con Ollama restano qui.")
@@ -77,6 +83,7 @@ class SettingsDialog(QDialog):
         form = QFormLayout()
         form.addRow("Cartella della Libreria", library_row)
         form.addRow("AI della scansione", self.g_scan_profile)
+        form.addRow("Lingua dell'interfaccia", self.g_language)
         form.addRow(note)
         widget = QWidget()
         widget.setLayout(form)
@@ -90,7 +97,7 @@ class SettingsDialog(QDialog):
     def _fill_scan_profiles(self) -> None:
         chosen = self.g_scan_profile.currentText() or self.settings.scan_profile
         self.g_scan_profile.clear()
-        self.g_scan_profile.addItem(NO_AI)
+        self.g_scan_profile.addItem(tr(NO_AI))
         for profile in self.profiles:
             self.g_scan_profile.addItem(profile.name)
         index = self.g_scan_profile.findText(chosen)
@@ -431,8 +438,9 @@ class SettingsDialog(QDialog):
                 set_secret(name, "")
         library = self.g_library.text().strip()
         self.settings.library_dir = library
+        self.settings.language = self.g_language.currentData() or DEFAULT_LANGUAGE
         chosen = self.g_scan_profile.currentText()
-        if chosen == NO_AI:
+        if chosen == tr(NO_AI):
             self.settings.scan_profile = ""
         else:
             self.settings.scan_profile = chosen

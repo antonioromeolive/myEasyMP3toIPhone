@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
 )
 
 from .. import provenance
+from ..i18n import tr
 from ..tags import AUDIO_EXTENSIONS
 
 HOW_TEXT = {provenance.HOW_RULES: "regole", provenance.HOW_AI: "AI", provenance.HOW_FINGERPRINT: "impronta",
@@ -100,7 +101,7 @@ class SourceDialog(QDialog):
             if index == 0:
                 reason = "consigliato — " + reason
             row = QTreeWidgetItem([tags.title or track.path.stem, tags.artist or tags.album_artist, tags.album,
-                                   _duration(track.length), str(track.path), reason])
+                                   _duration(track.length), str(track.path), tr(reason)])
             row.setData(0, Qt.UserRole, index)
             row.setToolTip(4, str(track.path))
             row.setToolTip(5, reason)
@@ -111,8 +112,8 @@ class SourceDialog(QDialog):
         if proposals:
             self.table.setCurrentItem(self.table.topLevelItem(0))
         else:
-            empty = QTreeWidgetItem(["Nessun file simile nella cartella aperta: scegli un file con il pulsante qui "
-                                     "sotto."])
+            empty = QTreeWidgetItem([tr("Nessun file simile nella cartella aperta: scegli un file con il pulsante qui "
+                                     "sotto.")])
             empty.setFlags(Qt.NoItemFlags)
             self.table.addTopLevelItem(empty)
         self.table.itemDoubleClicked.connect(lambda _row, _column: self._accept_current())
@@ -190,7 +191,7 @@ class FolderSourceDialog(QDialog):
                     row.setBackground(column, QBrush(MISSING_COLOR))
             else:
                 row = QTreeWidgetItem([_phone_text(item), str(proposal.pc.path),
-                                       HOW_TEXT.get(proposal.how, proposal.how), proposal.reason])
+                                       HOW_TEXT.get(proposal.how, proposal.how), tr(proposal.reason)])
                 row.setFlags(row.flags() | Qt.ItemIsUserCheckable)
                 row.setCheckState(0, Qt.Checked)
                 row.setToolTip(1, str(proposal.pc.path))

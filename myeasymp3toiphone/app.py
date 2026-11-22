@@ -79,7 +79,11 @@ def main() -> int:
         from PySide6.QtCore import QLockFile
         from PySide6.QtWidgets import QApplication, QMessageBox
 
-        from .config import PRODUCT, config_dir
+        from . import i18n
+        from .config import PRODUCT, AppSettings, config_dir
+        i18n.set_language(AppSettings.load().language)
+        if i18n.english():
+            i18n.install_qt_hooks()       # prima di importare l'interfaccia: le sue classi passano da tr()
         from .gui.main_window import MainWindow
         from .gui.theme import apply_theme, install_italian
 
@@ -87,7 +91,7 @@ def main() -> int:
         app = QApplication.instance() or QApplication(sys.argv)
         app.setApplicationName(PRODUCT)
         apply_theme(app)
-        if not install_italian(app):
+        if not i18n.english() and not install_italian(app):
             import logging
             logging.getLogger("myeasymp3toiphone").info("Traduzione italiana dei pulsanti di Qt non trovata: "
                                                         "restano in inglese")
@@ -125,10 +129,10 @@ def selftest() -> int:
 
     modules = ("PySide6.QtWidgets", "PySide6.QtGui", "mutagen.mp3", "mutagen.mp4", "mutagen.flac", "mutagen.oggopus",
                "requests", "keyring", "anthropic", "pymobiledevice3.lockdown", "pymobiledevice3.usbmux",
-               "pymobiledevice3.services.afc",
+               "pymobiledevice3.services.afc", "pymobiledevice3.services.notification_proxy",
                "cryptography.hazmat.primitives.ciphers", "sqlite3",
                "myeasymp3toiphone.gui.main_window", "myeasymp3toiphone.scan",
-               "myeasymp3toiphone.phone_sync", "myeasymp3toiphone.phone_actions")
+               "myeasymp3toiphone.phone_sync", "myeasymp3toiphone.phone_actions", "myeasymp3toiphone.i18n_en")
     failed = 0
     for name in modules:
         try:

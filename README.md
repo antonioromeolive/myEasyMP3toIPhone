@@ -46,7 +46,7 @@ Due schede: **PC** (i brani della cartella aperta) e **iPhone** (la musica dell'
 | **Esporta** | copia i brani selezionati (o quelli dell'artista o dell'album scelti negli elenchi) in una cartella, con la stessa struttura e le modifiche in sospeso |
 | **Verifica album** | controlla su [MusicBrainz](https://musicbrainz.org) che gli album siano completi, elenca i brani mancanti, propone i tag corretti e la copertina (in sospeso, per le copie) |
 | **Controlla la musica** | cerca i problemi della cartella aperta o della musica sull'iPhone, con i controlli che scegli (vedi sotto) |
-| **Impostazioni** | cartella della Libreria, AI della scansione, profili AI |
+| **Impostazioni** | cartella della Libreria, AI della scansione, **lingua dell'interfaccia** (italiano o inglese), profili AI |
 | **Informazioni** | versione, cartella dati, variabili d'ambiente e da dove viene ciascuna, dove sono le chiavi |
 
 **Elenchi Artisti e Album (i filtri).** Sopra la tabella dei brani due elenchi affiancati, ognuno ordinabile cliccando
@@ -449,7 +449,7 @@ programma. La musica invece sta nella Libreria.
 | File | Contenuto |
 |---|---|
 | `myEasyMP3toIPhone.env` | le variabili d'ambiente (sopra) |
-| `settings.json` | cartella della Libreria, ultime cartelle usate, AI della scansione e controlli tolti, posizione della finestra |
+| `settings.json` | cartella della Libreria, ultime cartelle usate, AI della scansione e controlli tolti, lingua, posizione della finestra |
 | `ai_profiles.json` | i profili AI (senza chiavi e senza indirizzi privati: quelli sono nella Gestione credenziali) |
 | `secrets.json` | solo senza credential store: le chiavi |
 | `scansioni\scansione_<data>.txt` | il rapporto di ogni scansione |
@@ -564,6 +564,13 @@ La casella *…e i nomi dubbi anche su MusicBrainz* (sotto *Artisti scritti in m
 `settings.json` (*Impostazioni → Generale*); senza valore `%USERPROFILE%\Music\myEasyMP3toIPhone`. Le impostazioni della
 prima versione nel registro di Windows si copiano una volta, solo se `settings.json` non esiste.
 
+### La lingua dell'interfaccia
+
+1. *Impostazioni → Generale → Lingua dell'interfaccia* (`language` in `settings.json`: `it` o `en`), dal prossimo avvio.
+2. Senza: italiano.
+
+In inglese sono in inglese finestre, pulsanti, menu, messaggi, la barra di stato, i problemi e il rapporto di *Controlla la musica* e i motivi scritti dall'AI (il prompt le chiede l'inglese). Restano come sono i dati (titoli, artisti, album, percorsi), la console e questo README. Il codice resta scritto in italiano: i testi si traducono quando arrivano allo schermo con il catalogo `myeasymp3toiphone/i18n_en.py` (un testo nuovo nel codice va aggiunto lì: `tools/i18n_catalog.py` elenca quelli mancanti e un test lo controlla).
+
 ### La cartella aperta all'avvio
 
 1. `--open <cartella>` sulla riga di comando (vale per quell'avvio, non si salva come scelta: ma quella cartella
@@ -644,6 +651,7 @@ L'icona si rigenera con `.venv\Scripts\python tools\make_icon.py`.
 | `myeasymp3toiphone/phone_library.py` | il database dell'app Musica, l'elenco salvato, il confronto con il PC |
 | `myeasymp3toiphone/provenance.py`, `adoption.py` | impronte dell'audio, registro della provenienza, *Associa sorgente/i* |
 | `myeasymp3toiphone/pending.py` | le modifiche all'iPhone in attesa (spunte della colonna *iPhone*) |
+| `myeasymp3toiphone/i18n.py`, `i18n_en.py` | la lingua dell'interfaccia: la traduzione inglese dei testi e gli agganci a Qt |
 | `myeasymp3toiphone/config.py` | cartella dati, impostazioni, profili AI, chiavi, `$NOME` |
 | `myeasymp3toiphone/env_file.py` | il file delle variabili |
 | `myeasymp3toiphone/environment.py` | il rapporto delle variabili (`--env`, *Informazioni*) |

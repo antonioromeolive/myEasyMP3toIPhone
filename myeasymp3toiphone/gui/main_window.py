@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 
 from ..albumcheck import MusicBrainzClient, check_album
 from ..config import PRODUCT, AppSettings, config_dir
+from ..i18n import tr
 from ..library import assign_groups, copy_organized, group_by_album, scan_folder, track_sort_key
 from .. import provenance
 from ..phone_library import (
@@ -155,7 +156,7 @@ class MainWindow(QMainWindow):
         self._format.setToolTip("Mostra solo i brani di un formato: vale per gli elenchi, la tabella, l'esportazione, "
                                 "Verifica album, la scansione e l'invio all'iPhone")
         for label, _extensions in FORMATS:
-            self._format.addItem(label)
+            self._format.addItem(tr(label))
         self._format.currentIndexChanged.connect(lambda _index: self._rebuild_views())
         top = QHBoxLayout()
         top.addWidget(self._search, 1)
@@ -396,7 +397,7 @@ class MainWindow(QMainWindow):
                 total = 0
                 for extension in extensions:
                     total += counts.get(extension, 0)
-            self._format.setItemText(index, f"{label} ({total})")
+            self._format.setItemText(index, f"{tr(label)} ({total})")
 
     def _rebuild_views(self, keep_tracks: Optional[set] = None) -> None:
         self._states = {}

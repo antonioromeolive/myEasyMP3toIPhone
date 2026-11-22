@@ -23,7 +23,8 @@ for name in ("myEasyMP3toIPhone.TEMPLATE.env", "_version.txt"):
     DATAS.append((os.path.join(PACKAGE, name), "myeasymp3toiphone"))
 DATAS.append((os.path.join(SPECPATH, "dist_files", "shortcuts.ps1"), "."))   # eseguito dagli script dei collegamenti
 # L'SDK anthropic e pymobiledevice3 caricano alcuni moduli per nome: inclusi tutti quelli che il programma usa
-HIDDEN = ["keyring.backends.Windows", "pymobiledevice3.services.afc"]
+HIDDEN = ["keyring.backends.Windows", "pymobiledevice3.services.afc", "pymobiledevice3.services.notification_proxy",
+          "myeasymp3toiphone.i18n_en"]
 EXCLUDES = ["tkinter", "setuptools", "pkg_resources", "_distutils_hack", "pytest", "_pytest", "IPython",
             "PySide6.QtWebEngineCore", "PySide6.QtWebEngineWidgets", "PySide6.QtPdf", "PySide6.Qt3DCore",
             "PySide6.QtQuick", "PySide6.QtQml"]

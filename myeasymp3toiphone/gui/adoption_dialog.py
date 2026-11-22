@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
 )
 
 from .. import provenance
+from ..i18n import tr
 
 HOW_TEXT = {provenance.HOW_RULES: "regole", provenance.HOW_AI: "AI", provenance.HOW_FINGERPRINT: "impronta"}
 
@@ -69,7 +70,7 @@ class AdoptionDialog(QDialog):
         self._rows = []
         for proposal in outcome.proposals:
             row = QTreeWidgetItem([_phone_text(proposal.phone), str(proposal.pc.path),
-                                   HOW_TEXT.get(proposal.how, proposal.how), proposal.reason])
+                                   HOW_TEXT.get(proposal.how, proposal.how), tr(proposal.reason)])
             row.setFlags(row.flags() | Qt.ItemIsUserCheckable)
             row.setCheckState(0, Qt.Checked if proposal.checked else Qt.Unchecked)
             row.setToolTip(1, str(proposal.pc.path))
