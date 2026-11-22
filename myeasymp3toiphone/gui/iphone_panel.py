@@ -15,7 +15,7 @@ from PySide6.QtWidgets import (
 from .. import adoption, iphone, phone_actions, provenance
 from ..config import config_dir
 from ..library import Track, copy_organized, scan_folder
-from ..phone_library import DEVICE_SAME, DEVICE_STALE, comparison, pc_matches
+from ..phone_library import DEVICE_SAME, DEVICE_STALE, comparison, pc_matches, playlist_reminder
 from .compare_tip import comparison_html, show_on_tooltip
 from .theme import set_role
 from .browser import SORT_ROLE, SortableItem
@@ -86,6 +86,27 @@ def _report_text(report, verb: str) -> str:
                 lines.append(f"… e altri {len(items) - 10}")
             message += f"\n\n{title}:\n" + "\n".join(lines)
     return message
+
+
+def _pc_value(name: str, value):
+    """Un valore di Cambia tag come tag del PC: anno in testo, 0 = vuoto."""
+    if name == "year":
+        result = str(value) if value else ""
+    elif name in ("track_number", "disc_number"):
+        result = int(value) if value else None
+    else:
+        result = value
+    return result
+
+
+def _playlist_note(phone_tracks: list) -> str:
+    """Il promemoria delle playlist da sistemare a mano dopo un rimpiazzo ("" se non ce ne sono)."""
+    reminder = playlist_reminder(phone_tracks)
+    result = ""
+    if reminder:
+        result = ("\n\nI brani rimpiazzati non sono più nelle playlist fatte sull'iPhone: rimettili a mano (app "
+                  "Musica, playlist, Modifica, Aggiungi musica):\n" + reminder)
+    return result
 
 
 class PhoneTagDialog(QDialog):
@@ -553,8 +574,9 @@ class IPhonePanel(QWidget):
 
     # ------------------------------------------------------------------ scrittura sull'iPhone
 
-    def _write(self, title: str, verb: str, action) -> None:
-        """Esegue action(progress, cancel) -> ActionReport, poi rilegge la musica dell'iPhone e mostra l'esito."""
+    def _write(self, title: str, verb: str, action, note: str = "", after=None) -> None:
+        """Esegue action(progress, cancel) -> ActionReport, poi rilegge la musica dell'iPhone e mostra l'esito (con
+        note in fondo, se qualcosa è riuscito). after(report), se c'è, prima del messaggio."""
         def work(progress, cancel):
             report = action(progress, cancel)
             progress(0, 0, "rilettura della musica dell'iPhone")
@@ -567,9 +589,11 @@ class IPhonePanel(QWidget):
             report, tracks, registry = value
             self._window.registry = registry        # prima: i confronti dei brani nuovi lo usano
             self._window.set_phone_tracks(tracks, self._device_name)
+            if after is not None:
+                after(report)
             message = _report_text(report, verb)
             if report.done:
-                message += "\n\n" + MUSIC_APP_REFRESH
+                message += note + "\n\n" + MUSIC_APP_REFRESH
             QMessageBox.information(self, title, message)
 
         self._window.runner.run(title, work, done)
@@ -599,9 +623,15 @@ class IPhonePanel(QWidget):
 
     def replace_pairs(self, pairs: list) -> None:
         """(brano dell'iPhone, brano del PC): la versione del PC prende il posto di quella dell'iPhone."""
+        phone_tracks = []
+        for phone_track, _track in pairs:
+            phone_tracks.append(phone_track)
         text = (f"Rimpiazzare {len(pairs)} brani dell'iPhone con la versione del PC?\n\n"
                 "Prima si invia la versione del PC, poi si toglie quella vecchia. I brani rimpiazzati perdono "
                 "il conteggio degli ascolti e spariscono dalle playlist fatte sull'iPhone.")
+        reminder = playlist_reminder(phone_tracks)
+        if reminder:
+            text += "\n\nSono nelle playlist (alla fine te le ricordo, per rimetterli a mano):\n" + reminder
         if self._confirm("Rimpiazza", text):
             overlay = self._window.overlay
 
@@ -609,7 +639,61 @@ class IPhonePanel(QWidget):
                 value = phone_actions.replace_tracks(pairs, overlay, progress, cancel, config_dir())
                 return value
 
-            self._write("Rimpiazzo sull'iPhone", "rimpiazzati", action)
+            self._write("Rimpiazzo sull'iPhone", "rimpiazzati", action, _playlist_note(phone_tracks))
+
+    def offer_phone_update(self, tracks: list, cover: bool) -> None:
+        """Dopo una modifica dei tag sul PC: i brani dell'iPhone che vengono da questi file (registro della
+        provenienza) e ora sono diversi si aggiornano anche lì? I campi sicuri con Cambia tag, artisti e copertina
+        con Rimpiazza. Si chiede ogni volta."""
+        from ..overlay import path_key
+        window = self._window
+        links = window.registry.links_here()
+        by_sync = {}
+        for item in window.phone_tracks:
+            if item.sync_id:
+                by_sync[item.sync_id] = item
+        pairs = []
+        covers = set()
+        for track in tracks:
+            sync_id = links.get(path_key(track.path))
+            phone_track = by_sync.get(sync_id) if sync_id else None
+            if phone_track is not None:
+                pairs.append((phone_track, track))
+                if cover:
+                    covers.add(str(track.path))
+        edits, replacements = phone_actions.plan_updates(pairs, frozenset(covers))
+        total = len(edits) + len(replacements)
+        if total and not (self._connected and not window.runner.is_busy):
+            window.statusBar().showMessage(f"{total} brani sull'iPhone vengono da questi file e ora sono diversi (⟳): "
+                                           "per aggiornarli connetti l'iPhone e usa Rimpiazza con la versione del "
+                                           "PC", 15000)
+        elif total:
+            if total == 1 and len(tracks) == 1:
+                text = "Il brano modificato è anche sull'iPhone. Aggiornarlo anche lì?\n"
+            elif total == len(tracks):
+                text = f"I {total} brani modificati sono anche sull'iPhone. Aggiornarli anche lì?\n"
+            else:
+                text = f"{total} dei {len(tracks)} brani modificati sono anche sull'iPhone. Aggiornarli anche lì?\n"
+            if edits:
+                text += (f"\n• {len(edits)} con Cambia tag (titolo, album, genere, anno, numeri, compilation): "
+                         "restano ascolti e playlist.")
+            if replacements:
+                text += (f"\n• {len(replacements)} con Rimpiazza (artista, artista dell'album o copertina): perdono "
+                         "ascolti e playlist; alla fine ti dico in quali playlist rimetterli.")
+            alone = len(tracks) - len(pairs)
+            if alone:
+                text += f"\n\n{alone} brani non sono sull'iPhone o lì non vengono da questi file: cambiano solo sul PC."
+            if self._confirm("Aggiorna anche l'iPhone", text):
+                overlay = window.overlay
+                replaced = []
+                for phone_track, _track in replacements:
+                    replaced.append(phone_track)
+
+                def action(progress, cancel):
+                    value = phone_actions.update_from_pc(edits, replacements, overlay, progress, cancel, config_dir())
+                    return value
+
+                self._write("Aggiornamento dell'iPhone", "aggiornati", action, _playlist_note(replaced))
 
     def _replace_selected(self) -> None:
         pairs = self._stale_pairs(self._selected_phone_tracks())
@@ -625,12 +709,60 @@ class IPhonePanel(QWidget):
             dialog = PhoneTagDialog(self, items)
             if dialog.exec():
                 values = dialog.values
+                linked = self._linked_files(items)
+                answer = QMessageBox.No
+                if linked:
+                    answer = QMessageBox.question(
+                        self, "Cambia tag",
+                        f"{len(linked)} dei {len(items)} brani vengono da file di questo PC. Salvare le stesse "
+                        "modifiche anche per quei file?\n\nSul PC le modifiche restano in sospeso (i file non "
+                        "cambiano) e valgono per le copie inviate, esportate o importate.",
+                        QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel)
 
                 def action(progress, _cancel):
                     value = phone_actions.edit_tracks(items, values, progress)
                     return value
 
-                self._write("Cambia tag sull'iPhone", "modificati", action)
+                def after(report):
+                    if report.done:
+                        self._apply_to_pc(linked, values)
+
+                if answer == QMessageBox.Yes:
+                    self._write("Cambia tag sull'iPhone", "modificati", action, after=after)
+                elif answer == QMessageBox.No:
+                    self._write("Cambia tag sull'iPhone", "modificati", action)
+
+    def _linked_files(self, items: list) -> list:
+        """(PhoneTrack, file del PC) per i brani che vengono da un file di questo computer che c'è ancora."""
+        result = []
+        for item in items:
+            link = self._window.registry.get(item.sync_id) if item.sync_id else None
+            if link is not None and link.here and Path(link.path).is_file():
+                result.append((item, Path(link.path)))
+        return result
+
+    def _apply_to_pc(self, linked: list, values: dict) -> None:
+        """Le modifiche di Cambia tag anche sui file del PC collegati: in sospeso (overlay), anche se non sono nella
+        cartella aperta."""
+        from ..library import load_track
+        from ..overlay import path_key
+        window = self._window
+        opened = {}
+        for track in window.tracks:
+            opened[path_key(track.path)] = track
+        pairs = []
+        for _item, path in linked:
+            track = opened.get(path_key(path))
+            if track is None:
+                track = load_track(path)
+                window.overlay.apply([track])
+            if not track.error:
+                new_tags = track.tags.copy()
+                for name, value in values.items():
+                    setattr(new_tags, name, _pc_value(name, value))
+                pairs.append((track, new_tags))
+        if pairs:
+            window.apply_tag_changes(pairs, None, propagate=False)
 
     def _delete_selected(self) -> None:
         items = []

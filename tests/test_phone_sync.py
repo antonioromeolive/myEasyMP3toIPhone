@@ -350,3 +350,31 @@ def test_tag_edit_rules():
     assert ps.update_track(9, flagged)["item"] == {"is_compilation": True}
     with pytest.raises(ps.PhoneSyncError):
         ps.update_track(9, {"is_compilation": 1})
+
+
+def test_plan_updates_from_pc():
+    from myeasymp3toiphone.library import Track
+    from myeasymp3toiphone.phone_library import PhoneTrack
+
+    def phone(sync_id, **values):
+        base = dict(title="T", artist="Artista", album="Album", year="1990", genre="Pop", track_number=1)
+        base.update(values)
+        result = PhoneTrack(sync_id, "/x.mp3", 1, 1.0, TrackTags(**base), sync_id=sync_id, album_sync_id=7)
+        return result
+
+    def pc(name, **values):
+        base = dict(title="T", artist="Artista", album="Album", year="1990", genre="Pop", track_number=1)
+        base.update(values)
+        result = Track(path=Path(f"C:/m/{name}.mp3"), tags=TrackTags(**base))
+        return result
+
+    pairs = [(phone(1), pc("uguale")),
+             (phone(2), pc("titolo", title="Nuovo", year="2001-05-01", track_number=None)),
+             (phone(3), pc("artista", artist="Altro", title="Nuovo")),
+             (phone(4), pc("copertina")),
+             (phone(5), pc("genere", genre="")),
+             (phone(0), pc("comprato", title="X"))]
+    edits, replacements = phone_actions.plan_updates(pairs, frozenset({str(Path("C:/m/copertina.mp3"))}))
+    assert [(item.sync_id, values) for item, values in edits] == [(2, {"title": "Nuovo", "year": 2001,
+                                                                       "track_number": 0})]
+    assert [item.sync_id for item, _track in replacements] == [3, 4, 5]

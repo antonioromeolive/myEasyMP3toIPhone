@@ -591,9 +591,10 @@ class MainWindow(QMainWindow):
 
     # ================================================================== modifica tag
 
-    def apply_tag_changes(self, pairs: list, cover: Optional[bytes] = None) -> None:
+    def apply_tag_changes(self, pairs: list, cover: Optional[bytes] = None, propagate: bool = True) -> None:
         """pairs: (Track, nuovi TrackTags o None se invariati). Le modifiche restano in sospeso nella cartella dati: i
-        file sul PC non cambiano mai; valgono per le copie inviate all'iPhone, esportate o importate."""
+        file sul PC non cambiano mai; valgono per le copie inviate all'iPhone, esportate o importate. propagate: poi
+        chiede se aggiornare anche i brani dell'iPhone che vengono da questi file."""
         for track, new_tags in pairs:
             if new_tags is not None:
                 self.overlay.set_tags(track, new_tags)
@@ -606,6 +607,11 @@ class MainWindow(QMainWindow):
         except OSError as exc:
             QMessageBox.warning(self, "Modifiche", f"Modifiche NON salvate nella cartella dati: {exc}")
         self.refresh_after_tag_change()
+        if propagate:
+            tracks = []
+            for track, _new_tags in pairs:
+                tracks.append(track)
+            self.iphone_panel.offer_phone_update(tracks, cover is not None)
 
     def _revert_tag_changes(self) -> None:
         tracks = []
@@ -621,6 +627,7 @@ class MainWindow(QMainWindow):
                 QMessageBox.warning(self, "Modifiche", f"Cartella dati non scrivibile: {exc}")
             self.statusBar().showMessage(f"Tornati ai tag del file: {len(tracks)} brani", 5000)
             self.refresh_after_tag_change()
+            self.iphone_panel.offer_phone_update(tracks, False)
 
     def prepare_copy_for(self, track, copy: Path) -> None:
         """Applica a una copia le modifiche in sospeso del brano (esportazione, importazione)."""

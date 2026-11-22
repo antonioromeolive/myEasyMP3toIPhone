@@ -94,6 +94,31 @@ def test_read_music_database(tmp_path):
     assert first.from_computer and first.album_sync_id == 8001
 
 
+def test_playlists_of_each_track(tmp_path):
+    connection = _database(tmp_path / "MediaLibrary.sqlitedb")
+    connection.executescript("""
+CREATE TABLE container (container_pid INTEGER PRIMARY KEY, distinguished_kind INTEGER, is_hidden INTEGER,
+                        smart_criteria BLOB, smart_is_folder INTEGER, name TEXT);
+CREATE TABLE container_item (container_item_pid INTEGER PRIMARY KEY, container_pid INTEGER, item_pid INTEGER,
+                             position INTEGER);
+INSERT INTO container VALUES (1, 0, 1, NULL, 0, 'Libreria'), (2, 0, 0, NULL, 0, 'In auto'),
+                             (3, 0, 0, x'00', 0, 'Smart'), (4, 10000, 1, NULL, 0, 'Cronologia'),
+                             (5, 0, 0, NULL, 0, 'Corsa');
+INSERT INTO container_item VALUES (1, 1, 101, 0), (2, 2, 101, 0), (3, 3, 101, 0), (4, 4, 101, 0), (5, 5, 101, 1),
+                                  (6, 5, 102, 0), (7, 2, 101, 3);
+""")
+    connection.commit()
+    connection.close()
+    tracks = {t.pid: t for t in read_music_database(tmp_path / "MediaLibrary.sqlitedb")}
+    assert tracks[101].playlists == ("Corsa", "In auto") and tracks[102].playlists == ("Corsa",)
+    assert tracks[103].playlists == ()
+    phone_library.save_listing(tmp_path, "iPhone", list(tracks.values()))
+    again = {t.pid: t for t in phone_library.load_listing(tmp_path)["tracks"]}
+    assert again[101].playlists == ("Corsa", "In auto")
+    reminder = phone_library.playlist_reminder(list(tracks.values()))
+    assert reminder.splitlines() == ["• Corsa: Canzone A, Canzone B", "• In auto: Canzone A"]
+
+
 def test_read_music_database_with_pending_wal_and_no_shm(tmp_path):
     """Il programma scarica il database e il file -wal, non il -shm: le ultime modifiche devono esserci."""
     source = tmp_path / "iphone"

@@ -52,6 +52,16 @@ LEFT JOIN base_location b ON b.base_location_id = i.base_location_id
 WHERE e.location IS NOT NULL AND e.location != '' AND b.path IS NOT NULL AND b.path != ''
 """
 
+# le playlist normali: non la libreria (nascosta), non le smart (si aggiornano da sole), non le cartelle
+_PLAYLIST_QUERY = """
+SELECT ci.item_pid, c.name
+FROM container_item ci
+JOIN container c ON c.container_pid = ci.container_pid
+WHERE c.distinguished_kind = 0 AND c.is_hidden = 0 AND c.smart_criteria IS NULL AND c.smart_is_folder = 0
+      AND c.name != ''
+ORDER BY c.name, ci.position
+"""
+
 
 class PhoneLibraryError(Exception):
     """Il database dell'app Musica non si legge (versione di iOS diversa, copia incompleta…)."""
@@ -67,6 +77,7 @@ class PhoneTrack:
     sync_id: int = 0      # l'identificativo con cui un computer lo aggiorna o lo elimina (0: non messo da un computer)
     album_sync_id: int = 0
     artist_sync_id: int = 0   # dell'artista dell'album
+    playlists: tuple = ()     # le playlist fatte a mano che lo contengono (non le smart)
 
     @property
     def from_computer(self) -> bool:
@@ -114,10 +125,19 @@ def read_music_database(path: Path) -> list:
         connection = sqlite3.connect(str(path))
         try:
             rows = connection.execute(_QUERY).fetchall()
+            try:
+                playlist_rows = connection.execute(_PLAYLIST_QUERY).fetchall()
+            except sqlite3.Error:
+                playlist_rows = []      # senza le playlist si va avanti: servono solo come promemoria
         finally:
             connection.close()
     except sqlite3.Error as exc:
         raise PhoneLibraryError(f"il database dell'app Musica non si legge ({exc})") from exc
+    playlists = {}
+    for item_pid, name in playlist_rows:
+        names = playlists.setdefault(int(item_pid), [])
+        if name not in names:
+            names.append(_text(name))
     for (pid, title, artist, album_artist, album, genre, year, track_number, track_count, disc_number, disc_count,
          total_ms, location, file_size, base, sync_id, album_sync_id, artist_sync_id, compilation) in rows:
         year_number = _number(year)
@@ -129,7 +149,8 @@ def read_music_database(path: Path) -> list:
         remote = "/" + _text(base).strip("/") + "/" + _text(location)
         tracks.append(PhoneTrack(pid=int(pid), remote_path=remote, size=int(file_size or 0),
                                  length=(_number(total_ms) or 0) / 1000.0, tags=tags, sync_id=_unsigned(sync_id),
-                                 album_sync_id=_unsigned(album_sync_id), artist_sync_id=_unsigned(artist_sync_id)))
+                                 album_sync_id=_unsigned(album_sync_id), artist_sync_id=_unsigned(artist_sync_id),
+                                 playlists=tuple(playlists.get(int(pid), ()))))
     tracks.sort(key=lambda item: (group_name(item.display_artist), group_name(item.tags.album),
                                   item.tags.disc_number or 1, item.tags.track_number or 9999,
                                   group_name(item.tags.title)))
@@ -140,11 +161,15 @@ def read_music_database(path: Path) -> list:
 
 def save_listing(home: Path, device: str, tracks: list) -> None:
     rows = []
+    playlists = {}
     for item in tracks:
         rows.append([item.pid, item.remote_path, item.size, item.length, asdict(item.tags), item.sync_id,
                      item.album_sync_id, item.artist_sync_id])
+        if item.playlists:
+            playlists[str(item.pid)] = list(item.playlists)
+    # le playlist a parte: le righe restano quelle che le versioni precedenti sanno leggere
     data = {"version": LISTING_VERSION, "device": device, "saved_at": time.strftime("%Y-%m-%d %H:%M"),
-            "tracks": rows}
+            "tracks": rows, "playlists": playlists}
     home.mkdir(parents=True, exist_ok=True)
     path = home / LISTING_FILE
     temporary = path.with_name(path.name + ".tmp")
@@ -159,14 +184,19 @@ def load_listing(home: Path) -> dict:
         data = json.loads((home / LISTING_FILE).read_text(encoding="utf-8"))
         if data.get("version") == LISTING_VERSION:
             tracks = []
+            playlists = data.get("playlists") or {}
             for pid, remote, size, length, values, sync_id, album_sync_id, artist_sync_id in data.get("tracks", []):
                 known = {}
                 for name, value in values.items():
                     if name in TAG_FIELD_NAMES:
                         known[name] = value
+                names = []
+                for name in playlists.get(str(pid), []):
+                    names.append(str(name))
                 tracks.append(PhoneTrack(pid=int(pid), remote_path=str(remote), size=int(size),
                                          length=float(length), tags=TrackTags(**known), sync_id=int(sync_id),
-                                         album_sync_id=int(album_sync_id), artist_sync_id=int(artist_sync_id)))
+                                         album_sync_id=int(album_sync_id), artist_sync_id=int(artist_sync_id),
+                                         playlists=tuple(names)))
             result = {"device": str(data.get("device", "")), "saved_at": str(data.get("saved_at", "")),
                       "tracks": tracks}
     except (OSError, ValueError, TypeError, AttributeError):
@@ -286,6 +316,33 @@ def comparison(pc_tags: TrackTags, phone_tags: TrackTags) -> list:
             same = pc_value == phone_value
         if relevant:
             result.append((label, _shown(name, pc_value), _shown(name, phone_value), not same))
+    return result
+
+
+def changed_fields(pc_tags: TrackTags, phone_tags: TrackTags) -> list:
+    """I nomi dei campi (COMPARED_FIELDS) diversi tra il PC e l'iPhone, con le regole di comparison."""
+    labels = {}
+    for name, label in COMPARED_FIELDS:
+        labels[label] = name
+    result = []
+    for label, _pc_value, _phone_value, differs in comparison(pc_tags, phone_tags):
+        if differs:
+            result.append(labels[label])
+    return result
+
+
+def playlist_reminder(phone_tracks: list) -> str:
+    """Le playlist dell'iPhone in cui rimettere a mano i brani (dopo un rimpiazzo): una riga per playlist."""
+    by_playlist = {}
+    for item in phone_tracks:
+        for name in item.playlists:
+            by_playlist.setdefault(name, []).append(item.tags.title or "?")
+    lines = []
+    for name in sorted(by_playlist, key=str.lower):
+        titles = by_playlist[name]
+        shown = ", ".join(titles[:6]) + (f" e altri {len(titles) - 6}" if len(titles) > 6 else "")
+        lines.append(f"• {name}: {shown}")
+    result = "\n".join(lines)
     return result
 
 

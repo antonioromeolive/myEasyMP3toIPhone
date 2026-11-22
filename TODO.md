@@ -1,20 +1,5 @@
 # TODO
 
-## Cambiare i tag da una parte propone di cambiarli anche dall'altra
-
-Quando un brano è collegato (registro della provenienza), una modifica dei tag da un lato chiede se va fatta anche
-sull'altro:
-- **dalla scheda PC** (editor dei tag, correzioni della scansione, Verifica album) su brani collegati a brani
-  dell'iPhone: "Aggiornare anche i N brani sull'iPhone?". Sì: i campi sicuri (titolo, album, genere, anno, numeri,
-  compilation) con *Cambia tag* sull'iPhone; artista e artista dell'album, che sull'iPhone non si cambiano senza
-  rischi, con *Rimpiazza* (detto prima: si perdono ascolti e playlist del brano). Senza iPhone collegato, o con il
-  passo 5, i brani restano ⟳ "in attesa di aggiornamento" e si applicano dopo;
-- **dalla scheda iPhone** (*Cambia tag*) su brani collegati a file di questo PC: "Salvare le stesse modifiche anche
-  per i file del PC?". Sì: le modifiche vanno in sospeso sui file collegati (overlay: i file non cambiano mai), anche
-  se non sono nella cartella aperta;
-- la domanda dice quanti brani sono collegati e quanti no (questi cambiano da una parte sola); una casella "non
-  chiederlo più, fallo sempre / mai" si ricorda nelle impostazioni (e va nella sezione "Quale valore vince" del README).
-
 ## Una sorgente sparita dal PC (per esempio un doppione cancellato)
 
 Il programma non cancella mai i file del PC; li cancella l'utente (per esempio un doppione trovato con *Controlla la

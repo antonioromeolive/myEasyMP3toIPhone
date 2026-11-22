@@ -477,11 +477,20 @@ def _update_item(phone_track, values: dict, snapshot: _Snapshot, new_albums: dic
 def edit_tracks(phone_tracks: list, values: dict, progress: Optional[ProgressFn] = None) -> ActionReport:
     """Gli stessi valori su tutti i brani (values: i campi di EDITABLE_FIELDS da cambiare; year 0 lo svuota).
     Artista e artista dell'album no: sull'iPhone cambiarli rinominerebbe l'artista per tutti i suoi brani."""
+    entries = []
+    for item in phone_tracks:
+        entries.append((item, values))
+    result = edit_each(entries, progress)
+    return result
+
+
+def edit_each(entries: list, progress: Optional[ProgressFn] = None) -> ActionReport:
+    """Come edit_tracks, con valori diversi per ogni brano: entries (PhoneTrack, values)."""
     report = ActionReport()
     pending = []
-    for item in phone_tracks:
+    for item, values in entries:
         if item.from_computer:
-            pending.append(item)
+            pending.append((item, values))
         else:
             report.skipped.append((_label(item.tags, ""), "non è stato messo da un computer"))
 
@@ -496,16 +505,16 @@ def edit_tracks(phone_tracks: list, values: dict, progress: Optional[ProgressFn]
                 operations = []
                 deferred = []
                 new_albums = {}
-                for phone_track in remaining:
+                for phone_track, values in remaining:
                     if len(operations) >= BATCH_CHANGES:
-                        deferred.append(phone_track)
+                        deferred.append((phone_track, values))
                     elif phone_track.sync_id not in snapshot.track_ids:
                         report.skipped.append((_label(phone_track.tags, ""), "non è più sull'iPhone"))
                     else:
                         try:
                             item = _update_item(phone_track, values, snapshot, new_albums)
                             if item is None:
-                                deferred.append(phone_track)
+                                deferred.append((phone_track, values))
                             elif item:
                                 operations.append(phone_sync.update_track(phone_track.sync_id, item))
                         except PhoneSyncError as exc:
@@ -529,4 +538,61 @@ def edit_tracks(phone_tracks: list, values: dict, progress: Optional[ProgressFn]
 
     if pending:
         iphone._run(work())
+    return report
+
+
+# --------------------------------------------------------------------------- dal PC all'iPhone
+
+REPLACE_ONLY = {"artist", "album_artist"}     # sull'iPhone non si cambiano senza rinominare l'artista per tutti
+
+
+def _phone_value(name: str, value):
+    """Un tag del PC come lo vuole _update_item: anno e numeri interi (0 = vuoto), compilation booleana."""
+    if name == "year":
+        digits = str(value or "").strip()[:4]
+        result = int(digits) if digits.isdigit() else 0
+    elif name in ("track_number", "disc_number"):
+        result = int(value or 0)
+    elif name == "compilation":
+        result = bool(value)
+    else:
+        result = str(value or "").strip()
+    return result
+
+
+def plan_updates(pairs: list, cover_changed: frozenset = frozenset()) -> tuple:
+    """pairs: (PhoneTrack, Track del PC) dopo una modifica sul PC. (modifiche [(PhoneTrack, values)] per edit_each,
+    rimpiazzi [(PhoneTrack, Track)] per replace_tracks): si rimpiazzano i brani con artista o artista dell'album
+    diversi, con una copertina nuova (cover_changed: i percorsi) o con un titolo, album o genere da svuotare."""
+    from .phone_library import changed_fields
+    edits = []
+    replacements = []
+    for phone_track, track in pairs:
+        if phone_track.from_computer:
+            needs_replace = str(track.path) in cover_changed
+            values = {}
+            for name in changed_fields(track.tags, phone_track.tags):
+                value = _phone_value(name, getattr(track.tags, name))
+                if name in REPLACE_ONLY or (name in ("title", "album", "genre") and not value):
+                    needs_replace = True
+                else:
+                    values[name] = value
+            if needs_replace:
+                replacements.append((phone_track, track))
+            elif values:
+                edits.append((phone_track, values))
+    result = (edits, replacements)
+    return result
+
+
+def update_from_pc(edits: list, replacements: list, overlay, progress: Optional[ProgressFn] = None,
+                   cancel: Optional[threading.Event] = None, home: Optional[Path] = None) -> ActionReport:
+    """Le modifiche fatte sul PC anche sull'iPhone: prima i campi sicuri (edit_each), poi i rimpiazzi."""
+    report = edit_each(edits, progress) if edits else ActionReport()
+    if replacements and not is_cancelled(cancel):
+        replaced = replace_tracks(replacements, overlay, progress, cancel, home)
+        report.done += replaced.done
+        report.skipped += replaced.skipped
+        report.errors += replaced.errors
+        report.cancelled = report.cancelled or replaced.cancelled
     return report

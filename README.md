@@ -195,7 +195,19 @@ CopyTrans Manager (*AirTrafficControl*), senza iTunes e senza sincronizzare tutt
 - **Compilation:** si invia la spunta, con l'artista dell'album ("Artisti vari" se manca): l'album resta intero
   nell'app Musica.
 - **Rimpiazza** prima invia la versione del PC, poi toglie quella vecchia, solo se l'invio è riuscito. Il brano
-  rimpiazzato perde il conteggio degli ascolti e la presenza nelle playlist fatte sull'iPhone.
+  rimpiazzato perde il conteggio degli ascolti e la presenza nelle playlist fatte sull'iPhone: prima di confermare e
+  alla fine il programma dice in quali playlist era ciascun brano, così lo rimetti a mano (le playlist smart si
+  aggiornano da sole).
+- **Una modifica da una parte si propone anche dall'altra**, per i brani che hanno la sorgente su questo PC (colonna
+  *Sorgente*), e si chiede ogni volta:
+  - cambiando i tag nella scheda **PC** (editor dei tag, correzioni della scansione, *Verifica album*, *Torna ai tag
+    del file*), se i brani collegati sull'iPhone ora sono diversi: *Aggiornarli anche lì?* Titolo, album, genere,
+    anno, numeri e compilation con *Cambia tag* (restano ascolti e playlist); artista, artista dell'album, una
+    copertina nuova o un campo da svuotare con *Rimpiazza*. Senza iPhone connesso lo dice la barra di stato e i brani
+    restano ⟳;
+  - con **Cambia tag** nella scheda **iPhone**, se i brani vengono da file di questo PC: *Salvare le stesse modifiche
+    anche per quei file?* Sul PC vanno in sospeso, come ogni modifica (i file non cambiano), anche per i file fuori
+    dalla cartella aperta.
 - **Artista e artista dell'album** non si cambiano con *Cambia tag*: sull'iPhone cambiarli rinominerebbe l'artista per
   tutti i suoi brani. Si cambiano nella scheda PC, poi *Rimpiazza*.
 - La spunta **Compilation** di *Cambia tag* cambia solo il brano. Una compilation vuole anche l'artista dell'album
