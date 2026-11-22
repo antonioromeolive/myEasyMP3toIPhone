@@ -88,7 +88,7 @@ def test_format_filter_in_main_window(tmp_path, monkeypatch):
     assert window._format.itemText(2) == "FLAC (1)" and window._format.itemText(1) == "MP3 (8)"
     window._format.setCurrentIndex(2)
     assert [t.path.suffix for t in window.format_tracks()] == [".flac"]
-    assert window._table.rowCount() == 1
+    assert window._model.rowCount() == 1
 
 
 def _wait(window, app, seconds=20):

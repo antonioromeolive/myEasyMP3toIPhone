@@ -19,11 +19,6 @@ Dopo ogni scrittura il programma ora manda all'iPhone l'avviso di fine sincroniz
 Musica aperta su un brano PROVA: se si aggiorna da sola, togliere dal messaggio finale l'invito a chiuderla e
 riaprirla; se no, provare anche `syncWillStart` all'inizio della sessione.
 
-## Tabella dei brani del PC con molte righe
-
-Riempire la tabella costa ~1,7 s per 30.000 brani (270.000 celle). Un modello Qt (QAbstractTableModel) lo
-eliminerebbe; tocca selezione, ordinamento e scorrimento (43 punti in `main_window.py`).
-
 ## Interfaccia anche in inglese
 
 Un'opzione in *Impostazioni* per la lingua dell'interfaccia: italiano (oggi l'unica) o inglese. Tutti i testi

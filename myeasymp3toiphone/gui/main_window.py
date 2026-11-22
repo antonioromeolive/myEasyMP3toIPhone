@@ -8,11 +8,11 @@ sospeso (overlay) e vanno solo sulle copie inviate all'iPhone, esportate o impor
 from pathlib import Path
 from typing import Optional
 
-from PySide6.QtCore import QByteArray, QItemSelectionModel, QSize, Qt, QTimer
-from PySide6.QtGui import QAction, QBrush, QColor, QFont, QKeySequence
+from PySide6.QtCore import QByteArray, QItemSelection, QItemSelectionModel, QSize, Qt, QTimer
+from PySide6.QtGui import QAction, QColor, QKeySequence
 from PySide6.QtWidgets import (
     QAbstractItemView, QComboBox, QFileDialog, QFrame, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMainWindow,
-    QMenu, QMessageBox, QPushButton, QScrollArea, QSplitter, QStyle, QTableWidget, QTableWidgetItem, QTabWidget,
+    QMenu, QMessageBox, QPushButton, QScrollArea, QSplitter, QStyle, QTableView, QTabWidget,
     QToolBar, QVBoxLayout, QWidget,
 )
 
@@ -37,6 +37,7 @@ from .iphone_panel import IPhonePanel
 from .scan_dialog import ScanLauncher
 from .settings_dialog import SettingsDialog
 from .tag_editor import TagEditor
+from .track_model import COL_DEVICE, COL_TITLE, COLUMNS, TrackTableModel
 from .worker import TaskRunner
 
 APP_NAME = PRODUCT
@@ -45,9 +46,6 @@ FORMATS = (("Tutti i formati", None), ("MP3", (".mp3",)), ("FLAC", (".flac",)), 
            ("OGG / Opus", (".ogg", ".opus")))
 SECONDS_PER_ALBUM_CHECK = 2.5
 
-COLUMNS = ["#", "iPhone", "Titolo", "Artista", "Album", "Anno", "Genere", "Durata", "File"]
-COL_NUMBER, COL_DEVICE, COL_TITLE, COL_ARTIST, COL_ALBUM, COL_YEAR, COL_GENRE, COL_LENGTH, COL_FILE = range(9)
-DEVICE_TEXT = {DEVICE_SAME: "✔", DEVICE_STALE: "⟳", DEVICE_ABSENT: ""}
 DEVICE_TIP = {DEVICE_SAME: "Nell'app Musica dell'iPhone c'è questo brano, con gli stessi tag",
               DEVICE_STALE: "Nell'app Musica dell'iPhone c'è questo brano, ma con tag diversi:",
               DEVICE_ABSENT: "Non è nell'app Musica dell'iPhone"}
@@ -67,11 +65,6 @@ def _format_length(seconds: float) -> str:
     return result
 
 
-def _number_item(value: Optional[int]) -> QTableWidgetItem:
-    item = QTableWidgetItem()
-    if value is not None:
-        item.setData(Qt.DisplayRole, value)
-    return item
 
 
 class MainWindow(QMainWindow):
@@ -175,12 +168,14 @@ class MainWindow(QMainWindow):
         self.browser.phone_state = self._browser_phone_state
         self.browser.phone_toggled.connect(self.set_wanted)
 
-        self._table = QTableWidget(0, len(COLUMNS))
-        self._table.setHorizontalHeaderLabels(COLUMNS)
+        self._table = QTableView()
+        self._model = TrackTableModel(self, PENDING_LOOK, PENDING_TIP)
+        self._table.setModel(self._model)
         self._table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self._table.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self._table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self._table.verticalHeader().setVisible(False)
+        self._table.verticalHeader().setDefaultSectionSize(self._table.fontMetrics().height() + 6)
         self._table.setAlternatingRowColors(True)
         self._table.setWordWrap(False)
         header = self._table.horizontalHeader()
@@ -193,8 +188,9 @@ class MainWindow(QMainWindow):
         widths = [40, 50, 230, 160, 180, 50, 90, 55]
         for column, width in enumerate(widths):
             self._table.setColumnWidth(column, width)
-        self._table.itemSelectionChanged.connect(self._selection_changed)
-        self._table.itemChanged.connect(self._device_changed)
+        self._table.selectionModel().selectionChanged.connect(lambda _new, _old: self._selection_changed())
+        self._table.setSortingEnabled(True)
+        header.setSortIndicator(-1, Qt.AscendingOrder)
         self._table.setContextMenuPolicy(Qt.CustomContextMenu)
         self._table.customContextMenuRequested.connect(self._table_menu)
         self._table.viewport().installEventFilter(self)    # il suggerimento della colonna iPhone, al passaggio
@@ -290,10 +286,8 @@ class MainWindow(QMainWindow):
         self._states = {}
         if self.pending.reconcile(self.tracks, lambda track: self._device_state(track)[0]):
             self._save_pending()
-        header = self._table.horizontalHeaderItem(COL_DEVICE)
-        if header is not None:
-            header.setToolTip(f"Nell'app Musica dell'iPhone ({label}): ✔ stesso brano, ⟳ stesso brano con tag "
-                              "diversi, vuoto = non c'è")
+        self._model.device_header_tip = (f"Nell'app Musica dell'iPhone ({label}): ✔ stesso brano, ⟳ stesso brano "
+                                         "con tag diversi, vuoto = non c'è; la spunta: voglio il brano sull'iPhone")
         self.iphone_panel.set_phone_tracks(tracks, label)
         self._fill_table()
         self.browser.refresh_phone_states()
@@ -450,49 +444,20 @@ class MainWindow(QMainWindow):
             for track in self._selected_table_tracks():
                 keep_tracks.add(id(track))
         self._visible = self._visible_tracks()
-        self._table.blockSignals(True)
-        self._table.setSortingEnabled(False)
-        self._table.clearContents()
-        self._table.setRowCount(len(self._visible))
-        for row, track in enumerate(self._visible):
-            tags = track.tags
-            number = _number_item(tags.track_number)
-            number.setData(Qt.UserRole, row)
-            values = {
-                COL_TITLE: track.title,
-                COL_ARTIST: tags.artist,
-                COL_ALBUM: tags.album,
-                COL_YEAR: tags.year,
-                COL_GENRE: tags.genre,
-                COL_LENGTH: _format_length(track.length),
-                COL_FILE: track.path.name,
-            }
-            status = self._device_state(track)[0]
-            values[COL_DEVICE] = DEVICE_TEXT[status]
-            self._table.setItem(row, COL_NUMBER, number)
-            for column, text in values.items():
-                item = QTableWidgetItem(text)
-                if track.error:
-                    item.setForeground(QBrush(QColor(200, 40, 40)))
-                    item.setToolTip(track.error)
-                self._table.setItem(row, column, item)
-            self._table.item(row, COL_FILE).setToolTip(str(track.path))
-            if self.overlay.is_edited(track.path):
-                title_item = self._table.item(row, COL_TITLE)
-                font = QFont(title_item.font())
-                font.setItalic(True)
-                title_item.setFont(font)
-                title_item.setForeground(QBrush(QColor(60, 130, 230)))
-                title_item.setToolTip("Modificato per l'iPhone (il file sul PC non cambia):\n"
-                                      + self.overlay.describe(track))
-            self._style_device_cell(row, track)
-        self._table.setSortingEnabled(True)
-        selection = self._table.selectionModel()
-        for row in range(self._table.rowCount()):
-            if id(self._track_at_row(row)) in keep_tracks:
-                selection.select(self._table.model().index(row, 0),
-                                 QItemSelectionModel.Select | QItemSelectionModel.Rows)
-        self._table.blockSignals(False)
+        self._model.set_tracks(self._visible)
+        header = self._table.horizontalHeader()
+        if header.sortIndicatorSection() >= 0:
+            self._model.sort(header.sortIndicatorSection(), header.sortIndicatorOrder())
+        selection = QItemSelection()
+        last = len(COLUMNS) - 1
+        for row in range(self._model.rowCount()):
+            if id(self._model.track(row)) in keep_tracks:
+                selection.select(self._model.index(row, 0), self._model.index(row, last))
+        model = self._table.selectionModel()
+        model.blockSignals(True)
+        model.select(selection, QItemSelectionModel.ClearAndSelect | QItemSelectionModel.Rows)
+        model.blockSignals(False)
+        self._table.viewport().update()
         self._selection_changed()
 
     # ================================================================== passo 5: spunte e modifiche in attesa
@@ -513,50 +478,24 @@ class MainWindow(QMainWindow):
             self._states[key] = result
         return result
 
-    def _style_device_cell(self, row: int, track) -> None:
-        """La cella iPhone: la spunta (voglio il brano sull'iPhone), il segno fatto (✔ ⟳) o in attesa (＋ － ⟳ blu) e
-        la tinta della riga per le modifiche in attesa."""
-        status, phone_track, linked = self._device_state(track)
-        item = self._table.item(row, COL_DEVICE)
-        action = self.pending.get(track.path) if self._phone_index is not None else ""
-        item.setTextAlignment(Qt.AlignCenter)
-        tint = QBrush()
-        if self._phone_index is None or track.error:
-            item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
-        else:
-            flags = Qt.ItemIsEnabled | Qt.ItemIsSelectable
-            if status == DEVICE_ABSENT or linked or action:
-                flags |= Qt.ItemIsUserCheckable
-            item.setFlags(flags)
-            item.setCheckState(Qt.Checked if wanted(status, action) else Qt.Unchecked)
-        if action:
-            text, color, background = PENDING_LOOK[action]
-            item.setText(text)
-            item.setForeground(QBrush(color))
-            tint = QBrush(background)
-        else:
-            item.setText(DEVICE_TEXT[status])
-            if status == DEVICE_STALE:
-                item.setForeground(QBrush(QColor(220, 140, 0)))
-            elif status == DEVICE_SAME:
-                item.setForeground(QBrush(QColor(30, 140, 60)))
-            else:
-                item.setForeground(QBrush())
-        for column in range(len(COLUMNS)):
-            cell = self._table.item(row, column)
-            if cell is not None:
-                cell.setBackground(tint)
+    def phone_known(self) -> bool:
+        """C'è un elenco della musica dell'iPhone (letto ora o ricordato): la colonna iPhone ha le spunte."""
+        result = self._phone_index is not None
+        return result
 
-    def _device_changed(self, item) -> None:
+    def device_state(self, track) -> tuple:
+        result = self._device_state(track)
+        return result
+
+    def device_checked(self, row: int, checked: bool) -> None:
         """Una spunta della colonna iPhone cambiata a mano: vale per tutte le righe selezionate, se la riga lo è."""
-        if item.column() == COL_DEVICE and self._phone_index is not None:
-            checked = item.checkState() == Qt.Checked
+        if self._phone_index is not None:
             rows = self._selected_rows()
-            if item.row() not in rows:
-                rows = [item.row()]
+            if row not in rows:
+                rows = [row]
             tracks = []
-            for row in rows:
-                tracks.append(self._track_at_row(row))
+            for selected in rows:
+                tracks.append(self._track_at_row(selected))
             self.set_wanted(tracks, checked)
 
     def set_wanted(self, tracks: list, checked: bool) -> None:
@@ -590,16 +529,9 @@ class MainWindow(QMainWindow):
         self.browser.refresh_phone_states()
         self._update_pending_bar()
 
-    def _restyle_rows(self, tracks: list) -> None:
-        wanted_ids = set()
-        for track in tracks:
-            wanted_ids.add(id(track))
-        self._table.blockSignals(True)
-        for row in range(self._table.rowCount()):
-            track = self._track_at_row(row)
-            if id(track) in wanted_ids:
-                self._style_device_cell(row, track)
-        self._table.blockSignals(False)
+    def _restyle_rows(self, _tracks: list) -> None:
+        """Le spunte e i segni della colonna iPhone da ridisegnare (il modello ricalcola solo le righe visibili)."""
+        self._model.refresh()
 
     def _save_pending(self) -> None:
         try:
@@ -682,8 +614,7 @@ class MainWindow(QMainWindow):
                                     "altre restano in attesa finché apri la cartella dei loro file.")
 
     def _track_at_row(self, row: int):
-        index = self._table.item(row, COL_NUMBER).data(Qt.UserRole)
-        result = self._visible[index]
+        result = self._model.track(row)
         return result
 
     def _selected_rows(self) -> list:
@@ -714,8 +645,7 @@ class MainWindow(QMainWindow):
         if row >= 0 and column == COL_DEVICE:
             result = self.device_tooltip(self._track_at_row(row))
         elif row >= 0 and column >= 0:
-            item = self._table.item(row, column)
-            result = item.toolTip() if item is not None else ""
+            result = self._model.data(self._model.index(row, column), Qt.ToolTipRole) or ""
         return result
 
     def device_tooltip(self, track) -> str:
@@ -806,7 +736,7 @@ class MainWindow(QMainWindow):
         self._fill_table(keep)
         rows = self._selected_rows()
         if rows:
-            self._table.scrollToItem(self._table.item(rows[0], COL_TITLE))
+            self._table.scrollTo(self._model.index(rows[0], COL_TITLE))
         self.activateWindow()
 
     def _selection_changed(self) -> None:

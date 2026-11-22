@@ -634,12 +634,19 @@ L'icona si rigenera con `.venv\Scripts\python tools\make_icon.py`.
 | `myeasymp3toiphone/tags.py` | lettura e scrittura dei tag e delle copertine (mutagen), ID3 v2.3 |
 | `myeasymp3toiphone/library.py` | scansione delle cartelle, raggruppamento, nomi dei file, copia e spostamento |
 | `myeasymp3toiphone/albumcheck.py` | MusicBrainz e Cover Art Archive, abbinamento delle tracce |
-| `myeasymp3toiphone/scan.py` | la scansione: regole, confronto con l'iPhone, analisi AI, correzioni |
+| `myeasymp3toiphone/scan.py` | *Controlla la musica*: regole, brani duplicati, confronto con l'iPhone, analisi AI, correzioni |
+| `myeasymp3toiphone/artist_names.py` | le forme dei nomi d'artista: varianti certe, dubbi (AI, MusicBrainz), duetti |
+| `myeasymp3toiphone/overlay.py`, `tag_cache.py` | le modifiche dei tag in sospeso; la cache dei tag e delle impronte |
 | `myeasymp3toiphone/ai.py` | i fornitori di AI (Ollama, Azure, OpenAI via HTTP; Anthropic con l'SDK ufficiale) |
-| `myeasymp3toiphone/iphone.py` | l'iPhone (pymobiledevice3: AFC e house_arrest) |
+| `myeasymp3toiphone/iphone.py` | l'iPhone (pymobiledevice3): connessione, musica dell'app Musica, file, brani fantasma |
+| `myeasymp3toiphone/phone_sync.py` | il protocollo di sincronizzazione di Apple (AirTrafficControl) per scrivere nell'app Musica |
+| `myeasymp3toiphone/phone_actions.py` | invia, rimpiazza, cambia tag, elimina sull'iPhone |
+| `myeasymp3toiphone/phone_library.py` | il database dell'app Musica, l'elenco salvato, il confronto con il PC |
+| `myeasymp3toiphone/provenance.py`, `adoption.py` | impronte dell'audio, registro della provenienza, *Associa sorgente/i* |
+| `myeasymp3toiphone/pending.py` | le modifiche all'iPhone in attesa (spunte della colonna *iPhone*) |
 | `myeasymp3toiphone/config.py` | cartella dati, impostazioni, profili AI, chiavi, `$NOME` |
 | `myeasymp3toiphone/env_file.py` | il file delle variabili |
 | `myeasymp3toiphone/environment.py` | il rapporto delle variabili (`--env`, *Informazioni*) |
 | `myeasymp3toiphone/home_backup.py` | la copia della cartella dati prima di un cambio di formato |
 | `myeasymp3toiphone/startup.py` | l'avvio: copia, variabili, migrazioni, registro, log |
-| `myeasymp3toiphone/gui/` | l'interfaccia PySide6 |
+| `myeasymp3toiphone/gui/` | l'interfaccia PySide6 (la tabella dei brani è un modello Qt, `track_model.py`: veloce anche con decine di migliaia di brani) |

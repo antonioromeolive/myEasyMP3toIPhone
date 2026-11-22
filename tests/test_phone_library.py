@@ -223,8 +223,8 @@ def test_iphone_tab_shows_music_and_pc_status(tmp_path):
             statuses[row.text(iphone_panel.COL_TITLE)] = row.text(iphone_panel.COL_PC)
         assert statuses == {"Canzone A": "✔", "Canzone B": "⟳", "Solo qui": ""}
         table_status = set()
-        for row in range(window._table.rowCount()):
-            table_status.add(window._table.item(row, COL_DEVICE).text())
+        for row in range(window._model.rowCount()):
+            table_status.add(window._model.data(window._model.index(row, COL_DEVICE)))
         assert table_status == {"✔", "⟳"}
         panel._search.setText("solo")
         assert panel._count.text() == "1 di 3 brani"
