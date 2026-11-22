@@ -9,7 +9,8 @@ Si esegue con l'ambiente virtuale del progetto, dove sono installati requirement
     .venv\\Scripts\\python -m pip install -r requirements.txt -r requirements_build.txt
     .venv\\Scripts\\python build_dist.py
 (oppure in VS Code: Terminale -> Esegui attività di compilazione, Ctrl+Shift+B).
-Risultato: dist/myEasyMP3toIPhone (i programmi di myEasyMP3toIPhone.spec con la loro cartella _internal, README.md, LICENSE e i
+Risultato: dist/myEasyMP3toIPhone (i programmi di myEasyMP3toIPhone.spec con la loro cartella _internal, README.md, LICENSE,
+THIRD_PARTY_NOTICES.md e i
 file di dist_files: READ ME FIRST.txt, Create shortcuts.cmd, Remove shortcuts.cmd) e
 dist/myEasyMP3toIPhone-<versione>-<sistema>-<processore>.zip, con la versione data da git (version.py): 0.1.3, oppure
 0.1.4-dev con modifiche non registrate. Degli zip precedenti in dist resta solo quello della build prima.
@@ -38,7 +39,7 @@ BUILD_DIRECTORY   = os.path.join(PROGRAM_DIRECTORY, "build")
 DIST_DIRECTORY    = os.path.join(PROGRAM_DIRECTORY, "dist")
 DIST_NAME         = "myEasyMP3toIPhone"
 SPEC_FILE         = os.path.join(PROGRAM_DIRECTORY, "myEasyMP3toIPhone.spec")
-TOP_FILES         = ("README.md", "LICENSE")   #copiati accanto ai programmi
+TOP_FILES         = ("README.md", "LICENSE", "THIRD_PARTY_NOTICES.md")   #copiati accanto ai programmi
 DIST_FILES_DIRECTORY = os.path.join(PROGRAM_DIRECTORY, "dist_files")   #anche questi, tranne INTERNAL_FILES
 INTERNAL_FILES    = ("shortcuts.ps1",)   #messi in _internal da myEasyMP3toIPhone.spec
 SELFTEST_PROGRAM  = "myEasyMP3toIPhone-cli.exe"

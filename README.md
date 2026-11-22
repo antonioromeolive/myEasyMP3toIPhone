@@ -35,6 +35,9 @@ Per l'iPhone serve l'app gratuita **Dispositivi Apple** dal Microsoft Store (opp
 > sospeso** nella cartella dati e valgono per le **copie**: quelle inviate all'iPhone, esportate o importate. Le
 > operazioni sull'iPhone non toccano mai i file del PC; quelle sul PC si riflettono sull'iPhone al prossimo invio.
 
+Due schede: **PC** (i brani della cartella aperta) e **iPhone** (la musica dell'app *Musica* dell'iPhone, vedi
+[L'iPhone](#liphone)).
+
 | Pulsante | Cosa fa |
 |---|---|
 | **Libreria** | mostra la Libreria musicale (la cartella si sceglie in *Impostazioni*; predefinita `Musica\myEasyMP3toIPhone`) |
@@ -56,19 +59,21 @@ sull'intestazione:
 - la riga **(Tutti …)**, sempre in cima, toglie il filtro; scegliere un artista (o "(Tutti)") azzera l'album scelto
   prima; la casella *Cerca* filtra ancora dentro la scelta;
 - **Formato** (accanto a *Cerca*): solo MP3, FLAC, M4A o OGG/Opus, con il numero di brani di ciascuno. Vale per gli
-  elenchi, la tabella, *Esporta*, *Verifica album*, la *Scansione* della cartella e l'invio all'iPhone.
+  elenchi, la tabella, *Esporta*, *Verifica album*, la *Scansione* della cartella e l'invio all'app Musica.
 
 La tabella dei brani si ordina cliccando sull'intestazione di una colonna (Artista, Album, Titolo, Anno…); finché non
-la clicchi i brani sono in ordine di artista, album, disco e traccia. *Esporta*, *Verifica album* e *Invia all'iPhone*
+la clicchi i brani sono in ordine di artista, album, disco e traccia. *Esporta*, *Verifica album* e *Invia all'app Musica*
 senza brani selezionati in tabella usano l'artista o l'album scelti negli elenchi.
 
 Artisti e album che differiscono solo per maiuscole, accenti o spazi ("Queen" e "queen") sono un gruppo solo, mostrato
 con la grafia più usata (a parità, quella con le maiuscole). I tag dei file non cambiano: la scansione segnala la
-variante, perché VLC e l'iPhone la considerano un artista diverso.
+variante, perché l'iPhone la considera un artista diverso.
 
-**Colonna iPhone.** Per ogni brano: **✔** sull'iPhone c'è già questa versione; **⟳** c'è una versione più vecchia (sul
-PC è stato modificato dopo l'invio: va inviato di nuovo); vuoto, non c'è. Si basa sull'elenco dei file dell'app
-dell'iPhone letto all'ultimo collegamento e salvato nella cartella dati, quindi si vede anche a iPhone scollegato (il
+**Colonna iPhone.** Per ogni brano: **✔** nell'app *Musica* dell'iPhone c'è lo stesso brano, con gli stessi tag;
+**⟳** c'è lo stesso brano, ma con tag diversi (il suggerimento elenca le differenze, *sul PC* / *sull'iPhone*); vuoto,
+non c'è. "Lo stesso brano" vuol dire stesso titolo e stesso album, senza badare a maiuscole, accenti e spazi, e un
+artista in comune; un brano con modifiche in sospeso si ritrova anche con i tag del file. Si basa sulla musica
+dell'iPhone letta all'ultimo collegamento e salvata nella cartella dati, quindi si vede anche a iPhone scollegato (il
 suggerimento sull'intestazione dice di quando è l'elenco).
 
 **Tag.** A destra si modificano titolo, artista, artista album, album, numero di traccia e di disco, anno, genere e
@@ -88,7 +93,9 @@ più recente → resta com'è (il riepilogo lo dice). Un brano con modifiche in 
 dimensione non basterebbe: cambiare i tag spesso non la cambia.
 
 **Cartelle grandi.** La prima lettura usa più file in parallelo; i tag letti restano in `cache_tag.json` nella
-cartella dati, e le volte successive si rileggono solo i file cambiati (dimensione o data diverse). Durante la lettura
+cartella dati, e le volte successive si rileggono solo i file cambiati (dimensione o data diverse). Dimensione e data
+vengono dall'elenco della cartella, senza aprire i file uno per uno: riaprire una cartella già letta è veloce anche su
+un disco esterno o di rete. Durante la lettura
 gli elenchi sono vuoti: la barra di stato mostra l'avanzamento. Il programma si apre **una volta sola**: una seconda
 copia lo dice e si chiude.
 
@@ -97,17 +104,20 @@ OneDrive…) compare in rosso, con il motivo nel suggerimento, e non interrompe 
 
 ## La scansione
 
-*Scansione* (F6) analizza la cartella aperta, oppure la musica nell'app dell'iPhone confrontata con la Libreria. Prima
+*Scansione* (F6) analizza la cartella aperta, oppure la musica dell'app *Musica* dell'iPhone confrontata con la
+Libreria (si può fare anche a iPhone scollegato, con l'ultimo elenco letto). Prima
 applica delle regole locali, veloci e gratuite; poi, se scegli di usarla, l'AI. Il rapporto resta in
 `.myEasyMP3toIPhone\scansioni\`. Ogni problema può avere una **correzione**: si applica dalla finestra dei risultati, dopo
 una conferma, come **modifiche in sospeso** (i file sul PC non cambiano; vanno sulle copie inviate all'iPhone); *Mostra
-i brani* li seleziona nella Libreria.
+i brani* li seleziona nella scheda PC. I problemi trovati sull'iPhone non hanno correzioni automatiche: si correggono i
+brani sul PC e poi si usa *Rimpiazza*, o si cambiano dalla scheda iPhone (tasto destro).
 
 | Sintomo | Cosa cerca | Correzione |
 |---|---|---|
-| **File che non si aggiornano** | sull'iPhone, brani più vecchi di quelli del PC o delle modifiche in sospeso; MP3 con un vecchio tag ID3v1 diverso o con un tag APE (solo informazione: le copie inviate ne sono ripulite) | invia di nuovo |
-| **Album con pochi brani** | numeri di traccia mancanti, meno brani del totale dichiarato, album di 1-2 brani; sull'iPhone, album con meno brani che sul PC | (Verifica album trova i titoli mancanti); invia i mancanti |
-| **Collezioni divise su più album** | una cartella con brani in album diversi; lo stesso album scritto in modi diversi o con "CD 1"/"Disc 2" nel nome; una compilation senza *Artista album*; lo stesso artista scritto in modi diversi; sull'iPhone, file con i nomi vecchi | unifica album e artista album ("Artisti vari" per le compilation), sposta il numero del disco in *N. disco*; elimina i file vecchi dall'iPhone |
+| **File che non si aggiornano** | sull'iPhone, brani con tag diversi da quelli del PC (o delle modifiche in sospeso); MP3 con un vecchio tag ID3v1 diverso o con un tag APE (solo informazione: le copie inviate ne sono ripulite) | sull'iPhone nessuna (la colonna *iPhone* della scheda PC mostra le differenze) |
+| **Album con pochi brani** | numeri di traccia mancanti, meno brani del totale dichiarato, album di 1-2 brani; sull'iPhone, album con meno brani che sul PC | (Verifica album trova i titoli mancanti) |
+| **Collezioni divise su più album** | una cartella con brani in album diversi; lo stesso album scritto in modi diversi o con "CD 1"/"Disc 2" nel nome; una compilation senza *Artista album*; lo stesso artista scritto in modi diversi | unifica album e artista album ("Artisti vari" per le compilation), sposta il numero del disco in *N. disco* |
+| **Solo sull'iPhone** | brani dell'app Musica senza un brano uguale (artista, album, titolo) nella Libreria del PC | nessuna: salvali sul PC dalla scheda iPhone (tasto destro → *Salva su PC*) |
 | **Brani doppi** | solo **dentro lo stesso album**: una copia "Titolo (2)" con lo stesso album, lo stesso brano (numero e titolo) due volte nell'album. Lo stesso brano in album diversi (l'album originale e una raccolta) è legittimo e non si segnala | nessuna automatica: quale copia tenere lo decidi tu (*Mostra i brani*) |
 | Tag mancanti, file illeggibili | brani senza titolo/album/artista, file danneggiati | ricava i tag mancanti dai nomi di cartelle e file |
 
@@ -133,46 +143,64 @@ prima volta l'iPhone chiede **"Autorizzare questo computer?"**: tocca *Autorizza
 autorizzazione negata) lo dice lì, e *Collega iPhone* riprova. Senza il driver Apple la scheda dice di installare
 *Dispositivi Apple*. Scollegando l'iPhone la scheda lo segna come scollegato.
 
-- **Dal PC all'iPhone:** Apple permette di aggiungere brani all'app *Musica* solo a iTunes / *Dispositivi Apple*. Il
-  programma copia quindi la musica, ordinata in `Musica/Artista/Album`, dentro un'app con condivisione file:
-  consigliata **VLC** (gratuita). I file si vedono anche in *File → Sul mio iPhone*. Ogni brano parte da una **copia
-  temporanea** con le modifiche in sospeso applicate: il file del PC non si apre mai in scrittura. Prima dell'invio il
-  programma guarda cosa c'è già sul telefono e manda solo i brani mancanti o vecchi (✔ nella colonna *iPhone* = saltato).
-  Ogni invio si registra in `iphone_inviati.json`: così il programma riconosce la copia sull'iPhone anche se ha tag
-  diversi dal file, e segna ⟳ un brano modificato dopo l'invio.
-- **I FLAC sull'iPhone:** sì, si copiano così come sono. VLC (e l'app *File* da iOS 11) li riproduce, con i tag e la
-  copertina. Occupano però 3-5 volte un MP3 (circa 25-40 MB a brano): tienine conto se lo spazio è poco.
-- **L'app Musica di Apple** (`com.apple.Music`) non compare tra le app di destinazione: Apple permette di
-  aggiungerle brani solo con la sincronizzazione di iTunes / *Dispositivi Apple*. Per lei c'è il riquadro **App Musica
-  dell'iPhone (tramite iTunes)**, qui sotto.
+**La musica dell'app Musica.** Collegato l'iPhone, la scheda **iPhone** mostra i brani dell'app *Musica* con i
+titoli, gli artisti e gli album che mostra l'app: il programma ne copia sul PC il database (`MediaLibrary.sqlitedb`)
+e lo legge, perché sul telefono i file hanno nomi casuali (`F12/ABCD.mp3`). Sono solo i brani con un file
+sull'iPhone, non quelli in streaming da Apple Music. *Cerca* filtra per titolo, artista o album.
 
-### L'app Musica dell'iPhone (tramite iTunes)
+- **Sul PC:** ✔ nella cartella aperta nella scheda PC c'è lo stesso brano, con gli stessi tag; ⟳ c'è, con tag diversi
+  (il suggerimento dice quali); vuoto, non c'è. Lo stesso confronto della colonna *iPhone* della scheda PC.
+- **Tasto destro** su uno o più brani: **Salva su PC…** copia i file in una cartella a scelta (proposta: la Libreria),
+  ordinati in `Artista/Album (Anno)/NN - Titolo` con i nomi che mostra l'app; crea solo file nuovi, un file già
+  presente sul PC non viene mai sostituito. **Mostra nella scheda PC** seleziona i brani corrispondenti del PC.
+- L'elenco letto resta in `iphone_musica.json` nella cartella dati: scheda iPhone, colonna *iPhone* e scansione
+  funzionano anche a telefono scollegato (*Aggiorna elenco* lo rilegge).
 
-Serve **iTunes** (gratuito, dal Microsoft Store). Il riquadro *App Musica dell'iPhone (tramite iTunes)* della scheda
-iPhone, con *Invia all'app Musica (tramite iTunes)*, per i brani selezionati (o l'artista/album scelto negli elenchi):
+### Scrivere nell'app Musica
 
-1. prepara per ogni brano una **copia** con i tag modificati e la copertina, nella cartella delle copie per iTunes
-   (`Musica\myEasyMP3toIPhone per iTunes`, si cambia in *Impostazioni*), ordinata in `Artista/Album (Anno)/NN - Titolo`;
-   i **FLAC** diventano **ALAC** (`.m4a`, senza perdita di qualità), perché l'app Musica non legge i FLAC;
-2. apre iTunes con la sua interfaccia di automazione e aggiunge le copie alla libreria, nella playlist
-   **myEasyMP3toIPhone**;
-3. con *Poi sincronizza l'iPhone* (ricordato tra un avvio e l'altro), avvia la sincronizzazione dell'iPhone collegato
-   a iTunes.
+Il programma scrive nella musica dell'app Musica con lo stesso servizio di sincronizzazione di Apple che usano iTunes e
+CopyTrans Manager (*AirTrafficControl*), senza iTunes e senza sincronizzare tutto: ogni volta manda solo le modifiche
+("Delta"), mai una sostituzione completa.
 
-- I **file originali non cambiano**. iTunes usa le copie dove sono: **non cancellare la cartella delle copie**.
-- Un nuovo invio salta i brani già in iTunes e non cambiati, **aggiorna** quelli modificati (stesso brano di iTunes,
-  nessun doppione) e, se cambia il nome della copia (album o titolo nuovi), sostituisce brano e copia vecchi. Il
-  registro è `itunes_aggiunti.json` nella cartella dati.
-- La sincronizzazione di iTunes rende la musica dell'iPhone **uguale a quella scelta in iTunes**: va bene se l'iPhone
-  si sincronizza già con questo iTunes. Se in iTunes sincronizzi solo alcune playlist, la prima volta aggiungi
-  *myEasyMP3toIPhone* (iTunes → iPhone → Musica). Con *Sincronizza libreria* di Apple Music attivo sull'iPhone, iTunes non
-  aggiunge brani a mano.
-- **ffmpeg** serve per i FLAC: se manca, il riquadro mostra *Installa ffmpeg* (gratuito, con winget, solo per il tuo
-  utente); senza, i FLAC vengono saltati e il riepilogo lo dice.
-- iTunes resta aperto dopo l'invio: la sincronizzazione continua lì.
-- **Dall'iPhone al PC:** importa nella Libreria tutta la musica dell'app *Musica* (non i brani protetti di Apple Music).
-  Crea solo file nuovi: un file già presente sul PC non viene mai sostituito.
-- **File nell'app:** elenco, copia sul PC, eliminazione (solo sull'iPhone).
+| Dove | Tasto destro | Cosa fa |
+|---|---|---|
+| Scheda **PC** | **Invia all'iPhone** | i brani selezionati che non sono sull'iPhone: una copia con i tag e la copertina modificati (i file del PC non cambiano) |
+| Scheda **PC** | **Rimpiazza sull'iPhone** | i brani selezionati che sull'iPhone hanno tag diversi (⟳): vedi *Rimpiazza* qui sotto |
+| Scheda **iPhone** | **Rimpiazza con la versione del PC** | lo stesso, partendo dai brani dell'iPhone |
+| Scheda **iPhone** | **Cambia tag…** | titolo (un brano alla volta), album, genere, anno, numero di traccia e di disco; un campo vuoto non cambia, 0 svuota anno o numero |
+| Scheda **iPhone** | **Elimina dall'iPhone…** | toglie i brani dall'app Musica; l'iPhone cancella i loro file da solo, entro qualche minuto |
+
+- **L'app Musica non si aggiorna da sola** se è aperta durante l'invio: chiudila del tutto (scorri via la sua scheda)
+  e riaprila; i brani si trovano nella tua libreria (*Libreria → Artisti* o *Brani*), non cercando in Apple Music.
+- **Formati:** MP3, FLAC (l'iPhone li suona così come sono) e M4A in AAC. Gli M4A in Apple Lossless non ancora.
+- **Copertine:** quella modificata, o altrimenti quella del file, se è JPEG o PNG.
+- **Album e artisti:** un brano va nell'album e nell'artista già presenti sull'iPhone con lo stesso nome (senza badare
+  a maiuscole, accenti e spazi), con la grafia dell'iPhone: niente doppioni.
+- **Rimpiazza** prima invia la versione del PC, poi toglie quella vecchia, solo se l'invio è riuscito. Il brano
+  rimpiazzato perde il conteggio degli ascolti e la presenza nelle playlist fatte sull'iPhone.
+- **Artista e artista dell'album** non si cambiano con *Cambia tag*: sull'iPhone cambiarli rinominerebbe l'artista per
+  tutti i suoi brani. Si cambiano nella scheda PC, poi *Rimpiazza*.
+- Si possono aggiornare ed eliminare solo i brani messi sull'iPhone da un computer (iTunes, CopyTrans, questo
+  programma), non quelli acquistati o scaricati sul telefono.
+- Serve l'iPhone collegato e sbloccato, con la gestione manuale della musica attiva (in iTunes: *Riepilogo →
+  Gestisci manualmente musica e video*) e senza *Sincronizza libreria* di Apple Music. Se manca qualcosa il programma
+  lo dice e non scrive niente.
+
+**Sicurezza.** Prima di scrivere il programma copia il database dell'app Musica e controlla l'identità della libreria
+(quella già sul telefono, mai una nuova) e l'"ancora" della sincronizzazione, che l'iPhone deve confermare. Il file
+delle operazioni viene firmato, scritto e riletto; solo allora l'iPhone lo applica. Se qualcosa non torna prima di
+quel momento, il telefono resta com'era. A ogni sessione l'iPhone chiede anche copertine di brani già presenti: il
+programma risponde che non le ha, come fa rustunes, e quei brani restano come sono.
+
+> **Non premere mai "Sincronizza" in iTunes o in Dispositivi Apple** con la musica messa da questo programma o da
+> CopyTrans: iTunes la toglierebbe dall'iPhone per sostituirla con la sua libreria, senza chiedere conferma.
+
+Il protocollo non è documentato da Apple: il programma segue la ricostruzione di
+[rustunes](https://github.com/fbiba/rustunes) (licenza MIT, vedi `THIRD_PARTY_NOTICES.md`), provata su iOS 26.7 e 27.0
+- 27.2.1. Un aggiornamento di iOS può cambiarlo: in quel caso il programma si ferma con un errore invece di scrivere.
+
+Il vecchio invio tramite iTunes (riquadro *Invio all'app Musica dell'iPhone (tramite iTunes)*) non è più nella scheda
+iPhone: con un iPhone caricato da un altro programma poteva far cancellare la musica del telefono.
 
 ## L'AI: profili e chiavi
 
@@ -282,13 +310,13 @@ programma. La musica invece sta nella Libreria.
 | File | Contenuto |
 |---|---|
 | `myEasyMP3toIPhone.env` | le variabili d'ambiente (sopra) |
-| `settings.json` | cartella della Libreria, ultime cartelle usate, app dell'iPhone, AI della scansione, posizione della finestra |
+| `settings.json` | cartella della Libreria, ultime cartelle usate, AI della scansione, posizione della finestra |
 | `ai_profiles.json` | i profili AI (senza chiavi e senza indirizzi privati: quelli sono nella Gestione credenziali) |
 | `secrets.json` | solo senza credential store: le chiavi |
 | `scansioni\scansione_<data>.txt` | il rapporto di ogni scansione |
-| `iphone_files.json` | l'elenco dei file nell'app dell'iPhone all'ultimo collegamento (nomi, dimensioni, date), per la colonna *iPhone* |
+| `iphone_musica.json` | la musica dell'app Musica dell'iPhone all'ultimo collegamento (tag, durata, file sul telefono), per la scheda iPhone, la colonna *iPhone* e la scansione a telefono scollegato |
 | `itunes_aggiunti.json` | per ogni file inviato a iTunes: la sua copia, le modifiche applicate e il brano di iTunes (ID permanente) |
-| `iphone_inviati.json` | cosa è stato inviato a ogni app: per ogni file sull'iPhone, il file del PC da cui viene e le modifiche applicate |
+| `iphone_files.json`, `iphone_inviati.json` | delle versioni precedenti (invio alle app come VLC): non più usati, si possono cancellare |
 | `cache_tag.json` | i tag già letti di ogni file (con dimensione e data), per riaprire in fretta le cartelle grandi; si può cancellare |
 | `modifiche_tag.json`, `copertine\` | le modifiche dei tag in sospeso, per percorso del file, e le copertine nuove: i file sul PC non cambiano |
 | `crash.log`, `myEasyMP3toIPhone.output.log` | solo se qualcosa va storto: la traccia di un arresto improvviso e quello che il programma avrebbe scritto su una console (la finestra non ne ha) |
@@ -360,14 +388,14 @@ valore, altrimenti con `http://localhost:11434` o un endpoint di esempio da comp
 creato al primo avvio usa sempre `http://localhost:11434`, anche se `OLLAMA_API_BASE` ha un valore: la scansione
 predefinita resta su questo computer.
 
-### L'invio all'app Musica (iTunes)
+### L'invio all'app Musica
 
-- La cartella delle copie: `itunes_dir` in `settings.json` (*Impostazioni → Generale → Cartella delle copie per
-  iTunes*); senza valore `%USERPROFILE%\Music\myEasyMP3toIPhone per iTunes`.
-- *Poi sincronizza l'iPhone*: `itunes_sync` in `settings.json`, salvato ogni volta che cambi la casella; predefinito
-  sì.
-- ffmpeg: quello nel `PATH`, altrimenti quello installato da winget per l'utente
-  (`%LOCALAPPDATA%\Microsoft\WinGet\Links\ffmpeg.exe`); senza, i FLAC non si inviano.
+- L'invio diretto (tasto destro → *Invia all'iPhone*) non ha impostazioni: l'identità della libreria e l'ancora
+  vengono sempre dall'iPhone (`iTunesPrefs` e il database dell'app Musica); il nome del computer che l'iPhone registra
+  è quello di Windows.
+- Il vecchio invio tramite iTunes non è più nella scheda iPhone. Le sue impostazioni restano in `settings.json` ma non
+  si usano: `itunes_dir` (*Impostazioni → Generale → Cartella delle copie per iTunes*; senza valore
+  `%USERPROFILE%\Music\myEasyMP3toIPhone per iTunes`) e `itunes_sync` (predefinito sì).
 
 ### L'AI della scansione
 

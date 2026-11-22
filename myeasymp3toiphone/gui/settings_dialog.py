@@ -23,6 +23,7 @@ from ..config import (
     get_secret, import_calibre_tools_key, literal_text, load_profiles, new_profile, save_profiles, set_secret,
     variable_in,
 )
+from .theme import mark_danger
 
 NO_AI = "(nessuna: solo le regole)"
 VARIABLE_TIP = ("$NOME legge il valore dalla variabile d'ambiente NOME: si salva solo il nome. La variabile si imposta "
@@ -115,6 +116,7 @@ class SettingsDialog(QDialog):
         add = QPushButton("Aggiungi")
         duplicate = QPushButton("Duplica")
         remove = QPushButton("Elimina")
+        mark_danger(remove)
         import_button = QPushButton("Importa da myCalibreTools…")
         import_button.setToolTip(f"Copia i profili AI di myCalibreTools ({calibre_tools_folder()}), con le chiavi "
                                  "salvate nella Gestione credenziali")

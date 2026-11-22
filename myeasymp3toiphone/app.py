@@ -81,10 +81,12 @@ def main() -> int:
 
         from .config import PRODUCT, config_dir
         from .gui.main_window import MainWindow
+        from .gui.theme import apply_theme
 
         install_error_handlers(config_dir())
         app = QApplication.instance() or QApplication(sys.argv)
         app.setApplicationName(PRODUCT)
+        apply_theme(app)
         instance_lock = QLockFile(str(config_dir() / INSTANCE_LOCK))
         instance_lock.setStaleLockTime(0)   # il lucchetto di un programma chiuso male si riconosce e si riprende
         if instance_lock.tryLock(200):
@@ -121,7 +123,9 @@ def selftest() -> int:
                "requests", "keyring", "anthropic", "pymobiledevice3.lockdown", "pymobiledevice3.usbmux",
                "pymobiledevice3.services.afc", "pymobiledevice3.services.house_arrest",
                "pymobiledevice3.services.installation_proxy", "win32com.client", "pythoncom",
-               "myeasymp3toiphone.gui.main_window", "myeasymp3toiphone.scan", "myeasymp3toiphone.itunes")
+               "cryptography.hazmat.primitives.ciphers", "sqlite3",
+               "myeasymp3toiphone.gui.main_window", "myeasymp3toiphone.scan",
+               "myeasymp3toiphone.phone_sync", "myeasymp3toiphone.phone_actions")
     failed = 0
     for name in modules:
         try:

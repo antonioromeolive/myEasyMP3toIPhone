@@ -34,14 +34,17 @@ class TagCache:
         if isinstance(data, dict) and data.get("version") == CACHE_VERSION and isinstance(data.get("files"), dict):
             self._entries = data["files"]
 
-    def lookup(self, path: Path):
-        """(TrackTags, durata, errore) se la voce vale ancora per il file com'è ora; altrimenti None."""
+    def lookup(self, path: Path, stat: Optional[tuple] = None):
+        """(TrackTags, durata, errore) se la voce vale ancora per il file com'è ora; altrimenti None.
+        stat: (dimensione, data di modifica) già noti dall'elenco della cartella; senza, si chiedono al disco."""
         result = None
         entry = self._entries.get(path_key(path))
         if isinstance(entry, dict):
             try:
-                info = path.stat()
-                if entry.get("s") == info.st_size and entry.get("m") == info.st_mtime:
+                if stat is None:
+                    info = path.stat()
+                    stat = (info.st_size, info.st_mtime)
+                if entry.get("s") == stat[0] and entry.get("m") == stat[1]:
                     values = {}
                     for name, value in (entry.get("t") or {}).items():
                         if name in TAG_FIELD_NAMES:
@@ -78,11 +81,11 @@ class TagCache:
         return result
 
 
-def cached_track(path: Path, cache: Optional[TagCache]):
-    """Il brano dalla cache, o None se va letto dal file."""
+def cached_track(path: Path, cache: Optional[TagCache], stat: Optional[tuple] = None):
+    """Il brano dalla cache, o None se va letto dal file. stat: come in TagCache.lookup."""
     result = None
     if cache is not None:
-        found = cache.lookup(path)
+        found = cache.lookup(path, stat)
         if found is not None:
             from .library import Track
             tags, length, error = found

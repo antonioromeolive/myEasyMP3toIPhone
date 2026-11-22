@@ -5,8 +5,8 @@
 """La scansione della libreria (sul PC, sul posto) o della musica sull'iPhone, per trovare i problemi tipici:
 
   * file che non vengono aggiornati: sola lettura, tag ID3v1 o APE con valori vecchi che alcuni lettori leggono per
-    primi, ID3 v2.4/v2.2 che Windows e diverse app non leggono, copie doppie "Titolo (2)", file sull'iPhone più vecchi
-    di quelli del PC;
+    primi, ID3 v2.4/v2.2 che Windows e diverse app non leggono, copie doppie "Titolo (2)", brani nell'app Musica
+    dell'iPhone con tag diversi da quelli del PC;
   * album con pochi brani: numeri di traccia mancanti, meno brani del totale dichiarato, album di uno o due brani;
   * collezioni divise su più album: la stessa cartella con album diversi, lo stesso album scritto in modi diversi
     (maiuscole, "CD1"/"Disc 2"), compilation senza "Artista album", lo stesso artista scritto in modi diversi.
@@ -33,9 +33,8 @@ from mutagen.apev2 import APENoHeaderError, APEv2
 
 from .library import (
     UNKNOWN_ALBUM, UNKNOWN_ARTIST, Track, assign_groups, best_spelling, group_by_album, is_cancelled,
-    target_relative_path,
 )
-from .overlay import path_key
+from .phone_library import DEVICE_ABSENT, DEVICE_STALE, PhoneIndex, device_status
 from .tags import TrackTags
 
 log = logging.getLogger(__name__)
@@ -67,12 +66,8 @@ ORIGIN_RULE = "regola"
 ORIGIN_AI = "AI"
 
 FIX_TAGS = "tags"            # modifiche dei tag: restano in sospeso (overlay), i file sul PC non cambiano
-FIX_RESEND = "resend"
-FIX_DELETE_REMOTE = "delete_remote"
 
 VARIOUS_ARTISTS = "Artisti vari"
-REMOTE_MUSIC_ROOT = "/Documents/Musica"
-MTIME_TOLERANCE = 2.0
 AI_CHUNK_ALBUMS = 100
 DISC_MARKER = re.compile(r"[\s\-–,:]*[\(\[]?\s*(?:disc|disco|disk|cd)\s*(\d{1,2})\s*[\)\]]?\s*$", re.IGNORECASE)
 NUMBERED_COPY = re.compile(r"^(.*) \((\d+)\)$")
@@ -593,103 +588,31 @@ def rule_issues(tracks: list, check_files: bool, progress: Optional[ProgressFn] 
 
 # --------------------------------------------------------------------------- iPhone
 
-def track_from_remote(path: str, size: int = 0) -> Track:
-    """Un brano sull'iPhone, con i tag ricavati dal percorso: Musica/Artista/Album (Anno)/[D-]NN - Titolo.ext."""
-    parts = path.strip("/").split("/")
-    tags = TrackTags()
-    file_name = parts[-1]
-    stem = file_name.rsplit(".", 1)[0]
-    match = TRACK_PREFIX.match(stem)
-    if match:
-        tags.disc_number = int(match.group(1)) if match.group(1) else None
-        tags.track_number = int(match.group(2))
-        tags.title = match.group(3).strip()
-    else:
-        tags.title = stem
-    if len(parts) >= 3:
-        album = parts[-2]
-        year_match = YEAR_SUFFIX.match(album)
-        if year_match:
-            album = year_match.group(1)
-            tags.year = year_match.group(2)
-        tags.album = album
-    if len(parts) >= 4:
-        tags.album_artist = parts[-3]
-        tags.artist = parts[-3]
-    result = Track(path=Path(path), tags=tags, length=float(size))
-    return result
-
-
-DEVICE_SAME = "same"      # sull'iPhone c'è la stessa versione
-DEVICE_STALE = "stale"    # sull'iPhone c'è una versione più vecchia (o diversa)
-DEVICE_ABSENT = ""        # non c'è
-
-
-def remote_path_of(track: Track) -> str:
-    """Dove l'invio mette il brano nell'app dell'iPhone."""
-    result = f"{REMOTE_MUSIC_ROOT}/{target_relative_path(track).as_posix()}"
-    return result
-
-
-def remote_index(remote_files: list) -> dict:
-    result = {}
-    for remote in remote_files:
-        result[remote.path.casefold()] = remote
-    return result
-
-
-def device_status(track: Track, index: dict, sent: Optional[dict] = None, signature: str = "") -> str:
-    """Se il brano è sull'iPhone e in che versione. Con il registro degli invii (iphone.load_sent): la copia inviata
-    viene da questo file, il file non è cambiato da allora e le modifiche in sospeso sono le stesse (signature).
-    Senza registro (inviato da una versione precedente): stessa dimensione, data del PC non più recente, nessuna
-    modifica in sospeso."""
-    remote_key = remote_path_of(track).casefold()
-    remote = index.get(remote_key)
-    if remote is None or track.error:
-        result = DEVICE_ABSENT
-    else:
-        entry = (sent or {}).get(remote_key)
-        try:
-            local = track.path.stat()
-            if isinstance(entry, dict):
-                same = (entry.get("source") == path_key(track.path) and entry.get("size") == local.st_size
-                        and abs(float(entry.get("mtime", 0)) - local.st_mtime) <= MTIME_TOLERANCE
-                        and entry.get("signature", "") == signature and entry.get("remote_size") == remote.size)
-            else:
-                same = (not signature and remote.size == local.st_size
-                        and local.st_mtime <= remote.mtime + MTIME_TOLERANCE)
-        except OSError:
-            same = False
-        result = DEVICE_SAME if same else DEVICE_STALE
-    return result
-
-
-def compare_with_library(remote_files: list, library_tracks: list, sent: Optional[dict] = None,
-                         signature_of: Optional[Callable[[Track], str]] = None) -> list:
-    """I file nell'app dell'iPhone confrontati con la Libreria del PC (stesso percorso Artista/Album/NN - Titolo)."""
-    index = remote_index(remote_files)
+def compare_with_library(phone_tracks: list, library_tracks: list) -> list:
+    """La musica dell'app Musica dell'iPhone (phone_library.PhoneTrack) confrontata con la Libreria del PC, per
+    artista, album e titolo. Sull'iPhone il programma non scrive: i problemi non hanno correzioni automatiche."""
+    index = PhoneIndex(phone_tracks)
     stale = []
     missing_by_album = {}
     present_albums = set()
-    known = set()
+    found_pids = set()
     for track in library_tracks:
         if not track.error:
-            known.add(remote_path_of(track).casefold())
-            signature = signature_of(track) if signature_of is not None else ""
-            status = device_status(track, index, sent, signature)
+            status, item, _found = device_status(track, index)
             if status == DEVICE_ABSENT:
                 missing_by_album.setdefault(track.album_key, []).append(track)
             else:
+                found_pids.add(item.pid)
                 present_albums.add(track.album_key)
                 if status == DEVICE_STALE:
                     stale.append(track)
     issues = []
     if stale:
         issues.append(Issue(
-            KIND_NOT_UPDATED, SEVERITY_HIGH, f"{len(stale)} brani sull'iPhone più vecchi di quelli del PC",
-            "Dopo l'ultimo invio il file sul PC è cambiato, oppure hai modificato i suoi tag: sull'iPhone c'è "
-            "ancora la versione vecchia.", [t.path for t in stale],
-            Fix(FIX_RESEND, "Invia di nuovo questi brani all'iPhone", files=[t.path for t in stale]), rule_id="I1"))
+            KIND_NOT_UPDATED, SEVERITY_HIGH, f"{len(stale)} brani sull'iPhone con tag diversi da quelli del PC",
+            "Il brano è nell'app Musica dell'iPhone, ma titolo, artista, album, anno, genere o numeri non sono "
+            "quelli del PC (per esempio dopo una modifica sul PC). Nella scheda PC, la colonna iPhone mostra le "
+            "differenze.", [t.path for t in stale], rule_id="I1"))
     incomplete = []
     for key, tracks in missing_by_album.items():
         if key in present_albums:
@@ -699,18 +622,21 @@ def compare_with_library(remote_files: list, library_tracks: list, sent: Optiona
         number += 1
         issues.append(Issue(
             KIND_FEW_TRACKS, SEVERITY_MEDIUM, f"{key[0]} — {key[1]}: mancano {_tracks_text(len(tracks))} sull'iPhone",
-            "Sul PC l'album ha più brani di quelli inviati all'iPhone.", [t.path for t in tracks],
-            Fix(FIX_RESEND, "Invia i brani mancanti", files=[t.path for t in tracks]), rule_id=f"I2.{number}"))
+            "Sul PC l'album ha più brani di quelli nell'app Musica dell'iPhone.", [t.path for t in tracks],
+            rule_id=f"I2.{number}"))
     orphans = []
-    for remote in remote_files:
-        if remote.path.casefold().startswith(REMOTE_MUSIC_ROOT.casefold() + "/") and remote.path.casefold() not in known:
-            orphans.append(remote.path)
+    for item in phone_tracks:
+        if item.pid not in found_pids:
+            orphans.append(item)
     if orphans:
+        names = []
+        for item in orphans:
+            names.append(f"{item.display_artist} — {item.tags.album} — {item.tags.title}")
         issues.append(Issue(
-            KIND_ONLY_ON_DEVICE, SEVERITY_MEDIUM, f"{len(orphans)} file sull'iPhone non più presenti sul PC",
-            "Di solito sono i nomi vecchi di brani a cui sul PC hai cambiato album, artista o titolo: sull'iPhone "
-            "restano sia la copia vecchia sia quella nuova, e la collezione appare divisa o doppia.",
-            orphans, Fix(FIX_DELETE_REMOTE, "Elimina questi file dall'iPhone", files=list(orphans)), rule_id="I3"))
+            KIND_ONLY_ON_DEVICE, SEVERITY_MEDIUM, f"{len(orphans)} brani sull'iPhone che non sono sul PC",
+            "Non c'è un brano con lo stesso artista, album e titolo nella Libreria del PC. Se vuoi conservarli, "
+            "salvali sul PC dalla scheda iPhone (tasto destro → Salva su PC); a volte sono solo scritti in modo "
+            "diverso.", names, rule_id="I3"))
     return issues
 
 
@@ -907,10 +833,10 @@ def ai_review(provider, tracks: list, issues: list, progress: Optional[ProgressF
 # --------------------------------------------------------------------------- scansione completa
 
 def scan_tracks(tracks: list, target: str, provider=None, check_files: bool = True,
-                remote_files: Optional[list] = None, library_tracks: Optional[list] = None,
-                sent: Optional[dict] = None, signature_of: Optional[Callable[[Track], str]] = None,
+                phone_tracks: Optional[list] = None, library_tracks: Optional[list] = None,
                 progress: Optional[ProgressFn] = None, cancel: Optional[threading.Event] = None) -> ScanReport:
-    """La scansione: regole, confronto con la Libreria (iPhone), poi l'AI se c'è un fornitore."""
+    """La scansione: regole, poi l'AI se c'è un fornitore. Con phone_tracks (la musica dell'app Musica, i cui
+    brani sono anche tracks) la scansione è dell'iPhone, confrontato con library_tracks."""
     assign_groups(tracks)
     report = ScanReport(target=target, tracks_scanned=len(tracks), albums_scanned=len(group_by_album(tracks)))
     issues = rule_issues(tracks, check_files, progress, cancel)
@@ -919,14 +845,14 @@ def scan_tracks(tracks: list, target: str, provider=None, check_files: bool = Tr
         found, errors = ai_review(provider, tracks, issues, progress, cancel)
         issues += drop_repeated(found, issues)
         report.ai_errors = errors
-    if remote_files is not None:
-        # sull'iPhone i tag non si modificano: si correggono sul PC e si inviano di nuovo
+    if phone_tracks is not None:
+        # sull'iPhone il programma non scrive: le correzioni si fanno sui brani del PC
         for issue in issues:
             if issue.fix is not None:
                 issue.fix = None
-                issue.detail += " Correggi i brani sul PC, poi inviali di nuovo all'iPhone."
+                issue.detail += " Correggi i brani sul PC (scheda PC)."
         if library_tracks is not None:
-            issues += compare_with_library(remote_files, library_tracks, sent, signature_of)
+            issues += compare_with_library(phone_tracks, library_tracks)
     issues.sort(key=lambda issue: issue.sort_key())
     report.issues = issues
     report.cancelled = is_cancelled(cancel)

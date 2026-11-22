@@ -11,16 +11,18 @@ from typing import Optional
 from PySide6.QtCore import QByteArray, QItemSelectionModel, QSize, Qt, QTimer
 from PySide6.QtGui import QAction, QBrush, QColor, QFont, QKeySequence
 from PySide6.QtWidgets import (
-    QAbstractItemView, QComboBox, QFileDialog, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMainWindow,
+    QAbstractItemView, QComboBox, QFileDialog, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMainWindow, QMenu,
     QMessageBox, QScrollArea, QSplitter, QStyle, QTableWidget, QTableWidgetItem, QTabWidget,
     QToolBar, QVBoxLayout, QWidget,
 )
 
 from ..albumcheck import MusicBrainzClient, check_album
-from .. import iphone
 from ..config import PRODUCT, AppSettings, config_dir
 from ..library import assign_groups, copy_organized, group_by_album, scan_folder, track_sort_key
-from ..scan import DEVICE_ABSENT, DEVICE_SAME, DEVICE_STALE, device_status, remote_index
+from ..phone_library import (
+    DEVICE_ABSENT, DEVICE_SAME, DEVICE_STALE, PhoneIndex, describe_differences, device_status, load_listing,
+    save_listing,
+)
 from ..overlay import TagOverlay
 from ..tag_cache import TagCache
 from ..tags import prepare_copy, protect_folder, read_cover
@@ -43,9 +45,9 @@ SECONDS_PER_ALBUM_CHECK = 2.5
 COLUMNS = ["#", "iPhone", "Titolo", "Artista", "Album", "Anno", "Genere", "Durata", "File"]
 COL_NUMBER, COL_DEVICE, COL_TITLE, COL_ARTIST, COL_ALBUM, COL_YEAR, COL_GENRE, COL_LENGTH, COL_FILE = range(9)
 DEVICE_TEXT = {DEVICE_SAME: "✔", DEVICE_STALE: "⟳", DEVICE_ABSENT: ""}
-DEVICE_TIP = {DEVICE_SAME: "Sull'iPhone c'è già questa versione",
-              DEVICE_STALE: "Sull'iPhone c'è una versione più vecchia: inviala di nuovo",
-              DEVICE_ABSENT: "Non è sull'iPhone"}
+DEVICE_TIP = {DEVICE_SAME: "Nell'app Musica dell'iPhone c'è questo brano, con gli stessi tag",
+              DEVICE_STALE: "Nell'app Musica dell'iPhone c'è questo brano, ma con tag diversi:",
+              DEVICE_ABSENT: "Non è nell'app Musica dell'iPhone"}
 
 
 
@@ -65,15 +67,16 @@ def _number_item(value: Optional[int]) -> QTableWidgetItem:
 class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
-        self.setWindowTitle(f"{APP_NAME} {app_version().split(' ', 1)[0]}")
+        # la versione intera, con la data: due build -dev dello stesso numero si distinguono (come myCalibreTools)
+        self.setWindowTitle(f"{APP_NAME} {app_version()}")
         self.resize(1400, 820)
         self.app_settings = AppSettings.load()
-        self._device_index = {}
-        self._device_sent = {}
+        self._phone_index: Optional[PhoneIndex] = None   # la musica dell'app Musica, per la colonna "iPhone"
+        self.phone_tracks = []     # la musica dell'app Musica (phone_library.PhoneTrack), letta o ricordata
+        self.phone_label = ""      # di quale iPhone e quando
         self.overlay = TagOverlay(config_dir())
         self.tag_cache = TagCache(config_dir())
         self.open_on_start: Optional[Path] = None   # --open CARTELLA: aperta all'avvio al posto della Libreria
-        self._device_label = ""
         if self.app_settings.window_geometry:
             self.restoreGeometry(QByteArray.fromBase64(self.app_settings.window_geometry.encode("ascii")))
         self.mb_client = MusicBrainzClient()
@@ -88,7 +91,7 @@ class MainWindow(QMainWindow):
 
         self._build_toolbar()
         self._tabs = QTabWidget()
-        self._tabs.addTab(self._build_library_tab(), "Libreria")
+        self._tabs.addTab(self._build_library_tab(), "PC")
         self.iphone_panel = IPhonePanel(self)
         self._tabs.addTab(self.iphone_panel, "iPhone")
         self.setCentralWidget(self._tabs)
@@ -176,6 +179,8 @@ class MainWindow(QMainWindow):
         for column, width in enumerate(widths):
             self._table.setColumnWidth(column, width)
         self._table.itemSelectionChanged.connect(self._selection_changed)
+        self._table.setContextMenuPolicy(Qt.CustomContextMenu)
+        self._table.customContextMenuRequested.connect(self._table_menu)
 
         self.editor = TagEditor()
         self.editor.apply_requested.connect(self._apply_tag_changes)
@@ -209,33 +214,30 @@ class MainWindow(QMainWindow):
     # ================================================================== avvio e cartelle
 
     def _load_device_listing(self) -> None:
-        """L'ultimo elenco dei file sull'iPhone, per la colonna "iPhone" anche a iPhone scollegato."""
-        listing = iphone.load_listing(config_dir())
-        if listing and listing["bundle_id"] == self.app_settings.iphone_last_app:
-            self._device_sent = iphone.load_sent(config_dir(), listing["bundle_id"])
-            self._set_device_index(listing["files"], f"app {listing['app_name']}, elenco del {listing['saved_at']}")
+        """L'ultimo elenco della musica dell'iPhone, per la colonna "iPhone" e la scheda iPhone anche a telefono
+        scollegato."""
+        listing = load_listing(config_dir())
+        if listing:
+            self._show_phone_tracks(listing["tracks"], f"{listing['device']}, elenco del {listing['saved_at']}")
 
-    def _set_device_index(self, files: list, label: str) -> None:
-        self._device_index = remote_index(files)
-        self._device_label = label
-        header = self._table.horizontalHeaderItem(COL_DEVICE)
-        if header is not None:
-            header.setToolTip(f"Sull'iPhone ({label}): ✔ già presente, ⟳ versione vecchia, vuoto = non presente")
-
-    def set_device_files(self, app, files: list) -> None:
-        """Chiamata dalla scheda iPhone quando legge l'elenco dei file dell'app: salva e aggiorna la colonna."""
+    def set_phone_tracks(self, tracks: list, device: str) -> None:
+        """Chiamata dalla scheda iPhone quando ha letto la musica dell'app Musica: la salva e aggiorna le viste."""
         try:
-            iphone.save_listing(config_dir(), app.bundle_id, app.name, files)
+            save_listing(config_dir(), device, tracks)
         except OSError:
             pass  # la colonna funziona lo stesso fino alla chiusura
-        self._device_sent = iphone.load_sent(config_dir(), app.bundle_id)
-        self._set_device_index(files, f"app {app.name}, collegato ora")
-        self._fill_table()
+        self._show_phone_tracks(tracks, f"{device}, letto ora")
 
-    def device_signature(self, track) -> str:
-        """Le modifiche in sospeso del brano, per riconoscere la versione inviata all'iPhone."""
-        result = self.overlay.signature(track.path)
-        return result
+    def _show_phone_tracks(self, tracks: list, label: str) -> None:
+        self.phone_tracks = list(tracks)
+        self.phone_label = label
+        self._phone_index = PhoneIndex(tracks)
+        header = self._table.horizontalHeaderItem(COL_DEVICE)
+        if header is not None:
+            header.setToolTip(f"Nell'app Musica dell'iPhone ({label}): ✔ stesso brano, ⟳ stesso brano con tag "
+                              "diversi, vuoto = non c'è")
+        self.iphone_panel.set_phone_tracks(tracks, label)
+        self._fill_table()
 
     def _startup(self) -> None:
         """All'avvio: --open, altrimenti l'ultima cartella usata (se c'è ancora), altrimenti la Libreria."""
@@ -346,6 +348,7 @@ class MainWindow(QMainWindow):
         self._update_format_counts()
         self.browser.set_data(group_by_album(self.format_tracks()), self.check_results)
         self._fill_table(keep_tracks)
+        self.iphone_panel.pc_changed()
 
     def _track_filter(self):
         """None = tutti; altrimenti (artisti, album) scelti nel navigatore."""
@@ -403,9 +406,9 @@ class MainWindow(QMainWindow):
                 COL_FILE: track.path.name,
             }
             status = DEVICE_ABSENT
-            if self._device_index:
-                status = device_status(track, self._device_index, self._device_sent,
-                                       self.overlay.signature(track.path))
+            found = []
+            if self._phone_index is not None:
+                status, _phone_track, found = device_status(track, self._phone_index)
             values[COL_DEVICE] = DEVICE_TEXT[status]
             self._table.setItem(row, COL_NUMBER, number)
             for column, text in values.items():
@@ -425,8 +428,11 @@ class MainWindow(QMainWindow):
                                       + self.overlay.describe(track))
             device_item = self._table.item(row, COL_DEVICE)
             device_item.setTextAlignment(Qt.AlignCenter)
-            if self._device_index:
-                device_item.setToolTip(DEVICE_TIP[status])
+            if self._phone_index is not None:
+                tip = DEVICE_TIP[status]
+                if found:
+                    tip += "\n" + describe_differences(found)
+                device_item.setToolTip(tip)
             if status == DEVICE_STALE:
                 device_item.setForeground(QBrush(QColor(220, 140, 0)))
             elif status == DEVICE_SAME:
@@ -457,6 +463,41 @@ class MainWindow(QMainWindow):
         for row in self._selected_rows():
             result.append(self._track_at_row(row))
         return result
+
+    def _table_menu(self, position) -> None:
+        """Tasto destro sui brani: invia all'iPhone quelli che non ci sono, rimpiazza quelli con tag diversi."""
+        tracks = self._selected_table_tracks()
+        if tracks:
+            absent = []
+            stale = []
+            present = 0
+            for track in tracks:
+                status = DEVICE_ABSENT
+                phone_track = None
+                if self._phone_index is not None:
+                    status, phone_track, _found = device_status(track, self._phone_index)
+                if status == DEVICE_ABSENT:
+                    absent.append(track)
+                elif status == DEVICE_STALE and phone_track.from_computer:
+                    stale.append((phone_track, track))
+                else:
+                    present += 1
+            ready = self.iphone_panel.connected and not self.runner.is_busy
+            menu = QMenu(self)
+            send = menu.addAction(f"Invia all'iPhone ({len(absent)} brani che non ci sono)")
+            send.setEnabled(ready and bool(absent))
+            send.triggered.connect(lambda: self.iphone_panel.send_tracks(absent))
+            replace = menu.addAction(f"Rimpiazza sull'iPhone ({len(stale)} brani con tag diversi ⟳)")
+            replace.setEnabled(ready and bool(stale))
+            replace.triggered.connect(lambda: self.iphone_panel.replace_pairs(stale))
+            if present:
+                note = menu.addAction(f"{present} brani già sull'iPhone uguali ✔")
+                note.setEnabled(False)
+            if not self.iphone_panel.connected:
+                for action in (send, replace):
+                    action.setToolTip("Collega l'iPhone")
+            menu.setToolTipsVisible(True)
+            menu.exec(self._table.viewport().mapToGlobal(position))
 
     def selected_tracks(self) -> list:
         """Brani selezionati in tabella; altrimenti quelli dell'artista o dell'album scelti negli elenchi."""

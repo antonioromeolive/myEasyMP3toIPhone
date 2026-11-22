@@ -8,6 +8,7 @@ import threading
 import unicodedata
 from collections import Counter
 from dataclasses import dataclass, field
+from functools import lru_cache
 from pathlib import Path
 from typing import Callable, Optional
 
@@ -112,14 +113,44 @@ def load_track(path: Path) -> Track:
     return result
 
 
+def _is_link(entry) -> bool:
+    """Un collegamento simbolico o una giunzione: non si segue (come os.walk)."""
+    result = entry.is_symlink()
+    is_junction = getattr(entry, "is_junction", None)
+    if not result and is_junction is not None:
+        result = is_junction()
+    return result
+
+
+def find_audio_entries(folder: Path) -> list:
+    """(percorso, dimensione, data di modifica) dei file audio, ordinati per percorso. Dimensione e data vengono
+    dall'elenco della cartella (su Windows senza leggere ogni file): bastano a TagCache per sapere se un file è
+    cambiato. Una cartella che non si legge si salta, come fa os.walk."""
+    found = []
+    pending = [str(folder)]
+    while pending:
+        directory = pending.pop()
+        try:
+            with os.scandir(directory) as entries:
+                for entry in entries:
+                    try:
+                        if entry.is_dir() and not _is_link(entry):
+                            pending.append(entry.path)
+                        elif entry.is_file() and is_audio_file(Path(entry.name)):
+                            info = entry.stat()
+                            found.append((Path(entry.path), info.st_size, info.st_mtime))
+                    except OSError:
+                        pass  # un file sparito o bloccato mentre si elenca: lo si salta
+        except OSError as exc:
+            log.warning("Cartella non leggibile %s: %s", directory, exc)
+    found.sort(key=lambda item: str(item[0]).lower())
+    return found
+
+
 def find_audio_files(folder: Path) -> list:
     found = []
-    for directory, _subdirs, filenames in os.walk(folder):
-        for name in filenames:
-            candidate = Path(directory) / name
-            if is_audio_file(candidate):
-                found.append(candidate)
-    found.sort(key=lambda p: str(p).lower())
+    for path, _size, _mtime in find_audio_entries(folder):
+        found.append(path)
     return found
 
 
@@ -128,9 +159,10 @@ READ_WINDOW = 256     # file affidati ai thread alla volta, per poter annullare 
 
 
 def load_tracks(files: list, progress: Optional[ProgressFn] = None,
-                cancel: Optional[threading.Event] = None, cache=None) -> list:
+                cancel: Optional[threading.Event] = None, cache=None, stats: Optional[list] = None) -> list:
     """I brani dei file, nell'ordine dei file. Con una cache (tag_cache.TagCache) i file non cambiati non si
-    rileggono; gli altri si leggono con più thread."""
+    rileggono; gli altri si leggono con più thread. stats: (dimensione, data) di ogni file, già note dall'elenco
+    della cartella; senza, la cache le chiede al disco file per file."""
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
     from .tag_cache import cached_track
@@ -138,7 +170,8 @@ def load_tracks(files: list, progress: Optional[ProgressFn] = None,
     results = [None] * len(files)
     pending = []
     for index, path in enumerate(files):
-        track = cached_track(path, cache)
+        known = stats[index] if stats is not None else None
+        track = cached_track(path, cache, known)
         if track is None:
             pending.append(index)
         else:
@@ -170,15 +203,22 @@ def load_tracks(files: list, progress: Optional[ProgressFn] = None,
 
 def scan_folder(folder: Path, progress: Optional[ProgressFn] = None,
                 cancel: Optional[threading.Event] = None, cache=None) -> list:
-    result = load_tracks(find_audio_files(folder), progress, cancel, cache)
+    files = []
+    stats = []
+    for path, size, mtime in find_audio_entries(folder):
+        files.append(path)
+        stats.append((size, mtime))
+    result = load_tracks(files, progress, cancel, cache, stats)
     if cache is not None:
         cache.save()
     assign_groups(result)
     return result
 
 
+@lru_cache(maxsize=65536)
 def group_name(text: str) -> str:
-    """Il nome che decide il gruppo: senza differenze di maiuscole, accenti e spazi."""
+    """Il nome che decide il gruppo: senza differenze di maiuscole, accenti e spazi. Ricordato: gli stessi artisti
+    e album tornano su migliaia di brani a ogni apertura."""
     decomposed = unicodedata.normalize("NFKD", text.casefold())
     kept = ""
     for char in decomposed:

@@ -2,13 +2,12 @@
 # Author: Antonio Romeo (with Claude Code et al.)
 # SPDX-License-Identifier: MIT (see the LICENSE file for the full terms)
 
-"""La scansione dall'interfaccia: cosa scansionare (la cartella aperta o la musica nell'app dell'iPhone), l'avvio e la
-finestra dei risultati, da cui si applicano le correzioni."""
+"""La scansione dall'interfaccia: cosa scansionare (la cartella aperta o la musica dell'app Musica dell'iPhone), l'avvio
+e la finestra dei risultati, da cui si applicano le correzioni."""
 
 from __future__ import annotations
 
 from html import escape
-from pathlib import Path
 
 from PySide6.QtCore import QUrl, Qt
 from PySide6.QtGui import QBrush, QColor, QDesktopServices
@@ -17,15 +16,11 @@ from PySide6.QtWidgets import (
     QPushButton, QRadioButton, QSplitter, QStyle, QTextBrowser, QTreeWidget, QTreeWidgetItem, QVBoxLayout,
 )
 
-from .. import iphone
 from ..ai import make_provider
 from ..config import config_dir, load_profiles
 from ..library import scan_folder
-from ..scan import (
-    FIX_DELETE_REMOTE, FIX_RESEND, KIND_LABELS, ORIGIN_AI, REMOTE_MUSIC_ROOT, SEVERITY_HIGH, SEVERITY_MEDIUM,
-    save_report, scan_tracks, tag_changes_of, track_from_remote,
-)
-from ..tags import is_audio_file
+from ..phone_library import tracks_for_scan
+from ..scan import KIND_LABELS, ORIGIN_AI, SEVERITY_HIGH, SEVERITY_MEDIUM, save_report, scan_tracks, tag_changes_of
 
 REPORTS_FOLDER = "scansioni"
 GREEN = QColor(30, 140, 60)
@@ -35,17 +30,18 @@ GREY = QColor(130, 130, 130)
 class ScanTargetDialog(QDialog):
     """Cosa scansionare e se usare l'AI."""
 
-    def __init__(self, window, app, profile_name: str) -> None:
+    def __init__(self, window, phone_count: int, profile_name: str) -> None:
         super().__init__(window)
         self.setWindowTitle("Scansione")
         folder = window.root_folder
         self.local = QRadioButton(f"I brani della cartella aperta ({folder})" if folder else "Nessuna cartella aperta")
         self.local.setEnabled(folder is not None and bool(window.tracks))
-        if app is not None:
-            self.device = QRadioButton(f"La musica nell'app {app.name} dell'iPhone, confrontata con la Libreria")
+        if phone_count:
+            self.device = QRadioButton(f"La musica dell'app Musica dell'iPhone ({phone_count} brani, "
+                                       f"{window.phone_label}), confrontata con la Libreria")
         else:
-            self.device = QRadioButton("L'iPhone (collegalo prima dalla scheda iPhone)")
-        self.device.setEnabled(app is not None)
+            self.device = QRadioButton("L'iPhone (collegalo una volta: la sua musica resta ricordata)")
+        self.device.setEnabled(phone_count > 0)
         if self.local.isEnabled():
             self.local.setChecked(True)
         else:
@@ -87,9 +83,8 @@ class ScanLauncher:
 
     def start(self) -> None:
         window = self.window
-        app = window.iphone_panel.connected_app()
         profile = self._profile()
-        dialog = ScanTargetDialog(window, app, profile.name if profile else "")
+        dialog = ScanTargetDialog(window, len(window.phone_tracks), profile.name if profile else "")
         if dialog.exec():
             window.app_settings.scan_use_ai = dialog.use_ai.isChecked()
             window.save_settings()
@@ -97,7 +92,7 @@ class ScanLauncher:
             if dialog.use_ai.isChecked() and profile is not None:
                 provider = make_provider(profile)
             if dialog.device.isChecked():
-                self._start_device(app, provider)
+                self._start_device(provider)
             else:
                 self._start_local(provider)
 
@@ -113,31 +108,21 @@ class ScanLauncher:
 
         window.runner.run("Scansione", work, self._show)
 
-    def _start_device(self, app, provider) -> None:
+    def _start_device(self, provider) -> None:
         window = self.window
         library = window.library_dir()
         loaded = list(window.tracks) if window.root_folder == library else None
-        bundle_id = app.bundle_id
-        target = f"iPhone, app {app.name}"
+        phone_tracks = list(window.phone_tracks)
+        target = f"iPhone, app Musica ({window.phone_label})"
 
         def work(progress, cancel):
-            progress(0, 0, "elenco dei file sull'iPhone")
-            files = iphone.list_app_files(bundle_id)
-            music = []
-            for remote in files:
-                if is_audio_file(Path(remote.path)):
-                    music.append(remote)
-            remote_tracks = []
-            for remote in music:
-                remote_tracks.append(track_from_remote(remote.path, remote.size))
+            tracks = tracks_for_scan(phone_tracks)
             library_tracks = loaded
             if library_tracks is None:
                 library_tracks = scan_folder(library, progress, cancel, window.tag_cache) if library.is_dir() else []
             window.overlay.apply(library_tracks)
-            sent = iphone.load_sent(config_dir(), bundle_id)
-            report = scan_tracks(remote_tracks, target, provider, check_files=False, remote_files=music,
-                                 library_tracks=library_tracks, sent=sent, signature_of=window.device_signature,
-                                 progress=progress, cancel=cancel)
+            report = scan_tracks(tracks, target, provider, check_files=False, phone_tracks=phone_tracks,
+                                 library_tracks=library_tracks, progress=progress, cancel=cancel)
             value = (report, library_tracks)
             return value
 
@@ -197,7 +182,7 @@ class ScanDialog(QDialog):
         self.fix_button = QPushButton("Applica la correzione")
         self.fix_button.clicked.connect(self._apply)
         self.show_button = QPushButton("Mostra i brani")
-        self.show_button.setToolTip("Seleziona questi brani nella scheda Libreria")
+        self.show_button.setToolTip("Seleziona questi brani nella scheda PC")
         self.show_button.clicked.connect(self._show_tracks)
         open_button = QPushButton("Apri il rapporto")
         open_button.setEnabled(saved is not None)
@@ -309,22 +294,11 @@ class ScanDialog(QDialog):
 
     def _apply(self) -> None:
         local = []
-        resend = []
-        delete = []
         for index, issue in self._selected_issues():
             if issue.fix is not None and index not in self.fixed:
-                if issue.fix.action == FIX_RESEND:
-                    resend.append((index, issue))
-                elif issue.fix.action == FIX_DELETE_REMOTE:
-                    delete.append((index, issue))
-                else:
-                    local.append((index, issue))
+                local.append((index, issue))
         if local:
             self._apply_local(local)
-        if resend:
-            self._resend(resend)
-        if delete:
-            self._delete(delete)
 
     def _apply_local(self, items: list) -> None:
         """Le correzioni dei tag restano in sospeso per le copie dell'iPhone: i file sul PC non cambiano."""
@@ -355,31 +329,3 @@ class ScanDialog(QDialog):
             if missing:
                 message += f"\n{missing} brani non sono più nella cartella aperta: ripeti la scansione."
             QMessageBox.information(self, "Applica la correzione", message)
-
-    def _resend(self, items: list) -> None:
-        wanted = set()
-        for _index, issue in items:
-            for path in issue.fix.files:
-                wanted.add(str(path))
-        tracks = []
-        for track in self.launcher.library_tracks:
-            if str(track.path) in wanted:
-                tracks.append(track)
-        if tracks and self.window.iphone_panel.connected_app() is not None:
-            self.window.iphone_panel.upload_tracks(tracks)
-            self._mark_fixed([index for index, _issue in items])
-        else:
-            QMessageBox.warning(self, "Invia di nuovo", "Collega l'iPhone e scegli l'app nella scheda iPhone.")
-
-    def _delete(self, items: list) -> None:
-        paths = []
-        for _index, issue in items:
-            for path in issue.fix.files:
-                if str(path).startswith(REMOTE_MUSIC_ROOT):
-                    paths.append(str(path))
-        answer = QMessageBox.question(self, "Elimina dall'iPhone",
-                                      f"Eliminare definitivamente {len(paths)} file dall'iPhone?\n"
-                                      "Sul PC non cambia niente.")
-        if answer == QMessageBox.Yes and paths:
-            self.window.iphone_panel.delete_remote(paths)
-            self._mark_fixed([index for index, _issue in items])

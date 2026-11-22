@@ -25,7 +25,7 @@ SORT_ROLE = Qt.UserRole + 1    # il valore con cui si ordina una colonna (testo 
 KEY_ROLE = Qt.UserRole         # l'artista, o la coppia (artista, album)
 
 
-class _Item(QTreeWidgetItem):
+class SortableItem(QTreeWidgetItem):
     """Una riga ordinabile per valore; la riga "(Tutti …)" resta sempre in cima, in entrambi i versi."""
 
     def __init__(self, texts: list, sort_values: list, pinned: bool = False) -> None:
@@ -113,10 +113,10 @@ class LibraryBrowser(QWidget):
         total = 0
         for _artist, (_albums, count) in by_artist.items():
             total += count
-        self.artists.addTopLevelItem(_Item([f"(Tutti gli artisti: {len(by_artist)})", str(len(groups)), str(total)],
+        self.artists.addTopLevelItem(SortableItem([f"(Tutti gli artisti: {len(by_artist)})", str(len(groups)), str(total)],
                                            ["", len(groups), total], pinned=True))
         for artist, (album_count, count) in by_artist.items():
-            item = _Item([artist, str(album_count), str(count)], [artist.lower(), album_count, count])
+            item = SortableItem([artist, str(album_count), str(count)], [artist.lower(), album_count, count])
             item.setData(0, KEY_ROLE, artist)
             self.artists.addTopLevelItem(item)
             if artist in chosen_artists:
@@ -138,12 +138,12 @@ class LibraryBrowser(QWidget):
         for _key, tracks in rows:
             shown_tracks += len(tracks)
         label = "(Tutti gli album" + (" degli artisti scelti" if artists else "") + f": {len(rows)})"
-        self.albums.addTopLevelItem(_Item([label, "", "", str(shown_tracks)], ["", "", "", shown_tracks], pinned=True))
+        self.albums.addTopLevelItem(SortableItem([label, "", "", str(shown_tracks)], ["", "", "", shown_tracks], pinned=True))
         for key, tracks in rows:
             artist, album = key
             years = sorted({track.tags.year for track in tracks if track.tags.year})
             year = years[0] if len(years) == 1 else ("-".join([years[0], years[-1]]) if years else "")
-            item = _Item([album, artist, year, str(len(tracks))], [album.lower(), artist.lower(), year, len(tracks)])
+            item = SortableItem([album, artist, year, str(len(tracks))], [album.lower(), artist.lower(), year, len(tracks)])
             item.setData(0, KEY_ROLE, key)
             result = self._check_results.get(key)
             if result is not None:

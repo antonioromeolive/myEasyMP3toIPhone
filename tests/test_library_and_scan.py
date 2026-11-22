@@ -6,11 +6,11 @@ import os
 import stat
 import time
 
+import pytest
 from mutagen.id3 import ID3
 
 from conftest import write_mp3
 from myeasymp3toiphone import scan
-from myeasymp3toiphone.iphone import RemoteFile
 from myeasymp3toiphone.library import copy_organized, scan_folder, target_relative_path
 from myeasymp3toiphone.tags import TrackTags, read_tags, write_tags
 
@@ -115,22 +115,6 @@ def test_few_tracks_and_split_collections(tmp_path):
     assert {t.album_key for t in reloaded} == {(scan.VARIOUS_ARTISTS, "Estate 2020")}
 
 
-def test_iphone_comparison(tmp_path):
-    _tagged(tmp_path / "x.mp3", title="Uno", artist="A", album="B", track_number=1)
-    _tagged(tmp_path / "y.mp3", title="Due", artist="A", album="B", track_number=2)
-    library = scan_folder(tmp_path)
-    first = library[0]
-    remote_path = f"{scan.REMOTE_MUSIC_ROOT}/{target_relative_path(first).as_posix()}"
-    stat_info = first.path.stat()
-    remote = [RemoteFile(remote_path, stat_info.st_size, stat_info.st_mtime - 3600),
-              RemoteFile(f"{scan.REMOTE_MUSIC_ROOT}/A/Vecchio/01 - Uno.mp3", 10, 0)]
-    issues = scan.compare_with_library(remote, library)
-    rules = {issue.rule_id for issue in issues}
-    assert {"I1", "I2.1", "I3"} <= rules
-    parsed = scan.track_from_remote(remote_path)
-    assert parsed.tags.album == "B" and parsed.tags.track_number == 1 and parsed.tags.title == "Uno"
-
-
 class FakeProvider:
     def __init__(self, reply):
         self.reply = reply
@@ -184,22 +168,6 @@ def test_same_song_on_different_albums_is_not_a_duplicate(tmp_path):
     assert all(issue.fix is None for issue in issues)  # quale tenere lo decide l'utente
 
 
-def test_device_status_and_listing(tmp_path):
-    from myeasymp3toiphone import iphone
-    _tagged(tmp_path / "lib" / "x.mp3", title="Uno", artist="A", album="B", track_number=1)
-    track = scan_folder(tmp_path / "lib")[0]
-    info = track.path.stat()
-    same = RemoteFile(scan.remote_path_of(track), info.st_size, info.st_mtime)
-    assert scan.device_status(track, scan.remote_index([same])) == scan.DEVICE_SAME
-    old = RemoteFile(scan.remote_path_of(track), info.st_size, info.st_mtime - 600)
-    assert scan.device_status(track, scan.remote_index([old])) == scan.DEVICE_STALE
-    assert scan.device_status(track, {}) == scan.DEVICE_ABSENT
-    iphone.save_listing(tmp_path, "org.videolan.vlc-ios", "VLC", [same])
-    listing = iphone.load_listing(tmp_path)
-    assert listing["bundle_id"] == "org.videolan.vlc-ios" and listing["files"] == [same]
-    assert iphone.load_listing(tmp_path / "nessuna") == {}
-
-
 def test_overlay_never_touches_files_and_copies_get_changes(tmp_path):
     from myeasymp3toiphone.overlay import TagOverlay
     from myeasymp3toiphone.tags import TagError, is_protected, prepare_copy, protect_folder, read_cover
@@ -246,21 +214,6 @@ def test_overlay_never_touches_files_and_copies_get_changes(tmp_path):
     assert track.tags.title == "Vecchio" and not overlay.is_edited(track.path)
 
 
-def test_device_status_uses_sent_registry(tmp_path):
-    from myeasymp3toiphone.overlay import path_key
-    _tagged(tmp_path / "lib" / "x.mp3", title="Uno", artist="A", album="B", track_number=1)
-    track = scan_folder(tmp_path / "lib")[0]
-    local = track.path.stat()
-    remote = RemoteFile(scan.remote_path_of(track), local.st_size + 500, local.st_mtime)
-    index = scan.remote_index([remote])
-    sent = {scan.remote_path_of(track).casefold(): {"source": path_key(track.path), "size": local.st_size,
-                                                    "mtime": local.st_mtime, "signature": "abc",
-                                                    "remote_size": local.st_size + 500}}
-    assert scan.device_status(track, index, sent, "abc") == scan.DEVICE_SAME      # copia con tag diversi: è quella
-    assert scan.device_status(track, index, sent, "def") == scan.DEVICE_STALE     # modifiche cambiate dopo l'invio
-    assert scan.device_status(track, index, {}, "abc") == scan.DEVICE_STALE       # modifiche mai inviate
-
-
 def test_import_never_overwrites(tmp_path):
     from myeasymp3toiphone.library import copy_organized
     _tagged(tmp_path / "tmp" / "a.mp3", frames=50, title="Uno", artist="A", album="B", track_number=1)
@@ -286,3 +239,31 @@ def test_tag_cache_reuses_unchanged_files(tmp_path):
     os.utime(tmp_path / "m" / "a.mp3", (later, later))
     assert again.lookup(tmp_path / "m" / "a.mp3") is None   # file cambiato: si rilegge
     assert [t.title for t in scan_folder(tmp_path / "m", cache=again)] == ["Uno bis", "Due"]
+
+
+def test_reopening_uses_the_folder_listing_not_one_stat_per_file(tmp_path, monkeypatch):
+    """Riaprire una cartella grande: dimensione e data vengono dall'elenco della cartella, non da un stat() per
+    file (lento su dischi esterni e di rete); i valori sono gli stessi che la cache ha salvato."""
+    from pathlib import Path
+
+    from myeasymp3toiphone import library
+    from myeasymp3toiphone.tag_cache import TagCache
+    _tagged(tmp_path / "m" / "x" / "a.mp3", title="Uno", artist="A", album="B", track_number=1)
+    _tagged(tmp_path / "m" / "b.mp3", frames=45, title="Due", artist="A", album="B", track_number=2)
+    (tmp_path / "m" / "note.txt").write_text("non è musica")
+    cache = TagCache(tmp_path / "home")
+    scan_folder(tmp_path / "m", cache=cache)
+    entries = library.find_audio_entries(tmp_path / "m")
+    assert [path.name for path, _size, _mtime in entries] == ["b.mp3", "a.mp3"]
+    assert library.find_audio_files(tmp_path / "m") == [path for path, _size, _mtime in entries]
+    original_stat = Path.stat
+
+    def no_stat_of_audio(self, *args, **kwargs):
+        assert self.suffix != ".mp3", f"stat() su {self.name}: doveva bastare l'elenco della cartella"
+        result = original_stat(self, *args, **kwargs)
+        return result
+
+    monkeypatch.setattr(Path, "stat", no_stat_of_audio)
+    monkeypatch.setattr(library, "load_track", lambda path: pytest.fail(f"{path.name} riletto: era in cache"))
+    again = scan_folder(tmp_path / "m", cache=TagCache(tmp_path / "home"))
+    assert sorted(t.title for t in again) == ["Due", "Uno"]
