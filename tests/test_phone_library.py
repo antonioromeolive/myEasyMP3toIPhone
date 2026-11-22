@@ -358,3 +358,19 @@ def test_connect_button_and_manual_disconnect(monkeypatch):
     finally:
         window.close()
         app.processEvents()
+
+
+def test_phantom_tracks_marked_saved_and_reported(tmp_path):
+    from myeasymp3toiphone import iphone, scan
+    tracks = [_phone(1, "Uno", "A", "B"), _phone(2, "Due", "A", "B"),
+              PhoneTrack(3, "/Purchases/X.m4a", 1, 1.0, TrackTags(title="Tre"))]
+    tracks[1].remote_path = "/iTunes_Control/Music/F05/W0084007.mp3"
+    iphone.mark_missing_files(tracks, {"/itunes_control/music/f01/1.mp3"})
+    assert [t.missing_file for t in tracks] == [False, True, False]     # fuori dalla cartella della musica: no
+    phone_library.save_listing(tmp_path, "iPhone", tracks)
+    again = phone_library.load_listing(tmp_path)["tracks"]
+    assert [t.missing_file for t in again] == [False, True, False]
+    issues = scan.detect_phantoms(again)
+    assert len(issues) == 1 and issues[0].kind == scan.KIND_UNREADABLE and "W0084007" in issues[0].files[0]
+    iphone.mark_missing_files(tracks, None)                              # cartelle non lette: non si cambia niente
+    assert tracks[1].missing_file

@@ -899,6 +899,23 @@ def detect_same_songs(tracks: list, fingerprints: dict, provider=None, progress:
 
 # --------------------------------------------------------------------------- iPhone
 
+def detect_phantoms(phone_tracks: list) -> list:
+    """I brani "fantasma" dell'iPhone: nell'elenco dell'app Musica, ma senza il loro file (PhoneTrack.missing_file,
+    segnato alla lettura dall'iPhone)."""
+    names = []
+    for item in phone_tracks:
+        if item.missing_file:
+            names.append(f"{item.display_artist} — {item.tags.album} — {item.tags.title} ({item.remote_path})")
+    issues = []
+    if names:
+        issues.append(Issue(
+            KIND_UNREADABLE, SEVERITY_HIGH, f"{_tracks_text(len(names))} dell'iPhone senza file (fantasmi)",
+            "Sono nell'elenco dell'app Musica, ma il loro file sull'iPhone non c'è: non si possono ascoltare. "
+            "Toglili dalla scheda iPhone: Mostra → \"Senza file sull'iPhone\", tasto destro → Elimina dall'iPhone. "
+            "Sul PC non cambia niente.", names, rule_id="I4"))
+    return issues
+
+
 def compare_with_library(phone_tracks: list, library_tracks: list) -> list:
     """La musica dell'app Musica dell'iPhone (phone_library.PhoneTrack) confrontata con la Libreria del PC, per
     artista, album e titolo. Sull'iPhone il programma non scrive: i problemi non hanno correzioni automatiche."""
@@ -1183,6 +1200,8 @@ def scan_tracks(tracks: list, target: str, provider=None, check_files: bool = Tr
             for issue in compare_with_library(phone_tracks, library_tracks):
                 if enabled(issue, checks):
                     issues.append(issue)
+        if CHECK_UNREADABLE in checks:
+            issues += detect_phantoms(phone_tracks)
     issues.sort(key=lambda issue: issue.sort_key())
     report.issues = issues
     report.cancelled = is_cancelled(cancel)

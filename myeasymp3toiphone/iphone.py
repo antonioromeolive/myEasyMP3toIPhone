@@ -40,6 +40,7 @@ from .phone_sync import PhoneSyncError
 
 USBMUXD_ADDRESS = ("127.0.0.1", 27015)
 MUSIC_DATABASE_FOLDER = "/iTunes_Control/iTunes"
+MUSIC_FOLDER = "/iTunes_Control/Music"
 # il database e il suo registro delle ultime modifiche; il file -shm no: SQLite lo ricostruisce dal registro
 MUSIC_DATABASE_FILES = (DATABASE_NAME, DATABASE_NAME + "-wal")
 PAIR_TIMEOUT = 60
@@ -154,8 +155,33 @@ async def _device_info() -> DeviceInfo:
     return result
 
 
+async def _music_files(afc) -> Optional[set]:
+    """I file nelle cartelle della musica (/iTunes_Control/Music/F00…), in minuscolo; None se non si leggono."""
+    try:
+        result = set()
+        for folder in await afc.listdir(MUSIC_FOLDER):
+            path = posixpath.join(MUSIC_FOLDER, folder)
+            if folder.upper().startswith("F") and await afc.isdir(path):
+                for name in await afc.listdir(path):
+                    result.add(posixpath.join(path, name).lower())
+    except (PyMobileDevice3Exception, OSError) as exc:
+        log.warning("Cartelle della musica non lette (niente controllo dei brani senza file): %s", exc)
+        result = None
+    return result
+
+
+def mark_missing_files(tracks: list, files: Optional[set]) -> None:
+    """missing_file per i brani della cartella della musica il cui file non c'è (files: _music_files)."""
+    if files is not None:
+        prefix = MUSIC_FOLDER.lower() + "/"
+        for item in tracks:
+            path = item.remote_path.lower()
+            item.missing_file = path.startswith(prefix) and path not in files
+
+
 async def _list_music_app() -> list:
-    """Scarica una copia del database dell'app Musica in una cartella temporanea e la legge."""
+    """Scarica una copia del database dell'app Musica in una cartella temporanea e la legge; segna i brani il cui
+    file non c'è sull'iPhone."""
     folder = Path(tempfile.mkdtemp(prefix="myEasyMP3toIPhone_musica_"))
     lockdown = await _open_lockdown()
     try:
@@ -164,6 +190,7 @@ async def _list_music_app() -> list:
                 remote = posixpath.join(MUSIC_DATABASE_FOLDER, name)
                 if await afc.exists(remote):
                     (folder / name).write_bytes(await afc.get_file_contents(remote))
+            files = await _music_files(afc)
         if not (folder / DATABASE_NAME).is_file():
             raise IPhoneError(NO_MUSIC_MESSAGE)
         try:
@@ -171,6 +198,7 @@ async def _list_music_app() -> list:
         except PhoneLibraryError as exc:
             raise IPhoneError(f"Non riesco a leggere la musica dell'iPhone: {exc}. Riprova; se succede ancora, "
                               "la versione di iOS potrebbe usare un formato diverso.") from exc
+        mark_missing_files(result, files)
     finally:
         await lockdown.close()
         shutil.rmtree(folder, ignore_errors=True)

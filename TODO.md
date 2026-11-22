@@ -24,11 +24,6 @@ nome. Risultato come problemi della scansione con la correzione, poi *Rimpiazza*
 con iniziali ("B.B. King"). Numeri misurati: 2.696 nomi, 4 per ordine delle parole, 56 "solo cognome", 33 quasi
 uguali, 47 con iniziali, 656 duetti.
 
-## Brani "fantasma" sull'iPhone
-
-Brani nel database dell'app Musica il cui file non c'è (uno trovato: `F05/W0084007.mp3`, OBJECT_NOT_FOUND).
-Segnalarli (scheda iPhone, scansione) e proporre di eliminarli (`delete_track`).
-
 ## Le proposte dubbie di "Collega al PC"
 
 Sui dati veri restano 44 proposte non spuntate (regole senza un candidato chiaro). Controllare cosa ne dice l'AI

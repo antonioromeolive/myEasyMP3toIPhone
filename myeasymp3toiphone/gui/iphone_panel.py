@@ -33,14 +33,17 @@ ORIGIN_HERE = "questo PC"
 ORIGIN_UNKNOWN = "nessuna"
 ORIGIN_PHONE = "telefono"
 ORIGIN_MISSING = "file non trovato"
+ORIGIN_NO_FILE = "senza file"     # brano "fantasma": il suo file sull'iPhone non c'è
 # il filtro "Mostra": (testo, funzione origine -> visibile)
 SHOW_FILTERS = [
     ("Tutti i brani", lambda origin: True),
     ("Senza sorgente (solo sull'iPhone)", lambda origin: origin == ORIGIN_UNKNOWN),
     ("Con la sorgente su questo PC", lambda origin: origin == ORIGIN_HERE),
-    ("Da altri computer", lambda origin: origin not in (ORIGIN_HERE, ORIGIN_UNKNOWN, ORIGIN_PHONE, ORIGIN_MISSING)),
+    ("Da altri computer", lambda origin: origin not in (ORIGIN_HERE, ORIGIN_UNKNOWN, ORIGIN_PHONE, ORIGIN_MISSING,
+                                                        ORIGIN_NO_FILE)),
     ("File del PC non trovato", lambda origin: origin == ORIGIN_MISSING),
     ("Acquistati o scaricati sul telefono", lambda origin: origin == ORIGIN_PHONE),
+    ("Senza file sull'iPhone (fantasmi)", lambda origin: origin == ORIGIN_NO_FILE),
 ]
 PC_TEXT = {DEVICE_SAME: "✔", DEVICE_STALE: "⟳"}
 PC_TIP = {DEVICE_SAME: "Sul PC c'è lo stesso brano, con gli stessi tag",
@@ -311,7 +314,9 @@ class IPhonePanel(QWidget):
     def _origin(self, item) -> str:
         """La parola della colonna Origine (e del filtro Mostra)."""
         link = self._window.registry.get(item.sync_id) if item.sync_id else None
-        if not item.from_computer:
+        if item.missing_file:
+            result = ORIGIN_NO_FILE
+        elif not item.from_computer:
             result = ORIGIN_PHONE
         elif link is None:
             result = ORIGIN_UNKNOWN
@@ -373,6 +378,9 @@ class IPhonePanel(QWidget):
         else:
             where = "questo PC" if link.here else link.pc
             result = f"Da {where} ({link.how}, {link.date}):\n{link.path}"
+        if item.missing_file:
+            result = ("Brano \"fantasma\": è nell'elenco dell'app Musica, ma il suo file sull'iPhone non c'è, quindi "
+                      "non si può ascoltare. Toglilo con Elimina dall'iPhone (tasto destro).\n" + result)
         result += "\n" + item.remote_path
         return result
 
@@ -383,7 +391,7 @@ class IPhonePanel(QWidget):
         tip = self._origin_text(item)
         row.setToolTip(COL_ORIGIN, tip)
         row.setToolTip(COL_TITLE, tip)
-        if origin == ORIGIN_MISSING:
+        if origin in (ORIGIN_MISSING, ORIGIN_NO_FILE):
             row.setForeground(COL_ORIGIN, QBrush(QColor(200, 40, 40)))
         elif origin == ORIGIN_UNKNOWN:
             row.setForeground(COL_ORIGIN, QBrush(QColor(220, 140, 0)))
@@ -573,6 +581,18 @@ class IPhonePanel(QWidget):
     def _music_read(self, tracks: list) -> None:
         self._window.set_phone_tracks(tracks, self._device_name)
         self.check_missing_sources()
+        self._report_phantoms()
+
+    def _report_phantoms(self) -> None:
+        """Dopo la lettura dell'iPhone: quanti brani non hanno il file (si vedono con Mostra)."""
+        count = 0
+        for item in self._phone_tracks:
+            if item.missing_file:
+                count += 1
+        if count:
+            self._window.statusBar().showMessage(
+                f"{count} brani dell'iPhone senza file (fantasmi): Mostra → \"Senza file sull'iPhone\", poi tasto "
+                "destro → Elimina dall'iPhone", 20000)
 
     # ------------------------------------------------------------------ sorgenti sparite
 
@@ -1279,3 +1299,4 @@ class IPhonePanel(QWidget):
         self._update_enabled()
         self._window.set_phone_tracks(tracks, info.name)
         self.check_missing_sources()
+        self._report_phantoms()

@@ -236,6 +236,7 @@ Nella scheda iPhone la colonna **Sorgente** dice da quale file viene ogni brano:
 | *nessuna* | messo da un computer, ma non si sa da quale file: un brano *solo sull'iPhone* |
 | *file non trovato* | un file di questo computer che non c'è più (spostato o cancellato): il brano **non** viene tolto dall'iPhone |
 | *telefono* | acquistato o scaricato sull'iPhone: non si gestisce da un computer |
+| *senza file* | un brano "fantasma": è nell'elenco dell'app Musica ma il suo file sull'iPhone non c'è (non si può ascoltare); toglilo con *Elimina dall'iPhone* |
 
 Il menu **Mostra** filtra l'elenco per sorgente (per esempio solo i brani *senza sorgente*). Quando un brano ha la
 sorgente, il confronto delle colonne *Sul PC* e *iPhone* usa quel file esatto: un doppione sul PC con gli stessi tag
@@ -265,6 +266,12 @@ sorgente** (la finestra di *Associa sorgente*, uno alla volta, con per prima la 
 **Lascia senza sorgente** o **Elimina dall'iPhone** (con conferma). Un file su un disco che ora non è collegato non
 conta come sparito. Il contrario non succede mai: eliminare un brano dall'iPhone non cambia niente sul PC, e i
 doppioni del PC e quelli dell'iPhone si gestiscono in modo del tutto separato.
+
+**Brani fantasma.** A ogni lettura dell'iPhone il programma guarda anche quali file ci sono nelle cartelle della musica
+del telefono (una lettura per cartella, non per brano): un brano dell'elenco il cui file non c'è è un *fantasma*.
+La colonna *Sorgente* dice *senza file*, la barra di stato li conta, *Mostra → Senza file sull'iPhone* li elenca e
+*Controlla la musica* dell'iPhone li segnala tra i file illeggibili. Non si tolgono da soli: tasto destro →
+*Elimina dall'iPhone*.
 
 L'**impronta** riassume l'audio e non cambia quando cambiano i tag: per gli MP3 i primi 64 KB dopo il tag ID3, per i
 FLAC l'impronta dell'audio che il file porta nella sua intestazione, per gli M4A l'inizio del blocco audio. Così un

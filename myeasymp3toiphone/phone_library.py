@@ -78,6 +78,7 @@ class PhoneTrack:
     album_sync_id: int = 0
     artist_sync_id: int = 0   # dell'artista dell'album
     playlists: tuple = ()     # le playlist fatte a mano che lo contengono (non le smart)
+    missing_file: bool = False   # "fantasma": nel database dell'app Musica, ma il suo file sull'iPhone non c'è
 
     @property
     def from_computer(self) -> bool:
@@ -162,14 +163,17 @@ def read_music_database(path: Path) -> list:
 def save_listing(home: Path, device: str, tracks: list) -> None:
     rows = []
     playlists = {}
+    missing = []
     for item in tracks:
         rows.append([item.pid, item.remote_path, item.size, item.length, asdict(item.tags), item.sync_id,
                      item.album_sync_id, item.artist_sync_id])
         if item.playlists:
             playlists[str(item.pid)] = list(item.playlists)
-    # le playlist a parte: le righe restano quelle che le versioni precedenti sanno leggere
+        if item.missing_file:
+            missing.append(item.pid)
+    # playlist e fantasmi a parte: le righe restano quelle che le versioni precedenti sanno leggere
     data = {"version": LISTING_VERSION, "device": device, "saved_at": time.strftime("%Y-%m-%d %H:%M"),
-            "tracks": rows, "playlists": playlists}
+            "tracks": rows, "playlists": playlists, "missing_files": missing}
     home.mkdir(parents=True, exist_ok=True)
     path = home / LISTING_FILE
     temporary = path.with_name(path.name + ".tmp")
@@ -185,6 +189,9 @@ def load_listing(home: Path) -> dict:
         if data.get("version") == LISTING_VERSION:
             tracks = []
             playlists = data.get("playlists") or {}
+            missing = set()
+            for pid in data.get("missing_files") or []:
+                missing.add(int(pid))
             for pid, remote, size, length, values, sync_id, album_sync_id, artist_sync_id in data.get("tracks", []):
                 known = {}
                 for name, value in values.items():
@@ -196,7 +203,7 @@ def load_listing(home: Path) -> dict:
                 tracks.append(PhoneTrack(pid=int(pid), remote_path=str(remote), size=int(size),
                                          length=float(length), tags=TrackTags(**known), sync_id=int(sync_id),
                                          album_sync_id=int(album_sync_id), artist_sync_id=int(artist_sync_id),
-                                         playlists=tuple(names)))
+                                         playlists=tuple(names), missing_file=int(pid) in missing))
             result = {"device": str(data.get("device", "")), "saved_at": str(data.get("saved_at", "")),
                       "tracks": tracks}
     except (OSError, ValueError, TypeError, AttributeError):
