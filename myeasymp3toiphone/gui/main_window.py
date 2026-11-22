@@ -224,6 +224,14 @@ class MainWindow(QMainWindow):
         if listing:
             self._show_phone_tracks(listing["tracks"], f"{listing['device']}, elenco del {listing['saved_at']}")
 
+    def show_iphone_connected(self, connected: bool) -> None:
+        """Il titolo della scheda iPhone dice se è connesso ("iPhone ●" verde), anche quando si guarda la scheda PC."""
+        index = self._tabs.indexOf(self.iphone_panel) if hasattr(self, "iphone_panel") else -1
+        if index >= 0:
+            self._tabs.setTabText(index, "iPhone ●" if connected else "iPhone")
+            self._tabs.tabBar().setTabTextColor(index, QColor(60, 180, 100) if connected else QColor())
+            self._tabs.setTabToolTip(index, "iPhone connesso" if connected else "iPhone non connesso")
+
     def set_registry(self, registry) -> None:
         """Il registro della provenienza è cambiato (collegamenti nuovi o tolti): confronti e viste da rifare."""
         self.registry = registry
@@ -539,7 +547,7 @@ class MainWindow(QMainWindow):
                 note.setEnabled(False)
             if not self.iphone_panel.connected:
                 for action in (send, replace):
-                    action.setToolTip("Collega l'iPhone")
+                    action.setToolTip("Connetti l'iPhone")
             menu.setToolTipsVisible(True)
             menu.exec(self._table.viewport().mapToGlobal(position))
 

@@ -14,6 +14,9 @@ from __future__ import annotations
 BLUE = "#2f6fb3"
 BLUE_LIGHT = "#3d82cc"
 BLUE_DARK = "#245a93"
+GREEN = "#2e8b57"
+GREEN_LIGHT = "#3aa56a"
+GREEN_DARK = "#226b43"
 RED = "#c0392b"
 RED_LIGHT = "#d64a3b"
 RED_DARK = "#962d22"
@@ -29,10 +32,13 @@ QPushButton {{
 QPushButton:hover {{ background-color: {BLUE_LIGHT}; }}
 QPushButton:pressed {{ background-color: {BLUE_DARK}; }}
 QPushButton:default {{ border: 2px solid {BLUE_DARK}; }}
+QPushButton[role="go"] {{ background-color: {GREEN}; border-color: {GREEN_DARK}; }}
+QPushButton[role="go"]:hover {{ background-color: {GREEN_LIGHT}; }}
+QPushButton[role="go"]:pressed {{ background-color: {GREEN_DARK}; }}
 QPushButton[role="danger"] {{ background-color: {RED}; border-color: {RED_DARK}; }}
 QPushButton[role="danger"]:hover {{ background-color: {RED_LIGHT}; }}
 QPushButton[role="danger"]:pressed {{ background-color: {RED_DARK}; }}
-QPushButton:disabled, QPushButton[role="danger"]:disabled {{
+QPushButton:disabled, QPushButton[role="danger"]:disabled, QPushButton[role="go"]:disabled {{
     background-color: {GRAY_BACK}; color: {GRAY_TEXT}; border: 1px solid {GRAY_BORDER};
 }}
 
@@ -83,6 +89,13 @@ def install_italian(app) -> bool:
         app.installTranslator(translator)
     result = loaded
     return result
+
+
+def set_role(button, role: str) -> None:
+    """Il colore di un pulsante: "go" verde (avvia), "danger" rosso (cancella o interrompe), "" il blu normale."""
+    button.setProperty("role", role)
+    button.style().unpolish(button)
+    button.style().polish(button)
 
 
 def mark_danger(button) -> None:

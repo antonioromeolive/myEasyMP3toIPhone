@@ -47,9 +47,9 @@ PAIR_TIMEOUT = 60
 DRIVER_MESSAGE = (
     "Il servizio Apple per i dispositivi non è attivo.\n\n"
     "Installa l'app gratuita \"Dispositivi Apple\" dal Microsoft Store "
-    "(oppure iTunes), poi ricollega l'iPhone."
+    "(oppure iTunes), poi riattacca l'iPhone."
 )
-NO_DEVICE_MESSAGE = "Nessun iPhone collegato. Collega l'iPhone con il cavo USB e sbloccalo."
+NO_DEVICE_MESSAGE = "Nessun iPhone trovato. Attacca l'iPhone con il cavo USB e sbloccalo."
 NO_MUSIC_MESSAGE = "Sull'iPhone non c'è la libreria dell'app Musica (nessun brano è mai stato caricato)."
 
 ProgressFn = Callable[[int, int, str], None]
@@ -118,7 +118,7 @@ def _run(coroutine):
     except (PairingDialogResponsePendingError, NotTrustedError) as exc:
         raise IPhoneError("Sull'iPhone tocca \"Autorizza\" e inserisci il codice, poi riprova.") from exc
     except UserDeniedPairingError as exc:
-        raise IPhoneError("L'autorizzazione è stata negata sull'iPhone. Scollega e ricollega il cavo per riprovare.") from exc
+        raise IPhoneError("L'autorizzazione è stata negata sull'iPhone. Stacca e riattacca il cavo per riprovare.") from exc
     except (PyMobileDevice3Exception, ConnectionError, OSError, asyncio.TimeoutError) as exc:
         raise IPhoneError(f"Errore di comunicazione con l'iPhone: {exc}") from exc
     return result

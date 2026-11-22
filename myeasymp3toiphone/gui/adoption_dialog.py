@@ -2,8 +2,9 @@
 # Author: Antonio Romeo (with Claude Code et al.)
 # SPDX-License-Identifier: MIT (see the LICENSE file for the full terms)
 
-"""La conferma dell'adozione: i brani dell'iPhone collegati con l'impronta (certi) e le proposte delle regole e
-dell'AI, da spuntare. Collega scrive il registro della provenienza; Annulla non cambia niente."""
+"""La conferma di Associa sorgenti: i brani dell'iPhone associati alla loro sorgente con l'impronta (certi) e le
+proposte delle regole e dell'AI, da spuntare. Associa scrive il registro della provenienza; Annulla non cambia
+niente."""
 
 from __future__ import annotations
 
@@ -26,18 +27,19 @@ def _phone_text(item) -> str:
 
 def summary_text(outcome) -> str:
     lines = [f"<b>{len(outcome.certain)}</b> brani dell'iPhone ritrovati sul PC con l'impronta dell'audio: si "
-             "collegano senza chiedere."]
+             "associano alla loro sorgente senza chiedere."]
     if outcome.proposals:
         checked = sum(1 for proposal in outcome.proposals if proposal.checked)
         lines.append(f"<b>{len(outcome.proposals)}</b> proposte da controllare ({checked} già spuntate perché quasi "
                      "certe).")
     if outcome.foreign:
-        lines.append(f"<b>{len(outcome.foreign)}</b> brani senza un file sul PC: restano <i>solo sull'iPhone</i>, il "
+        lines.append(f"<b>{len(outcome.foreign)}</b> brani senza un file sul PC: restano <i>senza sorgente</i>, il "
                      "programma non li tocca.")
     if outcome.already:
-        lines.append(f"{outcome.already} brani erano già collegati.")
+        lines.append(f"{outcome.already} brani avevano già la sorgente.")
     if outcome.not_from_computer:
-        lines.append(f"{outcome.not_from_computer} brani acquistati o scaricati sul telefono: non si collegano.")
+        lines.append(f"{outcome.not_from_computer} brani acquistati o scaricati sul telefono: non hanno una "
+                     "sorgente.")
     for error in outcome.ai_errors[:2]:
         lines.append(f"<span style='color:#c33'>AI non riuscita: {error}</span>")
     result = "<br>".join(lines)
@@ -47,7 +49,7 @@ def summary_text(outcome) -> str:
 class AdoptionDialog(QDialog):
     def __init__(self, parent, outcome) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Collega i brani dell'iPhone ai file del PC")
+        self.setWindowTitle("Associa sorgenti: i file del PC dei brani dell'iPhone")
         self.resize(1250, 640)
         self.outcome = outcome
         header = QLabel(summary_text(outcome))
@@ -85,11 +87,11 @@ class AdoptionDialog(QDialog):
         tools.addWidget(check_none)
         tools.addStretch(1)
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        buttons.button(QDialogButtonBox.Ok).setText("Collega")
+        buttons.button(QDialogButtonBox.Ok).setText("Associa")
         buttons.button(QDialogButtonBox.Cancel).setText("Annulla")
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
-        note = QLabel("Collegare scrive solo il registro della provenienza (sul PC e sull'iPhone): né i brani "
+        note = QLabel("Associare scrive solo il registro della provenienza (sul PC e sull'iPhone): né i brani "
                       "dell'iPhone né i file del PC cambiano.")
         note.setWordWrap(True)
         note.setStyleSheet("color: gray")

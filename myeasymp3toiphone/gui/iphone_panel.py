@@ -1,4 +1,4 @@
-"""Scheda iPhone: collegamento, la musica dell'app Musica (com'è nell'app, confrontata con il PC) e, con il tasto
+"""Scheda iPhone: connessione, la musica dell'app Musica (com'è nell'app, confrontata con il PC) e, con il tasto
 destro, salva su PC, rimpiazza con la versione del PC, cambia i tag, elimina. L'invio dal PC parte dalla scheda PC.
 La scrittura sull'iPhone passa per phone_actions (il servizio di sincronizzazione di Apple)."""
 
@@ -17,26 +17,27 @@ from ..config import config_dir
 from ..library import Track, copy_organized
 from ..phone_library import DEVICE_SAME, DEVICE_STALE, comparison, pc_matches
 from .compare_tip import comparison_html, show_on_tooltip
+from .theme import set_role
 from .browser import SORT_ROLE, SortableItem
 
 DEVICE_POLL_MS = 3000   # ogni quanto si guarda se è stato collegato (o scollegato) un iPhone
 DOWNLOAD_TEMP_FOLDER = ".salvataggio_iphone"
 PID_ROLE = Qt.UserRole
-COLUMNS = ["N.", "Sul PC", "Origine", "Titolo", "Artista", "Album", "Anno", "Genere", "Durata"]
+COLUMNS = ["N.", "Sul PC", "Sorgente", "Titolo", "Artista", "Album", "Anno", "Genere", "Durata"]
 (COL_NUMBER, COL_PC, COL_ORIGIN, COL_TITLE, COL_ARTIST, COL_ALBUM, COL_YEAR, COL_GENRE,
  COL_LENGTH) = range(len(COLUMNS))
 COLUMN_WIDTHS = {COL_NUMBER: 50, COL_PC: 60, COL_ORIGIN: 110, COL_TITLE: 300, COL_ARTIST: 200, COL_ALBUM: 240,
                  COL_YEAR: 55, COL_GENRE: 110, COL_LENGTH: 60}
 # l'origine di un brano dell'iPhone, secondo il registro della provenienza
 ORIGIN_HERE = "questo PC"
-ORIGIN_UNKNOWN = "sconosciuta"
+ORIGIN_UNKNOWN = "nessuna"
 ORIGIN_PHONE = "telefono"
 ORIGIN_MISSING = "file non trovato"
 # il filtro "Mostra": (testo, funzione origine -> visibile)
 SHOW_FILTERS = [
     ("Tutti i brani", lambda origin: True),
-    ("Solo sull'iPhone (origine sconosciuta)", lambda origin: origin == ORIGIN_UNKNOWN),
-    ("Collegati a questo PC", lambda origin: origin == ORIGIN_HERE),
+    ("Senza sorgente (solo sull'iPhone)", lambda origin: origin == ORIGIN_UNKNOWN),
+    ("Con la sorgente su questo PC", lambda origin: origin == ORIGIN_HERE),
     ("Da altri computer", lambda origin: origin not in (ORIGIN_HERE, ORIGIN_UNKNOWN, ORIGIN_PHONE, ORIGIN_MISSING)),
     ("File del PC non trovato", lambda origin: origin == ORIGIN_MISSING),
     ("Acquistati o scaricati sul telefono", lambda origin: origin == ORIGIN_PHONE),
@@ -47,17 +48,21 @@ PC_TIP = {DEVICE_SAME: "Sul PC c'è lo stesso brano, con gli stessi tag",
 NOT_ON_PC_TIP = "Non è nella cartella aperta sul PC (confronto per artista, album e titolo)"
 MUSIC_APP_REFRESH = ("Se l'app Musica era aperta, chiudila del tutto e riaprila per vedere le modifiche (cerca "
                      "nella tua libreria, non in Apple Music).")
+NOT_CONNECTED = "iPhone non connesso"
+CONNECT_TEXT = "Connetti iPhone"
+DISCONNECT_TEXT = "Disconnetti iPhone"
+CONNECTED, CONNECTING, NOT_CONNECTED_STATE = "connesso", "connessione", "non connesso"
 SYNC_WARNING = ("Non premere mai \"Sincronizza\" in iTunes o in Dispositivi Apple: con la musica messa da un altro "
                 "programma, iTunes la toglierebbe dall'iPhone.")
 
 INFO_TEXT = (
     "<b>Come funziona.</b> Qui vedi la musica dell'app <b>Musica</b> dell'iPhone, con i titoli, gli artisti e gli "
     "album che mostra l'app. La colonna <b>Sul PC</b> la confronta con la cartella aperta nella scheda PC: "
-    "✔ stesso brano, ⟳ stesso brano con tag diversi, vuoto = non c'è. <b>Origine</b>: da quale file viene il brano "
-    "(questo PC, un altro computer, sconosciuta, telefono); <b>Collega al PC</b> la ritrova per tutti, "
+    "✔ stesso brano, ⟳ stesso brano con tag diversi, vuoto = non c'è. <b>Sorgente</b>: il file da cui viene il "
+    "brano (questo PC, un altro computer, nessuna, telefono); <b>Associa sorgenti</b> la ritrova per tutti, "
     "<b>Mostra</b> filtra.<br>"
     "Tasto destro su uno o più brani: <b>Salva su PC</b>, <b>Mostra nella scheda PC</b>, <b>Rimpiazza con la "
-    "versione del PC</b> (per i ⟳), <b>Cambia tag</b>, <b>Collega a un file del PC</b>, <b>Scollega</b>, "
+    "versione del PC</b> (per i ⟳), <b>Cambia tag</b>, <b>Associa sorgente</b>, <b>Togli sorgente</b>, "
     "<b>Elimina dall'iPhone</b>. Per mandare brani nuovi: tasto "
     "destro nella scheda PC → <b>Invia all'iPhone</b>. I file del PC non cambiano mai.<br>"
     f"<b>Attenzione:</b> {SYNC_WARNING}"
@@ -158,10 +163,12 @@ class IPhonePanel(QWidget):
         self._matches = {}
         self._pc_dirty = True
 
-        self._status = QLabel("iPhone non collegato")
+        self._status = QLabel(NOT_CONNECTED)
         self._status.setStyleSheet("font-size: 15px; font-weight: bold;")
-        self._connect_button = QPushButton("Collega iPhone")
-        self._connect_button.clicked.connect(self.connect_device)
+        self._connect_button = QPushButton(CONNECT_TEXT)
+        self._connect_button.setMinimumWidth(170)
+        self._connect_button.clicked.connect(self._toggle_connection)
+        self._manual_off = False      # disconnesso a mano: niente riconnessione automatica fino al cavo staccato
         top = QHBoxLayout()
         top.addWidget(self._status, 1)
         top.addWidget(self._connect_button)
@@ -222,14 +229,14 @@ class IPhonePanel(QWidget):
         header.setSectionResizeMode(COL_TITLE, QHeaderView.Stretch)
 
         self._refresh_button = QPushButton("Aggiorna elenco")
-        self._refresh_button.setToolTip("Rilegge la musica dell'app Musica dall'iPhone collegato")
+        self._refresh_button.setToolTip("Rilegge la musica dell'app Musica dall'iPhone connesso")
         self._refresh_button.clicked.connect(self._refresh_music)
         self._save_button = QPushButton("Salva i selezionati sul PC…")
         self._save_button.clicked.connect(self._save_selected)
-        self._adopt_button = QPushButton("Collega al PC…")
-        self._adopt_button.setToolTip("Ritrova nella cartella aperta sul PC il file di ogni brano dell'iPhone "
-                                      "(impronta dell'audio, poi regole e AI per i dubbi) e lo scrive nel registro "
-                                      "della provenienza. Né i brani né i file cambiano.")
+        self._adopt_button = QPushButton("Associa sorgenti…")
+        self._adopt_button.setToolTip("Ritrova nella cartella aperta sul PC la sorgente (il file) di ogni brano "
+                                      "dell'iPhone: impronta dell'audio, poi regole e AI per i dubbi. Scrive solo il "
+                                      "registro della provenienza: né i brani né i file cambiano.")
         self._adopt_button.clicked.connect(self._adopt)
         self._listing_note = QLabel()
         self._listing_note.setStyleSheet("color: gray")
@@ -490,9 +497,9 @@ class IPhonePanel(QWidget):
                  ready and bool(stale)),
                 (f"Cambia tag… ({len(writable)} brani)", self._edit_selected, ready and bool(writable)),
                 None,
-                ("Collega a un file del PC…", lambda: self._link_manually(single),
+                ("Associa sorgente…", lambda: self._link_manually(single),
                  single is not None and not self._window.runner.is_busy),
-                (f"Scollega dal PC ({len(linked_here)} brani)", lambda: self._unlink(linked_here),
+                (f"Togli sorgente ({len(linked_here)} brani)", lambda: self._unlink(linked_here),
                  bool(linked_here) and not self._window.runner.is_busy),
                 None,
                 (f"Elimina dall'iPhone… ({len(writable)} brani)", self._delete_selected, ready and bool(writable)),
@@ -505,7 +512,7 @@ class IPhonePanel(QWidget):
                     action = menu.addAction(text)
                     action.setEnabled(enabled)
                     if not self._connected:
-                        action.setToolTip("Collega l'iPhone")
+                        action.setToolTip("Connetti l'iPhone")
                     action.triggered.connect(slot)
             menu.setToolTipsVisible(True)
             menu.exec(self._music_view.viewport().mapToGlobal(position))
@@ -641,7 +648,8 @@ class IPhonePanel(QWidget):
     def _adopt(self) -> None:
         window = self._window
         if not window.tracks:
-            QMessageBox.information(self, "Collega al PC", "Apri prima nella scheda PC la cartella con la tua musica.")
+            QMessageBox.information(self, "Associa sorgenti",
+                                    "Apri prima nella scheda PC la cartella con la tua musica.")
         else:
             unknown = 0
             known_prints = provenance.PhoneFingerprints(config_dir())
@@ -653,7 +661,8 @@ class IPhonePanel(QWidget):
                         to_read += 1
             provider = self._ai_provider()
             minutes = max(1, round(to_read * 0.25 / 60)) if to_read else 0
-            text = (f"Collegare {unknown} brani dell'iPhone ai file della cartella aperta ({len(window.tracks)} "
+            text = (f"Cercare la sorgente di {unknown} brani dell'iPhone nei file della cartella aperta "
+                    f"({len(window.tracks)} "
                     "brani)?\n\n")
             if to_read:
                 text += (f"Prima legge l'impronta dell'audio di {to_read} brani dall'iPhone: circa {minutes} minuti. "
@@ -663,7 +672,7 @@ class IPhonePanel(QWidget):
             else:
                 text += "I casi dubbi te li mostro da controllare (l'AI della scansione è spenta).\n\n"
             text += "Alla fine vedi tutto prima di confermare; i brani e i file non cambiano."
-            if QMessageBox.question(self, "Collega al PC", text) == QMessageBox.Yes:
+            if QMessageBox.question(self, "Associa sorgenti", text) == QMessageBox.Yes:
                 phone_tracks = list(self._phone_tracks)
                 pc_tracks = list(window.tracks)
                 registry = window.registry
@@ -674,14 +683,14 @@ class IPhonePanel(QWidget):
                                            progress, cancel)
                     return value
 
-                window.runner.run("Collegamento al PC", work, self._adopted)
+                window.runner.run("Associazione delle sorgenti", work, self._adopted)
 
     def _adopted(self, outcome) -> None:
         from .adoption_dialog import AdoptionDialog
         window = self._window
         if outcome.cancelled:
-            QMessageBox.information(self, "Collega al PC", "Interrotto. Le impronte già lette sono ricordate: "
-                                    "riprendi quando vuoi con Collega al PC.")
+            QMessageBox.information(self, "Associa sorgenti", "Interrotto. Le impronte già lette sono ricordate: "
+                                    "riprendi quando vuoi con Associa sorgenti.")
         else:
             dialog = AdoptionDialog(self, outcome)
             if dialog.exec():
@@ -699,12 +708,13 @@ class IPhonePanel(QWidget):
 
                 def done(count):
                     window.set_registry(registry)
-                    QMessageBox.information(self, "Collega al PC", f"{count} brani collegati ai file del PC.")
+                    QMessageBox.information(self, "Associa sorgenti", f"{count} brani associati alla loro "
+                                            "sorgente sul PC.")
 
                 window.runner.run("Registro della provenienza", work, done)
 
     def _store_registry(self, registry, message: str) -> None:
-        """Salva il registro (PC e iPhone, se collegato) e rifà i confronti."""
+        """Salva il registro (PC e iPhone, se connesso) e rifà i confronti."""
         window = self._window
         connected = self._connected
 
@@ -739,19 +749,19 @@ class IPhonePanel(QWidget):
                                                 size=info.st_size, mtime=info.st_mtime,
                                                 signature=window.overlay.signature(path), fingerprint=printed,
                                                 how=provenance.HOW_MANUAL))
-                self._store_registry(registry, f"Collegato a {path}")
+                self._store_registry(registry, f"Sorgente associata: {path}")
 
     def _unlink(self, items: list) -> None:
         if items:
             answer = QMessageBox.question(
-                self, "Scollega dal PC",
-                f"Togliere il collegamento di {len(items)} brani dell'iPhone al loro file del PC?\n\n"
-                "I brani restano sull'iPhone e i file sul PC: diventano di origine sconosciuta.")
+                self, "Togli sorgente",
+                f"Togliere la sorgente (il file del PC) di {len(items)} brani dell'iPhone?\n\n"
+                "I brani restano sull'iPhone e i file sul PC: diventano brani senza sorgente.")
             if answer == QMessageBox.Yes:
                 registry = self._window.registry
                 for item in items:
                     registry.forget(item.sync_id)
-                self._store_registry(registry, f"{len(items)} brani scollegati dal PC")
+                self._store_registry(registry, f"Tolta la sorgente di {len(items)} brani")
 
     # ------------------------------------------------------------------ salva su PC
 
@@ -760,7 +770,7 @@ class IPhonePanel(QWidget):
         if not items:
             QMessageBox.information(self, "Salva su PC", "Seleziona prima uno o più brani nell'elenco.")
         elif not self._connected:
-            QMessageBox.information(self, "Salva su PC", "Collega l'iPhone per copiarne i brani sul PC.")
+            QMessageBox.information(self, "Salva su PC", "Connetti l'iPhone per copiarne i brani sul PC.")
         else:
             start = str(self._window.library_dir())
             folder = QFileDialog.getExistingDirectory(
@@ -815,7 +825,7 @@ class IPhonePanel(QWidget):
         transfer, copy_report, target, linked = value
         message = (f"Copiati dall'iPhone: {len(transfer.done)}\n"
                    f"Nella cartella {target}: {copy_report.summary()}\n"
-                   f"Collegati ai file salvati: {linked}")
+                   f"Associati ai file salvati (sorgente): {linked}")
         self._window.set_registry(self._window.registry)
         if transfer.errors:
             details = []
@@ -834,6 +844,43 @@ class IPhonePanel(QWidget):
         self._refresh_button.setEnabled(self._connected)
         self._save_button.setEnabled(self._connected)
         self._adopt_button.setEnabled(self._connected)
+        self._show_connection(CONNECTED if self._connected else NOT_CONNECTED_STATE)
+
+    def _show_connection(self, state: str) -> None:
+        """Il pulsante dice cosa fa: verde "Connetti iPhone", "Connessione…", rosso "Disconnetti iPhone"; il titolo
+        della scheda mostra se l'iPhone è connesso anche dalla scheda PC."""
+        button = self._connect_button
+        if state == CONNECTED:
+            button.setText(DISCONNECT_TEXT)
+            set_role(button, "danger")
+            button.setEnabled(True)
+            button.setToolTip("Chiude la connessione: il programma non si riconnette da solo finché non premi "
+                              "Connetti iPhone o stacchi e riattacchi il cavo")
+        elif state == CONNECTING:
+            button.setText("Connessione…")
+            set_role(button, "")
+            button.setEnabled(False)
+        else:
+            button.setText(CONNECT_TEXT)
+            set_role(button, "go")
+            button.setEnabled(True)
+            button.setToolTip("Si connette all'iPhone attaccato con il cavo e ne legge la musica")
+        self._window.show_iphone_connected(state == CONNECTED)
+
+    def _toggle_connection(self) -> None:
+        if self._connected:
+            self.disconnect_device()
+        elif not self._window.runner.is_busy:
+            self._manual_off = False
+            self.connect_device()
+
+    def disconnect_device(self) -> None:
+        self._connected = False
+        self._manual_off = True
+        self._auto_tried = True
+        self._status.setText("iPhone disconnesso: premi Connetti iPhone per riconnetterlo")
+        self._update_enabled()
+        self._window.statusBar().showMessage("iPhone disconnesso", 5000)
 
     @property
     def connected(self) -> bool:
@@ -841,8 +888,9 @@ class IPhonePanel(QWidget):
         return result
 
     def _check_device(self) -> None:
-        """Ogni pochi secondi: un iPhone appena collegato si collega da solo (la prima volta l'iPhone chiede
-        "Autorizza"), uno scollegato si segna come tale. Senza driver Apple lo dice una volta."""
+        """Ogni pochi secondi: un iPhone appena attaccato si connette da solo (la prima volta l'iPhone chiede
+        "Autorizza"), uno staccato si segna come disconnesso. Dopo Disconnetti niente riconnessione automatica finché
+        il cavo non viene staccato. Senza driver Apple lo dice una volta."""
         present = iphone.device_present()
         if present is None:
             if not self._driver_warned:
@@ -851,29 +899,31 @@ class IPhonePanel(QWidget):
                                      "Microsoft Store (oppure iTunes)")
         elif not present:
             self._auto_tried = False
+            self._manual_off = False      # cavo staccato: al prossimo attacco ci si riconnette da soli
             if self._connected:
                 self._connected = False
-                self._status.setText("iPhone scollegato")
+                self._status.setText("iPhone disconnesso (cavo staccato)")
                 self._update_enabled()
-                self._window.statusBar().showMessage("iPhone scollegato", 5000)
-            elif self._driver_warned or self._status.text() == "iPhone non collegato":
+                self._window.statusBar().showMessage("iPhone disconnesso", 5000)
+            elif self._driver_warned or self._status.text() in (NOT_CONNECTED, ""):
                 self._driver_warned = False
-                self._status.setText("Collega l'iPhone con il cavo USB e sbloccalo")
-        elif not self._connected and not self._auto_tried and not self._window.runner.is_busy:
+                self._status.setText("Attacca l'iPhone con il cavo USB e sbloccalo")
+        elif (not self._connected and not self._auto_tried and not self._manual_off
+              and not self._window.runner.is_busy):
             self._auto_tried = True
-            self._status.setText("iPhone rilevato: collegamento… se l'iPhone lo chiede, tocca \"Autorizza\" e "
+            self._status.setText("iPhone rilevato: connessione… se l'iPhone lo chiede, tocca \"Autorizza\" e "
                                  "inserisci il codice")
-            self._window.statusBar().showMessage("iPhone rilevato: collegamento in corso", 5000)
+            self._window.statusBar().showMessage("iPhone rilevato: connessione in corso", 5000)
             self.connect_device(auto=True)
 
     def _show_error(self, message: str) -> None:
         self._connected = False
-        self._status.setText("iPhone non collegato")
+        self._status.setText(NOT_CONNECTED)
         self._update_enabled()
         QMessageBox.warning(self, "iPhone", message)
 
     def _show_auto_error(self, message: str) -> None:
-        """Il collegamento automatico non riuscito non apre finestre: lo dice qui; "Collega iPhone" riprova."""
+        """La connessione automatica non riuscita non apre finestre: lo dice qui; "Connetti iPhone" riprova."""
         self._connected = False
         self._status.setText(message.replace("\n\n", " "))
         self._update_enabled()
@@ -897,14 +947,15 @@ class IPhonePanel(QWidget):
             on_error = self._show_auto_error
         else:
             on_error = self._show_error
-        self._window.runner.run("Collegamento iPhone", work, self._connected_ok, on_error)
+        if self._window.runner.run("Connessione all'iPhone", work, self._connected_ok, on_error):
+            self._show_connection(CONNECTING)
 
     def _connected_ok(self, value) -> None:
         info, tracks, registry = value
         self._window.registry = registry
         self._connected = True
         self._device_name = info.name
-        self._status.setText("Collegato: " + info.label())
-        self._window.statusBar().showMessage("iPhone collegato: " + info.label(), 8000)
+        self._status.setText("Connesso: " + info.label())
+        self._window.statusBar().showMessage("iPhone connesso: " + info.label(), 8000)
         self._update_enabled()
         self._window.set_phone_tracks(tracks, info.name)

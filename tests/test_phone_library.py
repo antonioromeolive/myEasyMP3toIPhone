@@ -294,3 +294,42 @@ def test_comparison_table_tooltips(tmp_path):
     finally:
         window.close()
         app.processEvents()
+
+
+def test_connect_button_and_manual_disconnect(monkeypatch):
+    """Connetti (verde) / Disconnetti (rosso); dopo Disconnetti niente riconnessione automatica finché il cavo non
+    viene staccato; il titolo della scheda dice se l'iPhone è connesso."""
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtWidgets import QApplication
+    from myeasymp3toiphone import iphone
+    from myeasymp3toiphone.gui import iphone_panel
+    from myeasymp3toiphone.gui.main_window import MainWindow
+    app = QApplication.instance() or QApplication([])
+    window = MainWindow()
+    try:
+        panel = window.iphone_panel
+        attempts = []
+        monkeypatch.setattr(panel, "connect_device", lambda auto=False: attempts.append(auto))
+        button = panel._connect_button
+        assert button.text() == iphone_panel.CONNECT_TEXT and button.property("role") == "go"
+        panel._connected = True
+        panel._update_enabled()
+        assert button.text() == iphone_panel.DISCONNECT_TEXT and button.property("role") == "danger"
+        tab = window._tabs.indexOf(panel)
+        assert window._tabs.tabText(tab) == "iPhone ●"
+        button.click()                                           # Disconnetti
+        assert not panel.connected and button.text() == iphone_panel.CONNECT_TEXT
+        assert window._tabs.tabText(tab) == "iPhone"
+        monkeypatch.setattr(iphone, "device_present", lambda: True)
+        panel._check_device()
+        assert attempts == []                                    # attaccato, ma disconnesso a mano: niente
+        monkeypatch.setattr(iphone, "device_present", lambda: False)
+        panel._check_device()                                    # cavo staccato
+        monkeypatch.setattr(iphone, "device_present", lambda: True)
+        panel._check_device()                                    # riattaccato: si riconnette da solo
+        assert attempts == [True]
+        button.click()                                           # Connetti a mano
+        assert attempts == [True, False]
+    finally:
+        window.close()
+        app.processEvents()

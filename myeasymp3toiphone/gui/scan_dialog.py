@@ -40,7 +40,7 @@ class ScanTargetDialog(QDialog):
             self.device = QRadioButton(f"La musica dell'app Musica dell'iPhone ({phone_count} brani, "
                                        f"{window.phone_label}), confrontata con la Libreria")
         else:
-            self.device = QRadioButton("L'iPhone (collegalo una volta: la sua musica resta ricordata)")
+            self.device = QRadioButton("L'iPhone (connettilo una volta: la sua musica resta ricordata)")
         self.device.setEnabled(phone_count > 0)
         if self.local.isEnabled():
             self.local.setChecked(True)

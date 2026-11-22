@@ -73,7 +73,7 @@ variante, perché l'iPhone la considera un artista diverso.
 **⟳** c'è lo stesso brano, ma con tag diversi; vuoto,
 non c'è. "Lo stesso brano" vuol dire stesso titolo e stesso album, senza badare a maiuscole, accenti e spazi, e un
 artista in comune; un brano con modifiche in sospeso si ritrova anche con i tag del file. Si basa sulla musica
-dell'iPhone letta all'ultimo collegamento e salvata nella cartella dati, quindi si vede anche a iPhone scollegato (il
+dell'iPhone letta all'ultima connessione e salvata nella cartella dati, quindi si vede anche a iPhone disconnesso (il
 suggerimento sull'intestazione dice di quando è l'elenco).
 
 **Tag.** A destra si modificano titolo, artista, artista album, album, numero di traccia e di disco, anno, genere,
@@ -111,7 +111,7 @@ OneDrive…) compare in rosso, con il motivo nel suggerimento, e non interrompe 
 ## La scansione
 
 *Scansione* (F6) analizza la cartella aperta, oppure la musica dell'app *Musica* dell'iPhone confrontata con la
-Libreria (si può fare anche a iPhone scollegato, con l'ultimo elenco letto). Prima
+Libreria (si può fare anche a iPhone disconnesso, con l'ultimo elenco letto). Prima
 applica delle regole locali, veloci e gratuite; poi, se scegli di usarla, l'AI. Il rapporto resta in
 `.myEasyMP3toIPhone\scansioni\`. Ogni problema può avere una **correzione**: si applica dalla finestra dei risultati, dopo
 una conferma, come **modifiche in sospeso** (i file sul PC non cambiano; vanno sulle copie inviate all'iPhone); *Mostra
@@ -143,13 +143,16 @@ In console: `myEasyMP3toIPhone-cli --scan <cartella> [--ai "<profilo>"]`.
 
 ## L'iPhone
 
-**Basta collegare l'iPhone con il cavo:** il programma lo rileva da solo (controlla ogni 3 secondi) e si collega. La
+**Basta attaccare l'iPhone con il cavo:** il programma lo rileva da solo (controlla ogni 3 secondi) e si connette. La
 prima volta l'iPhone chiede **"Autorizzare questo computer?"**: tocca *Autorizza* e inserisci il codice. La scheda
-**iPhone** e la barra di stato dicono a che punto è; se il collegamento automatico non riesce (iPhone bloccato,
-autorizzazione negata) lo dice lì, e *Collega iPhone* riprova. Senza il driver Apple la scheda dice di installare
-*Dispositivi Apple*. Scollegando l'iPhone la scheda lo segna come scollegato.
+**iPhone** e la barra di stato dicono a che punto è; se la connessione automatica non riesce (iPhone bloccato,
+autorizzazione negata) lo dice lì, e *Connetti iPhone* riprova. Senza il driver Apple la scheda dice di installare
+*Dispositivi Apple*. Il pulsante dice cosa fa: **verde "Connetti iPhone"** quando non è connesso, **rosso
+"Disconnetti iPhone"** quando lo è; il titolo della scheda diventa **"iPhone ●"** in verde, così lo si vede anche
+dalla scheda PC. Dopo *Disconnetti* il programma non si riconnette da solo finché non premi *Connetti iPhone* o stacchi
+e riattacchi il cavo. Staccando il cavo l'iPhone risulta disconnesso.
 
-**La musica dell'app Musica.** Collegato l'iPhone, la scheda **iPhone** mostra i brani dell'app *Musica* con i
+**La musica dell'app Musica.** Connesso l'iPhone, la scheda **iPhone** mostra i brani dell'app *Musica* con i
 titoli, gli artisti e gli album che mostra l'app: il programma ne copia sul PC il database (`MediaLibrary.sqlitedb`)
 e lo legge, perché sul telefono i file hanno nomi casuali (`F12/ABCD.mp3`). Sono solo i brani con un file
 sull'iPhone, non quelli in streaming da Apple Music. *Cerca* filtra per titolo, artista o album.
@@ -166,7 +169,7 @@ accenti non sono evidenziati: sull'iPhone sono lo stesso gruppo.
   ordinati in `Artista/Album (Anno)/NN - Titolo` con i nomi che mostra l'app; crea solo file nuovi, un file già
   presente sul PC non viene mai sostituito. **Mostra nella scheda PC** seleziona i brani corrispondenti del PC.
 - L'elenco letto resta in `iphone_musica.json` nella cartella dati: scheda iPhone, colonna *iPhone* e scansione
-  funzionano anche a telefono scollegato (*Aggiorna elenco* lo rilegge).
+  funzionano anche a telefono disconnesso (*Aggiorna elenco* lo rilegge).
 
 ### Scrivere nell'app Musica
 
@@ -197,31 +200,31 @@ CopyTrans Manager (*AirTrafficControl*), senza iTunes e senza sincronizzare tutt
   tutti i suoi brani. Si cambiano nella scheda PC, poi *Rimpiazza*.
 - Si possono aggiornare ed eliminare solo i brani messi sull'iPhone da un computer (iTunes, CopyTrans, questo
   programma), non quelli acquistati o scaricati sul telefono.
-- Serve l'iPhone collegato e sbloccato, con la gestione manuale della musica attiva (in *Dispositivi Apple* o in
-  iTunes, con l'iPhone collegato: *Gestisci manualmente musica e video*) e senza *Sincronizza libreria* di Apple Music. Se manca qualcosa il programma
+- Serve l'iPhone connesso e sbloccato, con la gestione manuale della musica attiva (in *Dispositivi Apple* o in
+  iTunes, con l'iPhone attaccato: *Gestisci manualmente musica e video*) e senza *Sincronizza libreria* di Apple Music. Se manca qualcosa il programma
   lo dice e non scrive niente.
 
 **Da dove viene un brano.** Il programma tiene un **registro della provenienza**: per ogni brano dell'iPhone
 (il suo identificativo fisso, `sync_id`), il computer e il file da cui viene, con dimensione, data, le modifiche in
-sospeso al momento dell'invio e l'**impronta dell'audio**, e come è nato il collegamento (*inviato*, *impronta*,
+sospeso al momento dell'invio e l'**impronta dell'audio**, e come è nata l'associazione (*inviato*, *impronta*,
 *regole*, *ai*, *a mano*, *salvato*). Ogni invio lo registra; un'eliminazione toglie la riga. Il registro sta nella
 cartella dati (`registro_iphone.json`) e sull'iPhone (`myEasyMP3toIPhone/registro.json`, un file che l'iPhone non
-legge): così ogni computer con il programma vede anche le righe degli altri. Al collegamento le due copie si
+legge): così ogni computer con il programma vede anche le righe degli altri. Alla connessione le due copie si
 uniscono (per lo stesso brano vince la più recente) e le righe dei brani che non sono più sull'iPhone si tolgono.
-Nella scheda iPhone la colonna **Origine** dice da dove viene ogni brano:
+Nella scheda iPhone la colonna **Sorgente** dice da quale file viene ogni brano:
 
-| Origine | Significato |
+| Sorgente | Significato |
 |---|---|
-| *questo PC* | collegato a un file di questo computer (il suggerimento dice quale, e come è nato il collegamento) |
-| il nome di un altro computer | collegato a un file di quel computer |
-| *sconosciuta* | messo da un computer, ma non si sa da quale file: un brano *solo sull'iPhone* |
-| *file non trovato* | collegato a un file di questo computer che non c'è più (spostato o cancellato): il brano **non** viene tolto dall'iPhone |
+| *questo PC* | un file di questo computer (il suggerimento dice quale, e come è nata l'associazione) |
+| il nome di un altro computer | un file di quel computer |
+| *nessuna* | messo da un computer, ma non si sa da quale file: un brano *solo sull'iPhone* |
+| *file non trovato* | un file di questo computer che non c'è più (spostato o cancellato): il brano **non** viene tolto dall'iPhone |
 | *telefono* | acquistato o scaricato sull'iPhone: non si gestisce da un computer |
 
-Il menu **Mostra** filtra l'elenco per origine (per esempio solo i brani *solo sull'iPhone*). Quando un brano è
-collegato, il confronto delle colonne *Sul PC* e *iPhone* usa quel file esatto: un doppione sul PC con gli stessi tag
-non prende il suo posto. Tasto destro: **Collega a un file del PC…** (tra i file più simili della cartella aperta, o
-uno qualsiasi) e **Scollega dal PC**. **Salva su PC** collega ogni brano salvato al suo file nuovo (verificato con
+Il menu **Mostra** filtra l'elenco per sorgente (per esempio solo i brani *senza sorgente*). Quando un brano ha la
+sorgente, il confronto delle colonne *Sul PC* e *iPhone* usa quel file esatto: un doppione sul PC con gli stessi tag
+non prende il suo posto. Tasto destro: **Associa sorgente…** (tra i file più simili della cartella aperta, o
+uno qualsiasi) e **Togli sorgente**. **Salva su PC** associa ogni brano salvato al suo file nuovo (verificato con
 l'impronta), anche quando un file con lo stesso audio c'era già.
 
 L'**impronta** riassume l'audio e non cambia quando cambiano i tag: per gli MP3 i primi 64 KB dopo il tag ID3, per i
@@ -229,12 +232,12 @@ FLAC l'impronta dell'audio che il file porta nella sua intestazione, per gli M4A
 brano dell'iPhone si riconosce anche se titolo, album o artista sono diversi da quelli del PC (le compilation, i
 brani "sciolti"): su 40 brani messi sull'iPhone da CopyTrans, 40 sono stati ritrovati così sul PC.
 
-**Collega al PC** (scheda iPhone) ritrova il file del PC di ogni brano dell'iPhone di origine sconosciuta (messo
+**Associa sorgenti** (scheda iPhone) ritrova il file del PC di ogni brano dell'iPhone senza sorgente (messo
 da CopyTrans, da un altro computer…) e lo scrive nel registro. Confronta con la cartella aperta nella scheda PC, in
 tre livelli:
 
 1. **impronta dell'audio**: stesso audio = stesso brano, qualunque siano titolo, album, artista. Con più copie sul PC
-   sceglie quella con i tag più simili. Si collega senza chiedere;
+   sceglie quella con i tag più simili. Si associa senza chiedere;
 2. **regole**: durata entro 2 secondi e titolo e artista quasi uguali, con un solo candidato chiaramente migliore
    (per esempio un'altra codifica dello stesso brano). Proposto già spuntato;
 3. **AI**, per i dubbi veri (per esempio una versione dal vivo e una in studio): riceve per ogni brano dell'iPhone
@@ -242,7 +245,7 @@ tre livelli:
    registrazione, o nessuno, con la sicurezza e il motivo. Usa il profilo AI della scansione (*Impostazioni →
    Generale*); proposto spuntato solo se l'AI è sicura. Senza AI, i dubbi si mostrano da controllare.
 
-Prima di scrivere mostra tutto: quanti brani sono collegati con l'impronta, le proposte con il motivo (da spuntare o
+Prima di scrivere mostra tutto: quanti brani sono associati con l'impronta, le proposte con il motivo (da spuntare o
 togliere) e quanti brani non hanno un file sul PC: questi restano *solo sull'iPhone* e il programma non li tocca mai
 da solo. La prima volta legge l'impronta di ogni brano dall'iPhone, circa un quarto di secondo l'uno (un quarto d'ora
 per 3.500 brani); si può annullare e riprendere, quelle già lette si ricordano (`impronte_iphone.json`). Le impronte
@@ -377,7 +380,7 @@ programma. La musica invece sta nella Libreria.
 | `ai_profiles.json` | i profili AI (senza chiavi e senza indirizzi privati: quelli sono nella Gestione credenziali) |
 | `secrets.json` | solo senza credential store: le chiavi |
 | `scansioni\scansione_<data>.txt` | il rapporto di ogni scansione |
-| `iphone_musica.json` | la musica dell'app Musica dell'iPhone all'ultimo collegamento (tag, durata, file sul telefono), per la scheda iPhone, la colonna *iPhone* e la scansione a telefono scollegato |
+| `iphone_musica.json` | la musica dell'app Musica dell'iPhone all'ultima connessione (tag, durata, file sul telefono), per la scheda iPhone, la colonna *iPhone* e la scansione a telefono disconnesso |
 | `registro_iphone.json` | il registro della provenienza: per ogni brano dell'iPhone, il computer e il file da cui viene (vedi *Da dove viene un brano*); una copia sta sull'iPhone |
 | `impronte_iphone.json` | le impronte dell'audio dei file dell'iPhone già lette, per non rileggerle |
 | `itunes_aggiunti.json` | della versione 0.1.1 (invio tramite iTunes): non più usato, si può cancellare |

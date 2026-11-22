@@ -28,7 +28,7 @@ def _duration(seconds: float) -> str:
 class LinkDialog(QDialog):
     def __init__(self, parent, phone_track, pc_tracks: list) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Collega a un file del PC")
+        self.setWindowTitle("Associa sorgente")
         self.resize(900, 420)
         self.chosen: Optional[Path] = None
         tags = phone_track.tags
@@ -58,7 +58,7 @@ class LinkDialog(QDialog):
         other = QPushButton("Scegli un altro file…")
         other.clicked.connect(self._choose_file)
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        buttons.button(QDialogButtonBox.Ok).setText("Collega")
+        buttons.button(QDialogButtonBox.Ok).setText("Associa")
         buttons.accepted.connect(self._accept_current)
         buttons.rejected.connect(self.reject)
         note = QLabel("Si scrive solo il registro della provenienza: né il brano dell'iPhone né il file cambiano.")

@@ -1,23 +1,5 @@
 # TODO
 
-## Le parole: "connetti" per il cavo, "sorgente" per la provenienza
-
-Oggi "collega" vuol dire due cose: il cavo ("Collega iPhone") e la provenienza ("Collega al PC", "Collega a un file
-del PC", "Scollega dal PC"). Per il cavo **connetti / connesso / disconnetti**; per la provenienza **sorgente /
-associa**: il pulsante per tutti i brani "Associa sorgenti…", col tasto destro "Associa sorgente…" e "Togli
-sorgente", la colonna *Origine* diventa *Sorgente* (e "Solo sull'iPhone" = senza sorgente). Da applicare a interfaccia,
-messaggi e README.
-
-## Il pulsante dell'iPhone: "Connetti iPhone" (verde) / "Disconnetti iPhone" (rosso)
-
-Oggi il pulsante dice sempre "Collega iPhone" e lo stato è solo nel testo accanto: non si capisce.
-- iPhone non connesso: pulsante **verde "Connetti iPhone"**; durante la connessione "Connessione…";
-- connesso: pulsante **rosso "Disconnetti iPhone"**, che chiude la connessione;
-- dopo *Disconnetti* il programma **non** si riconnette da solo quando vede il telefono (oggi lo fa ogni 3 secondi):
-  resta disconnesso finché si preme *Connetti* o si stacca e riattacca il cavo;
-- lo stato si vede anche fuori dalla scheda iPhone (per esempio "iPhone ●" verde nel titolo della scheda), così dalla
-  scheda PC si sa se l'invio è possibile.
-
 ## "Associa sorgente" (tasto destro nella scheda iPhone)
 
 Sostituisce l'attuale *Collega a un file del PC…* (un elenco semplice dei 5 file più simili, filtrati per titolo).
