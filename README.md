@@ -202,7 +202,21 @@ sospeso al momento dell'invio e l'**impronta dell'audio**, e come è nato il col
 cartella dati (`registro_iphone.json`) e sull'iPhone (`myEasyMP3toIPhone/registro.json`, un file che l'iPhone non
 legge): così ogni computer con il programma vede anche le righe degli altri. Al collegamento le due copie si
 uniscono (per lo stesso brano vince la più recente) e le righe dei brani che non sono più sull'iPhone si tolgono.
-Nella scheda iPhone il suggerimento sul titolo dice da dove viene il brano.
+Nella scheda iPhone la colonna **Origine** dice da dove viene ogni brano:
+
+| Origine | Significato |
+|---|---|
+| *questo PC* | collegato a un file di questo computer (il suggerimento dice quale, e come è nato il collegamento) |
+| il nome di un altro computer | collegato a un file di quel computer |
+| *sconosciuta* | messo da un computer, ma non si sa da quale file: un brano *solo sull'iPhone* |
+| *file non trovato* | collegato a un file di questo computer che non c'è più (spostato o cancellato): il brano **non** viene tolto dall'iPhone |
+| *telefono* | acquistato o scaricato sull'iPhone: non si gestisce da un computer |
+
+Il menu **Mostra** filtra l'elenco per origine (per esempio solo i brani *solo sull'iPhone*). Quando un brano è
+collegato, il confronto delle colonne *Sul PC* e *iPhone* usa quel file esatto: un doppione sul PC con gli stessi tag
+non prende il suo posto. Tasto destro: **Collega a un file del PC…** (tra i file più simili della cartella aperta, o
+uno qualsiasi) e **Scollega dal PC**. **Salva su PC** collega ogni brano salvato al suo file nuovo (verificato con
+l'impronta), anche quando un file con lo stesso audio c'era già.
 
 L'**impronta** riassume l'audio e non cambia quando cambiano i tag: per gli MP3 i primi 64 KB dopo il tag ID3, per i
 FLAC l'impronta dell'audio che il file porta nella sua intestazione, per gli M4A l'inizio del blocco audio. Così un

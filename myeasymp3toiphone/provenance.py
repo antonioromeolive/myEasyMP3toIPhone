@@ -340,6 +340,15 @@ class Registry:
         result = len(self.links)
         return result
 
+    def links_here(self) -> dict:
+        """{overlay.path_key del file: sync_id} dei collegamenti di questo computer."""
+        from .overlay import path_key
+        result = {}
+        for link in self.links.values():
+            if link.here:
+                result[path_key(link.path)] = link.sync_id
+        return result
+
 
 async def read_phone_registry(afc) -> Registry:
     if await afc.exists(PHONE_REGISTRY):

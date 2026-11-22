@@ -8,7 +8,7 @@ from pathlib import Path
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QBrush, QColor
 from PySide6.QtWidgets import (
-    QAbstractItemView, QDialog, QDialogButtonBox, QFileDialog, QFormLayout, QGroupBox, QHBoxLayout, QHeaderView,
+    QAbstractItemView, QComboBox, QDialog, QDialogButtonBox, QFileDialog, QFormLayout, QGroupBox, QHBoxLayout, QHeaderView,
     QLabel, QLineEdit, QMenu, QMessageBox, QPushButton, QTreeWidget, QVBoxLayout, QWidget,
 )
 
@@ -21,10 +21,25 @@ from .browser import SORT_ROLE, SortableItem
 DEVICE_POLL_MS = 3000   # ogni quanto si guarda se è stato collegato (o scollegato) un iPhone
 DOWNLOAD_TEMP_FOLDER = ".salvataggio_iphone"
 PID_ROLE = Qt.UserRole
-COLUMNS = ["N.", "Sul PC", "Titolo", "Artista", "Album", "Anno", "Genere", "Durata"]
-COL_NUMBER, COL_PC, COL_TITLE, COL_ARTIST, COL_ALBUM, COL_YEAR, COL_GENRE, COL_LENGTH = range(len(COLUMNS))
-COLUMN_WIDTHS = {COL_NUMBER: 50, COL_PC: 60, COL_TITLE: 300, COL_ARTIST: 200, COL_ALBUM: 240, COL_YEAR: 55,
-                 COL_GENRE: 110, COL_LENGTH: 60}
+COLUMNS = ["N.", "Sul PC", "Origine", "Titolo", "Artista", "Album", "Anno", "Genere", "Durata"]
+(COL_NUMBER, COL_PC, COL_ORIGIN, COL_TITLE, COL_ARTIST, COL_ALBUM, COL_YEAR, COL_GENRE,
+ COL_LENGTH) = range(len(COLUMNS))
+COLUMN_WIDTHS = {COL_NUMBER: 50, COL_PC: 60, COL_ORIGIN: 110, COL_TITLE: 300, COL_ARTIST: 200, COL_ALBUM: 240,
+                 COL_YEAR: 55, COL_GENRE: 110, COL_LENGTH: 60}
+# l'origine di un brano dell'iPhone, secondo il registro della provenienza
+ORIGIN_HERE = "questo PC"
+ORIGIN_UNKNOWN = "sconosciuta"
+ORIGIN_PHONE = "telefono"
+ORIGIN_MISSING = "file non trovato"
+# il filtro "Mostra": (testo, funzione origine -> visibile)
+SHOW_FILTERS = [
+    ("Tutti i brani", lambda origin: True),
+    ("Solo sull'iPhone (origine sconosciuta)", lambda origin: origin == ORIGIN_UNKNOWN),
+    ("Collegati a questo PC", lambda origin: origin == ORIGIN_HERE),
+    ("Da altri computer", lambda origin: origin not in (ORIGIN_HERE, ORIGIN_UNKNOWN, ORIGIN_PHONE, ORIGIN_MISSING)),
+    ("File del PC non trovato", lambda origin: origin == ORIGIN_MISSING),
+    ("Acquistati o scaricati sul telefono", lambda origin: origin == ORIGIN_PHONE),
+]
 PC_TEXT = {DEVICE_SAME: "✔", DEVICE_STALE: "⟳"}
 PC_TIP = {DEVICE_SAME: "Sul PC c'è lo stesso brano, con gli stessi tag",
           DEVICE_STALE: "Sul PC c'è lo stesso brano, ma con tag diversi:\n"}
@@ -37,9 +52,12 @@ SYNC_WARNING = ("Non premere mai \"Sincronizza\" in iTunes o in Dispositivi Appl
 INFO_TEXT = (
     "<b>Come funziona.</b> Qui vedi la musica dell'app <b>Musica</b> dell'iPhone, con i titoli, gli artisti e gli "
     "album che mostra l'app. La colonna <b>Sul PC</b> la confronta con la cartella aperta nella scheda PC: "
-    "✔ stesso brano, ⟳ stesso brano con tag diversi, vuoto = non c'è.<br>"
+    "✔ stesso brano, ⟳ stesso brano con tag diversi, vuoto = non c'è. <b>Origine</b>: da quale file viene il brano "
+    "(questo PC, un altro computer, sconosciuta, telefono); <b>Collega al PC</b> la ritrova per tutti, "
+    "<b>Mostra</b> filtra.<br>"
     "Tasto destro su uno o più brani: <b>Salva su PC</b>, <b>Mostra nella scheda PC</b>, <b>Rimpiazza con la "
-    "versione del PC</b> (per i ⟳), <b>Cambia tag</b>, <b>Elimina dall'iPhone</b>. Per mandare brani nuovi: tasto "
+    "versione del PC</b> (per i ⟳), <b>Cambia tag</b>, <b>Collega a un file del PC</b>, <b>Scollega</b>, "
+    "<b>Elimina dall'iPhone</b>. Per mandare brani nuovi: tasto "
     "destro nella scheda PC → <b>Invia all'iPhone</b>. I file del PC non cambiano mai.<br>"
     f"<b>Attenzione:</b> {SYNC_WARNING}"
 )
@@ -173,8 +191,15 @@ class IPhonePanel(QWidget):
         self._search.setClearButtonEnabled(True)
         self._search.textChanged.connect(self._apply_search)
         self._count = QLabel()
+        self._show = QComboBox()
+        for text, _rule in SHOW_FILTERS:
+            self._show.addItem(text)
+        self._show.setToolTip("Quali brani mostrare, secondo la loro origine (il registro della provenienza)")
+        self._show.currentIndexChanged.connect(lambda _index: self._apply_search())
         search_row = QHBoxLayout()
         search_row.addWidget(self._search, 1)
+        search_row.addWidget(QLabel("Mostra:"))
+        search_row.addWidget(self._show)
         search_row.addWidget(self._count)
 
         self._music_view = QTreeWidget()
@@ -229,8 +254,27 @@ class IPhonePanel(QWidget):
         self._listing_note.setText(note)
         self._fill_music()
 
+    def _links(self) -> dict:
+        result = self._window.registry.links_here()
+        return result
+
+    def _origin(self, item) -> str:
+        """La parola della colonna Origine (e del filtro Mostra)."""
+        link = self._window.registry.get(item.sync_id) if item.sync_id else None
+        if not item.from_computer:
+            result = ORIGIN_PHONE
+        elif link is None:
+            result = ORIGIN_UNKNOWN
+        elif not link.here:
+            result = link.pc
+        elif Path(link.path).is_file():
+            result = ORIGIN_HERE
+        else:
+            result = ORIGIN_MISSING
+        return result
+
     def _fill_music(self) -> None:
-        self._matches = pc_matches(self._phone_tracks, self._window.tracks)
+        self._matches = pc_matches(self._phone_tracks, self._window.tracks, self._links())
         self._pc_dirty = False
         view = self._music_view
         view.setSortingEnabled(False)
@@ -246,6 +290,7 @@ class IPhonePanel(QWidget):
             cells = {
                 COL_NUMBER: (number, (tags.disc_number or 1) * 1000 + (tags.track_number or 0)),
                 COL_PC: ("", 0),
+                COL_ORIGIN: ("", ""),
                 COL_TITLE: (tags.title, tags.title.lower()),
                 COL_ARTIST: (tags.artist, item.display_artist.lower()),
                 COL_ALBUM: (tags.album, tags.album.lower()),
@@ -261,7 +306,7 @@ class IPhonePanel(QWidget):
                 keys.append(key)
             row = SortableItem(texts, keys)
             row.setData(COL_TITLE, PID_ROLE, item.pid)
-            row.setToolTip(COL_TITLE, self._origin_text(item))
+            self._set_origin_cell(row, item)
             self._set_pc_cell(row, item.pid)
             rows.append(row)
         view.addTopLevelItems(rows)
@@ -280,6 +325,20 @@ class IPhonePanel(QWidget):
             result = f"Da {where} ({link.how}, {link.date}):\n{link.path}"
         result += "\n" + item.remote_path
         return result
+
+    def _set_origin_cell(self, row, item) -> None:
+        origin = self._origin(item)
+        row.setText(COL_ORIGIN, origin)
+        row.setData(COL_ORIGIN, SORT_ROLE, origin.lower())
+        tip = self._origin_text(item)
+        row.setToolTip(COL_ORIGIN, tip)
+        row.setToolTip(COL_TITLE, tip)
+        if origin == ORIGIN_MISSING:
+            row.setForeground(COL_ORIGIN, QBrush(QColor(200, 40, 40)))
+        elif origin == ORIGIN_UNKNOWN:
+            row.setForeground(COL_ORIGIN, QBrush(QColor(220, 140, 0)))
+        else:
+            row.setForeground(COL_ORIGIN, QBrush())
 
     def _set_pc_cell(self, row, pid: int) -> None:
         match = self._matches.get(pid)
@@ -313,23 +372,30 @@ class IPhonePanel(QWidget):
             self._refresh_pc_column()
 
     def _refresh_pc_column(self) -> None:
-        self._matches = pc_matches(self._phone_tracks, self._window.tracks)
+        """Le colonne Sul PC e Origine, dopo un cambio dei brani del PC o del registro."""
+        self._matches = pc_matches(self._phone_tracks, self._window.tracks, self._links())
         self._pc_dirty = False
         view = self._music_view
         view.setSortingEnabled(False)
         for index in range(view.topLevelItemCount()):
             row = view.topLevelItem(index)
-            self._set_pc_cell(row, row.data(COL_TITLE, PID_ROLE))
+            pid = row.data(COL_TITLE, PID_ROLE)
+            item = self._by_pid.get(pid)
+            if item is not None:
+                self._set_origin_cell(row, item)
+            self._set_pc_cell(row, pid)
         view.setSortingEnabled(True)
+        self._apply_search()
 
     def _apply_search(self) -> None:
         words = self._search.text().casefold().split()
+        rule = SHOW_FILTERS[max(0, self._show.currentIndex())][1]
         shown = 0
         view = self._music_view
         for index in range(view.topLevelItemCount()):
             row = view.topLevelItem(index)
             text = " ".join([row.text(COL_TITLE), row.text(COL_ARTIST), row.text(COL_ALBUM)]).casefold()
-            visible = True
+            visible = rule(row.text(COL_ORIGIN))
             for word in words:
                 if word not in text:
                     visible = False
@@ -337,7 +403,7 @@ class IPhonePanel(QWidget):
             if visible:
                 shown += 1
         total = view.topLevelItemCount()
-        if words:
+        if words or self._show.currentIndex() > 0:
             self._count.setText(f"{shown} di {total} brani")
         else:
             self._count.setText(f"{total} brani")
@@ -373,6 +439,12 @@ class IPhonePanel(QWidget):
                 if item.from_computer:
                     writable.append(item)
             stale = self._stale_pairs(items)
+            linked_here = []
+            for item in items:
+                link = self._window.registry.get(item.sync_id) if item.sync_id else None
+                if link is not None and link.here:
+                    linked_here.append(item)
+            single = items[0] if len(items) == 1 and items[0].from_computer else None
             menu = QMenu(self)
             entries = [
                 (f"Salva su PC… ({len(items)} brani)", self._save_selected, ready),
@@ -382,6 +454,11 @@ class IPhonePanel(QWidget):
                 (f"Rimpiazza con la versione del PC ({len(stale)} brani ⟳)", self._replace_selected,
                  ready and bool(stale)),
                 (f"Cambia tag… ({len(writable)} brani)", self._edit_selected, ready and bool(writable)),
+                None,
+                ("Collega a un file del PC…", lambda: self._link_manually(single),
+                 single is not None and not self._window.runner.is_busy),
+                (f"Scollega dal PC ({len(linked_here)} brani)", lambda: self._unlink(linked_here),
+                 bool(linked_here) and not self._window.runner.is_busy),
                 None,
                 (f"Elimina dall'iPhone… ({len(writable)} brani)", self._delete_selected, ready and bool(writable)),
             ]
@@ -424,7 +501,7 @@ class IPhonePanel(QWidget):
 
         def done(value):
             report, tracks, registry = value
-            self._window.registry = registry
+            self._window.registry = registry        # prima: i confronti dei brani nuovi lo usano
             self._window.set_phone_tracks(tracks, self._device_name)
             message = _report_text(report, verb)
             if report.done:
@@ -586,10 +663,60 @@ class IPhonePanel(QWidget):
                     return value
 
                 def done(count):
-                    self._fill_music()
+                    window.set_registry(registry)
                     QMessageBox.information(self, "Collega al PC", f"{count} brani collegati ai file del PC.")
 
                 window.runner.run("Registro della provenienza", work, done)
+
+    def _store_registry(self, registry, message: str) -> None:
+        """Salva il registro (PC e iPhone, se collegato) e rifà i confronti."""
+        window = self._window
+        connected = self._connected
+
+        def work(progress, _cancel):
+            progress(0, 0, "registro della provenienza")
+            if connected:
+                iphone.store_registry(config_dir(), registry)
+            else:
+                registry.save(config_dir())   # sull'iPhone al prossimo collegamento
+            value = message
+            return value
+
+        def done(text):
+            window.set_registry(registry)
+            window.statusBar().showMessage(text, 8000)
+
+        window.runner.run("Registro della provenienza", work, done)
+
+    def _link_manually(self, item) -> None:
+        """Collega un brano dell'iPhone a un file del PC scelto a mano: tra i più simili della cartella aperta, o
+        un file qualsiasi."""
+        if item is not None:
+            from .link_dialog import LinkDialog
+            dialog = LinkDialog(self, item, self._window.tracks)
+            if dialog.exec() and dialog.chosen is not None:
+                path = dialog.chosen
+                window = self._window
+                printed = provenance.file_fingerprints([str(path)]).get(str(path), "")
+                info = path.stat()
+                registry = window.registry
+                registry.record(provenance.Link(sync_id=item.sync_id, pc=provenance.computer_name(), path=str(path),
+                                                size=info.st_size, mtime=info.st_mtime,
+                                                signature=window.overlay.signature(path), fingerprint=printed,
+                                                how=provenance.HOW_MANUAL))
+                self._store_registry(registry, f"Collegato a {path}")
+
+    def _unlink(self, items: list) -> None:
+        if items:
+            answer = QMessageBox.question(
+                self, "Scollega dal PC",
+                f"Togliere il collegamento di {len(items)} brani dell'iPhone al loro file del PC?\n\n"
+                "I brani restano sull'iPhone e i file sul PC: diventano di origine sconosciuta.")
+            if answer == QMessageBox.Yes:
+                registry = self._window.registry
+                for item in items:
+                    registry.forget(item.sync_id)
+                self._store_registry(registry, f"{len(items)} brani scollegati dal PC")
 
     # ------------------------------------------------------------------ salva su PC
 
@@ -609,26 +736,52 @@ class IPhonePanel(QWidget):
     def _save_to(self, items: list, target: Path) -> None:
         """Ogni brano si scarica in una cartella temporanea dentro target e poi va in Artista/Album (Anno)/NN -
         Titolo, con i nomi che mostra l'app Musica. Solo file nuovi: un file già presente non si sostituisce mai."""
+        registry = self._window.registry
+        connected = self._connected
+
         def work(progress, cancel):
             temp = target / DOWNLOAD_TEMP_FOLDER
+            linked = 0
             try:
                 transfer, downloaded = iphone.download_music(items, temp, progress, cancel)
                 tracks = []
+                by_local = {}
                 for item, local in downloaded:
                     tracks.append(Track(path=local, tags=item.tags.copy(), length=item.length))
+                    by_local[str(local)] = item
+                prints = provenance.file_fingerprints(list(by_local))
                 copy_report = copy_organized(tracks, target, move=True, progress=progress, cancel=cancel,
                                              overwrite=False)
+                # ogni brano salvato (o già presente con lo stesso audio) si collega al suo file
+                pairs = copy_report.copied + copy_report.skipped
+                placed = provenance.file_fingerprints([str(destination) for _source, destination in pairs])
+                for source, destination in pairs:
+                    item = by_local.get(str(source))
+                    printed = prints.get(str(source), "")
+                    if item is not None and item.sync_id and printed and placed.get(str(destination)) == printed:
+                        info = Path(destination).stat()
+                        registry.record(provenance.Link(sync_id=item.sync_id, pc=provenance.computer_name(),
+                                                        path=str(destination), size=info.st_size,
+                                                        mtime=info.st_mtime, fingerprint=printed,
+                                                        how=provenance.HOW_SAVED))
+                        linked += 1
             finally:
                 shutil.rmtree(temp, ignore_errors=True)
-            value = (transfer, copy_report, target)
+            if linked and connected:
+                iphone.store_registry(config_dir(), registry)
+            elif linked:
+                registry.save(config_dir())
+            value = (transfer, copy_report, target, linked)
             return value
 
         self._window.runner.run("Salvataggio dall'iPhone", work, self._after_save)
 
     def _after_save(self, value) -> None:
-        transfer, copy_report, target = value
+        transfer, copy_report, target, linked = value
         message = (f"Copiati dall'iPhone: {len(transfer.done)}\n"
-                   f"Nella cartella {target}: {copy_report.summary()}")
+                   f"Nella cartella {target}: {copy_report.summary()}\n"
+                   f"Collegati ai file salvati: {linked}")
+        self._window.set_registry(self._window.registry)
         if transfer.errors:
             details = []
             for name, error in transfer.errors[:10]:

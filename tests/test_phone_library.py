@@ -206,3 +206,55 @@ def test_iphone_tab_shows_music_and_pc_status(tmp_path):
     finally:
         window.close()
         app.processEvents()
+
+
+def test_registry_link_wins_over_tag_match(tmp_path):
+    """Un file collegato nel registro è quel brano; un doppione con gli stessi tag non lo "ruba"."""
+    from myeasymp3toiphone.overlay import path_key
+    phone = [_phone(1, "Canzone A", "Artista Uno", "Hits 2005")]
+    phone[0].sync_id = 77
+    linked = _pc("Canzone A", "Artista Uno", "Album vero")              # tag diversi: si trova solo dal registro
+    linked.path = tmp_path / "vero.mp3"
+    duplicate = _pc("Canzone A", "Artista Uno", "Hits 2005")            # tag uguali ma non è il file collegato
+    index = PhoneIndex(phone, {path_key(linked.path): 77})
+    assert index.find(linked) is phone[0] and index.find(duplicate) is None
+    status, _item, found = device_status(linked, index)
+    assert status == DEVICE_STALE and [label for label, _a, _b in found] == ["Album"]
+    assert PhoneIndex(phone).find(duplicate) is phone[0]                 # senza registro: per tag, come prima
+
+
+def test_iphone_tab_origin_column_and_filter(tmp_path):
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtWidgets import QApplication
+    from myeasymp3toiphone import provenance
+    from myeasymp3toiphone.gui import iphone_panel
+    from myeasymp3toiphone.gui.main_window import MainWindow
+    app = QApplication.instance() or QApplication([])
+    window = MainWindow()
+    try:
+        here = tmp_path / "presente.mp3"
+        here.write_bytes(b"x")
+        phone = [_phone(1, "Collegato", "A", "B"), _phone(2, "Sparito", "A", "B"), _phone(3, "Ignoto", "A", "B"),
+                 _phone(4, "Comprato", "A", "B")]
+        for item, sync_id in zip(phone, (11, 12, 13, 0)):
+            item.sync_id = sync_id
+        registry = provenance.Registry()
+        registry.record(provenance.Link(sync_id=11, pc=provenance.computer_name(), path=str(here)))
+        registry.record(provenance.Link(sync_id=12, pc=provenance.computer_name(), path=str(tmp_path / "via.mp3")))
+        window.registry = registry
+        window.set_phone_tracks(phone, "iPhone di prova")
+        panel = window.iphone_panel
+        origins = {}
+        view = panel._music_view
+        for index in range(view.topLevelItemCount()):
+            row = view.topLevelItem(index)
+            origins[row.text(iphone_panel.COL_TITLE)] = row.text(iphone_panel.COL_ORIGIN)
+        assert origins == {"Collegato": iphone_panel.ORIGIN_HERE, "Sparito": iphone_panel.ORIGIN_MISSING,
+                           "Ignoto": iphone_panel.ORIGIN_UNKNOWN, "Comprato": iphone_panel.ORIGIN_PHONE}
+        panel._show.setCurrentIndex(1)                     # solo sull'iPhone
+        assert panel._count.text() == "1 di 4 brani"
+        panel._show.setCurrentIndex(4)                     # file del PC non trovato
+        assert panel._count.text() == "1 di 4 brani"
+    finally:
+        window.close()
+        app.processEvents()

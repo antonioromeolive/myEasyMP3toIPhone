@@ -190,14 +190,28 @@ def _artist_names(tags: TrackTags) -> set:
 
 
 class PhoneIndex:
-    """I brani dell'iPhone, per ritrovare quello di un brano del PC: stesso titolo e album (senza differenze di
-    maiuscole, accenti e spazi) e un artista in comune."""
+    """I brani dell'iPhone, per ritrovare quello di un brano del PC. Prima il registro della provenienza (links:
+    {overlay.path_key del file: sync_id}, i collegamenti di questo PC): quel file è quel brano. Poi, per i brani non
+    collegati, stesso titolo e album (senza differenze di maiuscole, accenti e spazi) e un artista in comune: un
+    brano collegato a un file non si abbina per tag a un altro (un doppione sul PC non lo "ruba")."""
 
-    def __init__(self, tracks: list) -> None:
+    def __init__(self, tracks: list, links: Optional[dict] = None) -> None:
         self.tracks = list(tracks)
+        by_sync = {}
+        for item in self.tracks:
+            if item.sync_id:
+                by_sync[item.sync_id] = item
+        self._by_path = {}
+        linked = set()
+        for key, sync_id in (links or {}).items():
+            item = by_sync.get(sync_id)
+            if item is not None:
+                self._by_path[key] = item
+                linked.add(item.pid)
         self._by_key = {}
         for item in self.tracks:
-            self._by_key.setdefault(_match_key(item.tags), []).append(item)
+            if item.pid not in linked:
+                self._by_key.setdefault(_match_key(item.tags), []).append(item)
 
     def __len__(self) -> int:
         result = len(self.tracks)
@@ -213,9 +227,12 @@ class PhoneIndex:
         return result
 
     def find(self, track: Track) -> Optional[PhoneTrack]:
-        """Il brano sull'iPhone, cercato con i tag mostrati e, se diversi, con quelli del file (prima di una
-        modifica in sospeso)."""
-        result = self._lookup(track.tags)
+        """Il brano sull'iPhone: quello collegato al file nel registro; altrimenti cercato con i tag mostrati e, se
+        diversi, con quelli del file (prima di una modifica in sospeso)."""
+        from .overlay import path_key
+        result = self._by_path.get(path_key(track.path)) if self._by_path else None
+        if result is None:
+            result = self._lookup(track.tags)
         if result is None and track.original_tags is not None:
             result = self._lookup(track.original_tags)
         return result
@@ -278,9 +295,10 @@ def device_status(track: Track, index: PhoneIndex) -> tuple:
     return result
 
 
-def pc_matches(phone_tracks: list, pc_tracks: list) -> dict:
-    """{pid del brano dell'iPhone: (stato, brano del PC, differenze)} per i brani dell'iPhone che sono sul PC."""
-    index = PhoneIndex(phone_tracks)
+def pc_matches(phone_tracks: list, pc_tracks: list, links: Optional[dict] = None) -> dict:
+    """{pid del brano dell'iPhone: (stato, brano del PC, differenze)} per i brani dell'iPhone che sono sul PC
+    (links: i collegamenti del registro, come in PhoneIndex)."""
+    index = PhoneIndex(phone_tracks, links)
     result = {}
     for track in pc_tracks:
         status, item, found = device_status(track, index)

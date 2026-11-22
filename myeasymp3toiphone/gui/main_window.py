@@ -222,6 +222,13 @@ class MainWindow(QMainWindow):
         if listing:
             self._show_phone_tracks(listing["tracks"], f"{listing['device']}, elenco del {listing['saved_at']}")
 
+    def set_registry(self, registry) -> None:
+        """Il registro della provenienza è cambiato (collegamenti nuovi o tolti): confronti e viste da rifare."""
+        self.registry = registry
+        self._phone_index = PhoneIndex(self.phone_tracks, registry.links_here())
+        self._fill_table()
+        self.iphone_panel.pc_changed()
+
     def set_phone_tracks(self, tracks: list, device: str) -> None:
         """Chiamata dalla scheda iPhone quando ha letto la musica dell'app Musica: la salva e aggiorna le viste."""
         try:
@@ -233,7 +240,7 @@ class MainWindow(QMainWindow):
     def _show_phone_tracks(self, tracks: list, label: str) -> None:
         self.phone_tracks = list(tracks)
         self.phone_label = label
-        self._phone_index = PhoneIndex(tracks)
+        self._phone_index = PhoneIndex(tracks, self.registry.links_here())
         header = self._table.horizontalHeaderItem(COL_DEVICE)
         if header is not None:
             header.setToolTip(f"Nell'app Musica dell'iPhone ({label}): ✔ stesso brano, ⟳ stesso brano con tag "
