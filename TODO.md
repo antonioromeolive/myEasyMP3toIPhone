@@ -1,16 +1,5 @@
 # TODO
 
-## Una sorgente sparita dal PC (per esempio un doppione cancellato)
-
-Il programma non cancella mai i file del PC; li cancella l'utente (per esempio un doppione trovato con *Controlla la
-musica*). All'apertura della cartella o alla connessione, i brani dell'iPhone la cui sorgente non c'è più (*file non
-trovato*) si segnalano con un avviso che li elenca e offre, per tutti o uno per uno:
-- **un'altra sorgente**: la finestra di *Associa sorgente*, con prima proposta la copia con lo stesso audio (impronta);
-- **lasciarli senza sorgente** (orfani: tornano "solo sull'iPhone");
-- **eliminarli anche dall'iPhone**.
-Il contrario no: cancellare un brano (o un doppione) dall'iPhone non cambia mai niente sul PC. In generale i doppioni
-sul PC e quelli sull'iPhone si gestiscono in modo del tutto separato.
-
 ## Passo 5: spunte, stato "in attesa" e barra Applica
 
 Già deciso: nella colonna *iPhone* della scheda PC una spunta = "voglio questo brano sull'iPhone".

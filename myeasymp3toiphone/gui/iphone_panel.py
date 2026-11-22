@@ -199,6 +199,7 @@ class IPhonePanel(QWidget):
         self._device_name = "iPhone"
         self._phone_tracks = []
         self._source_queue = []       # brani da associare uno alla volta (Associa sorgente da una cartella)
+        self._warned_missing = set()  # sync_id già segnalati come sorgente sparita in questa sessione
         self._by_pid = {}
         self._matches = {}
         self._pc_dirty = True
@@ -571,6 +572,53 @@ class IPhonePanel(QWidget):
 
     def _music_read(self, tracks: list) -> None:
         self._window.set_phone_tracks(tracks, self._device_name)
+        self.check_missing_sources()
+
+    # ------------------------------------------------------------------ sorgenti sparite
+
+    def missing_sources(self) -> list:
+        """(PhoneTrack, Link) dei brani la cui sorgente su questo PC non c'è più. Un file su un disco che non c'è
+        (unità scollegata) non conta: non è sparito."""
+        result = []
+        drives = {}
+        for item in self._phone_tracks:
+            link = self._window.registry.get(item.sync_id) if item.sync_id else None
+            if link is not None and link.here:
+                path = Path(link.path)
+                anchor = path.anchor
+                if anchor not in drives:
+                    drives[anchor] = bool(anchor) and Path(anchor).exists()
+                if drives[anchor] and not path.is_file():
+                    result.append((item, link))
+        return result
+
+    def check_missing_sources(self) -> None:
+        """All'apertura di una cartella e alla lettura dell'iPhone: l'avviso per le sorgenti sparite, una volta sola
+        per brano in ogni sessione del programma."""
+        if not self._window.runner.is_busy:
+            rows = []
+            for item, link in self.missing_sources():
+                if item.sync_id not in self._warned_missing:
+                    rows.append((item, link))
+                    self._warned_missing.add(item.sync_id)
+            if rows:
+                QTimer.singleShot(0, lambda: self._show_missing(rows))
+
+    def _show_missing(self, rows: list) -> None:
+        from .missing_dialog import ACTION_DELETE, ACTION_ORPHAN, ACTION_SEARCH, MissingSourcesDialog
+        dialog = MissingSourcesDialog(self, rows, self._connected)
+        if dialog.exec() and not self._window.runner.is_busy:
+            chosen = dialog.chosen()
+            if dialog.action == ACTION_SEARCH:
+                self._source_queue = chosen[1:]
+                self._link_one(chosen[0])
+            elif dialog.action == ACTION_ORPHAN:
+                registry = self._window.registry
+                for item in chosen:
+                    registry.forget(item.sync_id)
+                self._store_registry(registry, f"{len(chosen)} brani ora sono senza sorgente")
+            elif dialog.action == ACTION_DELETE:
+                self._delete_items(chosen)
 
     # ------------------------------------------------------------------ scrittura sull'iPhone
 
@@ -769,6 +817,9 @@ class IPhonePanel(QWidget):
         for item in self._selected_phone_tracks():
             if item.from_computer:
                 items.append(item)
+        self._delete_items(items)
+
+    def _delete_items(self, items: list) -> None:
         if items:
             names = []
             for item in items[:8]:
@@ -1227,3 +1278,4 @@ class IPhonePanel(QWidget):
         self._window.statusBar().showMessage("iPhone connesso: " + info.label(), 8000)
         self._update_enabled()
         self._window.set_phone_tracks(tracks, info.name)
+        self.check_missing_sources()

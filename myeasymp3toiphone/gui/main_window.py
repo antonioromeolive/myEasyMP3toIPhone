@@ -331,6 +331,7 @@ class MainWindow(QMainWindow):
             self._tabs.setCurrentIndex(0)
             self.statusBar().showMessage(f"{len(tracks)} brani caricati (sola lettura: i file non vengono "
                                          "modificati)", 8000)
+            self.iphone_panel.check_missing_sources()
 
         self.runner.run("Lettura brani", work, done)
 

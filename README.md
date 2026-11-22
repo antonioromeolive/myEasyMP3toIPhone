@@ -257,6 +257,14 @@ anche quando un file con lo stesso audio c'era già. Tasto destro:
   associano uno alla volta con la finestra di *Associa sorgente* (*Salta* passa al prossimo).
 - **Togli sorgente**: il brano torna *senza sorgente*.
 
+**Sorgenti sparite.** Il programma non cancella mai i file del PC: li cancelli tu (per esempio un doppione). Quando
+apri una cartella o leggi l'iPhone, i brani dell'iPhone il cui file sul PC non c'è più (*file non trovato*) si
+segnalano con un avviso, una volta per sessione, che li elenca e per quelli spuntati offre: **Cerca un'altra
+sorgente** (la finestra di *Associa sorgente*, uno alla volta, con per prima la copia con lo stesso audio),
+**Lascia senza sorgente** o **Elimina dall'iPhone** (con conferma). Un file su un disco che ora non è collegato non
+conta come sparito. Il contrario non succede mai: eliminare un brano dall'iPhone non cambia niente sul PC, e i
+doppioni del PC e quelli dell'iPhone si gestiscono in modo del tutto separato.
+
 L'**impronta** riassume l'audio e non cambia quando cambiano i tag: per gli MP3 i primi 64 KB dopo il tag ID3, per i
 FLAC l'impronta dell'audio che il file porta nella sua intestazione, per gli M4A l'inizio del blocco audio. Così un
 brano dell'iPhone si riconosce anche se titolo, album o artista sono diversi da quelli del PC (le compilation, i
