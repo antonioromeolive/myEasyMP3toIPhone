@@ -18,11 +18,15 @@ from ..i18n import tr
 from ..pending import wanted
 from ..phone_library import DEVICE_ABSENT, DEVICE_SAME, DEVICE_STALE
 
-COLUMNS = ["#", "iPhone", "Titolo", "Artista", "Album", "Anno", "Genere", "Durata", "File"]
-COL_NUMBER, COL_DEVICE, COL_TITLE, COL_ARTIST, COL_ALBUM, COL_YEAR, COL_GENRE, COL_LENGTH, COL_FILE = range(9)
+COLUMNS = ["#", "iPhone", "Titolo", "Artista", "Artista album", "Album", "Anno", "Genere", "Durata", "File"]
+(COL_NUMBER, COL_DEVICE, COL_TITLE, COL_ARTIST, COL_ALBUM_ARTIST, COL_ALBUM, COL_YEAR, COL_GENRE, COL_LENGTH,
+ COL_FILE) = range(len(COLUMNS))
 DEVICE_TEXT = {DEVICE_SAME: "✔", DEVICE_STALE: "⟳", DEVICE_ABSENT: ""}
 DEVICE_COLOR = {DEVICE_SAME: QColor(30, 140, 60), DEVICE_STALE: QColor(220, 140, 0)}
-DEVICE_ORDER = {DEVICE_SAME: 0, DEVICE_STALE: 1, DEVICE_ABSENT: 2}
+DEVICE_ORDER = {DEVICE_SAME: 0, DEVICE_STALE: 1, DEVICE_ABSENT: 3}
+PROBABLE_TEXT = "≈"                     # sull'iPhone c'è un brano con gli stessi tag, ma non è collegato a questo file
+PROBABLE_COLOR = QColor(130, 130, 130)
+PROBABLE_ORDER = 2
 ERROR_COLOR = QColor(200, 40, 40)
 EDITED_COLOR = QColor(60, 130, 230)
 
@@ -86,14 +90,19 @@ class TrackTableModel(QAbstractTableModel):
             result = str(tags.track_number) if tags.track_number is not None else ""
         elif column == COL_DEVICE:
             action = self._action(track)
+            status, _phone_track, linked = self.owner.device_state(track)
             if action:
                 result = self.pending_look[action][0]
+            elif status != DEVICE_ABSENT and not linked:
+                result = PROBABLE_TEXT
             else:
-                result = DEVICE_TEXT[self.owner.device_state(track)[0]]
+                result = DEVICE_TEXT[status]
         elif column == COL_TITLE:
             result = track.title
         elif column == COL_ARTIST:
             result = tags.artist
+        elif column == COL_ALBUM_ARTIST:
+            result = tags.album_artist
         elif column == COL_ALBUM:
             result = tags.album
         elif column == COL_YEAR:
@@ -103,7 +112,13 @@ class TrackTableModel(QAbstractTableModel):
         elif column == COL_LENGTH:
             result = format_length(track.length)
         else:
-            result = track.path.name
+            result = self._file_text(track)
+        return result
+
+    def _file_text(self, track) -> str:
+        """Il file: il percorso completo o il solo nome (Impostazioni → Mostra il percorso completo dei file)."""
+        settings = getattr(self.owner, "app_settings", None)
+        result = str(track.path) if settings is not None and settings.show_full_path else track.path.name
         return result
 
     def _foreground(self, track, column: int):
@@ -114,10 +129,13 @@ class TrackTableModel(QAbstractTableModel):
             result = QBrush(EDITED_COLOR)
         elif column == COL_DEVICE:
             action = self._action(track)
+            status, _phone_track, linked = self.owner.device_state(track)
             if action:
                 result = QBrush(self.pending_look[action][1])
+            elif status != DEVICE_ABSENT and not linked:
+                result = QBrush(PROBABLE_COLOR)
             else:
-                color = DEVICE_COLOR.get(self.owner.device_state(track)[0])
+                color = DEVICE_COLOR.get(status)
                 result = QBrush(color) if color is not None else None
         return result
 
@@ -185,13 +203,18 @@ class TrackTableModel(QAbstractTableModel):
         if column == COL_NUMBER:
             result = track_sort_key
         elif column == COL_DEVICE:
-            result = lambda track: DEVICE_ORDER[self.owner.device_state(track)[0]]   # noqa: E731
+            result = self._device_order
         elif column == COL_LENGTH:
             result = lambda track: track.length   # noqa: E731
         elif column == COL_FILE:
-            result = lambda track: track.path.name.lower()   # noqa: E731
+            result = lambda track: self._file_text(track).lower()   # noqa: E731
         else:
             result = lambda track: self._text(track, column).lower()   # noqa: E731
+        return result
+
+    def _device_order(self, track) -> int:
+        status, _phone_track, linked = self.owner.device_state(track)
+        result = PROBABLE_ORDER if status != DEVICE_ABSENT and not linked else DEVICE_ORDER[status]
         return result
 
     def sort(self, column: int, order=Qt.AscendingOrder) -> None:

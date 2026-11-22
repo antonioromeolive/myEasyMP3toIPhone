@@ -33,3 +33,18 @@ Fatto e provato senza telefono (test e finestre di prova); da confermare sul tel
   controllare qualche risposta.
 - **Artisti scritti in modi diversi**: i 22 gruppi dubbi, con e senza MusicBrainz.
 - In inglese, i motivi dell'AI devono arrivare in inglese.
+
+## Da provare sui dati veri (le novità del 22/11/2026)
+
+Fatto e provato con i test (risposte finte, nessuna rete tranne una prova di Deezer e Apple Music); da guardare sulla
+musica vera:
+- **Tutti i tipi di tag** (ID3v2 → APEv2 → ID3v1, WMA/WAV/AIFF in sola lettura): l'MP3 d'esempio che nella scheda
+  PC era senza tag è stato cancellato. Trovarne un altro che TagScanner legge e il programma no, e vedere cosa dice
+  *Tag letti da* nell'editor. Alla prima apertura gli MP3 della cache con un campo vuoto si rileggono.
+- **Associa sorgenti** con il nome della cartella: quanti brani trova senza impronta sulla Libreria vera, e se i
+  *molto probabile* sono giusti. Provare anche *Tutta la Libreria* e i brani selezionati che hanno già una sorgente.
+- **Sul PC** nella scheda iPhone: ✔/⟳ per le sorgenti fuori dalla cartella aperta (quanto ci mette con migliaia di
+  brani su un disco esterno), ≈ e il filtro *Da rivedere*, ✖, *Associa le probabili*.
+- **Verifica album online**: Deezer e Apple Music sulla Libreria vera (album italiani: il negozio Apple è quello di
+  Windows), l'ordine dei servizi, *Ferma*, la finestra dei risultati non modale. Discogs con `DISCOGS_TOKEN`
+  impostata. L'AI per le edizioni dubbie con Ollama acceso.

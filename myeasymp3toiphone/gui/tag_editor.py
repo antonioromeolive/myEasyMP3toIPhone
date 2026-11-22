@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (
     QPushButton, QVBoxLayout, QWidget,
 )
 
-from ..tags import BOOL_FIELDS, COVER_EXTENSIONS, INT_FIELDS, TAG_FIELDS, read_cover
+from ..tags import BOOL_FIELDS, COVER_EXTENSIONS, INT_FIELDS, READ_ONLY_EXTENSIONS, TAG_FIELDS, read_cover, tag_kinds
 
 MIXED = "(valori diversi)"
 COVER_SIZE = 180
@@ -43,6 +43,9 @@ class TagEditor(QWidget):
         self._header = QLabel("Seleziona uno o più brani")
         self._header.setWordWrap(True)
         self._header.setStyleSheet("font-weight: bold;")
+        self._kinds = QLabel()
+        self._kinds.setWordWrap(True)
+        self._kinds.setStyleSheet("color: gray")
 
         form = QFormLayout()
         for name, label in TAG_FIELDS:
@@ -98,6 +101,7 @@ class TagEditor(QWidget):
 
         layout = QVBoxLayout(self)
         layout.addWidget(self._header)
+        layout.addWidget(self._kinds)
         layout.addWidget(tags_box)
         layout.addLayout(buttons)
         layout.addWidget(self._renumber_button)
@@ -121,7 +125,11 @@ class TagEditor(QWidget):
         self._dirty = set()
         self._new_cover = None
         count = len(self._tracks)
-        enabled = count > 0
+        read_only = False
+        for track in self._tracks:
+            if track.path.suffix.lower() in READ_ONLY_EXTENSIONS:
+                read_only = True
+        enabled = count > 0 and not read_only
         for name, editor in self._editors.items():
             editor.setEnabled(enabled)
             values = set()
@@ -145,6 +153,8 @@ class TagEditor(QWidget):
             self._header.setText(self._tracks[0].path.name)
         else:
             self._header.setText(f"{count} brani selezionati: i campi modificati verranno applicati a tutti")
+        self._kinds.setText(self._kinds_text(read_only))
+        self._kinds.setVisible(bool(self._kinds.text()))
         self._cover_button.setEnabled(enabled and self._cover_supported())
         self._renumber_button.setEnabled(count > 1)
         edited = False
@@ -154,6 +164,23 @@ class TagEditor(QWidget):
         self._restore_button.setEnabled(edited)
         self._update_buttons()
         self._show_cover(self._current_cover())
+
+    def _kinds_text(self, read_only: bool) -> str:
+        """Da quali tipi di tag vengono i valori (un brano), e se i tag si possono cambiare."""
+        result = ""
+        if len(self._tracks) == 1:
+            kinds = tag_kinds(self._tracks[0].path)
+            if not kinds:
+                result = "Nessun tag nel file"
+            elif len(kinds) == 1:
+                result = f"Tag letti da: {kinds[0]}"
+            else:
+                joined = " + ".join(kinds)
+                result = f"Tag letti da: {joined} (un campo vuoto si prende dal tipo seguente)"
+        if read_only:
+            note = "WMA, WAV e AIFF: i tag si leggono soltanto e i brani non si inviano all'iPhone"
+            result = f"{result}\n{note}" if result else note
+        return result
 
     def _bool_clicked(self, field: str) -> None:
         """Un clic sceglie sì o no per tutti: lo stato "valori diversi" non si sceglie a mano."""

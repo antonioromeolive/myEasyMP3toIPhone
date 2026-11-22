@@ -1,16 +1,119 @@
-"""Finestra con i risultati della verifica di completezza degli album."""
+"""Verifica album online: la finestra delle scelte (quali cataloghi, l'AI, cosa succede dopo) e quella dei risultati
+(per ogni album le tracce dell'edizione scelta e i file del PC; un'altra edizione, i tag corretti, la copertina)."""
 
-from PySide6.QtCore import QUrl, Qt
+from PySide6.QtCore import QUrl
 from PySide6.QtGui import QBrush, QColor, QDesktopServices
 from PySide6.QtWidgets import (
-    QCheckBox, QComboBox, QDialog, QHBoxLayout, QHeaderView, QLabel, QListWidget,
+    QCheckBox, QComboBox, QDialog, QDialogButtonBox, QHBoxLayout, QHeaderView, QLabel, QListWidget,
     QListWidgetItem, QMessageBox, QPushButton, QSplitter, QStyle, QTreeWidget,
     QTreeWidgetItem, QVBoxLayout, QWidget,
 )
 
 from ..albumcheck import (
+    DISCOGS_TOKEN_VAR, SERVICE_APPLE, SERVICE_DEEZER, SERVICE_DISCOGS, SERVICE_MUSICBRAINZ, SERVICE_ORDER,
     STATUS_COMPLETE, STATUS_ERROR, STATUS_INCOMPLETE, check_album, corrected_tags,
 )
+
+SERVICE_TEXT = {
+    SERVICE_DEEZER: "Deezer: veloce, gratis, senza chiave",
+    SERVICE_APPLE: "Apple Music: i nomi che usa l'app Musica dell'iPhone; più lento (circa 20 richieste al minuto)",
+    SERVICE_DISCOGS: "Discogs: tante edizioni, anche rare e in vinile; vuole un token personale",
+    SERVICE_MUSICBRAINZ: "MusicBrainz: il più completo, ma lento (una richiesta al secondo)",
+}
+SERVICE_LABEL = {SERVICE_DEEZER: "Deezer", SERVICE_APPLE: "Apple Music", SERVICE_DISCOGS: "Discogs",
+                 SERVICE_MUSICBRAINZ: "MusicBrainz"}
+SECONDS_PER_ALBUM = {SERVICE_DEEZER: 0.5, SERVICE_APPLE: 6.5, SERVICE_DISCOGS: 2.5, SERVICE_MUSICBRAINZ: 2.5}
+AFTER_TEXT = ("<b>Cosa succede dopo.</b> La verifica va in background: puoi continuare a usare il programma (la "
+              "barra di stato dice a che punto è, <i>Ferma</i> la interrompe). L'icona accanto a ogni album "
+              "nell'elenco Album ne dice l'esito man mano. Alla fine si apre la finestra dei risultati: per ogni album "
+              "le tracce dell'edizione trovata e i tuoi file, le tracce mancanti in rosso; puoi scegliere un'altra "
+              "edizione e <i>Correggere i tag</i> con quei dati e la copertina (restano in sospeso, per le copie: i "
+              "file del PC non cambiano). La riapri con <i>Risultati della verifica</i> nella barra di stato.")
+DIFFERENCE_TEXT = ("<i>Verifica album online</i> confronta i tuoi album con un catalogo su internet: dice se manca "
+                   "qualche brano e propone i tag giusti e la copertina. <i>Controlla la musica</i> invece confronta i "
+                   "tuoi brani tra loro (e con l'iPhone), senza cataloghi: doppioni, artisti scritti in modi diversi, "
+                   "album divisi, tag mancanti.")
+
+
+class AlbumCheckOptionsDialog(QDialog):
+    """services(): i cataloghi scelti, nell'ordine in cui provarli; use_ai."""
+
+    def __init__(self, parent, album_count: int, chosen: list, use_ai: bool, ai_name: str, discogs_ready: bool) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Verifica album online")
+        self.resize(760, 480)
+        header = QLabel(f"<b>Verificare {album_count} album</b> (quelli scelti negli elenchi, o tutti).<br>"
+                        + DIFFERENCE_TEXT)
+        header.setWordWrap(True)
+        self.boxes = {}
+        services = QVBoxLayout()
+        intro = QLabel("Cataloghi da usare. Con più cataloghi si provano in quest'ordine, album per album, finché uno "
+                       "dà l'album completo:")
+        intro.setWordWrap(True)
+        services.addWidget(intro)
+        for service in SERVICE_ORDER:
+            box = QCheckBox(SERVICE_TEXT[service])
+            box.setChecked(service in chosen)
+            if service == SERVICE_DISCOGS and not discogs_ready:
+                box.setChecked(False)
+                box.setEnabled(False)
+                box.setToolTip(f"Imposta la variabile {DISCOGS_TOKEN_VAR} (nel file delle variabili o in Windows) con "
+                               "un token personale di Discogs (discogs.com, Impostazioni, Sviluppatori), poi riavvia")
+                box.setText(SERVICE_TEXT[service] + f" ({DISCOGS_TOKEN_VAR} non impostata)")
+            box.toggled.connect(lambda _checked: self._update_estimate())
+            self.boxes[service] = box
+            services.addWidget(box)
+        self.ai_box = QCheckBox(f"AI per scegliere tra edizioni dubbie ({ai_name})" if ai_name else
+                                "AI per scegliere tra edizioni dubbie (scegli l'AI della scansione in Impostazioni)")
+        self.ai_box.setChecked(use_ai and bool(ai_name))
+        self.ai_box.setEnabled(bool(ai_name))
+        self.ai_box.setToolTip("Solo quando due edizioni di un album sono ugualmente probabili: l'AI riceve titoli e "
+                               "numero dei brani e le edizioni trovate, e sceglie")
+        self._albums = album_count
+        self.estimate = QLabel()
+        self.estimate.setStyleSheet("color: gray")
+        after = QLabel(AFTER_TEXT)
+        after.setWordWrap(True)
+        after.setStyleSheet("background: palette(alternate-base); padding: 8px; border-radius: 4px;")
+        self.buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        self.buttons.button(QDialogButtonBox.Ok).setText("Verifica")
+        self.buttons.button(QDialogButtonBox.Cancel).setText("Annulla")
+        self.buttons.accepted.connect(self.accept)
+        self.buttons.rejected.connect(self.reject)
+        layout = QVBoxLayout(self)
+        layout.addWidget(header)
+        layout.addLayout(services)
+        layout.addWidget(self.ai_box)
+        layout.addWidget(self.estimate)
+        layout.addWidget(after)
+        layout.addStretch(1)
+        layout.addWidget(self.buttons)
+        self._update_estimate()
+
+    def services(self) -> list:
+        result = []
+        for service in SERVICE_ORDER:
+            if self.boxes[service].isChecked() and self.boxes[service].isEnabled():
+                result.append(service)
+        return result
+
+    @property
+    def use_ai(self) -> bool:
+        result = self.ai_box.isChecked() and self.ai_box.isEnabled()
+        return result
+
+    def _update_estimate(self) -> None:
+        chosen = self.services()
+        self.buttons.button(QDialogButtonBox.Ok).setEnabled(bool(chosen))
+        if chosen:
+            minutes = max(1, round(self._albums * SECONDS_PER_ALBUM[chosen[0]] / 60))
+            text = f"Circa {minutes} minuti con {SERVICE_LABEL[chosen[0]]}"
+            if len(chosen) > 1:
+                text += ", di più per gli album che vanno cercati anche negli altri cataloghi"
+            self.estimate.setText(text)
+        else:
+            self.estimate.setText("Scegli almeno un catalogo")
+
 
 GREEN = QColor(30, 140, 60)
 RED = QColor(200, 40, 40)
@@ -31,7 +134,7 @@ def status_icon(widget: QWidget, status: str):
 class AlbumCheckDialog(QDialog):
     def __init__(self, results: list, window) -> None:
         super().__init__(window)
-        self.setWindowTitle("Verifica completezza album")
+        self.setWindowTitle("Verifica album online: i risultati")
         self.resize(1100, 650)
         self._window = window
         self._results = list(results)
@@ -50,14 +153,18 @@ class AlbumCheckDialog(QDialog):
         self._status_label = QLabel()
         self._status_label.setWordWrap(True)
         self._status_label.setStyleSheet("font-size: 14px; font-weight: bold;")
+        self._tried_label = QLabel()
+        self._tried_label.setWordWrap(True)
+        self._tried_label.setStyleSheet("color: gray")
         self._edition_combo = QComboBox()
         self._edition_combo.currentIndexChanged.connect(self._edition_changed)
+        self._edition_label = QLabel("Edizione:")
         edition_row = QHBoxLayout()
-        edition_row.addWidget(QLabel("Edizione su MusicBrainz:"))
+        edition_row.addWidget(self._edition_label)
         edition_row.addWidget(self._edition_combo, 1)
 
         self._tracks_view = QTreeWidget()
-        self._tracks_view.setHeaderLabels(["Traccia", "Titolo su MusicBrainz", "File sul PC", "Stato"])
+        self._tracks_view.setHeaderLabels(["Traccia", "Titolo nel catalogo", "File sul PC", "Stato"])
         self._tracks_view.setRootIsDecorated(False)
         self._tracks_view.header().setSectionResizeMode(QHeaderView.Interactive)
         self._tracks_view.setColumnWidth(0, 70)
@@ -68,9 +175,9 @@ class AlbumCheckDialog(QDialog):
         self._with_cover.setChecked(True)
         self._fix_button = QPushButton("Correggi i tag con questi dati")
         self._fix_button.setToolTip("Imposta titolo, numero traccia/disco, album, artista album e anno "
-                                    "dei brani riconosciuti secondo MusicBrainz")
+                                    "dei brani riconosciuti secondo il catalogo (in sospeso: i file non cambiano)")
         self._fix_button.clicked.connect(self._fix_tags)
-        self._open_button = QPushButton("Apri su MusicBrainz")
+        self._open_button = QPushButton("Apri nel catalogo")
         self._open_button.clicked.connect(self._open_release)
         self._retry_button = QPushButton("Riprova la verifica")
         self._retry_button.clicked.connect(self._retry)
@@ -84,7 +191,14 @@ class AlbumCheckDialog(QDialog):
         right = QWidget()
         right_layout = QVBoxLayout(right)
         right_layout.setContentsMargins(0, 0, 0, 0)
+        intro = QLabel("Per ogni album: le tracce dell'edizione trovata e i tuoi file (le mancanti in rosso). Puoi "
+                       "scegliere un'altra edizione e correggere i tag con i suoi dati: restano in sospeso e valgono "
+                       "per le copie (iPhone, esportazione), i file del PC non cambiano.")
+        intro.setWordWrap(True)
+        intro.setStyleSheet("color: gray")
+        right_layout.addWidget(intro)
         right_layout.addWidget(self._status_label)
+        right_layout.addWidget(self._tried_label)
         right_layout.addLayout(edition_row)
         right_layout.addWidget(self._tracks_view, 1)
         right_layout.addLayout(actions)
@@ -160,8 +274,20 @@ class AlbumCheckDialog(QDialog):
         self._edition_combo.clear()
         if result is None:
             self._status_label.setText("")
+            self._tried_label.setText("")
         else:
             self._status_label.setText(result.status_text())
+            details = []
+            if len(result.tried) > 1:
+                tried = []
+                for label, outcome in result.tried:
+                    tried.append(f"{label}: {outcome}")
+                details.append("Provati in ordine: " + "; ".join(tried))
+            if result.ai_reason:
+                details.append(f"Edizione scelta dall'AI. {result.ai_reason}")
+            self._tried_label.setText("\n".join(details))
+            self._edition_label.setText(f"Edizione su {result.service_label}:")
+            self._open_button.setText(f"Apri su {result.service_label}")
             for candidate in result.candidates:
                 self._edition_combo.addItem(candidate.label())
             if result.release is not None:
@@ -213,7 +339,7 @@ class AlbumCheckDialog(QDialog):
                  and 0 <= index < len(result.candidates))
         if valid:
             chosen = result.candidates[index]
-            client = self._window.mb_client
+            client = self._client(result)
 
             def work(_progress, _cancel):
                 value = check_album(client, result.local_tracks, result.candidates, chosen)
@@ -225,19 +351,24 @@ class AlbumCheckDialog(QDialog):
     def _retry(self) -> None:
         result = self._current_result()
         if result is not None:
-            client = self._window.mb_client
+            client = self._client(result)
 
             def work(_progress, _cancel):
                 value = check_album(client, result.local_tracks)
                 return value
 
-            self._window.runner.run("Verifica album", work,
+            self._window.runner.run("Verifica album online", work,
                                     lambda new: self._replace_result(result, new))
 
     def _open_release(self) -> None:
         result = self._current_result()
         if result is not None and result.release is not None:
-            QDesktopServices.openUrl(QUrl(f"https://musicbrainz.org/release/{result.release.id}"))
+            QDesktopServices.openUrl(QUrl(self._client(result).release_url(result.release)))
+
+    def _client(self, result):
+        """Il client del catalogo da cui viene il risultato."""
+        result_client = self._window.album_clients[result.service]
+        return result_client
 
     def _fix_tags(self) -> None:
         result = self._current_result()
@@ -245,7 +376,7 @@ class AlbumCheckDialog(QDialog):
             matched = [match for match in result.matches if match.local is not None]
             answer = QMessageBox.question(
                 self, "Correggi tag",
-                f"Aggiornare i tag di {len(matched)} brani con i dati di MusicBrainz?\n\n"
+                f"Aggiornare i tag di {len(matched)} brani con i dati di {result.service_label}?\n\n"
                 f"{result.release.label()}")
             if answer == QMessageBox.Yes:
                 self._run_fix(result, matched)
@@ -253,7 +384,7 @@ class AlbumCheckDialog(QDialog):
     def _run_fix(self, result, matched: list) -> None:
         """I tag corretti (e la copertina) restano in sospeso per le copie dell'iPhone: i file sul PC non cambiano.
         In background solo lo scaricamento della copertina."""
-        client = self._window.mb_client
+        client = self._client(result)
         release = result.release
         with_cover = self._with_cover.isChecked()
 

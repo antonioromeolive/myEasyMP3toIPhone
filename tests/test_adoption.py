@@ -155,17 +155,103 @@ def test_rank_sources_asks_ai_only_when_close(monkeypatch):
     assert ranked[0].how == provenance.HOW_RULES and silent.seen == ""                 # un solo candidato sicuro
 
 
-def test_match_in_folder(monkeypatch):
-    phone = [_phone(1, "Uno", "Anna", "Disco", length=100.0),
-             _phone(2, "Due", "Anna", "Disco", length=120.0),
-             _phone(3, "Tre", "Anna", "Disco", length=140.0)]
-    folder = [_pc("C:/m/Anna/Disco/01 - Traccia.mp3", "Traccia 1", "", "", length=100.5),
-              _pc("C:/m/Anna/Disco/02 - Due.flac", "Due", "Anna", "Disco", length=119.0)]
-    monkeypatch.setattr(adoption, "pc_fingerprints", lambda tracks, cache, progress=None, cancel=None:
-                        {str(folder[0].path): "mp3:1", str(folder[1].path): "flac:2"})
-    monkeypatch.setattr(adoption, "phone_fingerprints", lambda tracks, home, progress=None, cancel=None:
-                        {1: "mp3:1", 2: "mp3:altro", 3: "mp3:3"})
-    matches = dict((item.sync_id, proposal) for item, proposal in adoption.match_in_folder(phone, folder, Path(".")))
-    assert matches[1].pc is folder[0] and matches[1].how == provenance.HOW_FINGERPRINT
-    assert matches[2].pc is folder[1] and matches[2].how == provenance.HOW_RULES       # altra codifica
-    assert matches[3] is None
+def _numbered(sync_id, title, album, number, length):
+    item = _phone(sync_id, title, "Anna", album, length=length)
+    item.tags.track_number = number
+    return item
+
+
+def _numbered_pc(path, title, number, length):
+    track = _pc(path, title, "Anna", "", length=length)
+    track.tags.track_number = number
+    return track
+
+
+def test_folder_name_first_then_fingerprint_only_for_the_rest(monkeypatch):
+    """Il nome della cartella contiene l'album: con titolo, numero e durata uguali basta (niente impronta); senza
+    il numero è probabile e l'impronta, se c'è, lo rende certo; un titolo solo simile resta da controllare."""
+    phone = [_numbered(1, "Uno", "Il Disco Bello", 1, 100.0),
+             _numbered(2, "Due", "Il Disco Bello", None, 120.0),
+             _numbered(3, "Tre!", "Il Disco Bello", 3, 140.0),
+             _numbered(4, "Quattro", "Altro album", 4, 160.0)]
+    pc = [_numbered_pc("C:/m/Anna - Il disco bello (1999)/CD1/01 Uno.mp3", "Uno", 1, 100.4),
+          _numbered_pc("C:/m/Anna - Il disco bello (1999)/CD1/02 Due.mp3", "Due", 2, 120.2),
+          _numbered_pc("C:/m/Anna - Il disco bello (1999)/CD1/03 Tre.mp3", "Tree", 3, 139.0),
+          _numbered_pc("C:/m/Varie/x.mp3", "Quattro", 4, 160.0)]
+    asked = []
+
+    def phone_prints(tracks, home, progress, cancel):
+        asked.extend(item.sync_id for item in tracks)
+        return {2: "mp3:due"}
+
+    monkeypatch.setattr(adoption, "phone_fingerprints", phone_prints)
+    monkeypatch.setattr(adoption, "pc_fingerprints", lambda tracks, cache, progress, cancel:
+                        {str(pc[1].path): "mp3:due"})
+    outcome = adoption.adopt(phone, pc, Registry(), Path("."), None, None, None, None)
+    assert sorted(asked) == [2, 3, 4]                       # il brano 1 non ha bisogno dell'impronta
+    by_id = {p.phone.sync_id: p for p in outcome.proposals + outcome.certain}
+    assert by_id[1].how == provenance.HOW_FOLDER and by_id[1].level == adoption.LEVEL_VERY_LIKELY
+    assert by_id[1].checked and by_id[1].pc is pc[0]
+    assert by_id[2].how == provenance.HOW_FINGERPRINT and by_id[2].level == adoption.LEVEL_CERTAIN
+    assert by_id[3].how == provenance.HOW_FOLDER and not by_id[3].checked
+    assert by_id[4].how == provenance.HOW_RULES and by_id[4].pc is pc[3]    # nessuna cartella: le regole
+    assert outcome.by_folder == 2
+
+
+def test_without_fingerprint_or_phone_only_folder_and_rules(monkeypatch, tmp_path):
+    phone = [_numbered(2, "Due", "Il Disco Bello", None, 120.0)]
+    pc = [_numbered_pc("C:/m/Il Disco Bello/02 Due.mp3", "Due", 2, 120.2)]
+
+    def never(*args):
+        raise AssertionError("l'iPhone non si legge")
+
+    monkeypatch.setattr(adoption, "phone_fingerprints", never)
+    monkeypatch.setattr(adoption, "pc_fingerprints", never)
+    outcome = adoption.adopt(phone, pc, Registry(), tmp_path, use_fingerprint=False)
+    assert outcome.proposals[0].level == adoption.LEVEL_LIKELY and outcome.proposals[0].checked
+    monkeypatch.setattr(adoption, "pc_fingerprints", lambda tracks, cache, progress, cancel: {})
+    known = adoption.adopt(phone, pc, Registry(), tmp_path, read_phone=False)  # solo le impronte ricordate
+    assert known.proposals[0].how == provenance.HOW_FOLDER
+
+
+def test_replace_known_includes_tracks_with_a_source(monkeypatch):
+    phone = [_phone(4, "Nota", "Dario", "Album", length=150.0)]
+    pc = [_pc("C:/m/Dario/Album/01 - Nota.mp3", "Nota", "Dario", "Album", length=150.0)]
+    registry = Registry()
+    registry.record(Link(sync_id=4, pc="PC", path="C:/m/x.mp3"))
+    monkeypatch.setattr(adoption, "phone_fingerprints", lambda tracks, home, progress, cancel: {})
+    monkeypatch.setattr(adoption, "pc_fingerprints", lambda tracks, cache, progress, cancel: {})
+    assert adoption.adopt(phone, pc, registry, Path(".")).already == 1
+    assert len(adoption.adopt(phone, pc, registry, Path("."), replace_known=True).proposals) == 1
+
+
+def test_adoption_dialogs(tmp_path):
+    import os
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtCore import Qt
+    from PySide6.QtWidgets import QApplication
+    from myeasymp3toiphone.gui.adoption_dialog import AdoptionDialog, AdoptOptionsDialog
+    app = QApplication.instance() or QApplication([])
+    options = AdoptOptionsDialog(None, 40, 3, tmp_path, tmp_path / "Libreria", 10, False, "")
+    assert options.selected_only and options.use_fingerprint and not options.use_ai
+    assert options.folder() == tmp_path
+    options.library_box.setChecked(True)
+    assert options.folder() == tmp_path / "Libreria" and not options.folder_edit.isEnabled()
+    outcome = adoption.AdoptionResult()
+    sure = adoption.Proposal(_phone(1, "Uno", "A", "B"), _pc("C:/m/1.mp3", "Uno", "A", "B"),
+                             provenance.HOW_FINGERPRINT, "stesso audio", level=adoption.LEVEL_CERTAIN)
+    doubt = adoption.Proposal(_phone(2, "Due", "A", "B"), _pc("C:/m/2.mp3", "Due", "A", "B"), provenance.HOW_RULES,
+                              "controlla", checked=False, level=adoption.LEVEL_CHECK)
+    outcome.certain = [sure]
+    outcome.proposals = [doubt]
+    outcome.foreign = [_phone(3, "Tre", "A", "B")]
+    dialog = AdoptionDialog(None, outcome)
+    assert dialog.chosen() == [sure]                     # quella da controllare non è spuntata
+    dialog._rows[0][0].setCheckState(0, Qt.Unchecked)    # anche una certa si può togliere: resta com'è
+    assert dialog.chosen() == []
+    assert [item.sync_id for item in dialog.missing] == [3] and not dialog.one_by_one
+    dialog.one_by_one_box.setChecked(True)
+    assert dialog.one_by_one
+    dialog.close()
+    options.close()
+    app.processEvents()

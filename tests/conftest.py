@@ -37,7 +37,8 @@ def isolated(tmp_path, monkeypatch):
     monkeypatch.setenv("MYEASYMP3TOIPHONE_HOME", str(home))
     monkeypatch.setenv("MYCALIBRETOOLS_HOME", str(tmp_path / "calibre_tools"))
     for name in list(os.environ):
-        if name.startswith(("MY_TEST_", "OLLAMA_", "ANTHROPIC_", "OPENAI_", "AZURE_OPENAI_", "AZURE_FOUNDRY_")) or name == \
+        if name.startswith(("MY_TEST_", "OLLAMA_", "ANTHROPIC_", "OPENAI_", "AZURE_OPENAI_", "AZURE_FOUNDRY_",
+                            "DISCOGS_")) or name == \
                 "MYEASYMP3TOIPHONE_LOG_LEVEL":
             monkeypatch.delenv(name, raising=False)
     memory = MemoryKeyring()

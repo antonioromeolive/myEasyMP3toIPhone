@@ -128,6 +128,7 @@ def selftest() -> int:
     from . import env_file
 
     modules = ("PySide6.QtWidgets", "PySide6.QtGui", "mutagen.mp3", "mutagen.mp4", "mutagen.flac", "mutagen.oggopus",
+               "mutagen.apev2", "mutagen.asf", "mutagen.wave", "mutagen.aiff",
                "requests", "keyring", "anthropic", "pymobiledevice3.lockdown", "pymobiledevice3.usbmux",
                "pymobiledevice3.services.afc",
                "cryptography.hazmat.primitives.ciphers", "sqlite3",

@@ -11,15 +11,18 @@ from typing import Optional
 from PySide6.QtCore import QByteArray, QItemSelection, QItemSelectionModel, QSize, Qt, QTimer
 from PySide6.QtGui import QAction, QColor, QKeySequence
 from PySide6.QtWidgets import (
-    QAbstractItemView, QComboBox, QFileDialog, QFrame, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMainWindow,
+    QAbstractItemView, QApplication, QComboBox, QFileDialog, QFrame, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMainWindow,
     QMenu, QMessageBox, QPushButton, QScrollArea, QSplitter, QStyle, QTableView, QTabWidget,
     QToolBar, QVBoxLayout, QWidget,
 )
 
-from ..albumcheck import MusicBrainzClient, check_album
+from ..albumcheck import (
+    SERVICE_DISCOGS, SERVICE_MUSICBRAINZ, STATUS_COMPLETE, STATUS_INCOMPLETE, ai_chooser, check_album_services,
+    make_clients,
+)
 from ..config import PRODUCT, AppSettings, config_dir
 from ..i18n import tr
-from ..library import assign_groups, copy_organized, group_by_album, scan_folder, track_sort_key
+from ..library import assign_groups, copy_organized, group_by_album, load_track, scan_folder, track_sort_key
 from .. import provenance
 from ..phone_library import (
     DEVICE_ABSENT, DEVICE_SAME, DEVICE_STALE, PhoneIndex, comparison, device_status, load_listing,
@@ -27,25 +30,25 @@ from ..phone_library import (
 )
 from ..overlay import TagOverlay
 from ..pending import REMOVE, SEND, UPDATE, Pending, toggled, wanted
-from ..tag_cache import TagCache
+from ..tag_cache import TagCache, cached_track
 from ..tags import prepare_copy, protect_folder, read_cover
 from ..version import app_version
 from .about import AboutDialog
-from .album_check_dialog import AlbumCheckDialog
+from .album_check_dialog import AlbumCheckDialog, AlbumCheckOptionsDialog
 from .browser import LibraryBrowser
 from .compare_tip import comparison_html, show_on_tooltip
+from .file_actions import add_file_entries
 from .iphone_panel import IPhonePanel
 from .scan_dialog import ScanLauncher
 from .settings_dialog import SettingsDialog
 from .tag_editor import TagEditor
 from .track_model import COL_DEVICE, COL_TITLE, COLUMNS, TrackTableModel
-from .worker import TaskRunner
+from .worker import BackgroundJob, TaskRunner
 
 APP_NAME = PRODUCT
 # Il filtro per formato: (etichetta, estensioni); None = tutti
 FORMATS = (("Tutti i formati", None), ("MP3", (".mp3",)), ("FLAC", (".flac",)), ("M4A / AAC", (".m4a",)),
-           ("OGG / Opus", (".ogg", ".opus")))
-SECONDS_PER_ALBUM_CHECK = 2.5
+           ("OGG / Opus", (".ogg", ".opus")), ("WMA / WAV / AIFF", (".wma", ".wav", ".aif", ".aiff")))
 
 DEVICE_TIP = {DEVICE_SAME: "Nell'app Musica dell'iPhone c'è questo brano, con gli stessi tag",
               DEVICE_STALE: "Nell'app Musica dell'iPhone c'è questo brano, ma con tag diversi:",
@@ -86,12 +89,26 @@ class MainWindow(QMainWindow):
         self.open_on_start: Optional[Path] = None   # --open CARTELLA: aperta all'avvio al posto della Libreria
         if self.app_settings.window_geometry:
             self.restoreGeometry(QByteArray.fromBase64(self.app_settings.window_geometry.encode("ascii")))
-        self.mb_client = MusicBrainzClient()
+        self.album_clients = make_clients()      # i cataloghi di Verifica album online
+        self.mb_client = self.album_clients[SERVICE_MUSICBRAINZ]   # anche per i nomi d'artista della scansione
+        self._album_job = None                    # Verifica album online in background
+        self._album_results = []
+        self._album_total = 0
+        self._album_dialog = None
         self.tracks = []
         self._visible = []
         self.root_folder: Optional[Path] = None
         self.check_results = {}
 
+        self._album_label = QLabel()
+        self._album_stop = QPushButton("Ferma")
+        self._album_stop.setToolTip("Interrompe Verifica album online: i risultati già trovati restano")
+        self._album_stop.clicked.connect(self._stop_album_check)
+        self._album_results_button = QPushButton("Risultati della verifica…")
+        self._album_results_button.clicked.connect(self._open_album_results)
+        for widget in (self._album_label, self._album_stop, self._album_results_button):
+            self.statusBar().addPermanentWidget(widget)
+            widget.setVisible(False)
         self.runner = TaskRunner(self.statusBar())
         self.runner.error.connect(lambda title, message: QMessageBox.warning(self, title, message))
         self.runner.busy_changed.connect(self._busy_changed)
@@ -124,11 +141,13 @@ class MainWindow(QMainWindow):
              "Copia una cartella nella Libreria, ordinandola per Artista/Album", "Ctrl+I"),
             ("Esporta", QStyle.SP_ArrowUp, self._export_selection,
              "Copia i brani selezionati in una cartella, ordinati per Artista/Album", "Ctrl+E"),
-            ("Verifica album", QStyle.SP_DialogApplyButton, self._check_albums,
-             "Controlla su MusicBrainz che gli album selezionati (o tutti) siano completi", "F5"),
+            ("Verifica album online", QStyle.SP_DialogApplyButton, self._check_albums,
+             "Confronta gli album scelti (o tutti) con i cataloghi online (Deezer, Apple Music, Discogs, "
+             "MusicBrainz): brani mancanti, tag giusti, copertina. In background", "F5"),
             ("Controlla la musica", QStyle.SP_FileDialogContentsView, self._scan,
-             "Cerca i problemi nella cartella aperta o sull'iPhone: file non aggiornati, album con pochi brani, "
-             "collezioni divise su più album, brani duplicati (con l'AI, se configurata)", "F6"),
+             "Cerca i problemi confrontando i tuoi brani tra loro (cartella aperta o iPhone), senza cataloghi "
+             "online: file non aggiornati, album con pochi brani, collezioni divise, artisti scritti in modi "
+             "diversi, brani duplicati (con l'AI, se configurata)", "F6"),
             ("Impostazioni", QStyle.SP_FileDialogDetailedView, self._open_settings,
              "Cartella della Libreria, profili AI e chiavi", "Ctrl+,"),
             ("Informazioni", QStyle.SP_MessageBoxInformation, self._open_about,
@@ -154,15 +173,20 @@ class MainWindow(QMainWindow):
         self._folder_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
         self._format = QComboBox()
         self._format.setToolTip("Mostra solo i brani di un formato: vale per gli elenchi, la tabella, l'esportazione, "
-                                "Verifica album, la scansione e l'invio all'iPhone")
+                                "Verifica album online, la scansione e l'invio all'iPhone")
         for label, _extensions in FORMATS:
             self._format.addItem(tr(label))
         self._format.currentIndexChanged.connect(lambda _index: self._rebuild_views())
+        self._reload_button = QPushButton("Aggiorna")
+        self._reload_button.setToolTip("Rilegge la cartella aperta: i file nuovi, tolti o cambiati (gli altri dalla "
+                                       "cache dei tag). Con Maiusc premuto rilegge tutti i file da zero.")
+        self._reload_button.clicked.connect(self.reload_folder)
         top = QHBoxLayout()
         top.addWidget(self._search, 1)
         top.addWidget(QLabel("Formato:"))
         top.addWidget(self._format)
         top.addWidget(self._folder_label, 1)
+        top.addWidget(self._reload_button)
 
         self.browser = LibraryBrowser()
         self.browser.filter_changed.connect(self._fill_table)
@@ -186,7 +210,7 @@ class MainWindow(QMainWindow):
         # un'intestazione di colonna (Artista, Album, Titolo…), che poi mostra la freccia dell'ordinamento
         header.setSortIndicator(-1, Qt.AscendingOrder)
         header.setSortIndicatorShown(True)
-        widths = [40, 50, 230, 160, 180, 50, 90, 55]
+        widths = [40, 50, 230, 160, 140, 180, 50, 90, 55]
         for column, width in enumerate(widths):
             self._table.setColumnWidth(column, width)
         self._table.selectionModel().selectionChanged.connect(lambda _new, _old: self._selection_changed())
@@ -288,7 +312,8 @@ class MainWindow(QMainWindow):
         if self.pending.reconcile(self.tracks, lambda track: self._device_state(track)[0]):
             self._save_pending()
         self._model.device_header_tip = (f"Nell'app Musica dell'iPhone ({label}): ✔ stesso brano, ⟳ stesso brano "
-                                         "con tag diversi, vuoto = non c'è; la spunta: voglio il brano sull'iPhone")
+                                         "con tag diversi, ≈ forse lo stesso (abbinato solo per i tag: da rivedere), "
+                                         "vuoto = non c'è; la spunta: voglio il brano sull'iPhone")
         self.iphone_panel.set_phone_tracks(tracks, label)
         self._fill_table()
         self.browser.refresh_phone_states()
@@ -317,14 +342,32 @@ class MainWindow(QMainWindow):
         result = self.app_settings.library_path()
         return result
 
+    def source_track(self, path: Path):
+        """Il brano di un file del PC fuori dalla cartella aperta (la sorgente di un brano dell'iPhone), con le
+        modifiche in sospeso: dalla cache dei tag o letto dal file (solo lettura). None se non si legge."""
+        track = cached_track(path, self.tag_cache)
+        if track is None:
+            track = load_track(path)
+            if not track.error:
+                self.tag_cache.store(track)
+        if track.error:
+            result = None
+        else:
+            self.overlay.apply([track])
+            result = track
+        return result
+
     def save_settings(self) -> None:
         self.app_settings.save()
 
     def _open_settings(self) -> None:
         before = self.library_dir()
         dialog = SettingsDialog(self.app_settings, self)
-        if dialog.exec() and self.library_dir() != before:
-            self.open_library()
+        if dialog.exec():
+            self._model.refresh()                  # il percorso completo dei file, se è cambiato
+            self.iphone_panel.pc_changed()
+            if self.library_dir() != before:
+                self.open_library()
 
     def _open_about(self) -> None:
         AboutDialog(self).exec()
@@ -345,9 +388,20 @@ class MainWindow(QMainWindow):
             self.save_settings()
             self.load_folder(Path(folder))
 
-    def load_folder(self, folder: Path) -> None:
+    def reload_folder(self) -> None:
+        """Aggiorna: rilegge la cartella aperta; con Maiusc premuto tutti i file, senza la cache dei tag."""
+        if self.root_folder is None:
+            QMessageBox.information(self, "Aggiorna", "Nessuna cartella aperta")
+        else:
+            force = bool(QApplication.keyboardModifiers() & Qt.ShiftModifier)
+            self.load_folder(self.root_folder, force)
+
+    def load_folder(self, folder: Path, force: bool = False) -> None:
+        if self._album_job is not None and self._album_job.running:
+            self._stop_album_check()           # i risultati varrebbero per i brani della cartella di prima
+
         def work(progress, cancel):
-            value = scan_folder(folder, progress, cancel, self.tag_cache)
+            value = scan_folder(folder, progress, cancel, self.tag_cache, force)
             return value
 
         def done(tracks):
@@ -707,6 +761,11 @@ class MainWindow(QMainWindow):
             if not self.iphone_panel.connected:
                 for action in (send, replace):
                     action.setToolTip("Connetti l'iPhone")
+            menu.addSeparator()
+            paths = []
+            for track in tracks:
+                paths.append(track.path)
+            add_file_entries(menu, paths, lambda text: self.statusBar().showMessage(text, 8000))
             menu.setToolTipsVisible(True)
             menu.exec(self._table.viewport().mapToGlobal(position))
 
@@ -746,6 +805,7 @@ class MainWindow(QMainWindow):
     def _busy_changed(self, busy: bool) -> None:
         for action in self._task_actions:
             action.setEnabled(not busy)
+        self._reload_button.setEnabled(not busy)
         self.editor.setEnabled(not busy)
         QTimer.singleShot(0, self._update_pending_bar)
 
@@ -915,44 +975,104 @@ class MainWindow(QMainWindow):
 
     def _check_albums(self) -> None:
         albums = self._albums_to_check()
-        proceed = bool(albums)
-        if not albums:
-            QMessageBox.information(self, "Verifica album", "Non ci sono album da verificare.")
-        elif len(albums) > 10:
-            minutes = max(1, round(len(albums) * SECONDS_PER_ALBUM_CHECK / 60))
-            answer = QMessageBox.question(
-                self, "Verifica album",
-                f"Verificare {len(albums)} album su MusicBrainz?\n"
-                f"Servono circa {minutes} minuti (il servizio accetta una richiesta al secondo).\n\n"
-                "Per verificarne solo alcuni, sceglili negli elenchi Artisti o Album.")
-            proceed = answer == QMessageBox.Yes
-        if proceed:
-            client = self.mb_client
+        if self._album_job is not None and self._album_job.running:
+            QMessageBox.information(self, "Verifica album online", "La verifica è già in corso (barra di stato): "
+                                    "aspetta la fine o premi Ferma.")
+        elif not albums:
+            QMessageBox.information(self, "Verifica album online", "Non ci sono album da verificare.")
+        else:
+            provider = self.iphone_panel._ai_provider()
+            settings = self.app_settings
+            dialog = AlbumCheckOptionsDialog(self, len(albums), list(settings.album_services), settings.album_ai,
+                                             provider.profile.name if provider is not None else "",
+                                             self.album_clients[SERVICE_DISCOGS].available())
+            if dialog.exec():
+                settings.album_services = dialog.services()
+                settings.album_ai = dialog.use_ai
+                self.save_settings()
+                clients = []
+                for service in dialog.services():
+                    clients.append(self.album_clients[service])
+                chooser = ai_chooser(provider) if dialog.use_ai and provider is not None else None
+                self._start_album_check(albums, clients, chooser)
 
-            def work(progress, cancel):
-                results = []
-                index = 0
-                while index < len(albums) and not cancel.is_set():
-                    artist, album = albums[index][0].album_key
-                    progress(index, len(albums), f"{artist} — {album}")
-                    results.append(check_album(client, albums[index]))
-                    index += 1
-                return results
+    def _start_album_check(self, albums: list, clients: list, chooser) -> None:
+        """Verifica album online in background: il programma resta usabile, gli esiti arrivano album per album."""
+        def work(progress, cancel, emit):
+            index = 0
+            while index < len(albums) and not cancel.is_set():
+                artist, album = albums[index][0].album_key
+                progress(index, len(albums), f"{artist} — {album}")
+                emit(check_album_services(clients, albums[index], chooser))
+                index += 1
 
-            self.runner.run("Verifica album", work, self._show_check_results)
+        self._album_results = []
+        self._album_total = len(albums)
+        job = BackgroundJob(work)
+        job.item.connect(self._album_checked)
+        job.finished.connect(self._album_check_done)
+        job.failed.connect(lambda message: self._album_check_done(message))
+        self._album_job = job
+        self._album_label.setText(f"Verifica album online: 0 di {len(albums)}")
+        for widget in (self._album_label, self._album_stop):
+            widget.setVisible(True)
+        self._album_stop.setEnabled(True)
+        self._album_results_button.setVisible(False)
+        job.start()
 
-    def _show_check_results(self, results: list) -> None:
-        for result in results:
-            self.store_check_result(result)
-        self._rebuild_views()
-        if results:
-            dialog = AlbumCheckDialog(results, self)
-            dialog.exec()
-            self.refresh_after_tag_change()
+    def _album_checked(self, result) -> None:
+        self._album_results.append(result)
+        self.store_check_result(result)
+        self.browser.refresh_check_icons(self.check_results)
+        self._album_label.setText(f"Verifica album online: {len(self._album_results)} di {self._album_total}")
+        self._album_results_button.setVisible(True)
+
+    def _stop_album_check(self) -> None:
+        if self._album_job is not None:
+            self._album_job.cancel()
+            self._album_stop.setEnabled(False)
+            self._album_label.setText("Verifica album online: interruzione…")
+
+    def _album_summary(self) -> str:
+        complete = 0
+        incomplete = 0
+        for result in self._album_results:
+            if result.status == STATUS_COMPLETE:
+                complete += 1
+            elif result.status == STATUS_INCOMPLETE:
+                incomplete += 1
+        other = len(self._album_results) - complete - incomplete
+        text = f"{len(self._album_results)} album: {complete} completi, {incomplete} incompleti, {other} non trovati"
+        return text
+
+    def _album_check_done(self, error: str = "") -> None:
+        cancelled = self._album_job is not None and self._album_job.cancelled
+        self._album_stop.setVisible(False)
+        if error:
+            self._album_label.setText(f"Verifica album online non riuscita: {error}")
+        elif cancelled:
+            self._album_label.setText(f"Verifica album online interrotta: {self._album_summary()}")
+        else:
+            self._album_label.setText(f"Verifica album online finita: {self._album_summary()}")
+        self._album_results_button.setVisible(bool(self._album_results))
+        if self._album_results and not cancelled:
+            self._open_album_results()
+
+    def _open_album_results(self) -> None:
+        """La finestra dei risultati, non modale: si può continuare a usare il programma."""
+        if self._album_dialog is not None:
+            self._album_dialog.close()
+        if self._album_results:
+            dialog = AlbumCheckDialog(self._album_results, self)
+            dialog.finished.connect(lambda _code: self.refresh_after_tag_change())
+            self._album_dialog = dialog
+            dialog.show()
 
     # ================================================================== chiusura
 
     def closeEvent(self, event) -> None:
+        if self._album_job is not None and self._album_job.running:
+            self._album_job.cancel()
         self.app_settings.window_geometry = bytes(self.saveGeometry().toBase64()).decode("ascii")
         self.save_settings()
         if self.runner.is_busy:

@@ -24,7 +24,7 @@ from .config import (
 # Ogni variabile che il programma legge, tranne quelle nominate dalle Impostazioni e quelle di sistema (APPDATA…).
 # Un test confronta questo elenco con il codice.
 VARIABLES = (HOME_ENV_VAR, "MYEASYMP3TOIPHONE_LOG_LEVEL", "OLLAMA_API_BASE", "OLLAMA_API_KEY", "AZURE_FOUNDRY_EP",
-             "AZURE_FOUNDRY_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "MYCALIBRETOOLS_HOME")
+             "AZURE_FOUNDRY_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "MYCALIBRETOOLS_HOME", "DISCOGS_TOKEN")
 # Lette da build_dist.py e vscode_deploy.py: nel rapporto solo quando il programma gira dai sorgenti.
 BUILD_VARIABLES = ("MY_VSCODE_ZIP_DIR", "MY_VSCODE_INSTALL_DIR")
 NOT_SET = " (la variabile non è impostata)"

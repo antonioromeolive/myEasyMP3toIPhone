@@ -1743,4 +1743,304 @@ CATALOG = {
         "Interface language",
     "Vale dal prossimo avvio del programma. Il README resta in italiano.":
         "It applies from the next start of the program. The README stays in Italian.",
+    'certo':
+        'certain',
+    'molto probabile':
+        'very likely',
+    'probabile':
+        'likely',
+    'da controllare':
+        'to check',
+    'cartella "{0}": stesso titolo, numero e durata':
+        'folder "{0}": same title, number and duration',
+    'cartella "{0}": stesso titolo e durata':
+        'folder "{0}": same title and duration',
+    'cartella "{0}": titolo simile, stessa durata':
+        'folder "{0}": similar title, same duration',
+    'nomi delle cartelle':
+        'folder names',
+    'deezer':
+        'deezer',
+    'apple':
+        'apple',
+    'discogs':
+        'discogs',
+    'musicbrainz':
+        'musicbrainz',
+    'MusicBrainz':
+        'MusicBrainz',
+    'Non trovato su {0}':
+        'Not found on {0}',
+    'connessione a {0} non riuscita ({1})':
+        'connection to {0} failed ({1})',
+    '{0} ha risposto con dati non validi':
+        '{0} answered with invalid data',
+    '{0} è sovraccarico in questo momento: riprova tra qualche minuto':
+        '{0} is overloaded right now: try again in a few minutes',
+    "{0} ha risposto con l'errore {1}":
+        '{0} answered with error {1}',
+    'Deezer':
+        'Deezer',
+    'Apple Music':
+        'Apple Music',
+    'lookup':
+        'lookup',
+    'song':
+        'song',
+    'Discogs':
+        'Discogs',
+    'Discogs token={0}':
+        'Discogs token={0}',
+    'Discogs vuole un token personale: la variabile {0} non è impostata':
+        'Discogs needs a personal token: the variable {0} is not set',
+    'release':
+        'release',
+    'PC: {0} - {1}, {2} files:':
+        'PC: {0} - {1}, {2} files:',
+    'cartella':
+        'folder',
+    'Tutti i brani senza sorgente ({0})':
+        'All tracks without a source ({0})',
+    'I brani selezionati ({0}), anche quelli che hanno già una sorgente':
+        'The selected tracks ({0}), also those that already have a source',
+    'Tutta la Libreria ({0})':
+        'The whole Library ({0})',
+    "Nome della cartella, titolo, numero e durata (veloce: non legge l'audio)":
+        'Folder name, title, number and duration (fast: does not read the audio)',
+    "Impronta dell'audio, per i brani non trovati dal nome della cartella (al più {0} da leggere dall'iPhone: circa {1} minuti; quelle lette si ricordano)":
+        'Audio fingerprint, for the tracks the folder name did not find (at most {0} to read from the iPhone: about {1} minutes; the ones read are remembered)',
+    "Impronta dell'audio: solo quelle già lette (l'iPhone non è connesso)":
+        'Audio fingerprint: only those already read (the iPhone is not connected)',
+    "Impronta dell'audio (già lette tutte: veloce)":
+        'Audio fingerprint (all already read: fast)',
+    'AI per i dubbi ({0})':
+        'AI for the doubtful ones ({0})',
+    "AI per i dubbi (scegli l'AI della scansione in Impostazioni)":
+        'AI for the doubtful ones (choose the scan AI in Settings)',
+    'Dove cercare (con le sottocartelle)':
+        'Where to search (with subfolders)',
+    'Come, in ordine':
+        'How, in order',
+    "Alla fine vedi tutte le proposte, con la loro certezza e le spunte, prima di associare. Un brano senza spunta resta com'è; né i brani dell'iPhone né i file del PC cambiano.":
+        'At the end you see all the proposals, with their certainty and check marks, before linking. A track without a check mark stays as it is; neither the iPhone tracks nor the PC files change.',
+    'Cerca':
+        'Search',
+    'Dove cercare le sorgenti (anche nelle sottocartelle)':
+        'Where to search for the sources (also in subfolders)',
+    "<b>{0}</b> brani dell'iPhone con una sorgente proposta sul PC ({1} già spuntati perché certi o molto probabili).":
+        '<b>{0}</b> iPhone tracks with a proposed source on the PC ({1} already checked because certain or very likely).',
+    "{0} con l'impronta dell'audio (certi).":
+        '{0} with the audio fingerprint (certain).',
+    "{0} dal nome della cartella, senza leggere l'audio.":
+        '{0} from the folder name, without reading the audio.',
+    "<span style='color:#c33'><b>{0}</b> brani non trovati</span> (in rosso): restano <i>senza sorgente</i>, a meno che non scegli tu il file.":
+        "<span style='color:#c33'><b>{0}</b> tracks not found</span> (in red): they stay <i>without a source</i>, unless you choose the file.",
+    'Certezza':
+        'Certainty',
+    'Per la riga selezionata: scegli tu il file del PC (anche per un brano non trovato)':
+        'For the selected row: choose the PC file yourself (also for a track not found)',
+    "Associare scrive solo il registro della provenienza (sul PC e sull'iPhone): né i brani dell'iPhone né i file del PC cambiano. Un brano senza spunta resta com'è.":
+        'Linking writes only the provenance register (on the PC and on the iPhone): neither the iPhone tracks nor the PC files change. A track without a check mark stays as it is.',
+    'nessun file simile':
+        'no similar file',
+    'scelto da te':
+        'chosen by you',
+    'Deezer: veloce, gratis, senza chiave':
+        'Deezer: fast, free, no key',
+    "Apple Music: i nomi che usa l'app Musica dell'iPhone; più lento (circa 20 richieste al minuto)":
+        'Apple Music: the names the iPhone Music app uses; slower (about 20 requests a minute)',
+    'Discogs: tante edizioni, anche rare e in vinile; vuole un token personale':
+        'Discogs: many editions, also rare and vinyl ones; needs a personal token',
+    'MusicBrainz: il più completo, ma lento (una richiesta al secondo)':
+        'MusicBrainz: the most complete, but slow (one request a second)',
+    "<b>Cosa succede dopo.</b> La verifica va in background: puoi continuare a usare il programma (la barra di stato dice a che punto è, <i>Ferma</i> la interrompe). L'icona accanto a ogni album nell'elenco Album ne dice l'esito man mano. Alla fine si apre la finestra dei risultati: per ogni album le tracce dell'edizione trovata e i tuoi file, le tracce mancanti in rosso; puoi scegliere un'altra edizione e <i>Correggere i tag</i> con quei dati e la copertina (restano in sospeso, per le copie: i file del PC non cambiano). La riapri con <i>Risultati della verifica</i> nella barra di stato.":
+        '<b>What happens next.</b> The check runs in the background: you can keep using the program (the status bar tells how far it is, <i>Stop</i> interrupts it). The icon next to each album in the Album list shows its result as it arrives. At the end the results window opens: for each album the tracks of the edition found and your files, the missing tracks in red; you can choose another edition and <i>Fix the tags</i> with its data and the cover (they stay pending, for the copies: the PC files do not change). Reopen it with <i>Check results</i> in the status bar.',
+    "<i>Verifica album online</i> confronta i tuoi album con un catalogo su internet: dice se manca qualche brano e propone i tag giusti e la copertina. <i>Controlla la musica</i> invece confronta i tuoi brani tra loro (e con l'iPhone), senza cataloghi: doppioni, artisti scritti in modi diversi, album divisi, tag mancanti.":
+        '<i>Check albums online</i> compares your albums with a catalog on the internet: it tells whether a track is missing and proposes the right tags and the cover. <i>Check the music</i> instead compares your tracks with each other (and with the iPhone), without catalogs: duplicates, artists written in different ways, split albums, missing tags.',
+    'Verifica album online':
+        'Check albums online',
+    '<b>Verificare {0} album</b> (quelli scelti negli elenchi, o tutti).<br>':
+        '<b>Check {0} albums</b> (those chosen in the lists, or all).<br>',
+    "Cataloghi da usare. Con più cataloghi si provano in quest'ordine, album per album, finché uno dà l'album completo:":
+        'Catalogs to use. With more than one they are tried in this order, album by album, until one gives the complete album:',
+    'Imposta la variabile {0} (nel file delle variabili o in Windows) con un token personale di Discogs (discogs.com, Impostazioni, Sviluppatori), poi riavvia':
+        'Set the variable {0} (in the variables file or in Windows) to a personal Discogs token (discogs.com, Settings, Developers), then restart',
+    ' ({0} non impostata)':
+        ' ({0} not set)',
+    'AI per scegliere tra edizioni dubbie ({0})':
+        'AI to choose between doubtful editions ({0})',
+    "AI per scegliere tra edizioni dubbie (scegli l'AI della scansione in Impostazioni)":
+        'AI to choose between doubtful editions (choose the scan AI in Settings)',
+    "Solo quando due edizioni di un album sono ugualmente probabili: l'AI riceve titoli e numero dei brani e le edizioni trovate, e sceglie":
+        'Only when two editions of an album are equally likely: the AI gets the titles and number of the tracks and the editions found, and chooses',
+    'Verifica':
+        'Check',
+    'Circa {0} minuti con {1}':
+        'About {0} minutes with {1}',
+    ', di più per gli album che vanno cercati anche negli altri cataloghi':
+        ', more for the albums that must be searched in the other catalogs too',
+    'Scegli almeno un catalogo':
+        'Choose at least one catalog',
+    'Verifica album online: i risultati':
+        'Check albums online: the results',
+    'Edizione:':
+        'Edition:',
+    'Titolo nel catalogo':
+        'Title in the catalog',
+    'Imposta titolo, numero traccia/disco, album, artista album e anno dei brani riconosciuti secondo il catalogo (in sospeso: i file non cambiano)':
+        'Sets title, track/disc number, album, album artist and year of the recognized tracks from the catalog (pending: the files do not change)',
+    'Apri nel catalogo':
+        'Open in the catalog',
+    "Per ogni album: le tracce dell'edizione trovata e i tuoi file (le mancanti in rosso). Puoi scegliere un'altra edizione e correggere i tag con i suoi dati: restano in sospeso e valgono per le copie (iPhone, esportazione), i file del PC non cambiano.":
+        'For each album: the tracks of the edition found and your files (the missing ones in red). You can choose another edition and fix the tags with its data: they stay pending and apply to the copies (iPhone, export), the PC files do not change.',
+    'Provati in ordine: ':
+        'Tried in order: ',
+    "Edizione scelta dall'AI. {0}":
+        'Edition chosen by the AI. {0}',
+    'Edizione su {0}:':
+        'Edition on {0}:',
+    'Apri su {0}':
+        'Open on {0}',
+    'Aggiornare i tag di {0} brani con i dati di {1}?\n\n{2}':
+        'Update the tags of {0} tracks with the data of {1}?\n\n{2}',
+    'explorer':
+        'explorer',
+    'Copiati negli appunti i nomi di {0} file':
+        'Copied the names of {0} files to the clipboard',
+    'Copiati negli appunti i percorsi di {0} file':
+        'Copied the paths of {0} files to the clipboard',
+    'Copiate negli appunti {0} cartelle':
+        'Copied {0} folders to the clipboard',
+    'Le cartelle non ci sono su questo PC (disco scollegato o file spostati)':
+        'The folders are not on this PC (disk disconnected or files moved)',
+    'Aperte le prime {0} cartelle di {1}':
+        'Opened the first {0} folders of {1}',
+    'Copia nome file ({0})':
+        'Copy file name ({0})',
+    'Copia percorso completo ({0})':
+        'Copy full path ({0})',
+    'Copia cartella ({0})':
+        'Copy folder ({0})',
+    'Apri la cartella in Esplora risorse ({0})':
+        'Open the folder in File Explorer ({0})',
+    'File della sorgente':
+        'Source file',
+    'uguale':
+        'same',
+    'tag diversi':
+        'different tags',
+    'sparito':
+        'gone',
+    'Da rivedere: abbinati solo per i tag (≈)':
+        'To review: matched only by tags (≈)',
+    'Sorgente con tag diversi (⟳)':
+        'Source with different tags (⟳)',
+    "Sul PC c'è la sorgente di questo brano, con gli stessi tag":
+        'The source of this track is on the PC, with the same tags',
+    "Sul PC c'è la sorgente di questo brano, ma con tag diversi":
+        'The source of this track is on the PC, but with different tags',
+    "Da rivedere: sul PC c'è un brano con lo stesso titolo, album e artista, ma non è certo che sia la sorgente":
+        'To review: on the PC there is a track with the same title, album and artist, but it is not certain that it is the source',
+    "<b>Come funziona.</b> Qui vedi la musica dell'app <b>Musica</b> dell'iPhone, con i titoli, gli artisti e gli album che mostra l'app. La colonna <b>Sul PC</b> la confronta con il PC: ✔ la sorgente, stessi tag; ⟳ la sorgente, tag diversi; ≈ da rivedere (un brano con gli stessi tag nella cartella aperta, non certo); ✖ la sorgente non c'è più; vuoto = non trovato. <b>Sorgente</b>: il file da cui viene il brano (questo PC, un altro computer, nessuna, telefono); <b>Associa sorgenti</b> la ritrova, <b>Mostra</b> filtra.<br>Tasto destro su uno o più brani: <b>Salva su PC</b>, <b>Mostra nella scheda PC</b>, <b>Rimpiazza con la versione del PC</b> (per i ⟳), <b>Cambia tag</b>, <b>Associa sorgente</b>, <b>Togli sorgente</b>, <b>Elimina dall'iPhone</b>. Per mandare brani nuovi: tasto destro nella scheda PC → <b>Invia all'iPhone</b>. I file del PC non cambiano mai.<br><b>Attenzione:</b> {0}":
+        '<b>How it works.</b> Here you see the music of the iPhone <b>Music</b> app, with the titles, artists and albums the app shows. The <b>On the PC</b> column compares it with the PC: ✔ the source, same tags; ⟳ the source, different tags; ≈ to review (a track with the same tags in the open folder, not certain); ✖ the source is gone; empty = not found. <b>Source</b>: the file the track comes from (this PC, another computer, none, phone); <b>Link sources</b> finds it, <b>Show</b> filters.<br>Right click on one or more tracks: <b>Save to PC</b>, <b>Show in the PC tab</b>, <b>Replace with the PC version</b> (for ⟳), <b>Change tags</b>, <b>Link source</b>, <b>Remove source</b>, <b>Delete from the iPhone</b>. To send new tracks: right click in the PC tab → <b>Send to iPhone</b>. The PC files never change.<br><b>Warning:</b> {0}',
+    'Aggiorna':
+        'Refresh',
+    "Rilegge la musica dell'app Musica dall'iPhone connesso; senza iPhone rifà il confronto con il PC":
+        "Reads the Music app's music again from the connected iPhone; without an iPhone redoes the comparison with the PC",
+    "Ritrova sul PC la sorgente (il file) dei brani dell'iPhone, di quelli selezionati o di tutti quelli senza sorgente: nome della cartella, impronta dell'audio, regole e AI per i dubbi. Scrive solo il registro della provenienza: né i brani né i file cambiano.":
+        'Finds on the PC the source (the file) of the iPhone tracks, the selected ones or all those without a source: folder name, audio fingerprint, rules and AI for the doubtful ones. Writes only the provenance register: neither the tracks nor the files change.',
+    "La sorgente di questo brano non c'è più sul PC:\n{0}\n(spostata o cancellata). Il brano resta sull'iPhone: tasto destro → Associa sorgente per sceglierne un'altra.":
+        'The source of this track is no longer on the PC:\n{0}\n(moved or deleted). The track stays on the iPhone: right click → Link source to choose another one.',
+    ' (fuori dalla cartella aperta)':
+        ' (outside the open folder)',
+    'Abbinato per artista, album e titolo: probabile, non certo. Se è giusto, tasto destro → Associa le probabili':
+        'Matched by artist, album and title: likely, not certain. If it is right, right click → Link the likely ones',
+    'Associa le probabili':
+        'Link the likely ones',
+    "Associare {0} brani dell'iPhone al file del PC con lo stesso titolo, album e artista (≈)?\n\nControlla prima che siano giusti (il suggerimento di ≈ li confronta). Scrive solo il registro della provenienza: né i brani né i file cambiano.":
+        'Link {0} iPhone tracks to the PC file with the same title, album and artist (≈)?\n\nCheck first that they are right (the tooltip of ≈ compares them). Writes only the provenance register: neither the tracks nor the files change.',
+    'stessi titolo, album e artista':
+        'same title, album and artist',
+    'Associa sorgenti… ({0} brani)':
+        'Link sources… ({0} tracks)',
+    'Associa le probabili ≈ ({0} brani)':
+        'Link the likely ones ≈ ({0} tracks)',
+    "iPhone non connesso: rifatto il confronto con il PC sull'ultimo elenco letto":
+        'iPhone not connected: redid the comparison with the PC on the last list read',
+    'Nessun brano da associare.':
+        'No tracks to link.',
+    'lettura di {0}':
+        'reading {0}',
+    ' ({0} sostituite)':
+        ' ({0} replaced)',
+    'WMA / WAV / AIFF':
+        'WMA / WAV / AIFF',
+    'Ferma':
+        'Stop',
+    'Interrompe Verifica album online: i risultati già trovati restano':
+        'Stops Check albums online: the results already found stay',
+    'Risultati della verifica…':
+        'Check results…',
+    'Confronta gli album scelti (o tutti) con i cataloghi online (Deezer, Apple Music, Discogs, MusicBrainz): brani mancanti, tag giusti, copertina. In background':
+        'Compares the chosen albums (or all) with the online catalogs (Deezer, Apple Music, Discogs, MusicBrainz): missing tracks, right tags, cover. In the background',
+    "Cerca i problemi confrontando i tuoi brani tra loro (cartella aperta o iPhone), senza cataloghi online: file non aggiornati, album con pochi brani, collezioni divise, artisti scritti in modi diversi, brani duplicati (con l'AI, se configurata)":
+        'Looks for problems by comparing your tracks with each other (open folder or iPhone), without online catalogs: files not updated, albums with few tracks, split collections, artists written in different ways, duplicate tracks (with the AI, if configured)',
+    "Mostra solo i brani di un formato: vale per gli elenchi, la tabella, l'esportazione, Verifica album online, la scansione e l'invio all'iPhone":
+        'Shows only the tracks of one format: applies to the lists, the table, export, Check albums online, the scan and sending to the iPhone',
+    'Rilegge la cartella aperta: i file nuovi, tolti o cambiati (gli altri dalla cache dei tag). Con Maiusc premuto rilegge tutti i file da zero.':
+        'Reads the open folder again: new, removed or changed files (the others from the tag cache). With Shift held down it reads all files from scratch.',
+    "Nell'app Musica dell'iPhone ({0}): ✔ stesso brano, ⟳ stesso brano con tag diversi, ≈ forse lo stesso (abbinato solo per i tag: da rivedere), vuoto = non c'è; la spunta: voglio il brano sull'iPhone":
+        'In the iPhone Music app ({0}): ✔ same track, ⟳ same track with different tags, ≈ maybe the same (matched only by tags: to review), empty = not there; the check mark: I want the track on the iPhone',
+    'La verifica è già in corso (barra di stato): aspetta la fine o premi Ferma.':
+        'The check is already running (status bar): wait for the end or press Stop.',
+    'Verifica album online: 0 di {0}':
+        'Check albums online: 0 of {0}',
+    'Verifica album online: {0} di {1}':
+        'Check albums online: {0} of {1}',
+    'Verifica album online: interruzione…':
+        'Check albums online: stopping…',
+    '{0} album: {1} completi, {2} incompleti, {3} non trovati':
+        '{0} albums: {1} complete, {2} incomplete, {3} not found',
+    'Verifica album online non riuscita: {0}':
+        'Check albums online failed: {0}',
+    'Verifica album online interrotta: {0}':
+        'Check albums online stopped: {0}',
+    'Verifica album online finita: {0}':
+        'Check albums online finished: {0}',
+    'Mostra il percorso completo dei file':
+        'Show the full path of the files',
+    'Colonna File della scheda PC e File della sorgente della scheda iPhone: il percorso completo invece del solo nome del file':
+        'File column of the PC tab and Source file of the iPhone tab: the full path instead of the file name only',
+    'Colonne dei file':
+        'File columns',
+    'Nessun tag nel file':
+        'No tags in the file',
+    'Tag letti da: {0}':
+        'Tags read from: {0}',
+    'Tag letti da: {0} (un campo vuoto si prende dal tipo seguente)':
+        'Tags read from: {0} (an empty field is taken from the next type)',
+    "WMA, WAV e AIFF: i tag si leggono soltanto e i brani non si inviano all'iPhone":
+        'WMA, WAV and AIFF: the tags are read only and the tracks are not sent to the iPhone',
+    'Mancano i numeri di traccia {0}. "Verifica album online" controlla l\'elenco completo nei cataloghi online.':
+        'Track numbers {0} are missing. "Check albums online" checks the complete list in the online catalogs.',
+    'ASF (WMA)':
+        'ASF (WMA)',
+    'RIFF INFO':
+        'RIFF INFO',
+    'MP4 (iTunes)':
+        'MP4 (iTunes)',
+    'Vorbis comment':
+        'Vorbis comment',
+    '{0}: i tag dei file {1} si leggono soltanto':
+        '{0}: the tags of {1} files are read only',
+    'I brani selezionati ({0}), anche con una sorgente':
+        'The selected tracks ({0}), also with a source',
+    "Al più {0} impronte da leggere dall'iPhone: circa {1} minuti; quelle lette si ricordano":
+        'At most {0} fingerprints to read from the iPhone: about {1} minutes; the ones read are remembered',
+    "Solo le impronte già lette: l'iPhone non è connesso":
+        'Only the fingerprints already read: the iPhone is not connected',
+    'Già lette tutte: veloce':
+        'All already read: fast',
+    "Impronta dell'audio, per i brani non trovati dal nome della cartella":
+        'Audio fingerprint, for the tracks the folder name did not find',
 }

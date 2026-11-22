@@ -75,6 +75,10 @@ class SettingsDialog(QDialog):
             self.g_language.addItem(label, code)
         self.g_language.setCurrentIndex(max(0, self.g_language.findData(self.settings.language)))
         self.g_language.setToolTip("Vale dal prossimo avvio del programma. Il README resta in italiano.")
+        self.g_full_path = QCheckBox("Mostra il percorso completo dei file")
+        self.g_full_path.setToolTip("Colonna File della scheda PC e File della sorgente della scheda iPhone: il "
+                                    "percorso completo invece del solo nome del file")
+        self.g_full_path.setChecked(self.settings.show_full_path)
         note = QLabel("La scansione usa sempre le regole locali (gratuite). Con un profilo AI, l'AI riceve una tabella "
                       "degli album (artisti, titoli, numeri di traccia, nomi delle cartelle) e propone altri problemi e "
                       "le correzioni. Con un'AI nel cloud questi dati escono dal computer; con Ollama restano qui.")
@@ -84,6 +88,7 @@ class SettingsDialog(QDialog):
         form.addRow("Cartella della Libreria", library_row)
         form.addRow("AI della scansione", self.g_scan_profile)
         form.addRow("Lingua dell'interfaccia", self.g_language)
+        form.addRow("Colonne dei file", self.g_full_path)
         form.addRow(note)
         widget = QWidget()
         widget.setLayout(form)
@@ -439,6 +444,7 @@ class SettingsDialog(QDialog):
         library = self.g_library.text().strip()
         self.settings.library_dir = library
         self.settings.language = self.g_language.currentData() or DEFAULT_LANGUAGE
+        self.settings.show_full_path = self.g_full_path.isChecked()
         chosen = self.g_scan_profile.currentText()
         if chosen == tr(NO_AI):
             self.settings.scan_profile = ""

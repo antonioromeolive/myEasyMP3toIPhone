@@ -125,3 +125,70 @@ class TaskRunner(QObject):
             on_error(message)
         else:
             self.error.emit(title, message)
+
+
+class _JobSignals(QObject):
+    item = Signal(object)
+    progress = Signal(int, int, str)
+    finished = Signal()
+    failed = Signal(str)
+
+
+class _JobTask(QRunnable):
+    def __init__(self, fn: Callable, cancel: threading.Event, signals: _JobSignals) -> None:
+        super().__init__()
+        self.fn = fn
+        self.cancel = cancel
+        self.signals = signals
+
+    @Slot()
+    def run(self) -> None:
+        try:
+            self.fn(self.signals.progress.emit, self.cancel, self.signals.item.emit)
+            self.signals.finished.emit()
+        except Exception as exc:  # noqa: BLE001 - qualsiasi errore va mostrato all'utente
+            log.exception("Operazione in background non riuscita")
+            self.signals.failed.emit(f"{type(exc).__name__}: {exc}")
+
+
+class BackgroundJob(QObject):
+    """Un lavoro lungo che non blocca il programma (a differenza di TaskRunner, che ne fa uno alla volta e ferma i
+    pulsanti): fn(progress, cancel, emit) consegna i risultati man mano con emit(valore), che arrivano nel thread
+    dell'interfaccia con il segnale item."""
+
+    item = Signal(object)
+    progress = Signal(int, int, str)
+    finished = Signal()
+    failed = Signal(str)
+
+    def __init__(self, fn: Callable) -> None:
+        super().__init__()
+        self._cancel = threading.Event()
+        self._signals = _JobSignals()
+        self._signals.item.connect(self.item.emit)
+        self._signals.progress.connect(self.progress.emit)
+        self._signals.finished.connect(self._finish)
+        self._signals.failed.connect(self._fail)
+        self._task = _JobTask(fn, self._cancel, self._signals)
+        self._task.setAutoDelete(False)
+        self.running = False
+
+    def start(self) -> None:
+        self.running = True
+        QThreadPool.globalInstance().start(self._task)
+
+    def cancel(self) -> None:
+        self._cancel.set()
+
+    @property
+    def cancelled(self) -> bool:
+        result = self._cancel.is_set()
+        return result
+
+    def _finish(self) -> None:
+        self.running = False
+        self.finished.emit()
+
+    def _fail(self, message: str) -> None:
+        self.running = False
+        self.failed.emit(message)

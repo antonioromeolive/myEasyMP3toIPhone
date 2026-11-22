@@ -1,7 +1,9 @@
 """Lettura e scrittura dei tag audio.
 
-Supporta MP3 (ID3), M4A (MP4/iTunes), FLAC e OGG/Opus (Vorbis comment).
-Le copertine sono supportate per MP3, M4A e FLAC.
+Supporta MP3 (ID3), M4A (MP4/iTunes), FLAC e OGG/Opus (Vorbis comment). Si leggono tutti i tipi di tag, come i
+programmi dei tag (TagScanner, Mp3tag): negli MP3 ID3v2, poi APEv2, poi ID3v1, campo per campo (un campo vuoto si
+prende dal tipo seguente). WMA, WAV e AIFF si leggono soltanto (ASF, ID3, RIFF INFO): i loro tag non si scrivono e
+all'iPhone non si inviano. Le copertine sono supportate per MP3, M4A e FLAC.
 """
 
 import os
@@ -10,13 +12,16 @@ from pathlib import Path
 from typing import Optional
 
 import mutagen
+from mutagen.apev2 import APENoHeaderError, APEv2
 from mutagen.flac import FLAC, Picture
-from mutagen.id3 import APIC, ID3, ID3NoHeaderError
+from mutagen.id3 import APIC, ID3, TCON, ID3NoHeaderError
 from mutagen.mp4 import MP4, MP4Cover
 from mutagen.oggopus import OggOpus
 from mutagen.oggvorbis import OggVorbis
 
-AUDIO_EXTENSIONS = {".mp3", ".m4a", ".flac", ".ogg", ".opus"}
+# tag solo in lettura: non si scrivono (nemmeno sulle copie) e all'iPhone non si inviano
+READ_ONLY_EXTENSIONS = {".wma", ".wav", ".aif", ".aiff"}
+AUDIO_EXTENSIONS = {".mp3", ".m4a", ".flac", ".ogg", ".opus"} | READ_ONLY_EXTENSIONS
 COVER_EXTENSIONS = {".mp3", ".m4a", ".flac"}
 
 # Campi modificabili: (attributo, etichetta mostrata nell'interfaccia)
@@ -159,9 +164,8 @@ def _open_easy(path: Path):
     return audio
 
 
-def read_tags(path: Path) -> tuple:
-    """Restituisce (TrackTags, durata in secondi)."""
-    audio = _open_easy(path)
+def _easy_read(audio, path: Path) -> TrackTags:
+    """I tag letti da mutagen in modo "easy" (ID3, MP4, Vorbis)."""
     tags = TrackTags()
     if audio.tags is not None:
         source = audio.tags
@@ -181,10 +185,284 @@ def read_tags(path: Path) -> tuple:
                 tags.disc_total = _to_int(_first(source, "disctotal") or _first(source, "totaldiscs"))
     if path.suffix.lower() in MP4_EXTENSIONS:
         tags.compilation = _read_mp4_compilation(path)
+    return tags
+
+
+MERGED_FIELDS = ("title", "artist", "album_artist", "album", "track_number", "track_total", "disc_number",
+                 "disc_total", "year", "genre")
+
+
+def _merge(target: TrackTags, other: Optional[TrackTags]) -> None:
+    """I campi vuoti di target presi da other (un altro tipo di tag dello stesso file)."""
+    if other is not None:
+        for name in MERGED_FIELDS:
+            if getattr(target, name) in (None, "") and getattr(other, name) not in (None, ""):
+                setattr(target, name, getattr(other, name))
+        if not target.compilation and other.compilation:
+            target.compilation = True
+
+
+def _id3_kind(id3) -> str:
+    version = getattr(id3, "version", (2, 4, 0))
+    if version[0] == 1:
+        result = "ID3v1"
+    else:
+        result = f"ID3v2.{version[1]}"
+    return result
+
+
+def _id3_text(id3, frame_id: str) -> str:
+    result = ""
+    frames = id3.getall(frame_id)
+    if frames and getattr(frames[0], "text", None):
+        result = str(frames[0].text[0]).strip()
+    return result
+
+
+ID3_FRAMES = {"title": "TIT2", "artist": "TPE1", "album_artist": "TPE2", "album": "TALB", "year": "TDRC",
+              "old_year": "TYER", "genre": "TCON", "track": "TRCK", "disc": "TPOS", "compilation": "TCMP"}
+
+
+def _from_id3(id3) -> TrackTags:
+    """I tag di un ID3 letto senza "easy" (WAV, AIFF)."""
+    tags = TrackTags()
+    for name in ("title", "artist", "album_artist", "album"):
+        setattr(tags, name, _id3_text(id3, ID3_FRAMES[name]))
+    tags.year = (_id3_text(id3, ID3_FRAMES["year"]) or _id3_text(id3, ID3_FRAMES["old_year"]))[:4]
+    genres = id3.getall(ID3_FRAMES["genre"])
+    if genres and genres[0].genres:
+        tags.genre = str(genres[0].genres[0]).strip()
+    tags.track_number, tags.track_total = _split_pair(_id3_text(id3, ID3_FRAMES["track"]))
+    tags.disc_number, tags.disc_total = _split_pair(_id3_text(id3, ID3_FRAMES["disc"]))
+    tags.compilation = _flag(_id3_text(id3, ID3_FRAMES["compilation"]))
+    return tags
+
+
+APE_KEYS = (("title", "Title"), ("artist", "Artist"), ("album_artist", "Album Artist"),
+            ("album_artist", "AlbumArtist"), ("album", "Album"), ("year", "Year"), ("genre", "Genre"))
+APE_NUMBER_KEYS = (("track", "Track"), ("disc", "Disc"))
+APE_COMPILATION_KEYS = ("Compilation",)
+
+
+def _ape_tags(path: Path) -> Optional[TrackTags]:
+    """Il tag APEv2 del file (MP3), o None se non c'è."""
+    try:
+        ape = APEv2(str(path))
+    except (APENoHeaderError, mutagen.MutagenError, OSError):
+        ape = None
+    result = None
+    if ape is not None:
+        result = TrackTags()
+        for name, key in APE_KEYS:
+            value = str(ape[key]).strip() if key in ape else ""
+            if value and not getattr(result, name):
+                setattr(result, name, value)
+        result.year = result.year[:4]
+        for name, key in APE_NUMBER_KEYS:
+            if key in ape:
+                pair = _split_pair(str(ape[key]))
+                setattr(result, name + "_number", pair[0])
+                setattr(result, name + "_total", pair[1])
+        if APE_COMPILATION_KEYS[0] in ape:
+            result.compilation = _flag(str(ape[APE_COMPILATION_KEYS[0]]))
+    return result
+
+
+def _v1_text(block: bytes) -> str:
+    result = block.split(b"\x00")[0].decode("latin-1").strip()
+    return result
+
+
+def id3v1_tags(path: Path) -> Optional[TrackTags]:
+    """Il vecchio tag ID3v1 (gli ultimi 128 byte del file), o None se non c'è."""
+    block = b""
+    try:
+        with path.open("rb") as handle:
+            handle.seek(0, os.SEEK_END)
+            if handle.tell() >= 128:
+                handle.seek(-128, os.SEEK_END)
+                block = handle.read(128)
+    except OSError:
+        block = b""
+    result = None
+    if block[:3] == b"TAG":
+        result = TrackTags(title=_v1_text(block[3:33]), artist=_v1_text(block[33:63]),
+                           album=_v1_text(block[63:93]), year=_v1_text(block[93:97]))
+        if block[125] == 0 and block[126] != 0:      # ID3v1.1: il numero di traccia
+            result.track_number = block[126]
+        genre = block[127]
+        if genre < len(TCON.GENRES):
+            result.genre = TCON.GENRES[genre]
+    return result
+
+
+RIFF_INFO = {b"INAM": "title", b"IART": "artist", b"IPRD": "album", b"ICRD": "year", b"IGNR": "genre"}
+
+
+def _riff_text(data: bytes) -> str:
+    raw = data.split(b"\x00")[0]
+    try:
+        result = raw.decode("utf-8").strip()
+    except UnicodeDecodeError:
+        result = raw.decode("cp1252", errors="replace").strip()
+    return result
+
+
+def _riff_list(data: bytes, tags: Optional[TrackTags]) -> Optional[TrackTags]:
+    """Le voci di un blocco LIST INFO aggiunte a tags (creato se None)."""
+    result = tags
+    position = 0
+    while position + 8 <= len(data):
+        sub_id = data[position:position + 4]
+        size = int.from_bytes(data[position + 4:position + 8], "little")
+        text = _riff_text(data[position + 8:position + 8 + size])
+        if result is None:
+            result = TrackTags()
+        name = RIFF_INFO.get(sub_id)
+        if name is not None and text:
+            setattr(result, name, text[:4] if name == "year" else text)
+        elif sub_id in (b"ITRK", b"IPRT") and text:
+            result.track_number, result.track_total = _split_pair(text)
+        position += 8 + size + size % 2
+    return result
+
+
+def riff_info_tags(path: Path) -> Optional[TrackTags]:
+    """I tag RIFF INFO di un WAV (LIST INFO: INAM, IART, IPRD, ICRD, IGNR, ITRK), o None se non ci sono."""
+    result = None
+    try:
+        with path.open("rb") as handle:
+            header = handle.read(12)
+            valid = header[:4] == b"RIFF" and header[8:12] == b"WAVE"
+            while valid:
+                chunk = handle.read(8)
+                valid = len(chunk) == 8
+                if valid:
+                    chunk_id = chunk[:4]
+                    size = int.from_bytes(chunk[4:8], "little")
+                    if chunk_id == b"LIST":
+                        data = handle.read(size + size % 2)
+                        if data[:4] == b"INFO":
+                            result = _riff_list(data[4:size], result)
+                    else:
+                        handle.seek(size + size % 2, os.SEEK_CUR)   # l'audio non si legge
+    except OSError:
+        result = None
+    return result
+
+
+ASF_KEYS = (("title", "Title"), ("artist", "Author"), ("album_artist", "WM/AlbumArtist"),
+            ("album", "WM/AlbumTitle"), ("genre", "WM/Genre"))
+ASF_OTHER_KEYS = {"year": "WM/Year", "old_year": "WM/OriginalReleaseYear", "track": "WM/TrackNumber",
+                  "old_track": "WM/Track", "disc": "WM/PartOfSet", "compilation": "WM/IsCompilation"}
+
+
+def _asf_value(tags, key: str) -> str:
+    values = tags.get(key, []) if tags is not None else []
+    result = ""
+    if values:
+        first = values[0]
+        result = str(getattr(first, "value", first)).strip()
+    return result
+
+
+def _from_asf(audio) -> TrackTags:
+    """I tag di un WMA (ASF)."""
+    tags = TrackTags()
+    source = audio.tags
+    for name, key in ASF_KEYS:
+        setattr(tags, name, _asf_value(source, key))
+    tags.year = (_asf_value(source, ASF_OTHER_KEYS["year"]) or _asf_value(source, ASF_OTHER_KEYS["old_year"]))[:4]
+    tags.track_number, tags.track_total = _split_pair(_asf_value(source, ASF_OTHER_KEYS["track"])
+                                                      or _asf_value(source, ASF_OTHER_KEYS["old_track"]))
+    tags.disc_number, tags.disc_total = _split_pair(_asf_value(source, ASF_OTHER_KEYS["disc"]))
+    tags.compilation = _flag(_asf_value(source, ASF_OTHER_KEYS["compilation"]))
+    return tags
+
+
+def _read_read_only(path: Path) -> tuple:
+    """(TrackTags, durata, tipi di tag) di un WMA, WAV o AIFF."""
+    try:
+        audio = mutagen.File(str(path))
+    except mutagen.MutagenError as exc:
+        raise TagError(f"Impossibile leggere {path.name}: {exc}") from exc
+    if audio is None:
+        raise TagError(f"Formato non supportato: {path.name}")
+    suffix = path.suffix.lower()
+    tags = TrackTags()
+    kinds = []
+    if suffix == ".wma":
+        tags = _from_asf(audio)
+        if audio.tags:
+            kinds.append("ASF (WMA)")
+    elif audio.tags is not None:
+        tags = _from_id3(audio.tags)
+        kinds.append(_id3_kind(audio.tags))
+    if suffix == ".wav":
+        info = riff_info_tags(path)
+        if info is not None:
+            _merge(tags, info)
+            kinds.append("RIFF INFO")
     length = 0.0
     if audio.info is not None:
         length = float(getattr(audio.info, "length", 0.0) or 0.0)
+    result = (tags, length, kinds)
+    return result
+
+
+def read_all_tags(path: Path) -> tuple:
+    """(TrackTags, durata in secondi, tipi di tag trovati nel file in ordine di precedenza, es. ["ID3v2.3", "APEv2"]).
+    Negli MP3 i campi vuoti del tag principale si prendono da APEv2, poi da ID3v1 (come TagScanner e Mp3tag)."""
+    if path.suffix.lower() in READ_ONLY_EXTENSIONS:
+        result = _read_read_only(path)
+    else:
+        audio = _open_easy(path)
+        tags = _easy_read(audio, path)
+        kinds = []
+        id3 = getattr(audio.tags, "_EasyID3__id3", None) if audio.tags is not None else None
+        if id3 is not None:
+            kinds.append(_id3_kind(id3))
+        elif audio.tags is not None:
+            kinds.append(TAG_KIND_NAMES.get(type(audio).__name__, type(audio).__name__))
+        if path.suffix.lower() == ".mp3":
+            ape = _ape_tags(path)
+            if ape is not None and kinds == ["ID3v1"]:
+                # senza ID3v2 mutagen dà l'ID3v1 come tag principale: APEv2 viene prima
+                _merge(ape, tags)
+                tags = ape
+                kinds = ["APEv2", "ID3v1"]
+            elif ape is not None:
+                _merge(tags, ape)
+                kinds.append("APEv2")
+            if "ID3v1" not in kinds:
+                v1 = id3v1_tags(path)
+                if v1 is not None:
+                    _merge(tags, v1)
+                    kinds.append("ID3v1")
+        length = 0.0
+        if audio.info is not None:
+            length = float(getattr(audio.info, "length", 0.0) or 0.0)
+        result = (tags, length, kinds)
+    return result
+
+
+TAG_KIND_NAMES = {"EasyMP4": "MP4 (iTunes)", "FLAC": "Vorbis comment", "OggVorbis": "Vorbis comment",
+                  "OggOpus": "Vorbis comment"}
+
+
+def read_tags(path: Path) -> tuple:
+    """Restituisce (TrackTags, durata in secondi): tutti i tipi di tag del file, uniti (read_all_tags)."""
+    tags, length, _kinds = read_all_tags(path)
     result = (tags, length)
+    return result
+
+
+def tag_kinds(path: Path) -> list:
+    """I tipi di tag del file, in ordine di precedenza ([] se non si legge)."""
+    try:
+        result = read_all_tags(path)[2]
+    except TagError:
+        result = []
     return result
 
 
@@ -231,6 +509,8 @@ def _write_mp4_compilation(path: Path, value: bool) -> None:
 def write_tags(path: Path, tags: TrackTags, new_copy: bool = False) -> None:
     """Scrive i tag. new_copy=True solo per una copia appena creata dal programma (esportazione, importazione)."""
     _check_writable(path, new_copy)
+    if path.suffix.lower() in READ_ONLY_EXTENSIONS:
+        raise TagError(f"{path.name}: i tag dei file {path.suffix.lower()} si leggono soltanto")
     audio = _open_easy(path)
     if audio.tags is None:
         audio.add_tags()

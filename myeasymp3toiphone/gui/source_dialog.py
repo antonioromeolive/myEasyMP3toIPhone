@@ -5,8 +5,7 @@
 """Associa sorgente: il file del PC da cui viene un brano dell'iPhone.
 
 SourceDialog: un brano; i file possibili in una tabella, il più probabile per primo (adoption.rank_sources), oppure
-un file qualsiasi. FolderSourceDialog: più brani e una cartella; per ognuno il file della cartella che ne è la
-sorgente (adoption.match_in_folder), da confermare; quelli non trovati si possono associare dopo uno alla volta.
+un file qualsiasi. Più brani: Associa sorgenti (adoption_dialog).
 Si scrive solo il registro della provenienza: né i brani dell'iPhone né i file del PC cambiano."""
 
 from __future__ import annotations
@@ -15,9 +14,9 @@ from pathlib import Path
 from typing import Optional
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QBrush, QColor, QFont
+from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
-    QAbstractItemView, QCheckBox, QDialog, QDialogButtonBox, QFileDialog, QHeaderView, QLabel, QPushButton,
+    QAbstractItemView, QDialog, QDialogButtonBox, QFileDialog, QHeaderView, QLabel, QPushButton,
     QTreeWidget, QTreeWidgetItem, QVBoxLayout,
 )
 
@@ -27,7 +26,6 @@ from ..tags import AUDIO_EXTENSIONS
 
 HOW_TEXT = {provenance.HOW_RULES: "regole", provenance.HOW_AI: "AI", provenance.HOW_FINGERPRINT: "impronta",
             provenance.HOW_MANUAL: "a mano", provenance.HOW_SENT: "inviato", provenance.HOW_SAVED: "salvato"}
-MISSING_COLOR = QColor(255, 120, 120, 70)
 NOTE = "Si scrive solo il registro della provenienza: né i brani dell'iPhone né i file del PC cambiano."
 
 
@@ -157,69 +155,3 @@ class SourceDialog(QDialog):
     def _skip(self) -> None:
         self.skipped = True
         self.reject()
-
-
-class FolderSourceDialog(QDialog):
-    """Le sorgenti trovate in una cartella per più brani: chosen() le proposte spuntate, missing i brani senza un
-    file nella cartella, one_by_one se associarli dopo uno alla volta."""
-
-    def __init__(self, parent, folder: Path, matches: list) -> None:
-        super().__init__(parent)
-        self.setWindowTitle("Associa sorgente da una cartella")
-        self.resize(1250, 560)
-        self.missing = []
-        found = 0
-        for item, proposal in matches:
-            if proposal is None:
-                self.missing.append(item)
-            else:
-                found += 1
-        text = (f"Cartella <b>{folder}</b> (e sottocartelle): trovata la sorgente di <b>{found}</b> brani su "
-                f"{len(matches)}.")
-        if self.missing:
-            text += f" <span style='color:#c33'>{len(self.missing)} non trovati</span> (in rosso)."
-        header = QLabel(text)
-        header.setTextFormat(Qt.RichText)
-        header.setWordWrap(True)
-        self.table = _table(["Brano sull'iPhone", "File nella cartella", "Come", "Perché"], [400, 430, 70])
-        self.table.setSelectionMode(QAbstractItemView.NoSelection)
-        self._rows = []
-        for item, proposal in matches:
-            if proposal is None:
-                row = QTreeWidgetItem([_phone_text(item), "non trovato", "", "nessun file simile nella cartella"])
-                for column in range(4):
-                    row.setBackground(column, QBrush(MISSING_COLOR))
-            else:
-                row = QTreeWidgetItem([_phone_text(item), str(proposal.pc.path),
-                                       HOW_TEXT.get(proposal.how, proposal.how), tr(proposal.reason)])
-                row.setFlags(row.flags() | Qt.ItemIsUserCheckable)
-                row.setCheckState(0, Qt.Checked)
-                row.setToolTip(1, str(proposal.pc.path))
-                self._rows.append((row, proposal))
-            self.table.addTopLevelItem(row)
-        self.one_by_one_box = QCheckBox(f"Dopo, associa uno alla volta i {len(self.missing)} brani non trovati")
-        self.one_by_one_box.setChecked(bool(self.missing))
-        self.one_by_one_box.setVisible(bool(self.missing))
-        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        buttons.button(QDialogButtonBox.Ok).setText("Associa")
-        buttons.button(QDialogButtonBox.Cancel).setText("Annulla")
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
-        layout = QVBoxLayout(self)
-        layout.addWidget(header)
-        layout.addWidget(self.table, 1)
-        layout.addWidget(self.one_by_one_box)
-        layout.addWidget(_note_label())
-        layout.addWidget(buttons)
-
-    @property
-    def one_by_one(self) -> bool:
-        result = bool(self.missing) and self.one_by_one_box.isChecked()
-        return result
-
-    def chosen(self) -> list:
-        result = []
-        for row, proposal in self._rows:
-            if row.checkState(0) == Qt.Checked:
-                result.append(proposal)
-        return result

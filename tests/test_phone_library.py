@@ -221,11 +221,12 @@ def test_iphone_tab_shows_music_and_pc_status(tmp_path):
         for index in range(view.topLevelItemCount()):
             row = view.topLevelItem(index)
             statuses[row.text(iphone_panel.COL_TITLE)] = row.text(iphone_panel.COL_PC)
-        assert statuses == {"Canzone A": "✔", "Canzone B": "⟳", "Solo qui": ""}
+        # abbinati solo per i tag: da rivedere (≈), sia nella scheda iPhone sia nella colonna iPhone del PC
+        assert statuses == {"Canzone A": "≈", "Canzone B": "≈", "Solo qui": ""}
         table_status = set()
         for row in range(window._model.rowCount()):
             table_status.add(window._model.data(window._model.index(row, COL_DEVICE)))
-        assert table_status == {"✔", "⟳"}
+        assert table_status == {"≈"}
         panel._search.setText("solo")
         assert panel._count.text() == "1 di 3 brani"
     finally:
@@ -384,3 +385,64 @@ def test_sync_finished_notice_never_fails(monkeypatch):
 
     monkeypatch.setattr(iphone, "_open_lockdown", no_phone)
     assert iphone.post_sync_finished() is False
+
+
+def test_pc_column_states_source_outside_open_folder_and_probable(tmp_path):
+    """✔/⟳ dalla sorgente del registro anche fuori dalla cartella aperta, ✖ se il file non c'è più, ≈ per i tag;
+    il filtro "Da rivedere", la colonna File della sorgente e Associa le probabili."""
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtWidgets import QApplication
+    from myeasymp3toiphone import provenance
+    from myeasymp3toiphone.gui import iphone_panel
+    from myeasymp3toiphone.gui.main_window import MainWindow
+    app = QApplication.instance() or QApplication([])
+    window = MainWindow()
+    try:
+        outside = tmp_path / "altrove" / "Fuori.mp3"
+        write_mp3(outside)
+        write_tags(outside, TrackTags(title="Fuori", artist="Artista Uno", album="Album Primo", year="1991"))
+        window.tracks = [_pc("Per tag", "Artista Uno", "Album Primo")]
+        window._rebuild_views()
+        phone = [_phone(1, "Fuori", "Artista Uno", "Album Primo", year="1990"),
+                 _phone(2, "Sparito", "Artista Uno", "Album Primo"),
+                 _phone(3, "Per tag", "Artista Uno", "Album Primo"),
+                 _phone(4, "Fuori", "Artista Uno", "Album Primo", year="1991")]
+        for item, sync_id in zip(phone, (31, 32, 33, 34)):
+            item.sync_id = sync_id
+        registry = provenance.Registry()
+        registry.record(provenance.Link(sync_id=31, pc=provenance.computer_name(), path=str(outside)))
+        registry.record(provenance.Link(sync_id=34, pc=provenance.computer_name(), path=str(outside)))
+        registry.record(provenance.Link(sync_id=32, pc=provenance.computer_name(), path=str(tmp_path / "via.mp3")))
+        window.registry = registry
+        window.set_phone_tracks(phone, "iPhone di prova")
+        panel = window.iphone_panel
+        view = panel._music_view
+        states = {}
+        files = {}
+        for index in range(view.topLevelItemCount()):
+            row = view.topLevelItem(index)
+            pid = row.data(iphone_panel.COL_TITLE, iphone_panel.PID_ROLE)
+            states[pid] = row.text(iphone_panel.COL_PC)
+            files[pid] = row.text(iphone_panel.COL_SOURCE_FILE)
+        assert states == {1: "⟳", 2: "✖", 3: "≈", 4: "✔"}
+        assert files[1] == "Fuori.mp3" and files[3] == ""
+        assert "fuori dalla cartella aperta" in panel.pc_tooltip(1) and "non c'è più" in panel.pc_tooltip(2)
+        assert [item.pid for item, _track in panel._stale_pairs(phone)] == [1]
+        window.app_settings.show_full_path = True
+        panel.pc_changed()
+        panel._refresh_pc_column()
+        for index in range(view.topLevelItemCount()):
+            row = view.topLevelItem(index)
+            if row.data(iphone_panel.COL_TITLE, iphone_panel.PID_ROLE) == 1:
+                assert row.text(iphone_panel.COL_SOURCE_FILE) == str(outside)
+        texts = [text for text, _rule in iphone_panel.SHOW_FILTERS]
+        panel._show.setCurrentIndex(texts.index("Da rivedere: abbinati solo per i tag (≈)"))
+        assert panel._count.text() == "1 di 4 brani"
+        panel._show.setCurrentIndex(0)
+        assert [item.pid for item in panel._probable(phone)] == [3]
+        panel._link_probable(panel._probable(phone))           # QMessageBox.question dei test risponde Sì
+        app.processEvents()
+        assert window.registry.get(33) is not None and window.registry.get(33).how == provenance.HOW_RULES
+    finally:
+        window.close()
+        app.processEvents()

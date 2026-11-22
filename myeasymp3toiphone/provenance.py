@@ -44,6 +44,7 @@ REGISTRY_VERSION = 1
 HOW_SENT = "inviato"            # inviato da questo programma: certo
 HOW_FINGERPRINT = "impronta"    # stesso audio: certo
 HOW_RULES = "regole"            # durata e tag: molto probabile
+HOW_FOLDER = "cartella"         # il nome della cartella contiene l'album, e titolo, numero e durata coincidono
 HOW_AI = "ai"                   # scelto dall'AI, confermato da te
 HOW_MANUAL = "a mano"
 HOW_SAVED = "salvato"           # salvato sul PC dall'iPhone: certo

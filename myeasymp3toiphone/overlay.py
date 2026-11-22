@@ -4,7 +4,7 @@
 
 """Le modifiche dei tag in sospeso: i file sul PC sono in sola lettura e non cambiano mai.
 
-Ogni modifica (editor, scansione, Verifica album, copertina) si salva qui, nella cartella dati, per percorso del file.
+Ogni modifica (editor, scansione, Verifica album online, copertina) si salva qui, nella cartella dati, per percorso del file.
 La Libreria mostra i valori modificati; le copie inviate all'iPhone (ed esportate o importate) li ricevono. Il file
 originale resta com'è.
 

@@ -167,6 +167,17 @@ class LibraryBrowser(QWidget):
         self.albums.setSortingEnabled(True)
         self.albums.blockSignals(False)
 
+    def refresh_check_icons(self, check_results: dict) -> None:
+        """Le icone di Verifica album online, man mano che arrivano gli esiti (senza rifare gli elenchi)."""
+        self._check_results = check_results
+        for index in range(self.albums.topLevelItemCount()):
+            item = self.albums.topLevelItem(index)
+            key = item.data(0, KEY_ROLE)
+            result = check_results.get(key) if isinstance(key, tuple) else None
+            if result is not None:
+                item.setIcon(0, status_icon(self, result.status))
+                item.setToolTip(0, result.status_text())
+
     # ------------------------------------------------------------------ spunte "sull'iPhone"
 
     def tracks_of(self, item) -> list:

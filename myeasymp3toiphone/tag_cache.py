@@ -20,8 +20,21 @@ from .tags import TrackTags
 log = logging.getLogger(__name__)
 
 CACHE_FILE = "cache_tag.json"
-CACHE_VERSION = 2   # 2: anche la spunta compilation (le voci di prima non l'hanno: si rileggono)
+CACHE_VERSION = 3   # 2: anche la spunta compilation; 3: negli MP3 anche i tag APEv2 e ID3v1
 TAG_FIELD_NAMES = {field.name for field in fields(TrackTags)}
+# Dalla versione 2: un MP3 con uno di questi campi vuoti si rilegge (APEv2 o ID3v1 potrebbero riempirlo); le altre
+# voci valgono ancora, così una cartella grande non si rilegge tutta.
+REREAD_IF_EMPTY = ("title", "artist", "album", "year", "genre", "track_number")
+
+
+def _still_valid_v2(key: str, entry) -> bool:
+    result = isinstance(entry, dict)
+    if result and key.lower().endswith(".mp3"):
+        tags = entry.get("t") or {}
+        for name in REREAD_IF_EMPTY:
+            if tags.get(name) in (None, ""):
+                result = False
+    return result
 
 
 class TagCache:
@@ -33,6 +46,11 @@ class TagCache:
         data = read_json(home / CACHE_FILE)
         if isinstance(data, dict) and data.get("version") == CACHE_VERSION and isinstance(data.get("files"), dict):
             self._entries = data["files"]
+        elif isinstance(data, dict) and data.get("version") == 2 and isinstance(data.get("files"), dict):
+            for key, entry in data["files"].items():
+                if _still_valid_v2(key, entry):
+                    self._entries[key] = entry
+            self._dirty = True
 
     def lookup(self, path: Path, stat: Optional[tuple] = None):
         """(TrackTags, durata, errore) se la voce vale ancora per il file com'è ora; altrimenti None.

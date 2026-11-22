@@ -20,12 +20,13 @@ from pathlib import Path
 PACKAGE = Path(__file__).resolve().parent.parent / "myeasymp3toiphone"
 SKIPPED_FILES = {"i18n.py", "i18n_en.py", "vscode_deploy.py"}
 SKIPPED_NAMES = re.compile(r"(_SYSTEM|_SCHEMA|_QUERY|_PATTERN|_RE|SPLIT|MARKER|PREFIX|SUFFIX|NUMBERED_COPY|TITLE_EXTRA|"
-                           r"_WORDS|STYLE_SHEET|USER_AGENT|HOST_REQUEST|_FORMAT|_FILE|_FOLDER|_NAME|_PATH|_ENV_VAR)$")
+                           r"_WORDS|STYLE_SHEET|USER_AGENT|HOST_REQUEST|_FORMAT|_FILE|_FOLDER|_NAME|_PATH|_ENV_VAR|_KEYS|_FRAMES|_URL|_ROOT)$")
 SKIPPED_CALLS = {"debug", "info", "warning", "error", "exception", "critical", "compile", "sub", "search", "match",
                  "fullmatch", "split", "findall", "finditer", "execute", "executescript", "setStyleSheet", "getLogger",
                  "strftime", "strptime", "get", "setdefault", "pop", "environ", "getenv", "join", "startswith",
                  "endswith", "replace", "setProperty", "setObjectName", "connect", "post", "send_plist", "Path",
-                 "with_name", "with_suffix", "joinpath", "add_argument", "Formatter", "basicConfig", "addItem_data"}
+                 "with_name", "with_suffix", "joinpath", "add_argument", "Formatter", "basicConfig", "addItem_data",
+                 "getattr", "hasattr", "from_bytes", "decode", "encode"}
 TECHNICAL = re.compile(r"^\s*(SELECT|CREATE|INSERT|UPDATE|DELETE|PRAGMA|WITH)\b|^%\(|^\w+://|^[\s\W\d]*$")
 WORD = re.compile(r"[A-Za-zÀ-ÿ'’]{3,}[.:…?!]*")
 LETTER = re.compile(r"[A-Za-zÀ-ÿ]")

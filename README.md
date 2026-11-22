@@ -6,6 +6,7 @@ trovare i problemi della libreria (anche con l'AI) e trasferire la musica da e v
 - [Installazione](#installazione)
 - [Funzioni](#funzioni)
 - [Controlla la musica](#controlla-la-musica)
+- [Verifica album online](#verifica-album-online)
 - [L'iPhone](#liphone)
 - [L'AI: profili e chiavi](#lai-profili-e-chiavi)
 - [Il file delle variabili (myEasyMP3toIPhone.env)](#il-file-delle-variabili-myeasymp3toiphoneenv)
@@ -31,7 +32,7 @@ Per l'iPhone serve l'app gratuita **Dispositivi Apple** dal Microsoft Store (opp
 ## Funzioni
 
 > **I file sul PC sono in sola lettura.** Il programma non modifica, sposta o cancella mai i file delle cartelle che
-> apri (compresa la Libreria). Le modifiche dei tag, fatte a mano, dalla scansione o da *Verifica album*, restano **in
+> apri (compresa la Libreria). Le modifiche dei tag, fatte a mano, dalla scansione o da *Verifica album online*, restano **in
 > sospeso** nella cartella dati e valgono per le **copie**: quelle inviate all'iPhone, esportate o importate. Le
 > operazioni sull'iPhone non toccano mai i file del PC; quelle sul PC si riflettono sull'iPhone al prossimo invio.
 
@@ -44,8 +45,8 @@ Due schede: **PC** (i brani della cartella aperta) e **iPhone** (la musica dell'
 | **Apri cartella** | mostra i brani di una cartella qualsiasi, in sola lettura (da riga di comando: `myEasyMP3toIPhone --open <cartella>`) |
 | **Importa cartella** | copia una cartella nella Libreria in `Artista / Album (Anno) / NN - Titolo.ext`, con le modifiche in sospeso applicate alle copie |
 | **Esporta** | copia i brani selezionati (o quelli dell'artista o dell'album scelti negli elenchi) in una cartella, con la stessa struttura e le modifiche in sospeso |
-| **Verifica album** | controlla su [MusicBrainz](https://musicbrainz.org) che gli album siano completi, elenca i brani mancanti, propone i tag corretti e la copertina (in sospeso, per le copie) |
-| **Controlla la musica** | cerca i problemi della cartella aperta o della musica sull'iPhone, con i controlli che scegli (vedi sotto) |
+| **Verifica album online** | confronta gli album con i cataloghi online (Deezer, Apple Music, Discogs, MusicBrainz): elenca i brani mancanti, propone i tag corretti e la copertina (in sospeso, per le copie); in background (vedi [Verifica album online](#verifica-album-online)) |
+| **Controlla la musica** | cerca i problemi confrontando i tuoi brani tra loro (cartella aperta o musica dell'iPhone), senza cataloghi online, con i controlli che scegli (vedi sotto) |
 | **Impostazioni** | cartella della Libreria, AI della scansione, **lingua dell'interfaccia** (italiano o inglese), profili AI |
 | **Informazioni** | versione, cartella dati, variabili d'ambiente e da dove viene ciascuna, dove sono le chiavi |
 
@@ -54,25 +55,37 @@ sull'intestazione:
 
 - **Artisti** (artista, numero di album, numero di brani): sceglierne uno (o più, con Ctrl/Maiusc) filtra l'elenco
   Album sui suoi album e la tabella sui suoi brani;
-- **Album** (album, artista, anno, brani; l'icona dice l'esito di *Verifica album*): sceglierne uno (o più) mostra
+- **Album** (album, artista, anno, brani; l'icona dice l'esito di *Verifica album online*): sceglierne uno (o più) mostra
   solo quei brani;
 - la riga **(Tutti …)**, sempre in cima, toglie il filtro; scegliere un artista (o "(Tutti)") azzera l'album scelto
   prima; la casella *Cerca* filtra ancora dentro la scelta;
-- **Formato** (accanto a *Cerca*): solo MP3, FLAC, M4A o OGG/Opus, con il numero di brani di ciascuno. Vale per gli
-  elenchi, la tabella, *Esporta*, *Verifica album*, *Controlla la musica* e l'invio all'app Musica.
+- **Formato** (accanto a *Cerca*): solo MP3, FLAC, M4A, OGG/Opus o WMA/WAV/AIFF, con il numero di brani di
+  ciascuno. Vale per gli elenchi, la tabella, *Esporta*, *Verifica album online*, *Controlla la musica* e l'invio
+  all'app Musica.
+- **Aggiorna** (in alto a destra): rilegge la cartella aperta, cioè i file nuovi, tolti o cambiati (gli altri dalla
+  cache dei tag); con **Maiusc** premuto rilegge tutti i file da zero.
 
 La tabella dei brani si ordina cliccando sull'intestazione di una colonna (Artista, Album, Titolo, Anno…); finché non
-la clicchi i brani sono in ordine di artista, album, disco e traccia. *Esporta*, *Verifica album* e *Invia all'app Musica*
+la clicchi i brani sono in ordine di artista, album, disco e traccia. *Esporta*, *Verifica album online* e *Invia all'app Musica*
 senza brani selezionati in tabella usano l'artista o l'album scelti negli elenchi.
 
 Artisti e album che differiscono solo per maiuscole, accenti o spazi ("Queen" e "queen") sono un gruppo solo, mostrato
 con la grafia più usata (a parità, quella con le maiuscole). I tag dei file non cambiano: la scansione segnala la
 variante, perché l'iPhone la considera un artista diverso.
 
-**Colonna iPhone.** Per ogni brano: **✔** nell'app *Musica* dell'iPhone c'è lo stesso brano, con gli stessi tag;
-**⟳** c'è lo stesso brano, ma con tag diversi; vuoto,
-non c'è. "Lo stesso brano" vuol dire stesso titolo e stesso album, senza badare a maiuscole, accenti e spazi, e un
-artista in comune; un brano con modifiche in sospeso si ritrova anche con i tag del file. Si basa sulla musica
+**Colonne.** #, iPhone, Titolo, Artista, **Artista album**, Album, Anno, Genere, Durata, File. *File* mostra il nome
+del file, o il percorso completo con *Impostazioni → Generale → Mostra il percorso completo dei file*.
+
+**Tasto destro sui brani**, oltre ai comandi per l'iPhone: **Copia nome file**, **Copia percorso completo**, **Copia
+cartella** (negli appunti, una riga per brano; le cartelle una volta sola) e **Apri la cartella in Esplora risorse**
+(un file solo: selezionato; più cartelle: le prime 5).
+
+**Colonna iPhone.** Per ogni brano: **✔** nell'app *Musica* dell'iPhone c'è questo brano (la sua sorgente è questo
+file, dal registro della provenienza), con gli stessi tag; **⟳** c'è, ma con tag diversi; **≈** grigio, *da rivedere*:
+sull'iPhone c'è un brano con lo stesso titolo e album e un artista in comune, ma non è collegato a questo file, quindi
+non è certo che sia lui; vuoto, non c'è. "Lo stesso titolo e album" vuol dire senza badare a maiuscole, accenti e
+spazi; un brano con modifiche in sospeso si ritrova anche con i tag del file. Per rendere certo un ≈: nella scheda
+iPhone, tasto destro → *Associa le probabili* (o *Associa sorgenti*). Si basa sulla musica
 dell'iPhone letta all'ultima connessione e salvata nella cartella dati, quindi si vede anche a iPhone disconnesso (il
 suggerimento sull'intestazione dice di quando è l'elenco).
 
@@ -84,6 +97,7 @@ quelli delle cose fatte e la riga appena colorata:
 |---|---|
 | ✔ verde | c'è, uguale |
 | ⟳ arancio | c'è, con tag diversi |
+| ≈ grigio | forse c'è: abbinato solo per i tag, da rivedere |
 | **＋ blu** | in attesa: da inviare |
 | **－ rosso** | in attesa: da togliere dall'iPhone |
 | **⟳ blu** | in attesa: da aggiornare (anche quando cambi i tag a iPhone disconnesso, o con il tasto destro → *Aggiorna più tardi*) |
@@ -105,6 +119,13 @@ la spunta **Compilation** e la copertina (MP3, M4A, FLAC, OGG, Opus; copertina p
 selezionati, solo i campi modificati valgono per tutti; la spunta mostra un quadratino pieno a metà quando i brani
 sono diversi.
 
+**Tutti i tipi di tag**, come TagScanner e Mp3tag. Negli MP3 si leggono **ID3v2** (2.2, 2.3, 2.4), **APEv2** e il
+vecchio **ID3v1**, uniti campo per campo in quest'ordine: un campo vuoto si prende dal tipo seguente (un MP3 con solo
+APE o solo ID3v1 mostra i suoi tag). Con un brano selezionato, sotto il nome del file, *Tag letti da: ID3v2.3 + APEv2*
+dice da dove vengono. Le copie (iPhone, esportazione) ricevono i tag uniti, in ID3v2.3. **WMA, WAV e AIFF** si leggono
+(ASF; ID3 e RIFF INFO per i WAV; ID3 per gli AIFF) e si vedono, ma i loro tag non si modificano e all'iPhone non si
+inviano (serve una conversione).
+
 **Compilation.** Un album di più artisti: l'*artista* è quello di ogni brano, l'*artista album* è "Artisti vari", e
 in più c'è la spunta **Compilation** (nei file: TCMP negli MP3, COMPILATION nei FLAC e Ogg, cpil negli M4A). L'app
 Musica dell'iPhone tiene insieme l'album solo con tutte e tre le cose; senza la spunta lo divide in un album per
@@ -125,7 +146,8 @@ dimensione non basterebbe: cambiare i tag spesso non la cambia.
 **Cartelle grandi.** La prima lettura usa più file in parallelo; i tag letti restano in `cache_tag.json` nella
 cartella dati, e le volte successive si rileggono solo i file cambiati (dimensione o data diverse). Dimensione e data
 vengono dall'elenco della cartella, senza aprire i file uno per uno: riaprire una cartella già letta è veloce anche su
-un disco esterno o di rete. Durante la lettura
+un disco esterno o di rete. Con la lettura di tutti i tipi di tag, gli MP3 della cache con un campo vuoto (titolo,
+artista, album, anno, genere o numero) si rileggono una volta. Durante la lettura
 gli elenchi sono vuoti: la barra di stato mostra l'avanzamento. Il programma si apre **una volta sola**: una seconda
 copia lo dice e si chiude.
 
@@ -146,7 +168,7 @@ brani sul PC e poi si usa *Rimpiazza*, o si cambiano dalla scheda iPhone (tasto 
 | Sintomo | Cosa cerca | Correzione |
 |---|---|---|
 | **File che non si aggiornano** | sull'iPhone, brani con tag diversi da quelli del PC (o delle modifiche in sospeso); MP3 con un vecchio tag ID3v1 diverso o con un tag APE (solo informazione: le copie inviate ne sono ripulite) | sull'iPhone nessuna (la colonna *iPhone* della scheda PC mostra le differenze) |
-| **Album con pochi brani** | numeri di traccia mancanti, meno brani del totale dichiarato, album di 1-2 brani; sull'iPhone, album con meno brani che sul PC | (Verifica album trova i titoli mancanti) |
+| **Album con pochi brani** | numeri di traccia mancanti, meno brani del totale dichiarato, album di 1-2 brani; sull'iPhone, album con meno brani che sul PC | (Verifica album online trova i titoli mancanti) |
 | **Collezioni divise su più album** | una cartella con brani in album diversi; lo stesso album scritto in modi diversi o con "CD 1"/"Disc 2" nel nome; una compilation senza *Artista album* | unifica album e artista album ("Artisti vari" e la spunta *Compilation* per le compilation), sposta il numero del disco in *N. disco* |
 | **Artisti scritti in modi diversi** | **certo**: le stesse parole a parte maiuscole, accenti, punteggiatura, "The" e ordine ("Battiato Franco" = "Franco Battiato", "AC/DC" = "ACDC"); **dubbio**: solo il cognome ("Battiato"), le iniziali ("F. Battiato"), un errore di battitura: decide l'AI (con album e anni) e, se lo chiedi, MusicBrainz (nomi e alias dell'artista), solo per questi gruppi; senza nessuno dei due restano "forse lo stesso artista", da controllare. **Duetti** ("A & B", "A feat. B", "A, B"): se A c'è anche da solo, artista e artista album diventano A e gli ospiti vanno nel titolo, "Titolo (feat. B)" (l'app Musica non gestisce più artisti); un nome come "Simon & Garfunkel" resta com'è | scrive ovunque la forma **più usata** (quella con più brani); per l'iPhone poi *Rimpiazza* (o *Applica*) |
 | **Solo sull'iPhone** | brani dell'app Musica senza un brano uguale (artista, album, titolo) nella Libreria del PC | nessuna: salvali sul PC dalla scheda iPhone (tasto destro → *Salva su PC*) |
@@ -167,6 +189,36 @@ tue scelte non vengono mai cambiate.
 
 In console: `myEasyMP3toIPhone-cli --scan <cartella> [--ai "<profilo>"]`.
 
+## Verifica album online
+
+*Verifica album online* (F5) confronta gli album scelti negli elenchi (o tutti) con un **catalogo su internet**: dice
+se manca qualche brano e propone i tag giusti e la copertina. È diverso da *Controlla la musica*, che confronta i tuoi
+brani tra loro (e con l'iPhone), senza cataloghi.
+
+Nella finestra si scelgono i **cataloghi** (le scelte si ricordano):
+
+| Catalogo | Com'è | Predefinito |
+|---|---|---|
+| **Deezer** | veloce, gratis, senza chiave | acceso |
+| **Apple Music** | l'iTunes Search API, gratis e senza chiave, con i nomi che usa l'app Musica; circa 20 richieste al minuto (il paese del negozio è quello di Windows) | acceso |
+| **Discogs** | tante edizioni, anche rare e in vinile; vuole un **token personale** in `DISCOGS_TOKEN` (discogs.com, *Impostazioni → Sviluppatori → Generate new token*); senza, la casella è spenta | spento |
+| **MusicBrainz** | il più completo, ma una richiesta al secondo | spento |
+
+Con più cataloghi scelti **si provano in quest'ordine** (dal più veloce), album per album, **finché uno dà l'album
+completo**; se nessuno lo dà, vale il risultato migliore (quello con meno brani mancanti) e la finestra dei risultati
+dice quali cataloghi sono stati provati e con che esito. La casella **AI per scegliere tra edizioni dubbie** (spenta di
+base) interviene solo quando due edizioni di un album sono ugualmente probabili: l'AI della scansione riceve titoli e
+numero dei brani e le edizioni trovate, e ne sceglie una (il motivo si vede nei risultati). CDDB/freedb ha chiuso nel
+2020; il suo erede gnudb vuole la struttura del CD (TOC), che dei file non hanno.
+
+**In background.** La verifica non blocca il programma: la barra di stato dice a che punto è (*Ferma* la interrompe,
+i risultati già trovati restano) e l'icona di ogni album nell'elenco *Album* ne mostra l'esito man mano. Alla fine si
+apre la finestra dei **risultati** (non blocca la finestra principale; si riapre con *Risultati della verifica…* nella
+barra di stato): per ogni album le tracce dell'edizione trovata e i tuoi file, le **mancanti in rosso** e quelle non
+riconosciute in grigio. Si può scegliere un'altra edizione, *Correggere i tag con questi dati* (titolo, numeri di
+traccia e disco, album, artista album, anno, e la copertina: tutto in sospeso, per le copie) e *Apri su …* la pagina
+dell'edizione nel catalogo. Aprire un'altra cartella ferma la verifica in corso.
+
 ## L'iPhone
 
 **Basta attaccare l'iPhone con il cavo:** il programma lo rileva da solo (controlla ogni 3 secondi) e si connette. La
@@ -183,8 +235,21 @@ titoli, gli artisti e gli album che mostra l'app: il programma ne copia sul PC i
 e lo legge, perché sul telefono i file hanno nomi casuali (`F12/ABCD.mp3`). Sono solo i brani con un file
 sull'iPhone, non quelli in streaming da Apple Music. *Cerca* filtra per titolo, artista o album.
 
-- **Sul PC:** ✔ nella cartella aperta nella scheda PC c'è lo stesso brano, con gli stessi tag; ⟳ c'è, con tag
-  diversi; vuoto, non c'è. Lo stesso confronto della colonna *iPhone* della scheda PC.
+- **Colonne:** N., Sul PC, Sorgente, Titolo, Artista, **Artista album**, Album, Anno, Genere, Durata e **File della
+  sorgente** (il file del PC da cui viene il brano: il nome, o il percorso completo con *Impostazioni → Mostra il
+  percorso completo dei file*; per una sorgente su un altro computer, `COMPUTER: percorso`).
+- **Sul PC:**
+
+  | Segno | Significato |
+  |---|---|
+  | ✔ verde | la sorgente (dal registro della provenienza) c'è, con gli stessi tag |
+  | ⟳ arancio | la sorgente c'è, con tag diversi: si può usare *Rimpiazza con la versione del PC* |
+  | ≈ grigio | **da rivedere**: nella cartella aperta c'è un brano con lo stesso titolo, album e artista, ma non è collegato: non è certo che sia la sorgente |
+  | ✖ rosso | il registro ha una sorgente su questo PC, ma il file non c'è più |
+  | vuoto | non trovato |
+
+  La sorgente vale anche **fuori dalla cartella aperta**: il programma ne legge i tag (solo lettura, con la cache dei
+  tag) e la confronta, così ✔ e ⟳ non dipendono da quale cartella è aperta. Il suggerimento lo dice.
 
 **Il suggerimento di ✔ e ⟳** (colonna *iPhone* della scheda PC, *Sul PC* della scheda iPhone) è una tabella: in
 cima il brano abbinato (il brano dell'iPhone, o il file del PC con il percorso) e come è stato abbinato, *certo*
@@ -194,8 +259,12 @@ accenti non sono evidenziati: sull'iPhone sono lo stesso gruppo.
 - **Tasto destro** su uno o più brani: **Salva su PC…** copia i file in una cartella a scelta (proposta: la Libreria),
   ordinati in `Artista/Album (Anno)/NN - Titolo` con i nomi che mostra l'app; crea solo file nuovi, un file già
   presente sul PC non viene mai sostituito. **Mostra nella scheda PC** seleziona i brani corrispondenti del PC.
+  **Associa le probabili ≈** rende certi i brani ≈ scelti (li collega al file con gli stessi tag, dopo una conferma).
+  **File della sorgente** → *Copia nome file*, *Copia percorso completo*, *Copia cartella*, *Apri la cartella in
+  Esplora risorse*, come nella scheda PC.
 - L'elenco letto resta in `iphone_musica.json` nella cartella dati: scheda iPhone, colonna *iPhone* e scansione
-  funzionano anche a telefono disconnesso (*Aggiorna elenco* lo rilegge).
+  funzionano anche a telefono disconnesso. **Aggiorna** lo rilegge dall'iPhone connesso; senza iPhone rifà il
+  confronto con il PC.
 
 ### Scrivere nell'app Musica
 
@@ -228,7 +297,7 @@ CopyTrans Manager (*AirTrafficControl*), senza iTunes e senza sincronizzare tutt
   aggiornano da sole).
 - **Una modifica da una parte si propone anche dall'altra**, per i brani che hanno la sorgente su questo PC (colonna
   *Sorgente*), e si chiede ogni volta:
-  - cambiando i tag nella scheda **PC** (editor dei tag, correzioni della scansione, *Verifica album*, *Torna ai tag
+  - cambiando i tag nella scheda **PC** (editor dei tag, correzioni della scansione, *Verifica album online*, *Torna ai tag
     del file*), se i brani collegati sull'iPhone ora sono diversi: *Aggiornarli anche lì?* Titolo, album, genere,
     anno, numeri e compilation con *Cambia tag* (restano ascolti e playlist); artista, artista dell'album, una
     copertina nuova o un campo da svuotare con *Rimpiazza*. Senza iPhone connesso lo dice la barra di stato e i brani
@@ -250,7 +319,7 @@ CopyTrans Manager (*AirTrafficControl*), senza iTunes e senza sincronizzare tutt
 **Da dove viene un brano.** Il programma tiene un **registro della provenienza**: per ogni brano dell'iPhone
 (il suo identificativo fisso, `sync_id`), il computer e il file da cui viene, con dimensione, data, le modifiche in
 sospeso al momento dell'invio e l'**impronta dell'audio**, e come è nata l'associazione (*inviato*, *impronta*,
-*regole*, *ai*, *a mano*, *salvato*). Ogni invio lo registra; un'eliminazione toglie la riga. Il registro sta nella
+*cartella*, *regole*, *ai*, *a mano*, *salvato*). Ogni invio lo registra; un'eliminazione toglie la riga. Il registro sta nella
 cartella dati (`registro_iphone.json`) e sull'iPhone (`myEasyMP3toIPhone/registro.json`, un file che l'iPhone non
 legge): così ogni computer con il programma vede anche le righe degli altri. Alla connessione le due copie si
 uniscono (per lo stesso brano vince la più recente) e le righe dei brani che non sono più sull'iPhone si tolgono.
@@ -265,7 +334,8 @@ Nella scheda iPhone la colonna **Sorgente** dice da quale file viene ogni brano:
 | *telefono* | acquistato o scaricato sull'iPhone: non si gestisce da un computer |
 | *senza file* | un brano "fantasma": è nell'elenco dell'app Musica ma il suo file sull'iPhone non c'è (non si può ascoltare); toglilo con *Elimina dall'iPhone* |
 
-Il menu **Mostra** filtra l'elenco per sorgente (per esempio solo i brani *senza sorgente*). Quando un brano ha la
+Il menu **Mostra** filtra l'elenco per sorgente (per esempio solo i brani *senza sorgente*), e per la colonna *Sul PC*:
+*Da rivedere: abbinati solo per i tag (≈)* e *Sorgente con tag diversi (⟳)*. Quando un brano ha la
 sorgente, il confronto delle colonne *Sul PC* e *iPhone* usa quel file esatto: un doppione sul PC con gli stessi tag
 non prende il suo posto. **Salva su PC** associa ogni brano salvato al suo file nuovo (verificato con l'impronta),
 anche quando un file con lo stesso audio c'era già. Tasto destro:
@@ -279,11 +349,8 @@ anche quando un file con lo stesso audio c'era già. Tasto destro:
   sostituirla chiede. Nel registro resta come è nata l'associazione: *impronta*, *regole* o *ai* se si accetta la
   prima proposta, *a mano* se si sceglie un altro file. L'impronta dell'iPhone si legge dal telefono se è connesso
   (o dalla memoria, se è già stata letta).
-- **Associa sorgente da una cartella…** (più brani, per esempio un album intero): si sceglie la cartella del PC da cui
-  vengono (proposta: quella dove stanno le sorgenti già note dei brani degli stessi album); per ogni brano si cerca il
-  file nella cartella e nelle sottocartelle (stesso audio, oppure titolo, artista e durata molto simili) e un
-  riepilogo, da confermare, mostra brano → file. I brani **non trovati** sono in rosso e, se lasci la spunta, dopo si
-  associano uno alla volta con la finestra di *Associa sorgente* (*Salta* passa al prossimo).
+- **Associa sorgenti…** (più brani, per esempio un album intero): la finestra di *Associa sorgenti* (sotto) per
+  i brani scelti, anche quelli che hanno già una sorgente.
 - **Togli sorgente**: il brano torna *senza sorgente*.
 
 **Sorgenti sparite.** Il programma non cancella mai i file del PC: li cancelli tu (per esempio un doppione). Quando
@@ -305,22 +372,38 @@ FLAC l'impronta dell'audio che il file porta nella sua intestazione, per gli M4A
 brano dell'iPhone si riconosce anche se titolo, album o artista sono diversi da quelli del PC (le compilation, i
 brani "sciolti"): su 40 brani messi sull'iPhone da CopyTrans, 40 sono stati ritrovati così sul PC.
 
-**Associa sorgenti** (scheda iPhone) ritrova il file del PC di ogni brano dell'iPhone senza sorgente (messo
-da CopyTrans, da un altro computer…) e lo scrive nel registro. Confronta con la cartella aperta nella scheda PC, in
-tre livelli:
+**Associa sorgenti** (pulsante della scheda iPhone, o tasto destro su più brani) ritrova il file del PC dei brani
+dell'iPhone (messi da CopyTrans, da un altro computer…) e lo scrive nel registro. Una finestra chiede:
 
-1. **impronta dell'audio**: stesso audio = stesso brano, qualunque siano titolo, album, artista. Con più copie sul PC
-   sceglie quella con i tag più simili. Si associa senza chiedere;
-2. **regole**: durata entro 2 secondi e titolo e artista quasi uguali, con un solo candidato chiaramente migliore
-   (per esempio un'altra codifica dello stesso brano). Proposto già spuntato;
-3. **AI**, per i dubbi veri (per esempio una versione dal vivo e una in studio): riceve per ogni brano dell'iPhone
-   al più 5 candidati del PC con titolo, artista, album, durata e **cartella**, e dice quale è la stessa
-   registrazione, o nessuno, con la sicurezza e il motivo. Usa il profilo AI della scansione (*Impostazioni →
-   Generale*); proposto spuntato solo se l'AI è sicura. Senza AI, i dubbi si mostrano da controllare.
+- **Brani:** tutti quelli senza sorgente, oppure quelli selezionati (anche con una sorgente: la si può sostituire);
+- **Dove cercare:** una cartella con tutte le sue sottocartelle (proposta: quella dove stanno le sorgenti già note
+  degli stessi album, altrimenti la cartella aperta), oppure **Tutta la Libreria**. Una cartella fuori da quella
+  aperta si legge in quel momento (con la cache dei tag);
+- **Come**, in ordine, dal più veloce; per ogni brano ci si ferma al primo che lo trova:
 
-Prima di scrivere mostra tutto: quanti brani sono associati con l'impronta, le proposte con il motivo (da spuntare o
-togliere) e quanti brani non hanno un file sul PC: questi restano *solo sull'iPhone* e il programma non li tocca mai
-da solo. La prima volta legge l'impronta di ogni brano dall'iPhone, circa un quarto di secondo l'uno (un quarto d'ora
+1. **nome della cartella** (sempre, veloce: non legge l'audio): una cartella il cui nome, o quello della cartella sopra,
+   contiene il nome dell'album (senza maiuscole, accenti, punteggiatura e parentesi: "Il Disco" si trova in
+   `Artista - Il disco (1999)\CD1`), e dentro un file con lo stesso titolo e la stessa durata (entro 2 secondi).
+   Con anche lo stesso numero di traccia è **molto probabile**, e il brano non ha bisogno d'altro; senza il numero è
+   **probabile** (spuntato, ma se c'è l'impronta si controlla anche quella); con il titolo solo simile è **da
+   controllare**;
+2. **impronta dell'audio** (casella, accesa di base): stesso audio = stesso brano, qualunque siano titolo, album,
+   artista; con più copie sul PC sceglie quella con i tag più simili. **Certo.** Si leggono solo le impronte dei
+   brani che il nome della cartella non ha trovato con sicurezza, e solo dei file del PC con una durata vicina. A
+   iPhone disconnesso valgono solo quelle già lette;
+3. **regole**: durata entro 2 secondi e titolo e artista quasi uguali, con un solo candidato chiaramente migliore (per
+   esempio un'altra codifica dello stesso brano). Molto probabile;
+4. **AI** (casella, accesa se c'è l'AI della scansione), per i dubbi veri (per esempio una versione dal vivo e una in
+   studio): riceve per ogni brano dell'iPhone al più 5 candidati del PC con titolo, artista, album, durata e
+   **cartella**, e dice quale è la stessa registrazione, o nessuno, con la sicurezza e il motivo. Spuntato solo se
+   l'AI è sicura. Senza AI, i dubbi si mostrano da controllare.
+
+Prima di scrivere mostra **una lista sola** con tutte le proposte: brano dell'iPhone, file del PC, **certezza** (certo,
+molto probabile, probabile, da controllare), come e perché, con le spunte già messe per quelle certe o molto
+probabili. Si può togliere o mettere ogni spunta (**un brano senza spunta resta com'è**) e, per la riga selezionata,
+**Scegli un altro file…**. I brani senza un file sul PC sono in rosso: restano *solo sull'iPhone* (il programma non li
+tocca mai da solo), oppure, con la casella in fondo, si associano dopo uno alla volta con la finestra di *Associa
+sorgente*. La prima volta l'impronta di un brano dell'iPhone si legge in circa un quarto di secondo (un quarto d'ora
 per 3.500 brani); si può annullare e riprendere, quelle già lette si ricordano (`impronte_iphone.json`). Le impronte
 dei file del PC si ricordano nella cache dei tag. Né i brani dell'iPhone né i file del PC cambiano.
 
@@ -414,8 +497,6 @@ valore. Il nuovo file è leggibile solo dal proprietario.
 
 ### Le variabili
 
-| Variabile | A cosa serve | Senza valore |
-|---|---|---|
 I nomi delle variabili AI sono **gli stessi di myCalibreTools**: se le hai già impostate in Windows per quel programma,
 myEasyMP3toIPhone le usa così come sono (lascia vuote le righe del file). Le due variabili proprie del programma seguono lo
 stesso schema di nomi: `MYCALIBRETOOLS_HOME` → `MYEASYMP3TOIPHONE_HOME`, `CALIBRE_DEDUP_LOG_LEVEL` →
@@ -430,6 +511,7 @@ stesso schema di nomi: `MYCALIBRETOOLS_HOME` → `MYEASYMP3TOIPHONE_HOME`, `CALI
 | `OPENAI_API_KEY` | la chiave dei profili OpenAI (nome standard: myCalibreTools non ha profili OpenAI) | — |
 | `ANTHROPIC_API_KEY` | la chiave dei profili Anthropic (nome standard: myCalibreTools non ha profili Anthropic) | — |
 | `MYCALIBRETOOLS_HOME` | dove cercare i profili di myCalibreTools per *Importa da myCalibreTools* | `%USERPROFILE%\.myCalibreTools` |
+| `DISCOGS_TOKEN` | il token personale di Discogs, per *Verifica album online* con il catalogo Discogs; si manda solo nell'intestazione delle richieste a Discogs, mai altrove | Discogs non si usa (la casella è spenta) |
 | `MYEASYMP3TOIPHONE_HOME` | **solo nel sistema**: un'altra cartella dati (percorso completo) | `%USERPROFILE%\.myEasyMP3toIPhone` |
 
 **Un profilo AI nuovo** (*Impostazioni → Profili AI → Aggiungi*, o cambiando il tipo di un profilo appena aggiunto)
@@ -449,7 +531,7 @@ programma. La musica invece sta nella Libreria.
 | File | Contenuto |
 |---|---|
 | `myEasyMP3toIPhone.env` | le variabili d'ambiente (sopra) |
-| `settings.json` | cartella della Libreria, ultime cartelle usate, AI della scansione e controlli tolti, lingua, posizione della finestra |
+| `settings.json` | cartella della Libreria, ultime cartelle usate, AI della scansione e controlli tolti, lingua, percorso completo dei file, cataloghi di *Verifica album online*, posizione della finestra |
 | `ai_profiles.json` | i profili AI (senza chiavi e senza indirizzi privati: quelli sono nella Gestione credenziali) |
 | `secrets.json` | solo senza credential store: le chiavi |
 | `scansioni\scansione_<data>.txt` | il rapporto di ogni scansione |
@@ -571,6 +653,23 @@ prima versione nel registro di Windows si copiano una volta, solo se `settings.j
 
 In inglese sono in inglese finestre, pulsanti, menu, messaggi, la barra di stato, i problemi e il rapporto di *Controlla la musica* e i motivi scritti dall'AI (il prompt le chiede l'inglese). Restano come sono i dati (titoli, artisti, album, percorsi), la console e questo README. Il codice resta scritto in italiano: i testi si traducono quando arrivano allo schermo con il catalogo `myeasymp3toiphone/i18n_en.py` (un testo nuovo nel codice va aggiunto lì: `tools/i18n_catalog.py` elenca quelli mancanti e un test lo controlla).
 
+### Il percorso completo dei file
+
+*Impostazioni → Generale → Mostra il percorso completo dei file* (`show_full_path` in `settings.json`): vale per la
+colonna *File* della scheda PC e *File della sorgente* della scheda iPhone, subito. Senza: spento (il solo nome del
+file). Il suggerimento della cella mostra sempre il percorso completo.
+
+### I cataloghi di "Verifica album online"
+
+1. Le caselle della finestra di *Verifica album online*: valgono per quella verifica e si ricordano in `settings.json`
+   (`album_services`, nell'ordine fisso Deezer, Apple Music, Discogs, MusicBrainz; `album_ai` per l'AI).
+2. Al primo uso, e con un `settings.json` senza `album_services`: Deezer e Apple Music; l'AI spenta.
+3. Discogs vale solo con `DISCOGS_TOKEN` impostata (file delle variabili o sistema, come ogni variabile); senza, la
+   casella è spenta anche se era scelta.
+4. L'AI è quella della scansione (*Impostazioni → Generale → AI della scansione*); senza un profilo la casella è spenta.
+5. Il paese del negozio di Apple Music è quello delle impostazioni internazionali di Windows (`it-IT` → `IT`); se non
+   si legge, `US`.
+
 ### La cartella aperta all'avvio
 
 1. `--open <cartella>` sulla riga di comando (vale per quell'avvio, non si salva come scelta: ma quella cartella
@@ -638,9 +737,9 @@ L'icona si rigenera con `.venv\Scripts\python tools\make_icon.py`.
 
 | File | Contenuto |
 |---|---|
-| `myeasymp3toiphone/tags.py` | lettura e scrittura dei tag e delle copertine (mutagen), ID3 v2.3 |
+| `myeasymp3toiphone/tags.py` | lettura di tutti i tipi di tag (ID3v2, APEv2, ID3v1, MP4, Vorbis, ASF, RIFF INFO), scrittura dei tag e delle copertine (mutagen), ID3 v2.3 |
 | `myeasymp3toiphone/library.py` | scansione delle cartelle, raggruppamento, nomi dei file, copia e spostamento |
-| `myeasymp3toiphone/albumcheck.py` | MusicBrainz e Cover Art Archive, abbinamento delle tracce |
+| `myeasymp3toiphone/albumcheck.py` | *Verifica album online*: i cataloghi (Deezer, Apple Music, Discogs, MusicBrainz e Cover Art Archive), l'ordine dei servizi, l'abbinamento delle tracce |
 | `myeasymp3toiphone/scan.py` | *Controlla la musica*: regole, brani duplicati, confronto con l'iPhone, analisi AI, correzioni |
 | `myeasymp3toiphone/artist_names.py` | le forme dei nomi d'artista: varianti certe, dubbi (AI, MusicBrainz), duetti |
 | `myeasymp3toiphone/overlay.py`, `tag_cache.py` | le modifiche dei tag in sospeso; la cache dei tag e delle impronte |

@@ -159,10 +159,12 @@ READ_WINDOW = 256     # file affidati ai thread alla volta, per poter annullare 
 
 
 def load_tracks(files: list, progress: Optional[ProgressFn] = None,
-                cancel: Optional[threading.Event] = None, cache=None, stats: Optional[list] = None) -> list:
+                cancel: Optional[threading.Event] = None, cache=None, stats: Optional[list] = None,
+                force: bool = False) -> list:
     """I brani dei file, nell'ordine dei file. Con una cache (tag_cache.TagCache) i file non cambiati non si
     rileggono; gli altri si leggono con più thread. stats: (dimensione, data) di ogni file, già note dall'elenco
-    della cartella; senza, la cache le chiede al disco file per file."""
+    della cartella; senza, la cache le chiede al disco file per file. force: si rilegge tutto (la cache si
+    aggiorna)."""
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
     from .tag_cache import cached_track
@@ -171,7 +173,7 @@ def load_tracks(files: list, progress: Optional[ProgressFn] = None,
     pending = []
     for index, path in enumerate(files):
         known = stats[index] if stats is not None else None
-        track = cached_track(path, cache, known)
+        track = None if force else cached_track(path, cache, known)
         if track is None:
             pending.append(index)
         else:
@@ -202,13 +204,13 @@ def load_tracks(files: list, progress: Optional[ProgressFn] = None,
 
 
 def scan_folder(folder: Path, progress: Optional[ProgressFn] = None,
-                cancel: Optional[threading.Event] = None, cache=None) -> list:
+                cancel: Optional[threading.Event] = None, cache=None, force: bool = False) -> list:
     files = []
     stats = []
     for path, size, mtime in find_audio_entries(folder):
         files.append(path)
         stats.append((size, mtime))
-    result = load_tracks(files, progress, cancel, cache, stats)
+    result = load_tracks(files, progress, cancel, cache, stats, force)
     if cache is not None:
         cache.save()
     assign_groups(result)

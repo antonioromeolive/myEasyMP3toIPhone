@@ -421,8 +421,8 @@ def detect_few_tracks(tracks: list) -> list:
                 shown = ", ".join(gaps[:15]) + ("…" if len(gaps) > 15 else "")
                 issues.append(Issue(
                     KIND_FEW_TRACKS, severity, f"{artist} — {album}: {_tracks_text(count)} su almeno {expected}",
-                    f"Mancano i numeri di traccia {shown}. \"Verifica album\" controlla l'elenco completo su "
-                    "MusicBrainz.", files, rule_id=f"R9.{number}"))
+                    f"Mancano i numeri di traccia {shown}. \"Verifica album online\" controlla l'elenco completo "
+                    "nei cataloghi online.", files, rule_id=f"R9.{number}"))
             elif count <= 2:
                 issues.append(Issue(
                     KIND_FEW_TRACKS, SEVERITY_LOW, f"{artist} — {album}: solo {_tracks_text(count)}",

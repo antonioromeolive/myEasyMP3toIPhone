@@ -529,6 +529,9 @@ class AppSettings:
     scan_musicbrainz: bool = False  # i nomi d'artista dubbi anche su MusicBrainz (lento)
     window_geometry: str = ""       # base64 di QMainWindow.saveGeometry
     language: str = "it"            # la lingua dell'interfaccia (i18n.LANGUAGES), dal prossimo avvio
+    show_full_path: bool = False    # colonne File (scheda PC) e File della sorgente (scheda iPhone): percorso completo
+    album_services: list = field(default_factory=lambda: ["deezer", "apple"])   # Verifica album online, in ordine
+    album_ai: bool = False          # Verifica album online: l'AI sceglie tra edizioni dubbie
     extra: dict = field(default_factory=dict)
 
     def library_path(self) -> Path:
