@@ -118,3 +118,54 @@ def test_link_for_records_how_and_file(tmp_path):
     link = adoption.link_for(proposal, None, "mp3:abc")
     assert (link.sync_id, link.path, link.size, link.how, link.fingerprint) == (7, str(path), 10, "ai", "mp3:abc")
     assert link.here
+
+
+# --------------------------------------------------------------------------- Associa sorgente
+
+def _fake_prints(monkeypatch, phone_print, pc_prints):
+    monkeypatch.setattr(adoption, "_phone_print", lambda track, home, read_phone: phone_print)
+    monkeypatch.setattr(adoption, "pc_fingerprints", lambda tracks, cache, progress=None, cancel=None: dict(pc_prints))
+
+
+def test_rank_sources_fingerprint_first_without_title_filter(monkeypatch):
+    phone = _phone(1, "Canzone", "Cantante", "Hits 2005", album_artist="Artisti Vari")
+    pc = [_pc("C:/m/Cantante/Album/01 - Canzone.mp3", "Canzone", "Cantante", "Album"),
+          _pc("C:/m/Raccolte/Hits/05 - Traccia 05.mp3", "Traccia 05", "", "Hits", length=201.5),
+          _pc("C:/m/Lontano/01 - Canzone.mp3", "Canzone", "Cantante", "Altro", length=260.0)]
+    _fake_prints(monkeypatch, "mp3:x", {str(pc[1].path): "mp3:x", str(pc[0].path): "mp3:y"})
+    ranked = adoption.rank_sources(phone, pc, Path("."))
+    assert ranked[0].pc is pc[1] and ranked[0].how == provenance.HOW_FINGERPRINT      # titolo diverso, stesso audio
+    assert ranked[1].pc is pc[0] and ranked[1].how == provenance.HOW_RULES
+    assert all(proposal.pc is not pc[2] for proposal in ranked)                         # durata troppo diversa
+
+
+def test_rank_sources_asks_ai_only_when_close(monkeypatch):
+    phone = _phone(2, "Notte", "Carla", "Raccolta", length=240.0)
+    pc = [_pc("C:/m/Carla/Notte/01 - Notte.mp3", "Notte", "Carla", "Notte", length=239.5),
+          _pc("C:/m/Carla/Live/07 - Notte.mp3", "Notte", "Carla", "Live", length=241.0)]
+    _fake_prints(monkeypatch, "", {})
+    provider = FakeProvider("Carla/Live", "medium")
+    ranked = adoption.rank_sources(phone, pc, Path("."), provider=provider)
+    assert ranked[0].pc is pc[1] and ranked[0].how == provenance.HOW_AI
+    assert [proposal.pc for proposal in ranked[1:]] == [pc[0]]
+    clear = _phone(3, "Estate", "Bruno", "Estate", length=180.0)
+    silent = FakeProvider("Bruno", "high")
+    ranked = adoption.rank_sources(clear, [_pc("C:/m/Bruno/01 - Estate.mp3", "Estate", "Bruno", "Estate", 181.0)],
+                                   Path("."), provider=silent)
+    assert ranked[0].how == provenance.HOW_RULES and silent.seen == ""                 # un solo candidato sicuro
+
+
+def test_match_in_folder(monkeypatch):
+    phone = [_phone(1, "Uno", "Anna", "Disco", length=100.0),
+             _phone(2, "Due", "Anna", "Disco", length=120.0),
+             _phone(3, "Tre", "Anna", "Disco", length=140.0)]
+    folder = [_pc("C:/m/Anna/Disco/01 - Traccia.mp3", "Traccia 1", "", "", length=100.5),
+              _pc("C:/m/Anna/Disco/02 - Due.flac", "Due", "Anna", "Disco", length=119.0)]
+    monkeypatch.setattr(adoption, "pc_fingerprints", lambda tracks, cache, progress=None, cancel=None:
+                        {str(folder[0].path): "mp3:1", str(folder[1].path): "flac:2"})
+    monkeypatch.setattr(adoption, "phone_fingerprints", lambda tracks, home, progress=None, cancel=None:
+                        {1: "mp3:1", 2: "mp3:altro", 3: "mp3:3"})
+    matches = dict((item.sync_id, proposal) for item, proposal in adoption.match_in_folder(phone, folder, Path(".")))
+    assert matches[1].pc is folder[0] and matches[1].how == provenance.HOW_FINGERPRINT
+    assert matches[2].pc is folder[1] and matches[2].how == provenance.HOW_RULES       # altra codifica
+    assert matches[3] is None

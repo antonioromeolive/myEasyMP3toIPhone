@@ -352,6 +352,113 @@ def adopt(phone_tracks: list, pc_tracks: list, registry, home: Path, tag_cache=N
     return outcome
 
 
+# --------------------------------------------------------------------------- Associa sorgente (uno o una cartella)
+
+def _phone_print(phone_track, home: Path, read_phone: bool) -> str:
+    """L'impronta di un brano dell'iPhone: dalla memoria, o letta dal telefono se read_phone (iPhone connesso)."""
+    result = provenance.PhoneFingerprints(home).get(phone_track.remote_path, phone_track.size)
+    if not result and read_phone and phone_track.sync_id:
+        try:
+            result = phone_fingerprints([phone_track], home).get(phone_track.sync_id, "")
+        except Exception as exc:  # noqa: BLE001 - senza impronta si va avanti con titolo e durata
+            log.warning("Impronta non letta dall'iPhone: %s", exc)
+            result = ""
+    return result
+
+
+def _by_length(tracks: list) -> list:
+    result = []
+    for index, track in enumerate(tracks):
+        if track.length > 0 and not track.error:
+            result.append((track.length, index, track))
+    result.sort(key=lambda entry: (entry[0], entry[1]))
+    return result
+
+
+def rank_sources(phone_track, pc_tracks: list, home: Path, tag_cache=None, provider=None,
+                 read_phone: bool = True) -> list:
+    """I file del PC che possono essere la sorgente del brano, il più probabile per primo (Proposal):
+      1. stesso audio (impronta), tra tutti i file con durata entro DURATION_TOLERANCE, senza filtro sul titolo
+         (le compilation con titoli diversi): certo;
+      2. titolo, artista e durata (candidates);
+      3. se non c'è un'impronta uguale e i primi candidati sono vicini, l'AI sceglie (se c'è un fornitore)."""
+    proposals = []
+    near = []
+    for track in pc_tracks:
+        if not track.error and track.length > 0 and abs(track.length - phone_track.length) <= DURATION_TOLERANCE:
+            near.append(track)
+    printed = _phone_print(phone_track, home, read_phone) if near else ""
+    exact = []
+    if printed:
+        prints = pc_fingerprints(near, tag_cache)
+        for track in near:
+            if prints.get(str(track.path)) == printed:
+                exact.append(track)
+    exact.sort(key=lambda track: (len(differences(track.tags, phone_track.tags)), str(track.path).lower()))
+    for track in exact:
+        proposals.append(Proposal(phone_track, track, provenance.HOW_FINGERPRINT, "stesso audio (impronta): certo"))
+    exact_ids = set()
+    for track in exact:
+        exact_ids.add(id(track))
+    scored = []
+    for score, track in candidates(phone_track, _by_length(pc_tracks)):
+        if id(track) not in exact_ids:
+            scored.append((score, track))
+    close = len(scored) > 1 and scored[1][0] > scored[0][0] - RULE_MARGIN
+    if not exact and provider is not None and scored and (close or scored[0][0] < RULE_SCORE):
+        outcome = AdoptionResult()
+        chosen = ask_ai(provider, [(phone_track, scored)], None, None, outcome)
+        if chosen:
+            proposals.append(Proposal(phone_track, chosen[0].pc, provenance.HOW_AI, chosen[0].reason))
+            remaining = []
+            for score, track in scored:
+                if track is not chosen[0].pc:
+                    remaining.append((score, track))
+            scored = remaining
+    for score, track in scored:
+        proposals.append(Proposal(phone_track, track, provenance.HOW_RULES,
+                                  f"titolo, artista e durata simili ({score:.0%})"))
+    return proposals
+
+
+FOLDER_MIN_SCORE = 0.8     # senza impronta uguale, un file della cartella vale solo se molto simile
+
+
+def match_in_folder(phone_tracks: list, folder_tracks: list, home: Path, tag_cache=None,
+                    read_phone: bool = True) -> list:
+    """[(PhoneTrack, Proposal o None)]: per ogni brano dell'iPhone il file della cartella che ne è la sorgente
+    (stesso audio, oppure titolo, artista e durata molto simili), o None."""
+    prints = pc_fingerprints(folder_tracks, tag_cache)
+    by_print = {}
+    for track in folder_tracks:
+        value = prints.get(str(track.path))
+        if value:
+            by_print.setdefault(value, []).append(track)
+    phone_prints = {}
+    if read_phone:
+        try:
+            phone_prints = phone_fingerprints(phone_tracks, home)
+        except Exception as exc:  # noqa: BLE001
+            log.warning("Impronte non lette dall'iPhone: %s", exc)
+    known = provenance.PhoneFingerprints(home)
+    by_length = _by_length(folder_tracks)
+    result = []
+    for item in phone_tracks:
+        printed = phone_prints.get(item.sync_id) or known.get(item.remote_path, item.size)
+        copies = by_print.get(printed, []) if printed else []
+        proposal = None
+        if copies:
+            proposal = Proposal(item, _closest_copy(item, copies), provenance.HOW_FINGERPRINT,
+                                "stesso audio (impronta): certo")
+        else:
+            scored = candidates(item, by_length)
+            if scored and scored[0][0] >= FOLDER_MIN_SCORE:
+                proposal = Proposal(item, scored[0][1], provenance.HOW_RULES,
+                                    f"titolo, artista e durata simili ({scored[0][0]:.0%})")
+        result.append((item, proposal))
+    return result
+
+
 def link_for(proposal: Proposal, overlay=None, fingerprint: str = ""):
     """La riga del registro per una proposta confermata."""
     path = proposal.pc.path

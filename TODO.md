@@ -1,33 +1,5 @@
 # TODO
 
-## "Associa sorgente" (tasto destro nella scheda iPhone)
-
-Sostituisce l'attuale *Collega a un file del PC…* (un elenco semplice dei 5 file più simili, filtrati per titolo).
-- Nome della voce: **Associa sorgente…**, per un brano alla volta.
-- Una **tabella** di brani del PC tra cui scegliere: Titolo | Artista | Album | Durata | **Percorso** (ben visibile)
-  | Perché; più "Scegli un altro file…".
-- Su un brano che ha già una sorgente: si mostra quella attuale e si chiede se sostituirla.
-- **Il primo, già selezionato, è il più probabile**: si accetta con *Associa* senza cambiare niente. Ordine:
-  1. **impronta dell'audio** uguale (certo): cercata tra tutti i file con durata entro 2 s, **senza filtro sul
-     titolo** (oggi le compilation con titoli diversi restano fuori); impronte del PC dalla cache, quelle mancanti
-     calcolate al momento (pochi file); quella dell'iPhone dalla memoria o letta dal telefono se è collegato;
-  2. altrimenti titolo, artista e durata (il punteggio di oggi);
-  3. se i primi due candidati sono vicini, **decide l'AI** della scansione (una richiesta, il brano e i suoi
-     candidati con la cartella), e la colonna *Perché* riporta il motivo.
-- Calcolo in background (impronte e AI richiedono qualche secondo), poi la finestra.
-- Nel registro il collegamento ha il "come" giusto: *impronta* o *ai* se si accetta la proposta, *a mano* se si
-  sceglie un altro brano.
-
-**Versione "per cartella"**: con più brani selezionati (per esempio un album intero) la voce diventa **Associa
-sorgente da una cartella…**:
-- si sceglie la cartella del PC da cui vengono (proposta: quella dove stanno già i brani collegati dello stesso album,
-  o la più probabile secondo le impronte);
-- per ogni brano selezionato si cerca il file in quella cartella e nelle sue sottocartelle (impronta, poi titolo e
-  durata; i brani possono essere di album diversi) e si mostra una tabella di riepilogo: brano dell'iPhone → file
-  trovato (con il percorso e il "perché"), da confermare;
-- i brani **senza** un file nella cartella sono evidenziati con un avviso, e per ognuno si propone di associarlo uno
-  alla volta (la finestra di *Associa sorgente* per quel brano), oppure di lasciarlo così.
-
 ## "Cambia tag" sull'iPhone: manca la spunta Compilation
 
 La finestra *Cambia tag* della scheda iPhone (titolo, album, genere, anno, numeri) non ha la casella

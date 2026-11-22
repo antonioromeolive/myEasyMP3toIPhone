@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (
 
 from .. import adoption, iphone, phone_actions, provenance
 from ..config import config_dir
-from ..library import Track, copy_organized
+from ..library import Track, copy_organized, scan_folder
 from ..phone_library import DEVICE_SAME, DEVICE_STALE, comparison, pc_matches
 from .compare_tip import comparison_html, show_on_tooltip
 from .theme import set_role
@@ -159,6 +159,7 @@ class IPhonePanel(QWidget):
         self._connected = False
         self._device_name = "iPhone"
         self._phone_tracks = []
+        self._source_queue = []       # brani da associare uno alla volta (Associa sorgente da una cartella)
         self._by_pid = {}
         self._matches = {}
         self._pc_dirty = True
@@ -486,7 +487,10 @@ class IPhonePanel(QWidget):
                 link = self._window.registry.get(item.sync_id) if item.sync_id else None
                 if link is not None and link.here:
                     linked_here.append(item)
-            single = items[0] if len(items) == 1 and items[0].from_computer else None
+            if len(writable) == 1:
+                source_text = "Associa sorgente…"
+            else:
+                source_text = f"Associa sorgente da una cartella… ({len(writable)} brani)"
             menu = QMenu(self)
             entries = [
                 (f"Salva su PC… ({len(items)} brani)", self._save_selected, ready),
@@ -497,8 +501,8 @@ class IPhonePanel(QWidget):
                  ready and bool(stale)),
                 (f"Cambia tag… ({len(writable)} brani)", self._edit_selected, ready and bool(writable)),
                 None,
-                ("Associa sorgente…", lambda: self._link_manually(single),
-                 single is not None and not self._window.runner.is_busy),
+                (source_text, lambda: self._link_sources(writable),
+                 bool(writable) and not self._window.runner.is_busy),
                 (f"Togli sorgente ({len(linked_here)} brani)", lambda: self._unlink(linked_here),
                  bool(linked_here) and not self._window.runner.is_busy),
                 None,
@@ -713,8 +717,8 @@ class IPhonePanel(QWidget):
 
                 window.runner.run("Registro della provenienza", work, done)
 
-    def _store_registry(self, registry, message: str) -> None:
-        """Salva il registro (PC e iPhone, se connesso) e rifà i confronti."""
+    def _store_registry(self, registry, message: str, then=None) -> None:
+        """Salva il registro (PC e iPhone, se connesso) e rifà i confronti; poi then(), se c'è."""
         window = self._window
         connected = self._connected
 
@@ -730,26 +734,140 @@ class IPhonePanel(QWidget):
         def done(text):
             window.set_registry(registry)
             window.statusBar().showMessage(text, 8000)
+            if then is not None:
+                then()
 
         window.runner.run("Registro della provenienza", work, done)
 
-    def _link_manually(self, item) -> None:
-        """Collega un brano dell'iPhone a un file del PC scelto a mano: tra i più simili della cartella aperta, o
-        un file qualsiasi."""
-        if item is not None:
-            from .link_dialog import LinkDialog
-            dialog = LinkDialog(self, item, self._window.tracks)
-            if dialog.exec() and dialog.chosen is not None:
-                path = dialog.chosen
-                window = self._window
-                printed = provenance.file_fingerprints([str(path)]).get(str(path), "")
-                info = path.stat()
+    # ------------------------------------------------------------------ associa sorgente
+
+    def _link_sources(self, items: list) -> None:
+        """Un brano: i file possibili, il più probabile per primo. Più brani: una cartella in cui cercarli."""
+        self._source_queue = []
+        if len(items) == 1:
+            self._link_one(items[0])
+        elif items:
+            self._link_folder(items)
+
+    def _next_source(self) -> None:
+        """Il prossimo brano da associare uno alla volta (quelli non trovati nella cartella)."""
+        if self._source_queue:
+            item = self._source_queue.pop(0)
+            self._link_one(item)
+
+    def _link_one(self, item) -> None:
+        window = self._window
+        pc_tracks = list(window.tracks)
+        provider = self._ai_provider()
+        read_phone = self._connected
+        tag_cache = window.tag_cache
+
+        def work(progress, _cancel):
+            progress(0, 0, "ricerca dei file possibili")
+            value = adoption.rank_sources(item, pc_tracks, config_dir(), tag_cache, provider, read_phone)
+            return value
+
+        window.runner.run("Associa sorgente", work, lambda proposals: self._choose_source(item, proposals))
+
+    def _choose_source(self, item, proposals: list) -> None:
+        from .source_dialog import SourceDialog
+        window = self._window
+        current = window.registry.get(item.sync_id)
+        dialog = SourceDialog(self, item, proposals, current, len(self._source_queue))
+        if dialog.exec() and dialog.chosen is not None:
+            path = dialog.chosen
+            accepted = True
+            if current is not None and (not current.here or Path(current.path) != path):
+                where = "" if current.here else f" (sul computer {current.pc})"
+                answer = QMessageBox.question(self, "Associa sorgente",
+                                              f"Il brano ha già una sorgente:\n{current.path}{where}\n\n"
+                                              f"Sostituirla con:\n{path}?")
+                accepted = answer == QMessageBox.Yes
+            if accepted:
                 registry = window.registry
-                registry.record(provenance.Link(sync_id=item.sync_id, pc=provenance.computer_name(), path=str(path),
-                                                size=info.st_size, mtime=info.st_mtime,
-                                                signature=window.overlay.signature(path), fingerprint=printed,
-                                                how=provenance.HOW_MANUAL))
-                self._store_registry(registry, f"Sorgente associata: {path}")
+                registry.record(self._link_to(item, path, dialog.how))
+                self._store_registry(registry, f"Sorgente associata: {path}", self._next_source)
+            else:
+                self._next_source()
+        elif dialog.skipped:
+            self._next_source()
+        else:
+            self._source_queue = []
+
+    def _link_to(self, item, path: Path, how: str):
+        """La riga del registro: il brano dell'iPhone viene dal file path."""
+        window = self._window
+        printed = window.tag_cache.fingerprint(path) or provenance.file_fingerprints([str(path)]).get(str(path), "")
+        info = path.stat()
+        result = provenance.Link(sync_id=item.sync_id, pc=provenance.computer_name(), path=str(path),
+                                 size=info.st_size, mtime=info.st_mtime, signature=window.overlay.signature(path),
+                                 fingerprint=printed, how=how)
+        return result
+
+    def _folder_for(self, items: list) -> Path:
+        """La cartella da proporre: quella più usata dalle sorgenti già note dei brani scelti o dei loro album."""
+        from ..library import group_name
+        window = self._window
+        albums = set()
+        for item in items:
+            albums.add(group_name(item.tags.album))
+        counts = {}
+        for item in self._phone_tracks:
+            link = window.registry.get(item.sync_id) if item.sync_id else None
+            if link is not None and link.here and group_name(item.tags.album) in albums:
+                folder = str(Path(link.path).parent)
+                counts[folder] = counts.get(folder, 0) + 1
+        result = window.root_folder or window.library_dir()
+        best = 0
+        for folder, count in counts.items():
+            if count > best:
+                best = count
+                result = Path(folder)
+        return result
+
+    def _link_folder(self, items: list) -> None:
+        window = self._window
+        start = self._folder_for(items)
+        chosen = QFileDialog.getExistingDirectory(
+            self, f"La cartella del PC con le sorgenti di {len(items)} brani (anche nelle sottocartelle)", str(start))
+        if chosen:
+            folder = Path(chosen)
+            root = window.root_folder
+            opened = list(window.tracks) if root is not None and folder.is_relative_to(root) else None
+            tag_cache = window.tag_cache
+            read_phone = self._connected
+
+            def work(progress, cancel):
+                if opened is None:
+                    folder_tracks = scan_folder(folder, progress, cancel, tag_cache)
+                else:
+                    folder_tracks = []
+                    for track in opened:
+                        if track.path.is_relative_to(folder):
+                            folder_tracks.append(track)
+                progress(0, 0, "impronte dell'audio")
+                value = (folder, adoption.match_in_folder(items, folder_tracks, config_dir(), tag_cache, read_phone))
+                return value
+
+            window.runner.run("Associa sorgente da una cartella", work, self._folder_matched)
+
+    def _folder_matched(self, value) -> None:
+        from .source_dialog import FolderSourceDialog
+        folder, matches = value
+        window = self._window
+        dialog = FolderSourceDialog(self, folder, matches)
+        if dialog.exec():
+            if dialog.one_by_one:
+                self._source_queue = list(dialog.missing)
+            chosen = dialog.chosen()
+            if chosen:
+                registry = window.registry
+                for proposal in chosen:
+                    registry.record(adoption.link_for(proposal, window.overlay,
+                                                      window.tag_cache.fingerprint(proposal.pc.path)))
+                self._store_registry(registry, f"Sorgente associata a {len(chosen)} brani", self._next_source)
+            else:
+                self._next_source()
 
     def _unlink(self, items: list) -> None:
         if items:

@@ -223,9 +223,24 @@ Nella scheda iPhone la colonna **Sorgente** dice da quale file viene ogni brano:
 
 Il menu **Mostra** filtra l'elenco per sorgente (per esempio solo i brani *senza sorgente*). Quando un brano ha la
 sorgente, il confronto delle colonne *Sul PC* e *iPhone* usa quel file esatto: un doppione sul PC con gli stessi tag
-non prende il suo posto. Tasto destro: **Associa sorgente…** (tra i file più simili della cartella aperta, o
-uno qualsiasi) e **Togli sorgente**. **Salva su PC** associa ogni brano salvato al suo file nuovo (verificato con
-l'impronta), anche quando un file con lo stesso audio c'era già.
+non prende il suo posto. **Salva su PC** associa ogni brano salvato al suo file nuovo (verificato con l'impronta),
+anche quando un file con lo stesso audio c'era già. Tasto destro:
+
+- **Associa sorgente…** (un brano): una tabella dei file della cartella aperta che possono essere la sua sorgente
+  (titolo, artista, album, durata, **percorso**, perché), **il più probabile per primo e già selezionato**: basta
+  *Associa*. Ordine: prima i file con lo **stesso audio** (impronta; cercati tra tutti i file con durata entro 2
+  secondi, anche con un titolo diverso, come nelle compilation), poi titolo, artista e durata simili; se i primi due
+  si somigliano troppo **sceglie l'AI** della scansione (se è accesa) e la colonna *Perché* ne riporta il motivo.
+  *Scegli un altro file…* prende un file qualsiasi. Se il brano ha già una sorgente, la finestra la mostra e prima di
+  sostituirla chiede. Nel registro resta come è nata l'associazione: *impronta*, *regole* o *ai* se si accetta la
+  prima proposta, *a mano* se si sceglie un altro file. L'impronta dell'iPhone si legge dal telefono se è connesso
+  (o dalla memoria, se è già stata letta).
+- **Associa sorgente da una cartella…** (più brani, per esempio un album intero): si sceglie la cartella del PC da cui
+  vengono (proposta: quella dove stanno le sorgenti già note dei brani degli stessi album); per ogni brano si cerca il
+  file nella cartella e nelle sottocartelle (stesso audio, oppure titolo, artista e durata molto simili) e un
+  riepilogo, da confermare, mostra brano → file. I brani **non trovati** sono in rosso e, se lasci la spunta, dopo si
+  associano uno alla volta con la finestra di *Associa sorgente* (*Salta* passa al prossimo).
+- **Togli sorgente**: il brano torna *senza sorgente*.
 
 L'**impronta** riassume l'audio e non cambia quando cambiano i tag: per gli MP3 i primi 64 KB dopo il tag ID3, per i
 FLAC l'impronta dell'audio che il file porta nella sua intestazione, per gli M4A l'inizio del blocco audio. Così un
