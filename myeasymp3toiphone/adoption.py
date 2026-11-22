@@ -1,0 +1,366 @@
+# Copyright (c) 2026 Antonio Romeo <antonioromeo@ilve.it>
+# Author: Antonio Romeo (with Claude Code et al.)
+# SPDX-License-Identifier: MIT (see the LICENSE file for the full terms)
+
+"""L'adozione: collegare i brani già sull'iPhone (messi da CopyTrans, da un altro computer…) ai file del PC, per
+riempire il registro della provenienza. In tre livelli, dal più sicuro:
+
+  1. impronta dell'audio: stesso audio = stesso brano, qualunque siano titolo, album, artista (le compilation, i
+     brani "sciolti"); con più copie sul PC si sceglie quella con i tag più simili. Certo: si collega subito.
+  2. regole: durata entro DURATION_TOLERANCE e titolo e artista somiglianti, con un candidato chiaramente migliore.
+     Molto probabile: proposto già spuntato.
+  3. AI: per i dubbi veri, al più MAX_CANDIDATES candidati per brano con la cartella del PC come contesto; risponde
+     quale (o nessuno), con la sicurezza e il motivo. Proposto, spuntato solo se l'AI è sicura.
+Quello che resta non ha un file sul PC: è un brano "estraneo", che il programma non tocca mai da solo.
+
+Bloccante: va chiamato da un thread di lavoro. Le impronte dell'iPhone si ricordano (provenance.PhoneFingerprints):
+la prima volta servono ~0,25 s a brano, poi solo per i brani nuovi.
+"""
+
+from __future__ import annotations
+
+import logging
+import threading
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Callable, Optional
+
+from . import iphone, provenance
+from .albumcheck import similarity
+from .phone_library import differences
+
+log = logging.getLogger(__name__)
+
+DURATION_TOLERANCE = 2.0      # secondi
+MAX_CANDIDATES = 5
+RULE_SCORE = 0.9              # titolo e artista quasi uguali…
+RULE_MARGIN = 0.15            # …e nessun altro candidato vicino
+MIN_TITLE = 0.5               # sotto, un candidato non vale la pena di mostrarlo
+AI_BATCH = 25
+SAVE_EVERY = 100
+
+ProgressFn = Callable[[int, int, str], None]
+
+
+@dataclass
+class Proposal:
+    phone: object             # phone_library.PhoneTrack
+    pc: object                # library.Track
+    how: str                  # provenance.HOW_*
+    reason: str = ""
+    checked: bool = True
+
+
+@dataclass
+class AdoptionResult:
+    certain: list = field(default_factory=list)      # Proposal con l'impronta: collegati senza chiedere
+    proposals: list = field(default_factory=list)    # regole e AI: da confermare
+    foreign: list = field(default_factory=list)      # PhoneTrack senza un file sul PC
+    already: int = 0                                 # brani già nel registro
+    not_from_computer: int = 0                       # acquistati o scaricati sul telefono: niente da collegare
+    ai_errors: list = field(default_factory=list)
+    cancelled: bool = False
+
+
+def _cancelled(cancel: Optional[threading.Event]) -> bool:
+    result = cancel is not None and cancel.is_set()
+    return result
+
+
+# --------------------------------------------------------------------------- impronte
+
+def phone_fingerprints(phone_tracks: list, home: Path, progress: Optional[ProgressFn] = None,
+                       cancel: Optional[threading.Event] = None) -> dict:
+    """{sync_id: impronta} dei brani dell'iPhone; legge dal telefono solo quelle che non conosce già."""
+    from pymobiledevice3.services.afc import AfcService
+
+    known = provenance.PhoneFingerprints(home)
+    result = {}
+    missing = []
+    for item in phone_tracks:
+        value = known.get(item.remote_path, item.size)
+        if value:
+            result[item.sync_id] = value
+        else:
+            missing.append(item)
+
+    async def work():
+        lockdown = await iphone._open_lockdown()
+        try:
+            async with AfcService(lockdown) as afc:
+                index = 0
+                while index < len(missing) and not _cancelled(cancel):
+                    item = missing[index]
+                    try:
+                        value = await provenance.phone_fingerprint(afc, item.remote_path, item.size,
+                                                                   Path(item.remote_path).suffix)
+                    except Exception as exc:  # noqa: BLE001 - un file che non si legge non ferma gli altri
+                        log.warning("Impronta non letta dall'iPhone per %s: %s", item.remote_path, exc)
+                        value = ""
+                    if value:
+                        known.put(item.remote_path, item.size, value)
+                        result[item.sync_id] = value
+                    index += 1
+                    if index % SAVE_EVERY == 0:
+                        known.save()       # se si annulla o si interrompe, si riprende da qui
+                    if progress is not None and index % 10 == 0:
+                        progress(index, len(missing), f"impronte dei brani dell'iPhone: {index} di {len(missing)}")
+        finally:
+            await lockdown.close()
+
+    if missing:
+        try:
+            iphone._run(work())
+        finally:
+            known.save()
+    return result
+
+
+def pc_fingerprints(tracks: list, tag_cache, progress: Optional[ProgressFn] = None,
+                    cancel: Optional[threading.Event] = None) -> dict:
+    """{percorso: impronta} dei file del PC; quelle nuove si ricordano nella cache dei tag."""
+    result = {}
+    missing = []
+    for track in tracks:
+        value = tag_cache.fingerprint(track.path) if tag_cache is not None else ""
+        if value:
+            result[str(track.path)] = value
+        elif not track.error:
+            missing.append(str(track.path))
+    if missing:
+        computed = provenance.file_fingerprints(missing, progress, cancel)
+        for path, value in computed.items():
+            if value:
+                result[path] = value
+                if tag_cache is not None:
+                    tag_cache.store_fingerprint(Path(path), value)
+        if tag_cache is not None:
+            tag_cache.save()
+    return result
+
+
+# --------------------------------------------------------------------------- regole
+
+def _closest_copy(phone_track, copies: list):
+    """Tra più copie dello stesso audio sul PC, quella con meno tag diversi (a parità, il percorso più corto)."""
+    best = None
+    best_key = None
+    for track in copies:
+        key = (len(differences(track.tags, phone_track.tags)), len(str(track.path)), str(track.path).lower())
+        if best_key is None or key < best_key:
+            best = track
+            best_key = key
+    return best
+
+
+def _artist_of(tags) -> str:
+    result = tags.artist or tags.album_artist
+    return result
+
+
+def _score(phone_track, track) -> float:
+    title = similarity(phone_track.tags.title, track.tags.title or track.path.stem)
+    artist = max(similarity(_artist_of(phone_track.tags), track.tags.artist),
+                 similarity(_artist_of(phone_track.tags), track.tags.album_artist or ""))
+    result = 0.6 * title + 0.4 * artist
+    return result
+
+
+def candidates(phone_track, by_length: list) -> list:
+    """[(punteggio, Track)] in ordine, i più simili, con durata entro DURATION_TOLERANCE."""
+    import bisect
+    lengths = [length for length, _index, _track in by_length]
+    start = bisect.bisect_left(lengths, phone_track.length - DURATION_TOLERANCE)
+    end = bisect.bisect_right(lengths, phone_track.length + DURATION_TOLERANCE)
+    scored = []
+    for _length, _index, track in by_length[start:end]:
+        if similarity(phone_track.tags.title, track.tags.title or track.path.stem) >= MIN_TITLE:
+            scored.append((_score(phone_track, track), track))
+    scored.sort(key=lambda pair: (-pair[0], str(pair[1].path).lower()))
+    result = scored[:MAX_CANDIDATES]
+    return result
+
+
+# --------------------------------------------------------------------------- AI
+
+AI_SYSTEM = """You match songs on an iPhone with the music files on the owner's PC. For each iPhone track you get up to \
+five candidate PC files with a similar duration. The tags may differ (spelling, featured artists, compilations, \
+remasters, live versions); the PC folder name tells the album or compilation a file belongs to, and tracks of the \
+same iPhone album usually come from the same PC folder.
+
+For every track answer with the id of the candidate that is the same recording, or "" when none is. A different \
+recording (live, remix, another version, a cover) is NOT the same. Confidence: "high" only when title, artist and \
+duration agree; "medium" when one detail differs but it is surely the same recording; "low" otherwise. Write the \
+reason in Italian, short and concrete. Use only the ids given."""
+
+AI_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "matches": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "track": {"type": "string"},
+                    "candidate": {"type": "string"},
+                    "confidence": {"type": "string", "enum": ["high", "medium", "low"]},
+                    "reason": {"type": "string"},
+                },
+                "required": ["track", "candidate", "confidence", "reason"],
+                "additionalProperties": False,
+            },
+        },
+    },
+    "required": ["matches"],
+    "additionalProperties": False,
+}
+
+
+def _duration(seconds: float) -> str:
+    total = int(round(seconds))
+    result = f"{total // 60}:{total % 60:02d}"
+    return result
+
+
+def ai_lines(batch: list) -> tuple:
+    """(testo per l'AI, {id brano: (PhoneTrack, {id candidato: Track})})."""
+    lines = []
+    ids = {}
+    for number, (phone_track, scored) in enumerate(batch, start=1):
+        tags = phone_track.tags
+        track_id = f"T{number}"
+        lines.append(f"{track_id} | {tags.title} | artist: {tags.artist} | album artist: {tags.album_artist or '-'} | "
+                     f"album: {tags.album} | {_duration(phone_track.length)}")
+        options = {}
+        for index, (_score_value, track) in enumerate(scored, start=1):
+            candidate_id = f"{track_id}.C{index}"
+            folder = "/".join(track.path.parent.parts[-2:])
+            pc_tags = track.tags
+            lines.append(f"   {candidate_id} | {pc_tags.title or track.path.stem} | artist: {pc_tags.artist} | "
+                         f"album artist: {pc_tags.album_artist or '-'} | album: {pc_tags.album} | "
+                         f"{_duration(track.length)} | folder: {folder}")
+            options[candidate_id] = track
+        ids[track_id] = (phone_track, options)
+    result = ("\n".join(lines), ids)
+    return result
+
+
+def ask_ai(provider, doubtful: list, progress: Optional[ProgressFn], cancel, outcome: AdoptionResult) -> list:
+    """Le proposte dell'AI per i brani dubbi [(PhoneTrack, [(punteggio, Track)])]. Chi non ha risposta resta dubbio."""
+    from .ai import AIError
+
+    proposals = []
+    answered = set()
+    start = 0
+    while start < len(doubtful) and not _cancelled(cancel):
+        batch = doubtful[start:start + AI_BATCH]
+        if progress is not None:
+            progress(start, len(doubtful), f"l'AI confronta {len(batch)} brani dubbi")
+        text, ids = ai_lines(batch)
+        try:
+            reply = provider.ask_json(AI_SYSTEM, "TRACKS\n" + text, AI_SCHEMA)
+            for match in reply.get("matches", []):
+                entry = ids.get(str(match.get("track", "")))
+                if entry is not None and entry[0].sync_id not in answered:
+                    phone_track, options = entry
+                    answered.add(phone_track.sync_id)
+                    chosen = options.get(str(match.get("candidate", "")))
+                    if chosen is not None:
+                        confidence = str(match.get("confidence", "low"))
+                        proposals.append(Proposal(phone_track, chosen, provenance.HOW_AI,
+                                                  f"AI ({confidence}): {str(match.get('reason', '')).strip()}",
+                                                  checked=confidence == "high"))
+        except AIError as exc:
+            outcome.ai_errors.append(str(exc))
+            log.warning("Abbinamento con l'AI non riuscito: %s", exc)
+        start += AI_BATCH
+    return proposals
+
+
+# --------------------------------------------------------------------------- tutto insieme
+
+def adopt(phone_tracks: list, pc_tracks: list, registry, home: Path, tag_cache=None, provider=None,
+          progress: Optional[ProgressFn] = None, cancel: Optional[threading.Event] = None) -> AdoptionResult:
+    outcome = AdoptionResult()
+    unknown = []
+    for item in phone_tracks:
+        if not item.from_computer:
+            outcome.not_from_computer += 1
+        elif registry.get(item.sync_id) is not None:
+            outcome.already += 1
+        else:
+            unknown.append(item)
+    usable = []
+    for track in pc_tracks:
+        if not track.error:
+            usable.append(track)
+    pc_prints = {}
+    phone_prints = {}
+    if unknown and usable:
+        if progress is not None:
+            progress(0, 0, "impronte dei file del PC")
+        pc_prints = pc_fingerprints(usable, tag_cache, progress, cancel)
+        if not _cancelled(cancel):
+            phone_prints = phone_fingerprints(unknown, home, progress, cancel)
+    # annullato: niente proposte a metà (i brani senza impronta sembrerebbero dubbi); le impronte lette restano
+    if unknown and usable and not _cancelled(cancel):
+        by_print = {}
+        for track in usable:
+            value = pc_prints.get(str(track.path))
+            if value:
+                by_print.setdefault(value, []).append(track)
+        by_length = []
+        for index, track in enumerate(usable):
+            if track.length > 0:
+                by_length.append((track.length, index, track))
+        by_length.sort(key=lambda entry: (entry[0], entry[1]))
+        doubtful = []
+        for item in unknown:
+            copies = by_print.get(phone_prints.get(item.sync_id, ""), [])
+            if copies:
+                chosen = _closest_copy(item, copies)
+                note = "stesso audio" if len(copies) == 1 else f"stesso audio (la più simile di {len(copies)} copie)"
+                outcome.certain.append(Proposal(item, chosen, provenance.HOW_FINGERPRINT, note))
+            else:
+                scored = candidates(item, by_length)
+                if not scored:
+                    outcome.foreign.append(item)
+                elif scored[0][0] >= RULE_SCORE and (len(scored) == 1 or scored[1][0] <= scored[0][0] - RULE_MARGIN):
+                    outcome.proposals.append(Proposal(item, scored[0][1], provenance.HOW_RULES,
+                                                      "stessa durata, titolo e artista quasi uguali (audio diverso: "
+                                                      "forse un'altra codifica)"))
+                else:
+                    doubtful.append((item, scored))
+        if doubtful and provider is not None and not _cancelled(cancel):
+            ai_proposals = ask_ai(provider, doubtful, progress, cancel, outcome)
+            outcome.proposals += ai_proposals
+            decided = set()
+            for proposal in ai_proposals:
+                decided.add(proposal.phone.sync_id)
+            remaining = []
+            for item, scored in doubtful:
+                if item.sync_id not in decided:
+                    remaining.append((item, scored))
+            doubtful = remaining
+        for item, scored in doubtful:
+            # senza AI, o senza risposta: il candidato migliore, non spuntato
+            outcome.proposals.append(Proposal(item, scored[0][1], provenance.HOW_RULES,
+                                              f"il più simile di {len(scored)} candidati: controlla", checked=False))
+    elif unknown and not usable:
+        outcome.foreign += unknown          # nessuna cartella aperta sul PC: niente con cui confrontare
+    outcome.cancelled = _cancelled(cancel)
+    return outcome
+
+
+def link_for(proposal: Proposal, overlay=None, fingerprint: str = ""):
+    """La riga del registro per una proposta confermata."""
+    path = proposal.pc.path
+    try:
+        info = path.stat()
+        size, mtime = info.st_size, info.st_mtime
+    except OSError:
+        size, mtime = 0, 0.0
+    result = provenance.Link(sync_id=proposal.phone.sync_id, pc=provenance.computer_name(), path=str(path),
+                             size=size, mtime=mtime, signature=overlay.signature(path) if overlay is not None else "",
+                             fingerprint=fingerprint, how=proposal.how)
+    return result

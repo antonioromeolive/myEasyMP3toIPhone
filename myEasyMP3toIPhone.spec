@@ -29,9 +29,11 @@ HIDDEN = ["keyring.backends.Windows", "pymobiledevice3.services.afc", "pymobiled
 EXCLUDES = ["tkinter", "setuptools", "pkg_resources", "_distutils_hack", "pytest", "_pytest", "IPython",
             "PySide6.QtWebEngineCore", "PySide6.QtWebEngineWidgets", "PySide6.QtPdf", "PySide6.Qt3DCore",
             "PySide6.QtQuick", "PySide6.QtQml"]
-# File di Qt che il programma non usa (~27 MB): il renderer OpenGL software e le traduzioni di Qt
+# File di Qt che il programma non usa (~27 MB): il renderer OpenGL software e le traduzioni di Qt, tranne quella
+# italiana dei pulsanti standard (Annulla, Sì, No: gui/theme.install_italian)
 UNUSED_QT_FILES = ("opengl32sw.dll",)
 UNUSED_QT_FOLDERS = (os.path.join("PySide6", "translations") + os.sep,)
+KEPT_QT_FILES = ("qtbase_it.qm",)
 ICON = os.path.join(SPECPATH, "icons", "myEasyMP3toIPhone.ico")
 VERSION = VERSION_FILE.read_text(encoding="utf-8").strip()
 COMPANY = "Antonio Romeo"
@@ -73,7 +75,8 @@ def used(entries):
     result = []
     for entry in entries:
         dest = os.path.normpath(entry[0])
-        if os.path.basename(dest) not in UNUSED_QT_FILES and not dest.startswith(UNUSED_QT_FOLDERS):
+        name = os.path.basename(dest)
+        if name in KEPT_QT_FILES or (name not in UNUSED_QT_FILES and not dest.startswith(UNUSED_QT_FOLDERS)):
             result.append(entry)
     return result
 

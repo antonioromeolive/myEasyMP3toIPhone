@@ -73,6 +73,18 @@ def apply_theme(app) -> None:
     app.setStyleSheet(STYLE_SHEET)
 
 
+def install_italian(app) -> bool:
+    """I pulsanti standard di Qt in italiano (OK, Annulla, Sì, No…): la traduzione di Qt stessa, se c'è."""
+    from PySide6.QtCore import QLibraryInfo, QLocale, QTranslator
+    translator = QTranslator(app)     # figlio dell'applicazione: resta vivo quanto lei
+    loaded = translator.load(QLocale(QLocale.Italian, QLocale.Italy), "qtbase", "_",
+                             QLibraryInfo.path(QLibraryInfo.TranslationsPath))
+    if loaded:
+        app.installTranslator(translator)
+    result = loaded
+    return result
+
+
 def mark_danger(button) -> None:
     """Un pulsante che cancella qualcosa: rosso finché si può premere."""
     button.setProperty("role", "danger")

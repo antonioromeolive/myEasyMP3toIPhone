@@ -12,7 +12,7 @@ from PySide6.QtWidgets import (
     QLabel, QLineEdit, QMenu, QMessageBox, QPushButton, QTreeWidget, QVBoxLayout, QWidget,
 )
 
-from .. import iphone, phone_actions, provenance
+from .. import adoption, iphone, phone_actions, provenance
 from ..config import config_dir
 from ..library import Track, copy_organized
 from ..phone_library import DEVICE_SAME, DEVICE_STALE, describe_differences, pc_matches
@@ -199,11 +199,17 @@ class IPhonePanel(QWidget):
         self._refresh_button.clicked.connect(self._refresh_music)
         self._save_button = QPushButton("Salva i selezionati sul PC…")
         self._save_button.clicked.connect(self._save_selected)
+        self._adopt_button = QPushButton("Collega al PC…")
+        self._adopt_button.setToolTip("Ritrova nella cartella aperta sul PC il file di ogni brano dell'iPhone "
+                                      "(impronta dell'audio, poi regole e AI per i dubbi) e lo scrive nel registro "
+                                      "della provenienza. Né i brani né i file cambiano.")
+        self._adopt_button.clicked.connect(self._adopt)
         self._listing_note = QLabel()
         self._listing_note.setStyleSheet("color: gray")
         buttons = QHBoxLayout()
         buttons.addWidget(self._refresh_button)
         buttons.addWidget(self._save_button)
+        buttons.addWidget(self._adopt_button)
         buttons.addStretch(1)
         buttons.addWidget(self._listing_note)
 
@@ -506,6 +512,85 @@ class IPhonePanel(QWidget):
 
                 self._write("Eliminazione dall'iPhone", "eliminati", action)
 
+    # ------------------------------------------------------------------ collega al PC (adozione)
+
+    def _ai_provider(self):
+        """Il fornitore AI della scansione, se c'è e se la scansione usa l'AI; altrimenti None."""
+        from ..ai import make_provider
+        from ..config import load_profiles
+        settings = self._window.app_settings
+        result = None
+        if settings.scan_use_ai:
+            for profile in load_profiles():
+                if profile.name == settings.scan_profile:
+                    result = make_provider(profile)
+        return result
+
+    def _adopt(self) -> None:
+        window = self._window
+        if not window.tracks:
+            QMessageBox.information(self, "Collega al PC", "Apri prima nella scheda PC la cartella con la tua musica.")
+        else:
+            unknown = 0
+            known_prints = provenance.PhoneFingerprints(config_dir())
+            to_read = 0
+            for item in self._phone_tracks:
+                if item.from_computer and window.registry.get(item.sync_id) is None:
+                    unknown += 1
+                    if not known_prints.get(item.remote_path, item.size):
+                        to_read += 1
+            provider = self._ai_provider()
+            minutes = max(1, round(to_read * 0.25 / 60)) if to_read else 0
+            text = (f"Collegare {unknown} brani dell'iPhone ai file della cartella aperta ({len(window.tracks)} "
+                    "brani)?\n\n")
+            if to_read:
+                text += (f"Prima legge l'impronta dell'audio di {to_read} brani dall'iPhone: circa {minutes} minuti. "
+                         "Puoi annullare e riprendere: quelle già lette si ricordano.\n\n")
+            if provider is not None:
+                text += f"I casi dubbi li confronta l'AI ({provider.profile.name}).\n\n"
+            else:
+                text += "I casi dubbi te li mostro da controllare (l'AI della scansione è spenta).\n\n"
+            text += "Alla fine vedi tutto prima di confermare; i brani e i file non cambiano."
+            if QMessageBox.question(self, "Collega al PC", text) == QMessageBox.Yes:
+                phone_tracks = list(self._phone_tracks)
+                pc_tracks = list(window.tracks)
+                registry = window.registry
+                tag_cache = window.tag_cache
+
+                def work(progress, cancel):
+                    value = adoption.adopt(phone_tracks, pc_tracks, registry, config_dir(), tag_cache, provider,
+                                           progress, cancel)
+                    return value
+
+                window.runner.run("Collegamento al PC", work, self._adopted)
+
+    def _adopted(self, outcome) -> None:
+        from .adoption_dialog import AdoptionDialog
+        window = self._window
+        if outcome.cancelled:
+            QMessageBox.information(self, "Collega al PC", "Interrotto. Le impronte già lette sono ricordate: "
+                                    "riprendi quando vuoi con Collega al PC.")
+        else:
+            dialog = AdoptionDialog(self, outcome)
+            if dialog.exec():
+                chosen = dialog.chosen()
+                registry = window.registry
+                for proposal in chosen:
+                    registry.record(adoption.link_for(proposal, window.overlay,
+                                                      window.tag_cache.fingerprint(proposal.pc.path)))
+
+                def work(progress, _cancel):
+                    progress(0, 0, "registro della provenienza sull'iPhone")
+                    iphone.store_registry(config_dir(), registry)
+                    value = len(chosen)
+                    return value
+
+                def done(count):
+                    self._fill_music()
+                    QMessageBox.information(self, "Collega al PC", f"{count} brani collegati ai file del PC.")
+
+                window.runner.run("Registro della provenienza", work, done)
+
     # ------------------------------------------------------------------ salva su PC
 
     def _save_selected(self) -> None:
@@ -560,6 +645,7 @@ class IPhonePanel(QWidget):
     def _update_enabled(self) -> None:
         self._refresh_button.setEnabled(self._connected)
         self._save_button.setEnabled(self._connected)
+        self._adopt_button.setEnabled(self._connected)
 
     @property
     def connected(self) -> bool:

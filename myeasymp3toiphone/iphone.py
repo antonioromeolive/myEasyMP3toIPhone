@@ -243,6 +243,22 @@ async def _sync_registry(home: Path, sync_ids: set):
     return result
 
 
+async def _store_registry(home: Path, registry) -> None:
+    from .provenance import write_phone_registry
+    registry.save(home)
+    lockdown = await _open_lockdown()
+    try:
+        async with AfcService(lockdown) as afc:
+            await write_phone_registry(afc, registry)
+    finally:
+        await lockdown.close()
+
+
+def store_registry(home: Path, registry) -> None:
+    """Il registro della provenienza nella cartella dati e sull'iPhone."""
+    _run(_store_registry(home, registry))
+
+
 def sync_registry(home: Path, sync_ids: set):
     """Il registro della provenienza (provenance.Registry), unito a quello sull'iPhone e ripulito dei brani che non
     ci sono più."""

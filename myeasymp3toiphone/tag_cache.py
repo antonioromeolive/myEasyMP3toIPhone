@@ -65,6 +65,27 @@ class TagCache:
         except OSError:
             pass  # un file sparito nel frattempo: niente da ricordare
 
+    def fingerprint(self, path: Path) -> str:
+        """L'impronta dell'audio già calcolata (provenance), se la voce vale ancora per il file; altrimenti ""."""
+        result = ""
+        entry = self._entries.get(path_key(path))
+        if isinstance(entry, dict) and entry.get("f"):
+            try:
+                info = path.stat()
+                if entry.get("s") == info.st_size and entry.get("m") == info.st_mtime:
+                    result = str(entry["f"])
+            except OSError:
+                result = ""
+        return result
+
+    def store_fingerprint(self, path: Path, value: str) -> None:
+        """Si aggiunge alla voce dei tag del file (che deve esserci e valere): cambia il file, si perde con lei."""
+        with self._lock:
+            entry = self._entries.get(path_key(path))
+            if isinstance(entry, dict) and value:
+                entry["f"] = value
+                self._dirty = True
+
     def save(self) -> None:
         if self._dirty:
             with self._lock:

@@ -81,12 +81,16 @@ def main() -> int:
 
         from .config import PRODUCT, config_dir
         from .gui.main_window import MainWindow
-        from .gui.theme import apply_theme
+        from .gui.theme import apply_theme, install_italian
 
         install_error_handlers(config_dir())
         app = QApplication.instance() or QApplication(sys.argv)
         app.setApplicationName(PRODUCT)
         apply_theme(app)
+        if not install_italian(app):
+            import logging
+            logging.getLogger("myeasymp3toiphone").info("Traduzione italiana dei pulsanti di Qt non trovata: "
+                                                        "restano in inglese")
         instance_lock = QLockFile(str(config_dir() / INSTANCE_LOCK))
         instance_lock.setStaleLockTime(0)   # il lucchetto di un programma chiuso male si riconosce e si riprende
         if instance_lock.tryLock(200):

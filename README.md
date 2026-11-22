@@ -209,6 +209,25 @@ FLAC l'impronta dell'audio che il file porta nella sua intestazione, per gli M4A
 brano dell'iPhone si riconosce anche se titolo, album o artista sono diversi da quelli del PC (le compilation, i
 brani "sciolti"): su 40 brani messi sull'iPhone da CopyTrans, 40 sono stati ritrovati così sul PC.
 
+**Collega al PC** (scheda iPhone) ritrova il file del PC di ogni brano dell'iPhone di origine sconosciuta (messo
+da CopyTrans, da un altro computer…) e lo scrive nel registro. Confronta con la cartella aperta nella scheda PC, in
+tre livelli:
+
+1. **impronta dell'audio**: stesso audio = stesso brano, qualunque siano titolo, album, artista. Con più copie sul PC
+   sceglie quella con i tag più simili. Si collega senza chiedere;
+2. **regole**: durata entro 2 secondi e titolo e artista quasi uguali, con un solo candidato chiaramente migliore
+   (per esempio un'altra codifica dello stesso brano). Proposto già spuntato;
+3. **AI**, per i dubbi veri (per esempio una versione dal vivo e una in studio): riceve per ogni brano dell'iPhone
+   al più 5 candidati del PC con titolo, artista, album, durata e **cartella**, e dice quale è la stessa
+   registrazione, o nessuno, con la sicurezza e il motivo. Usa il profilo AI della scansione (*Impostazioni →
+   Generale*); proposto spuntato solo se l'AI è sicura. Senza AI, i dubbi si mostrano da controllare.
+
+Prima di scrivere mostra tutto: quanti brani sono collegati con l'impronta, le proposte con il motivo (da spuntare o
+togliere) e quanti brani non hanno un file sul PC: questi restano *solo sull'iPhone* e il programma non li tocca mai
+da solo. La prima volta legge l'impronta di ogni brano dall'iPhone, circa un quarto di secondo l'uno (un quarto d'ora
+per 3.500 brani); si può annullare e riprendere, quelle già lette si ricordano (`impronte_iphone.json`). Le impronte
+dei file del PC si ricordano nella cache dei tag. Né i brani dell'iPhone né i file del PC cambiano.
+
 **Sicurezza.** Prima di scrivere il programma copia il database dell'app Musica e controlla l'identità della libreria
 (quella già sul telefono, mai una nuova) e l'"ancora" della sincronizzazione, che l'iPhone deve confermare. Il file
 delle operazioni viene firmato, scritto e riletto; solo allora l'iPhone lo applica. Se qualcosa non torna prima di
