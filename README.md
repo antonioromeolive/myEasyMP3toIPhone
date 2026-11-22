@@ -211,7 +211,9 @@ CopyTrans Manager (*AirTrafficControl*), senza iTunes e senza sincronizzare tutt
 | Scheda **iPhone** | **Cambia tag…** | titolo (un brano alla volta), album, genere, anno, numero di traccia e di disco, la spunta **Compilation** (a tre stati con brani diversi); un campo vuoto non cambia, 0 svuota anno o numero |
 | Scheda **iPhone** | **Elimina dall'iPhone…** | toglie i brani dall'app Musica; l'iPhone cancella i loro file da solo, entro qualche minuto |
 
-- **L'app Musica non si aggiorna da sola** se è aperta durante l'invio: chiudila del tutto (scorri via la sua scheda)
+- Alla fine di ogni scrittura il programma manda all'iPhone l'avviso di fine sincronizzazione, come iTunes (una prova:
+  non è documentato).
+- **L'app Musica potrebbe non aggiornarsi da sola** se è aperta durante l'invio: chiudila del tutto (scorri via la sua scheda)
   e riaprila; i brani si trovano nella tua libreria (*Libreria → Artisti* o *Brani*), non cercando in Apple Music.
 - **Formati:** MP3, FLAC (l'iPhone li suona così come sono) e M4A in AAC. Gli M4A in Apple Lossless non ancora.
 - **Copertine:** quella modificata, o altrimenti quella del file, se è JPEG o PNG.

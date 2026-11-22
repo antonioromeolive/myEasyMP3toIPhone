@@ -647,6 +647,8 @@ class IPhonePanel(QWidget):
         note in fondo, se qualcosa è riuscito). after(report), se c'è, prima del messaggio."""
         def work(progress, cancel):
             report = action(progress, cancel)
+            if report.done:
+                iphone.post_sync_finished()       # l'app Musica aperta può rileggere la libreria (esperimento)
             progress(0, 0, "rilettura della musica dell'iPhone")
             tracks = iphone.list_music_app()
             registry = provenance.Registry.load(config_dir())

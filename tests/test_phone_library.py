@@ -374,3 +374,13 @@ def test_phantom_tracks_marked_saved_and_reported(tmp_path):
     assert len(issues) == 1 and issues[0].kind == scan.KIND_UNREADABLE and "W0084007" in issues[0].files[0]
     iphone.mark_missing_files(tracks, None)                              # cartelle non lette: non si cambia niente
     assert tracks[1].missing_file
+
+
+def test_sync_finished_notice_never_fails(monkeypatch):
+    from myeasymp3toiphone import iphone
+
+    async def no_phone():
+        raise iphone.IPhoneError("nessun iPhone")
+
+    monkeypatch.setattr(iphone, "_open_lockdown", no_phone)
+    assert iphone.post_sync_finished() is False

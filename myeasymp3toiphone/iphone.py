@@ -282,6 +282,31 @@ async def _store_registry(home: Path, registry) -> None:
         await lockdown.close()
 
 
+SYNC_DID_FINISH = "com.apple.itunes-mobdev.syncDidFinish"   # quella che manda iTunes alla fine di una sincronizzazione
+
+
+async def _post_sync_finished() -> None:
+    from pymobiledevice3.services.notification_proxy import NotificationProxyService
+    lockdown = await _open_lockdown()
+    try:
+        async with NotificationProxyService(lockdown) as proxy:
+            await proxy.notify_post(SYNC_DID_FINISH)
+    finally:
+        await lockdown.close()
+
+
+def post_sync_finished() -> bool:
+    """Dice all'iPhone che la sincronizzazione è finita, come iTunes: l'app Musica aperta può così rileggere la
+    libreria. Un esperimento: se non riesce non cambia niente (False)."""
+    try:
+        asyncio.run(_post_sync_finished())
+        result = True
+    except Exception as exc:  # noqa: BLE001 - solo un avviso: mai un errore per l'utente
+        log.warning("Avviso di fine sincronizzazione non inviato: %s", exc)
+        result = False
+    return result
+
+
 def store_registry(home: Path, registry) -> None:
     """Il registro della provenienza nella cartella dati e sull'iPhone."""
     _run(_store_registry(home, registry))
