@@ -33,12 +33,14 @@ DEVICE_ABSENT = ""        # non c'è
 
 # i campi confrontati tra PC e iPhone, con il nome mostrato
 COMPARED_FIELDS = (("title", "Titolo"), ("artist", "Artista"), ("album_artist", "Artista album"), ("album", "Album"),
-                   ("year", "Anno"), ("genre", "Genere"), ("track_number", "N. traccia"), ("disc_number", "N. disco"))
+                   ("year", "Anno"), ("genre", "Genere"), ("track_number", "N. traccia"), ("disc_number", "N. disco"),
+                   ("compilation", "Compilation"))
+GROUPED_FIELDS = {"artist", "album_artist", "album"}
 
 _QUERY = """
 SELECT i.item_pid, e.title, ia.item_artist, aa.album_artist, a.album, g.genre, e.year, i.track_number,
        e.track_count, i.disc_number, e.disc_count, e.total_time_ms, e.location, e.file_size, b.path,
-       s.sync_id, a.sync_id, aa.sync_id
+       s.sync_id, a.sync_id, aa.sync_id, i.is_compilation
 FROM item i
 JOIN item_extra e ON e.item_pid = i.item_pid
 LEFT JOIN item_store s ON s.item_pid = i.item_pid
@@ -117,12 +119,13 @@ def read_music_database(path: Path) -> list:
     except sqlite3.Error as exc:
         raise PhoneLibraryError(f"il database dell'app Musica non si legge ({exc})") from exc
     for (pid, title, artist, album_artist, album, genre, year, track_number, track_count, disc_number, disc_count,
-         total_ms, location, file_size, base, sync_id, album_sync_id, artist_sync_id) in rows:
+         total_ms, location, file_size, base, sync_id, album_sync_id, artist_sync_id, compilation) in rows:
         year_number = _number(year)
         tags = TrackTags(title=_text(title), artist=_text(artist), album_artist=_text(album_artist),
                          album=_text(album), track_number=_number(track_number), track_total=_number(track_count),
                          disc_number=_number(disc_number), disc_total=_number(disc_count),
-                         year=str(year_number) if year_number else "", genre=_text(genre))
+                         year=str(year_number) if year_number else "", genre=_text(genre),
+                         compilation=bool(compilation))
         remote = "/" + _text(base).strip("/") + "/" + _text(location)
         tracks.append(PhoneTrack(pid=int(pid), remote_path=remote, size=int(file_size or 0),
                                  length=(_number(total_ms) or 0) / 1000.0, tags=tags, sync_id=_unsigned(sync_id),
@@ -235,13 +238,19 @@ def _comparable(name: str, tags: TrackTags):
 
 def differences(pc_tags: TrackTags, phone_tags: TrackTags) -> list:
     """(nome del campo, valore sul PC, valore sull'iPhone) per ogni campo diverso. "Artista album" si confronta solo
-    se almeno uno dei due ce l'ha (altrimenti ripete la differenza dell'artista)."""
+    se almeno uno dei due ce l'ha (altrimenti ripete la differenza dell'artista). Artisti e album si confrontano senza
+    maiuscole, accenti e spazi: sull'iPhone sono gruppi, e l'invio si unisce al gruppo che c'è già con la sua grafia
+    ("Artisti Vari" per "Artisti vari"), quindi quella differenza non si può né si deve correggere."""
     result = []
     for name, label in COMPARED_FIELDS:
         pc_value = _comparable(name, pc_tags)
         phone_value = _comparable(name, phone_tags)
         relevant = name != "album_artist" or bool(pc_tags.album_artist or phone_tags.album_artist)
-        if relevant and pc_value != phone_value:
+        if name in GROUPED_FIELDS:
+            same = group_name(str(pc_value)) == group_name(str(phone_value))
+        else:
+            same = pc_value == phone_value
+        if relevant and not same:
             result.append((label, "" if pc_value is None else str(pc_value),
                            "" if phone_value is None else str(phone_value)))
     return result
@@ -250,6 +259,9 @@ def differences(pc_tags: TrackTags, phone_tags: TrackTags) -> list:
 def describe_differences(found: list) -> str:
     lines = []
     for label, pc_value, phone_value in found:
+        if label == "Compilation":
+            pc_value = "sì" if pc_value == "True" else "no"
+            phone_value = "sì" if phone_value == "True" else "no"
         lines.append(f"{label}: sul PC \"{pc_value}\", sull'iPhone \"{phone_value}\"")
     result = "\n".join(lines)
     return result

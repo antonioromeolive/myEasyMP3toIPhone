@@ -20,7 +20,7 @@ from .tags import TrackTags
 log = logging.getLogger(__name__)
 
 CACHE_FILE = "cache_tag.json"
-CACHE_VERSION = 1
+CACHE_VERSION = 2   # 2: anche la spunta compilation (le voci di prima non l'hanno: si rileggono)
 TAG_FIELD_NAMES = {field.name for field in fields(TrackTags)}
 
 

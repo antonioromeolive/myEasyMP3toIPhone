@@ -22,7 +22,7 @@ from myeasymp3toiphone.tags import TrackTags, write_tags
 SCHEMA = """
 CREATE TABLE item (item_pid INTEGER PRIMARY KEY, media_type INTEGER, item_artist_pid INTEGER, album_pid INTEGER,
                    album_artist_pid INTEGER, genre_id INTEGER, disc_number INTEGER, track_number INTEGER,
-                   base_location_id INTEGER);
+                   base_location_id INTEGER, is_compilation INTEGER DEFAULT 0);
 CREATE TABLE item_extra (item_pid INTEGER PRIMARY KEY, title TEXT, disc_count INTEGER, track_count INTEGER,
                          total_time_ms INTEGER, year INTEGER, location TEXT, file_size INTEGER);
 CREATE TABLE item_artist (item_artist_pid INTEGER PRIMARY KEY, item_artist TEXT);
@@ -36,8 +36,8 @@ CREATE TABLE base_location (base_location_id INTEGER PRIMARY KEY, path TEXT);
 
 def _add(connection, pid, title, artist, album, year=0, track=0, disc=0, genre=0, location="", base=1,
          album_artist=0, ms=200000):
-    connection.execute("INSERT INTO item VALUES (?, 8, ?, ?, ?, ?, ?, ?, ?)",
-                       (pid, artist, album, album_artist, genre, disc, track, base))
+    connection.execute("INSERT INTO item VALUES (?, 8, ?, ?, ?, ?, ?, ?, ?, ?)",
+                       (pid, artist, album, album_artist, genre, disc, track, base, 1 if album_artist else 0))
     connection.execute("INSERT INTO item_extra VALUES (?, ?, 1, 12, ?, ?, ?, 5000000)",
                        (pid, title, ms, year, location))
     connection.execute("INSERT INTO item_store VALUES (?, ?)", (pid, -pid))   # sync_id negativo: 64 bit con segno
@@ -89,7 +89,7 @@ def test_read_music_database(tmp_path):
     assert tracks[1].tags.disc_number == 2
     third = tracks[2]
     assert third.tags.album_artist == "Artisti vari" and third.tags.year == "" and third.tags.track_number is None
-    assert third.display_artist == "Artisti vari"
+    assert third.display_artist == "Artisti vari" and third.tags.compilation and not first.tags.compilation
     assert third.sync_id == (1 << 64) - 103 and third.album_sync_id == 8002 and third.artist_sync_id == 7001
     assert first.from_computer and first.album_sync_id == 8001
 
@@ -135,7 +135,7 @@ def test_device_status_by_artist_album_and_title():
     same = _pc("canzone  a", "ARTISTA UNO", "Album Primo", year="1991-05-01", track_number=1)
     status, item, found = device_status(same, index)
     assert item.pid == 1 and status == DEVICE_STALE and [label for label, _pc_value, _value in found] == \
-        ["Titolo", "Artista"]                     # ritrovato senza badare a maiuscole e spazi, ma i tag differiscono
+        ["Titolo"]       # ritrovato senza badare a maiuscole e spazi; il titolo differisce, l'artista (un gruppo) no
     exact = _pc("Canzone A", "Artista Uno", "Album Primo", year="1991", track_number=1, disc_number=1)
     assert device_status(exact, index)[0] == DEVICE_SAME   # anno e disco 1 / nessun disco sono uguali
     other_artist = _pc("Intro", "Artista Due", "Album Primo")

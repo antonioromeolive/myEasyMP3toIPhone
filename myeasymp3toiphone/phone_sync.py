@@ -499,6 +499,8 @@ def insert_track(pid: int, album_pid: int, artist_pid: int, tags, audio: AudioIn
         album_artist = _text(tags.album_artist, "artista dell'album")
         item["album_artist"] = album_artist
         item["sort_album_artist"] = album_artist
+        if tags.compilation:
+            item["is_compilation"] = True      # l'iPhone vuole anche l'artista dell'album (rustunes)
     if tags.genre:
         item["genre"] = _text(tags.genre, "genere")
     year = _year(tags.year)

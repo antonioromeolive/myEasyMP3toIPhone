@@ -7,11 +7,11 @@ from typing import Optional
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QIntValidator, QPixmap
 from PySide6.QtWidgets import (
-    QFileDialog, QFormLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit, QMessageBox,
+    QCheckBox, QFileDialog, QFormLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit, QMessageBox,
     QPushButton, QVBoxLayout, QWidget,
 )
 
-from ..tags import COVER_EXTENSIONS, INT_FIELDS, TAG_FIELDS, read_cover
+from ..tags import BOOL_FIELDS, COVER_EXTENSIONS, INT_FIELDS, TAG_FIELDS, read_cover
 
 MIXED = "(valori diversi)"
 COVER_SIZE = 180
@@ -46,11 +46,18 @@ class TagEditor(QWidget):
 
         form = QFormLayout()
         for name, label in TAG_FIELDS:
-            editor = QLineEdit()
-            if name in INT_FIELDS:
-                editor.setValidator(QIntValidator(0, 999, editor))
-                editor.setMaximumWidth(80)
-            editor.textEdited.connect(lambda _text, field=name: self._mark_dirty(field))
+            if name in BOOL_FIELDS:
+                # tre stati: sì, no e "valori diversi" quando i brani selezionati non sono uguali
+                editor = QCheckBox("album di più artisti")
+                editor.setToolTip("Compilation: l'artista dell'album è \"Artisti vari\", quello del brano è il "
+                                  "suo. Senza, l'app Musica dell'iPhone divide l'album in un album per artista.")
+                editor.clicked.connect(lambda _checked, field=name: self._bool_clicked(field))
+            else:
+                editor = QLineEdit()
+                if name in INT_FIELDS:
+                    editor.setValidator(QIntValidator(0, 999, editor))
+                    editor.setMaximumWidth(80)
+                editor.textEdited.connect(lambda _text, field=name: self._mark_dirty(field))
             self._editors[name] = editor
             form.addRow(label + ":", editor)
         tags_box = QGroupBox("Tag")
@@ -120,7 +127,13 @@ class TagEditor(QWidget):
             values = set()
             for track in self._tracks:
                 values.add(_as_text(getattr(track.tags, name)))
-            if len(values) == 1:
+            if name in BOOL_FIELDS:
+                editor.setTristate(len(values) > 1)
+                if len(values) > 1:
+                    editor.setCheckState(Qt.PartiallyChecked)
+                else:
+                    editor.setCheckState(Qt.Checked if values == {"True"} else Qt.Unchecked)
+            elif len(values) == 1:
                 editor.setText(values.pop())
                 editor.setPlaceholderText("")
             else:
@@ -141,6 +154,14 @@ class TagEditor(QWidget):
         self._restore_button.setEnabled(edited)
         self._update_buttons()
         self._show_cover(self._current_cover())
+
+    def _bool_clicked(self, field: str) -> None:
+        """Un clic sceglie sì o no per tutti: lo stato "valori diversi" non si sceglie a mano."""
+        editor = self._editors[field]
+        if editor.checkState() == Qt.PartiallyChecked:
+            editor.setCheckState(Qt.Checked)
+        editor.setTristate(False)
+        self._mark_dirty(field)
 
     def _mark_dirty(self, field: str) -> None:
         self._dirty.add(field)
@@ -207,8 +228,10 @@ class TagEditor(QWidget):
         changes = {}
         valid = True
         for name in sorted(self._dirty):
-            text = self._editors[name].text().strip()
-            if name in INT_FIELDS:
+            if name in BOOL_FIELDS:
+                changes[name] = self._editors[name].checkState() == Qt.Checked
+            elif name in INT_FIELDS:
+                text = self._editors[name].text().strip()
                 if text == "":
                     changes[name] = None
                 elif text.isdigit():
@@ -216,7 +239,7 @@ class TagEditor(QWidget):
                 else:
                     valid = False
             else:
-                changes[name] = text
+                changes[name] = self._editors[name].text().strip()
         if valid:
             self.apply_requested.emit(changes, self._new_cover)
         else:

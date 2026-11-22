@@ -76,9 +76,15 @@ artista in comune; un brano con modifiche in sospeso si ritrova anche con i tag 
 dell'iPhone letta all'ultimo collegamento e salvata nella cartella dati, quindi si vede anche a iPhone scollegato (il
 suggerimento sull'intestazione dice di quando è l'elenco).
 
-**Tag.** A destra si modificano titolo, artista, artista album, album, numero di traccia e di disco, anno, genere e
-copertina (MP3, M4A, FLAC, OGG, Opus; copertina per MP3, M4A, FLAC). Con più brani selezionati, solo i campi
-modificati valgono per tutti. *Numera in ordine* assegna 1, 2, 3… nell'ordine della tabella. *Salva modifiche* **non
+**Tag.** A destra si modificano titolo, artista, artista album, album, numero di traccia e di disco, anno, genere,
+la spunta **Compilation** e la copertina (MP3, M4A, FLAC, OGG, Opus; copertina per MP3, M4A, FLAC). Con più brani
+selezionati, solo i campi modificati valgono per tutti; la spunta mostra un quadratino pieno a metà quando i brani
+sono diversi.
+
+**Compilation.** Un album di più artisti: l'*artista* è quello di ogni brano, l'*artista album* è "Artisti vari", e
+in più c'è la spunta **Compilation** (nei file: TCMP negli MP3, COMPILATION nei FLAC e Ogg, cpil negli M4A). L'app
+Musica dell'iPhone tiene insieme l'album solo con tutte e tre le cose; senza la spunta lo divide in un album per
+artista. La scansione, quando propone "Artisti vari", propone anche la spunta. *Numera in ordine* assegna 1, 2, 3… nell'ordine della tabella. *Salva modifiche* **non
 scrive nel file**: salva le modifiche in sospeso (`modifiche_tag.json` e `copertine\` nella cartella dati). In tabella
 i brani modificati hanno il titolo in corsivo blu, e il suggerimento elenca le modifiche (*campo: prima → dopo*).
 *Torna ai tag del file* le annulla.
@@ -116,7 +122,7 @@ brani sul PC e poi si usa *Rimpiazza*, o si cambiano dalla scheda iPhone (tasto 
 |---|---|---|
 | **File che non si aggiornano** | sull'iPhone, brani con tag diversi da quelli del PC (o delle modifiche in sospeso); MP3 con un vecchio tag ID3v1 diverso o con un tag APE (solo informazione: le copie inviate ne sono ripulite) | sull'iPhone nessuna (la colonna *iPhone* della scheda PC mostra le differenze) |
 | **Album con pochi brani** | numeri di traccia mancanti, meno brani del totale dichiarato, album di 1-2 brani; sull'iPhone, album con meno brani che sul PC | (Verifica album trova i titoli mancanti) |
-| **Collezioni divise su più album** | una cartella con brani in album diversi; lo stesso album scritto in modi diversi o con "CD 1"/"Disc 2" nel nome; una compilation senza *Artista album*; lo stesso artista scritto in modi diversi | unifica album e artista album ("Artisti vari" per le compilation), sposta il numero del disco in *N. disco* |
+| **Collezioni divise su più album** | una cartella con brani in album diversi; lo stesso album scritto in modi diversi o con "CD 1"/"Disc 2" nel nome; una compilation senza *Artista album*; lo stesso artista scritto in modi diversi | unifica album e artista album ("Artisti vari" e la spunta *Compilation* per le compilation), sposta il numero del disco in *N. disco* |
 | **Solo sull'iPhone** | brani dell'app Musica senza un brano uguale (artista, album, titolo) nella Libreria del PC | nessuna: salvali sul PC dalla scheda iPhone (tasto destro → *Salva su PC*) |
 | **Brani doppi** | solo **dentro lo stesso album**: una copia "Titolo (2)" con lo stesso album, lo stesso brano (numero e titolo) due volte nell'album. Lo stesso brano in album diversi (l'album originale e una raccolta) è legittimo e non si segnala | nessuna automatica: quale copia tenere lo decidi tu (*Mostra i brani*) |
 | Tag mancanti, file illeggibili | brani senza titolo/album/artista, file danneggiati | ricava i tag mancanti dai nomi di cartelle e file |
@@ -175,7 +181,10 @@ CopyTrans Manager (*AirTrafficControl*), senza iTunes e senza sincronizzare tutt
 - **Formati:** MP3, FLAC (l'iPhone li suona così come sono) e M4A in AAC. Gli M4A in Apple Lossless non ancora.
 - **Copertine:** quella modificata, o altrimenti quella del file, se è JPEG o PNG.
 - **Album e artisti:** un brano va nell'album e nell'artista già presenti sull'iPhone con lo stesso nome (senza badare
-  a maiuscole, accenti e spazi), con la grafia dell'iPhone: niente doppioni.
+  a maiuscole, accenti e spazi), con la grafia dell'iPhone: niente doppioni. Per lo stesso motivo la colonna *iPhone*
+  confronta artisti e album senza badare a maiuscole e accenti ("Artisti vari" e "Artisti Vari" sono uguali).
+- **Compilation:** si invia la spunta, con l'artista dell'album ("Artisti vari" se manca): l'album resta intero
+  nell'app Musica.
 - **Rimpiazza** prima invia la versione del PC, poi toglie quella vecchia, solo se l'invio è riuscito. Il brano
   rimpiazzato perde il conteggio degli ascolti e la presenza nelle playlist fatte sull'iPhone.
 - **Artista e artista dell'album** non si cambiano con *Cambia tag*: sull'iPhone cambiarli rinominerebbe l'artista per

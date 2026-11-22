@@ -38,6 +38,16 @@ def path_key(path) -> str:
     return result
 
 
+def _shown(value) -> str:
+    if isinstance(value, bool):
+        result = "sì" if value else "no"
+    elif value in (None, ""):
+        result = "—"
+    else:
+        result = str(value)
+    return result
+
+
 def _image_extension(data: bytes) -> str:
     if data[:8] == b"\x89PNG\r\n\x1a\n":
         result = ".png"
@@ -95,8 +105,7 @@ class TagOverlay:
         original = track.original_tags or track.tags
         for name, value in self.changes_for(track.path).items():
             before = getattr(original, name, "")
-            lines.append(f"{FIELD_LABELS.get(name, name)}: {before if before not in (None, '') else '—'} → "
-                         f"{value if value not in (None, '') else '—'}")
+            lines.append(f"{FIELD_LABELS.get(name, name)}: {_shown(before)} → {_shown(value)}")
         if self.entries.get(path_key(track.path), {}).get("cover"):
             lines.append("Copertina nuova")
         result = "\n".join(lines)

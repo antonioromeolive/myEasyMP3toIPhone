@@ -31,8 +31,12 @@ TAG_FIELDS = [
     ("disc_total", "Dischi totali"),
     ("year", "Anno"),
     ("genre", "Genere"),
+    ("compilation", "Compilation"),
 ]
 INT_FIELDS = {"track_number", "track_total", "disc_number", "disc_total"}
+# sì/no: un album di più artisti (l'artista dell'album è "Artisti vari", quello del brano è il suo); l'app Musica
+# tiene insieme l'album solo con questa spunta
+BOOL_FIELDS = {"compilation"}
 
 
 class TagError(Exception):
@@ -74,6 +78,7 @@ class TrackTags:
     disc_total: Optional[int] = None
     year: str = ""
     genre: str = ""
+    compilation: bool = False
 
     def copy(self) -> "TrackTags":
         result = replace(self)
@@ -168,16 +173,59 @@ def read_tags(path: Path) -> tuple:
         tags.year = _first(source, "date")[:4]
         tags.track_number, tags.track_total = _split_pair(_first(source, "tracknumber"))
         tags.disc_number, tags.disc_total = _split_pair(_first(source, "discnumber"))
+        tags.compilation = _flag(_first(source, "compilation")) if "compilation" in _easy_keys(audio) else False
         if _is_vorbis(audio):
             if tags.track_total is None:
                 tags.track_total = _to_int(_first(source, "tracktotal") or _first(source, "totaltracks"))
             if tags.disc_total is None:
                 tags.disc_total = _to_int(_first(source, "disctotal") or _first(source, "totaldiscs"))
+    if path.suffix.lower() in MP4_EXTENSIONS:
+        tags.compilation = _read_mp4_compilation(path)
     length = 0.0
     if audio.info is not None:
         length = float(getattr(audio.info, "length", 0.0) or 0.0)
     result = (tags, length)
     return result
+
+
+MP4_EXTENSIONS = {".m4a", ".m4b", ".mp4"}
+
+
+def _flag(text: str) -> bool:
+    result = text.strip().lower() in ("1", "true", "yes", "sì", "si")
+    return result
+
+
+def _easy_keys(audio) -> set:
+    """Le chiavi che l'interfaccia "facile" di mutagen conosce per questo file (le Vorbis le accettano tutte)."""
+    if _is_vorbis(audio):
+        result = {"compilation"}
+    else:
+        result = set(getattr(audio.tags, "valid_keys", {}) or {})
+    return result
+
+
+def _read_mp4_compilation(path: Path) -> bool:
+    """EasyMP4 non conosce la spunta compilation (cpil): si legge dal tag MP4 vero."""
+    result = False
+    try:
+        audio = MP4(str(path))
+        if audio.tags is not None:
+            result = bool(audio.tags.get("cpil", False))
+    except mutagen.MutagenError:
+        result = False
+    return result
+
+
+def _write_mp4_compilation(path: Path, value: bool) -> None:
+    audio = MP4(str(path))
+    if audio.tags is None:
+        audio.add_tags()
+    if value:
+        audio.tags["cpil"] = True
+    else:
+        audio.tags.pop("cpil", None)
+    audio.save()
 
 
 def write_tags(path: Path, tags: TrackTags, new_copy: bool = False) -> None:
@@ -193,6 +241,8 @@ def write_tags(path: Path, tags: TrackTags, new_copy: bool = False) -> None:
     _set(target, "album", tags.album)
     _set(target, "genre", tags.genre)
     _set(target, "date", tags.year)
+    if "compilation" in _easy_keys(audio):
+        _set(target, "compilation", "1" if tags.compilation else "")
     if _is_vorbis(audio):
         _set(target, "tracknumber", _join_pair(tags.track_number, None))
         _set(target, "tracktotal", _join_pair(tags.track_total, None))
@@ -203,6 +253,8 @@ def write_tags(path: Path, tags: TrackTags, new_copy: bool = False) -> None:
         _set(target, "discnumber", _join_pair(tags.disc_number, tags.disc_total))
     try:
         audio.save()
+        if path.suffix.lower() in MP4_EXTENSIONS:
+            _write_mp4_compilation(path, tags.compilation)
         if path.suffix.lower() == ".mp3":
             save_as_id3v23(path, new_copy)
     except mutagen.MutagenError as exc:

@@ -267,3 +267,23 @@ def test_reopening_uses_the_folder_listing_not_one_stat_per_file(tmp_path, monke
     monkeypatch.setattr(library, "load_track", lambda path: pytest.fail(f"{path.name} riletto: era in cache"))
     again = scan_folder(tmp_path / "m", cache=TagCache(tmp_path / "home"))
     assert sorted(t.title for t in again) == ["Due", "Uno"]
+
+
+def test_compilation_flag_read_written_and_proposed(tmp_path):
+    """La spunta compilation: letta e scritta (MP3 in ID3 v2.3, FLAC), e la scansione la propone con "Artisti vari"."""
+    from conftest import write_flac
+    from myeasymp3toiphone.tags import prepare_copy
+    write_mp3(tmp_path / "a.mp3", 40)
+    write_flac(tmp_path / "b.flac")
+    for name in ("a.mp3", "b.flac"):
+        prepare_copy(tmp_path / name, TrackTags(title="T", artist="Uno", album_artist=scan.VARIOUS_ARTISTS,
+                                                album="Raccolta", compilation=True))
+        assert read_tags(tmp_path / name)[0].compilation
+    assert ID3(str(tmp_path / "a.mp3")).version[:2] == (2, 3) and "TCMP" in ID3(str(tmp_path / "a.mp3"))
+    tracks = scan_folder(tmp_path)
+    changes = scan._unify_changes(tracks, {"album_artist": scan.VARIOUS_ARTISTS})
+    assert changes == []            # già compilation e già "Artisti vari": niente da cambiare
+    prepare_copy(tmp_path / "a.mp3", TrackTags(title="T", artist="Uno", album="Raccolta"))
+    changes = scan._unify_changes(scan_folder(tmp_path), {"album_artist": scan.VARIOUS_ARTISTS})
+    assert [(path.name, values) for path, values in changes] == [
+        ("a.mp3", {"album_artist": scan.VARIOUS_ARTISTS, "compilation": True})]

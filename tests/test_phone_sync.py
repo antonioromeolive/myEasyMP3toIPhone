@@ -107,6 +107,10 @@ def test_operations():
     assert (item["artwork_checksum"], "artwork_cache_id" in item, item["year"], item["track_count"]) == (0, False, 1999,
                                                                                                          10)
     assert item["album_artist"] == "Vari" and plain["location"] == {"kind": ps.MPEG_KIND}
+    assert "is_compilation" not in item
+    compilation = tags.copy()
+    compilation.compilation = True
+    assert ps.insert_track(11, 22, 33, compilation, audio)["item"]["is_compilation"] is True
     covered = ps.insert_track(11, 22, 33, tags, audio, 4391, ps.cover_checksum(b"x" * 100, ".mp3"))
     assert (covered["item"]["artwork_cache_id"], covered["item"]["artwork_checksum"]) == (4391, 101)
     assert ps.cover_checksum(b"x" * 100, ".m4a") == 117

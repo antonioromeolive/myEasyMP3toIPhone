@@ -28,6 +28,7 @@ from typing import Callable, Optional
 from . import iphone, phone_sync
 from .library import UNKNOWN_ALBUM, UNKNOWN_ARTIST, group_name, is_cancelled
 from .phone_sync import PhoneSyncError
+from .scan import VARIOUS_ARTISTS
 from .tags import TagError, prepare_copy, read_cover
 
 log = logging.getLogger(__name__)
@@ -225,6 +226,8 @@ async def _send_batches(pending: list, progress: Optional[ProgressFn], cancel, r
                     audio = phone_sync.audio_info(copy)
                     tags = track.tags.copy()
                     tags.title = tags.title or track.title
+                    if tags.compilation and not tags.album_artist:
+                        tags.album_artist = VARIOUS_ARTISTS   # l'iPhone vuole la compilation con l'artista dell'album
                     artist_name = tags.album_artist or tags.artist or UNKNOWN_ARTIST
                     album_name = tags.album or UNKNOWN_ALBUM
                     artist_key = group_name(artist_name)

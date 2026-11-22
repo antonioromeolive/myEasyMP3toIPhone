@@ -395,6 +395,11 @@ def detect_few_tracks(tracks: list) -> list:
 
 
 def _unify_changes(tracks: list, values: dict) -> list:
+    """Le modifiche per portare i brani ai valori dati. "Artisti vari" come artista dell'album porta con sé la spunta
+    compilation: senza, l'app Musica dell'iPhone divide l'album in un album per artista."""
+    if values.get("album_artist") == VARIOUS_ARTISTS:
+        values = dict(values)
+        values["compilation"] = True
     changes = []
     for track in tracks:
         wanted = {}
