@@ -283,14 +283,19 @@ async def _store_registry(home: Path, registry) -> None:
 
 
 SYNC_DID_FINISH = "com.apple.itunes-mobdev.syncDidFinish"   # quella che manda iTunes alla fine di una sincronizzazione
+NOTIFICATION_PROXY = "com.apple.mobile.notification_proxy"
 
 
 async def _post_sync_finished() -> None:
-    from pymobiledevice3.services.notification_proxy import NotificationProxyService
+    # il servizio aperto direttamente: il modulo notification_proxy di pymobiledevice3 importa anche la parte di
+    # ripristino (pyimg4), che nella build non c'è
     lockdown = await _open_lockdown()
     try:
-        async with NotificationProxyService(lockdown) as proxy:
-            await proxy.notify_post(SYNC_DID_FINISH)
+        service = await lockdown.start_lockdown_service(NOTIFICATION_PROXY)
+        try:
+            await service.send_plist({"Command": "PostNotification", "Name": SYNC_DID_FINISH})
+        finally:
+            await service.close()
     finally:
         await lockdown.close()
 
