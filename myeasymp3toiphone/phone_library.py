@@ -226,6 +226,12 @@ class PhoneIndex:
                 result = item
         return result
 
+    def via_registry(self, track: Track) -> bool:
+        """True se il brano del PC è abbinato dal registro della provenienza (certo), non solo per tag."""
+        from .overlay import path_key
+        result = bool(self._by_path) and path_key(track.path) in self._by_path
+        return result
+
     def find(self, track: Track) -> Optional[PhoneTrack]:
         """Il brano sull'iPhone: quello collegato al file nel registro; altrimenti cercato con i tag mostrati e, se
         diversi, con quelli del file (prima di una modifica in sospeso)."""
@@ -253,11 +259,22 @@ def _comparable(name: str, tags: TrackTags):
     return result
 
 
-def differences(pc_tags: TrackTags, phone_tags: TrackTags) -> list:
-    """(nome del campo, valore sul PC, valore sull'iPhone) per ogni campo diverso. "Artista album" si confronta solo
-    se almeno uno dei due ce l'ha (altrimenti ripete la differenza dell'artista). Artisti e album si confrontano senza
-    maiuscole, accenti e spazi: sull'iPhone sono gruppi, e l'invio si unisce al gruppo che c'è già con la sua grafia
-    ("Artisti Vari" per "Artisti vari"), quindi quella differenza non si può né si deve correggere."""
+def _shown(name: str, value) -> str:
+    """Un valore confrontato, come si mostra: "" per un tag vuoto, sì/no per la compilation."""
+    if name == "compilation":
+        result = "sì" if value else "no"
+    elif value is None:
+        result = ""
+    else:
+        result = str(value)
+    return result
+
+
+def comparison(pc_tags: TrackTags, phone_tags: TrackTags) -> list:
+    """(nome del campo, valore sul PC, valore sull'iPhone, diverso) per ogni campo confrontato. "Artista album" si
+    confronta solo se almeno uno dei due ce l'ha (altrimenti ripete la differenza dell'artista). Artisti e album si
+    confrontano senza maiuscole, accenti e spazi: sull'iPhone sono gruppi, e l'invio si unisce al gruppo che c'è già con
+    la sua grafia ("Artisti Vari" per "Artisti vari"), quindi quella differenza non si può né si deve correggere."""
     result = []
     for name, label in COMPARED_FIELDS:
         pc_value = _comparable(name, pc_tags)
@@ -267,18 +284,23 @@ def differences(pc_tags: TrackTags, phone_tags: TrackTags) -> list:
             same = group_name(str(pc_value)) == group_name(str(phone_value))
         else:
             same = pc_value == phone_value
-        if relevant and not same:
-            result.append((label, "" if pc_value is None else str(pc_value),
-                           "" if phone_value is None else str(phone_value)))
+        if relevant:
+            result.append((label, _shown(name, pc_value), _shown(name, phone_value), not same))
+    return result
+
+
+def differences(pc_tags: TrackTags, phone_tags: TrackTags) -> list:
+    """(nome del campo, valore sul PC, valore sull'iPhone) per ogni campo diverso (vedi comparison)."""
+    result = []
+    for label, pc_value, phone_value, differs in comparison(pc_tags, phone_tags):
+        if differs:
+            result.append((label, pc_value, phone_value))
     return result
 
 
 def describe_differences(found: list) -> str:
     lines = []
     for label, pc_value, phone_value in found:
-        if label == "Compilation":
-            pc_value = "sì" if pc_value == "True" else "no"
-            phone_value = "sì" if phone_value == "True" else "no"
         lines.append(f"{label}: sul PC \"{pc_value}\", sull'iPhone \"{phone_value}\"")
     result = "\n".join(lines)
     return result
@@ -296,14 +318,17 @@ def device_status(track: Track, index: PhoneIndex) -> tuple:
 
 
 def pc_matches(phone_tracks: list, pc_tracks: list, links: Optional[dict] = None) -> dict:
-    """{pid del brano dell'iPhone: (stato, brano del PC, differenze)} per i brani dell'iPhone che sono sul PC
-    (links: i collegamenti del registro, come in PhoneIndex)."""
+    """{pid del brano dell'iPhone: (stato, brano del PC, differenze, dal registro)} per i brani dell'iPhone che sono
+    sul PC (links: i collegamenti del registro, come in PhoneIndex). Un abbinamento dal registro vince su uno per tag."""
     index = PhoneIndex(phone_tracks, links)
     result = {}
     for track in pc_tracks:
         status, item, found = device_status(track, index)
-        if item is not None and item.pid not in result:
-            result[item.pid] = (status, track, found)
+        if item is not None:
+            via = index.via_registry(track)
+            current = result.get(item.pid)
+            if current is None or (via and not current[3]):
+                result[item.pid] = (status, track, found, via)
     return result
 
 

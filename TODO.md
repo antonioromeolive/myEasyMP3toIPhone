@@ -1,15 +1,11 @@
 # TODO
 
-## ⟳ "tag diversi": una tabella invece della spiegazione
+## Il pulsante "Collega iPhone" deve dire se l'iPhone è collegato
 
-Oggi il suggerimento di ⟳ (colonna *Sul PC* della scheda iPhone, colonna *iPhone* della scheda PC) è un elenco di
-righe "Campo: sul PC "…", sull'iPhone "…"". Va sostituito da una tabella (i suggerimenti di Qt accettano HTML):
-- **riga 1**: il brano "sospettato" di essere l'equivalente: nella scheda iPhone il file del PC (percorso), nella
-  scheda PC il brano dell'iPhone (artista — titolo, album); e **come** è stato abbinato: dal registro della
-  provenienza (*inviato*, *impronta*, *a mano*… = certo) o solo per tag (artista, album, titolo = probabile);
-- **poi una riga per campo**: Campo | Sul PC | Sull'iPhone, con tutti i tag confrontati (titolo, artista, artista
-  album, album, anno, genere, numeri, compilation) e i valori diversi evidenziati;
-- per ✔ la stessa tabella, senza evidenziazioni.
+Oggi il pulsante dice sempre "Collega iPhone" e lo stato è solo nel testo accanto: non si capisce. Quando l'iPhone è
+collegato il pulsante deve mostrarlo, con un colore diverso (per esempio verde "Connesso all'iPhone"); scollegato
+torna "Collega iPhone"; durante il collegamento "Collegamento…". Lo stesso stato si potrebbe vedere anche fuori dalla
+scheda iPhone (barra di stato o titolo della scheda), così si sa dalla scheda PC se l'invio è possibile.
 
 ## "Associa sorgente" (tasto destro nella scheda iPhone)
 
@@ -27,6 +23,15 @@ Sostituisce l'attuale *Collega a un file del PC…* (un elenco semplice dei 5 fi
 - Calcolo in background (impronte e AI richiedono qualche secondo), poi la finestra.
 - Nel registro il collegamento ha il "come" giusto: *impronta* o *ai* se si accetta la proposta, *a mano* se si
   sceglie un altro brano.
+
+**Versione "per cartella"**: con più brani selezionati (per esempio un album intero) la voce diventa **Associa
+sorgente da una cartella…**:
+- si sceglie la cartella del PC da cui vengono (proposta: quella dove stanno già i brani collegati dello stesso album,
+  o la più probabile secondo le impronte);
+- per ogni brano selezionato si cerca il file in quella cartella (impronta, poi titolo e durata) e si mostra una
+  tabella di riepilogo: brano dell'iPhone → file trovato (con il percorso e il "perché"), da confermare;
+- i brani **senza** un file nella cartella sono evidenziati con un avviso, e per ognuno si propone di associarlo uno
+  alla volta (la finestra di *Associa sorgente* per quel brano), oppure di lasciarlo così.
 
 ## Passo 5: spunte, stato "in attesa" e barra Applica
 

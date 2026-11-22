@@ -258,3 +258,39 @@ def test_iphone_tab_origin_column_and_filter(tmp_path):
     finally:
         window.close()
         app.processEvents()
+
+
+def test_comparison_table_tooltips(tmp_path):
+    """Il suggerimento di ✔/⟳: il brano abbinato, come (registro = certo, tag = probabile), i tag affiancati."""
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtWidgets import QApplication
+    from myeasymp3toiphone import provenance
+    from myeasymp3toiphone.gui.main_window import MainWindow
+    rows = phone_library.comparison(TrackTags(title="T", artist="A", album="B", year="1991", compilation=True),
+                                    TrackTags(title="T", artist="a", album="B", year="1990"))
+    assert ("Anno", "1991", "1990", True) in rows and ("Artista", "A", "a", False) in rows
+    assert ("Compilation", "sì", "no", True) in rows
+    app = QApplication.instance() or QApplication([])
+    window = MainWindow()
+    try:
+        pc = [_pc("Canzone A", "Artista Uno", "Album Primo", year="1991", track_number=1),
+              _pc("Canzone B", "Artista Uno", "Album Primo", year="1991", track_number=2)]
+        window.tracks = pc
+        phone = [_phone(1, "Canzone A", "Artista Uno", "Album Primo", year="1991", track_number=1),
+                 _phone(2, "Canzone B", "Artista Uno", "Album Primo", year="1990", track_number=2)]
+        phone[1].sync_id = 22
+        window.set_phone_tracks(phone, "iPhone di prova")
+        stale = window.iphone_panel.pc_tooltip(2)
+        assert "<table" in stale and "Canzone B.mp3" in stale and "probabile" in stale
+        assert "<td>1991</td><td>1990</td>" in stale and "font-weight:bold" in stale
+        same = window.device_tooltip(pc[0])
+        assert "Canzone A" in same and "font-weight:bold" not in same
+        registry = provenance.Registry()
+        registry.record(provenance.Link(sync_id=22, pc=provenance.computer_name(), path=str(pc[1].path),
+                                        how=provenance.HOW_FINGERPRINT))
+        window.set_registry(registry)
+        assert "certo" in window.iphone_panel.pc_tooltip(2) and "impronta" in window.device_tooltip(pc[1])
+        assert window.iphone_panel.pc_tooltip(999).startswith("Non è")
+    finally:
+        window.close()
+        app.processEvents()

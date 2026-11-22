@@ -15,7 +15,8 @@ from PySide6.QtWidgets import (
 from .. import adoption, iphone, phone_actions, provenance
 from ..config import config_dir
 from ..library import Track, copy_organized
-from ..phone_library import DEVICE_SAME, DEVICE_STALE, describe_differences, pc_matches
+from ..phone_library import DEVICE_SAME, DEVICE_STALE, comparison, pc_matches
+from .compare_tip import comparison_html, show_on_tooltip
 from .browser import SORT_ROLE, SortableItem
 
 DEVICE_POLL_MS = 3000   # ogni quanto si guarda se è stato collegato (o scollegato) un iPhone
@@ -212,6 +213,7 @@ class IPhonePanel(QWidget):
         self._music_view.sortByColumn(COL_ARTIST, Qt.AscendingOrder)
         self._music_view.setContextMenuPolicy(Qt.CustomContextMenu)
         self._music_view.customContextMenuRequested.connect(self._show_menu)
+        self._music_view.viewport().installEventFilter(self)    # il suggerimento di Sul PC, al passaggio del mouse
         header = self._music_view.header()
         header.setSectionResizeMode(QHeaderView.Interactive)
         header.setStretchLastSection(False)
@@ -348,16 +350,49 @@ class IPhonePanel(QWidget):
             row.setData(COL_PC, SORT_ROLE, 0)
             row.setForeground(COL_PC, QBrush())
         else:
-            status, _track, found = match
+            status = match[0]
             row.setText(COL_PC, PC_TEXT[status])
-            tip = PC_TIP[status]
-            if found:
-                tip += describe_differences(found)
-            row.setToolTip(COL_PC, tip)
             row.setData(COL_PC, SORT_ROLE, 2 if status == DEVICE_SAME else 1)
             color = QColor(30, 140, 60) if status == DEVICE_SAME else QColor(220, 140, 0)
             row.setForeground(COL_PC, QBrush(color))
         row.setTextAlignment(COL_PC, Qt.AlignCenter)
+
+    def eventFilter(self, watched, event) -> bool:
+        handled = False
+        if watched is self._music_view.viewport():
+            handled = show_on_tooltip(event, self._music_view, self._tooltip_at)
+        result = handled or super().eventFilter(watched, event)
+        return result
+
+    def _tooltip_at(self, position) -> str:
+        """Il suggerimento della cella sotto il mouse: la tabella del confronto per Sul PC, il testo della cella per
+        le altre colonne."""
+        view = self._music_view
+        row = view.itemAt(position)
+        column = view.columnAt(position.x())
+        result = ""
+        if row is not None and column == COL_PC:
+            result = self.pc_tooltip(row.data(COL_TITLE, PID_ROLE))
+        elif row is not None:
+            result = row.toolTip(column)
+        return result
+
+    def pc_tooltip(self, pid) -> str:
+        item = self._by_pid.get(pid)
+        match = self._matches.get(pid)
+        if item is None or match is None:
+            result = NOT_ON_PC_TIP
+        else:
+            status, track, _found, via = match
+            title = PC_TIP[status].split(":")[0].rstrip()
+            link = self._window.registry.get(item.sync_id) if via and item.sync_id else None
+            if link is not None:
+                how = f"Abbinato dal registro della provenienza ({link.how}): certo"
+            else:
+                how = "Abbinato per artista, album e titolo: probabile, non certo"
+            result = comparison_html(title, str(track.path), how, link is not None,
+                                     comparison(track.tags, item.tags))
+        return result
 
     def pc_changed(self) -> None:
         """I brani del PC sono cambiati (cartella aperta, tag modificati): la colonna "Sul PC" va rifatta, subito se

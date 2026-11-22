@@ -70,7 +70,7 @@ con la grafia più usata (a parità, quella con le maiuscole). I tag dei file no
 variante, perché l'iPhone la considera un artista diverso.
 
 **Colonna iPhone.** Per ogni brano: **✔** nell'app *Musica* dell'iPhone c'è lo stesso brano, con gli stessi tag;
-**⟳** c'è lo stesso brano, ma con tag diversi (il suggerimento elenca le differenze, *sul PC* / *sull'iPhone*); vuoto,
+**⟳** c'è lo stesso brano, ma con tag diversi; vuoto,
 non c'è. "Lo stesso brano" vuol dire stesso titolo e stesso album, senza badare a maiuscole, accenti e spazi, e un
 artista in comune; un brano con modifiche in sospeso si ritrova anche con i tag del file. Si basa sulla musica
 dell'iPhone letta all'ultimo collegamento e salvata nella cartella dati, quindi si vede anche a iPhone scollegato (il
@@ -154,8 +154,14 @@ titoli, gli artisti e gli album che mostra l'app: il programma ne copia sul PC i
 e lo legge, perché sul telefono i file hanno nomi casuali (`F12/ABCD.mp3`). Sono solo i brani con un file
 sull'iPhone, non quelli in streaming da Apple Music. *Cerca* filtra per titolo, artista o album.
 
-- **Sul PC:** ✔ nella cartella aperta nella scheda PC c'è lo stesso brano, con gli stessi tag; ⟳ c'è, con tag diversi
-  (il suggerimento dice quali); vuoto, non c'è. Lo stesso confronto della colonna *iPhone* della scheda PC.
+- **Sul PC:** ✔ nella cartella aperta nella scheda PC c'è lo stesso brano, con gli stessi tag; ⟳ c'è, con tag
+  diversi; vuoto, non c'è. Lo stesso confronto della colonna *iPhone* della scheda PC.
+
+**Il suggerimento di ✔ e ⟳** (colonna *iPhone* della scheda PC, *Sul PC* della scheda iPhone) è una tabella: in
+cima il brano abbinato (il brano dell'iPhone, o il file del PC con il percorso) e come è stato abbinato, *certo*
+dal registro della provenienza o *probabile* solo per artista, album e titolo; sotto, tutti i tag confrontati, sul PC
+e sull'iPhone affiancati, con i valori diversi evidenziati. Artisti e album che differiscono solo per maiuscole o
+accenti non sono evidenziati: sull'iPhone sono lo stesso gruppo.
 - **Tasto destro** su uno o più brani: **Salva su PC…** copia i file in una cartella a scelta (proposta: la Libreria),
   ordinati in `Artista/Album (Anno)/NN - Titolo` con i nomi che mostra l'app; crea solo file nuovi, un file già
   presente sul PC non viene mai sostituito. **Mostra nella scheda PC** seleziona i brani corrispondenti del PC.

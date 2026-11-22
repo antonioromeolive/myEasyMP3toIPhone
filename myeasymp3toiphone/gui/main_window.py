@@ -21,7 +21,7 @@ from ..config import PRODUCT, AppSettings, config_dir
 from ..library import assign_groups, copy_organized, group_by_album, scan_folder, track_sort_key
 from .. import provenance
 from ..phone_library import (
-    DEVICE_ABSENT, DEVICE_SAME, DEVICE_STALE, PhoneIndex, describe_differences, device_status, load_listing,
+    DEVICE_ABSENT, DEVICE_SAME, DEVICE_STALE, PhoneIndex, comparison, device_status, load_listing,
     save_listing,
 )
 from ..overlay import TagOverlay
@@ -31,6 +31,7 @@ from ..version import app_version
 from .about import AboutDialog
 from .album_check_dialog import AlbumCheckDialog
 from .browser import LibraryBrowser
+from .compare_tip import comparison_html, show_on_tooltip
 from .iphone_panel import IPhonePanel
 from .scan_dialog import ScanLauncher
 from .settings_dialog import SettingsDialog
@@ -183,6 +184,7 @@ class MainWindow(QMainWindow):
         self._table.itemSelectionChanged.connect(self._selection_changed)
         self._table.setContextMenuPolicy(Qt.CustomContextMenu)
         self._table.customContextMenuRequested.connect(self._table_menu)
+        self._table.viewport().installEventFilter(self)    # il suggerimento della colonna iPhone, al passaggio
 
         self.editor = TagEditor()
         self.editor.apply_requested.connect(self._apply_tag_changes)
@@ -415,9 +417,8 @@ class MainWindow(QMainWindow):
                 COL_FILE: track.path.name,
             }
             status = DEVICE_ABSENT
-            found = []
             if self._phone_index is not None:
-                status, _phone_track, found = device_status(track, self._phone_index)
+                status, _phone_track, _found = device_status(track, self._phone_index)
             values[COL_DEVICE] = DEVICE_TEXT[status]
             self._table.setItem(row, COL_NUMBER, number)
             for column, text in values.items():
@@ -437,11 +438,6 @@ class MainWindow(QMainWindow):
                                       + self.overlay.describe(track))
             device_item = self._table.item(row, COL_DEVICE)
             device_item.setTextAlignment(Qt.AlignCenter)
-            if self._phone_index is not None:
-                tip = DEVICE_TIP[status]
-                if found:
-                    tip += "\n" + describe_differences(found)
-                device_item.setToolTip(tip)
             if status == DEVICE_STALE:
                 device_item.setForeground(QBrush(QColor(220, 140, 0)))
             elif status == DEVICE_SAME:
@@ -471,6 +467,45 @@ class MainWindow(QMainWindow):
         result = []
         for row in self._selected_rows():
             result.append(self._track_at_row(row))
+        return result
+
+    def eventFilter(self, watched, event) -> bool:
+        handled = False
+        if watched is self._table.viewport():
+            handled = show_on_tooltip(event, self._table, self._table_tooltip_at)
+        result = handled or super().eventFilter(watched, event)
+        return result
+
+    def _table_tooltip_at(self, position) -> str:
+        """Il suggerimento della cella sotto il mouse: per la colonna iPhone la tabella del confronto."""
+        row = self._table.rowAt(position.y())
+        column = self._table.columnAt(position.x())
+        result = ""
+        if row >= 0 and column == COL_DEVICE:
+            result = self.device_tooltip(self._track_at_row(row))
+        elif row >= 0 and column >= 0:
+            item = self._table.item(row, column)
+            result = item.toolTip() if item is not None else ""
+        return result
+
+    def device_tooltip(self, track) -> str:
+        result = ""
+        if self._phone_index is not None and track is not None:
+            status, phone_track, _found = device_status(track, self._phone_index)
+            if phone_track is None:
+                result = DEVICE_TIP[DEVICE_ABSENT]
+            else:
+                tags = phone_track.tags
+                matched = f"{tags.artist or tags.album_artist} — {tags.title}  ({tags.album})"
+                if self._phone_index.via_registry(track):
+                    link = self.registry.get(phone_track.sync_id)
+                    how = f"Abbinato dal registro della provenienza ({link.how if link else '?'}): certo"
+                    certain = True
+                else:
+                    how = "Abbinato per artista, album e titolo: probabile, non certo"
+                    certain = False
+                result = comparison_html(DEVICE_TIP[status].rstrip(":"), matched, how, certain,
+                                         comparison(track.tags, phone_track.tags))
         return result
 
     def _table_menu(self, position) -> None:
