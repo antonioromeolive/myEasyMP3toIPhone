@@ -525,6 +525,7 @@ class AppSettings:
     last_export: str = ""
     scan_profile: str = ""          # il profilo AI della scansione; "" = senza AI
     scan_use_ai: bool = True
+    scan_checks_off: list = field(default_factory=list)   # i controlli tolti in "Controlla la musica"
     window_geometry: str = ""       # base64 di QMainWindow.saveGeometry
     extra: dict = field(default_factory=dict)
 

@@ -50,7 +50,7 @@ KIND_LABELS = {
     KIND_NOT_UPDATED: "File che non si aggiornano",
     KIND_FEW_TRACKS: "Album con pochi brani",
     KIND_SPLIT: "Collezioni divise su più album",
-    KIND_DUPLICATE: "Brani doppi",
+    KIND_DUPLICATE: "Brani duplicati",
     KIND_MISSING_TAGS: "Tag mancanti",
     KIND_UNREADABLE: "File illeggibili",
     KIND_ONLY_ON_DEVICE: "Solo sull'iPhone",
@@ -74,6 +74,38 @@ NUMBERED_COPY = re.compile(r"^(.*) \((\d+)\)$")
 YEAR_SUFFIX = re.compile(r"^(.*?)\s*\((\d{4})\)$")
 TRACK_PREFIX = re.compile(r"^(?:(\d{1,2})-)?(\d{1,3})\s*-\s*(.+)$")
 FIX_FIELDS = ("album", "album_artist", "artist", "year", "genre")
+
+# i controlli che si possono scegliere: (id, nome, spiegazione in una riga)
+CHECK_FILES = "file"
+CHECK_FEW = "pochi_brani"
+CHECK_SPLIT = "collezioni_divise"
+CHECK_VARIANTS = "artisti"
+CHECK_MISSING = "tag_mancanti"
+CHECK_UNREADABLE = "illeggibili"
+CHECK_DUPLICATES = "duplicati"
+CHECKS = (
+    (CHECK_FILES, "File che non si aggiornano",
+     "MP3 con un vecchio tag ID3v1 diverso o un tag APE; sull'iPhone, brani con tag diversi da quelli del PC"),
+    (CHECK_FEW, "Album con pochi brani",
+     "numeri di traccia mancanti, meno brani del totale dichiarato, album di 1-2 brani"),
+    (CHECK_SPLIT, "Collezioni divise su più album",
+     "una cartella con album diversi, lo stesso album scritto in modi diversi o con \"CD 1\" nel nome, "
+     "compilation senza artista dell'album"),
+    (CHECK_VARIANTS, "Artisti scritti in modi diversi", "\"The Beatles\" e \"Beatles\", maiuscole, \"AC/DC\" e \"ACDC\""),
+    (CHECK_MISSING, "Tag mancanti", "brani senza titolo, album o artista"),
+    (CHECK_UNREADABLE, "File illeggibili", "file danneggiati, bloccati o disponibili solo online"),
+    (CHECK_DUPLICATES, "Brani duplicati",
+     "lo stesso brano in più file: stesso audio anche con tag diversi, oppure stessa durata, titolo e artista in "
+     "file diversi (un MP3 e un FLAC); l'AI guarda solo le coppie sospette"),
+)
+ALL_CHECKS = frozenset(check_id for check_id, _label, _note in CHECKS)
+KIND_CHECK = {KIND_NOT_UPDATED: CHECK_FILES, KIND_FEW_TRACKS: CHECK_FEW, KIND_SPLIT: CHECK_SPLIT,
+              KIND_DUPLICATE: CHECK_DUPLICATES, KIND_MISSING_TAGS: CHECK_MISSING, KIND_UNREADABLE: CHECK_UNREADABLE}
+AI_REVIEW_CHECKS = frozenset({CHECK_FILES, CHECK_FEW, CHECK_SPLIT, CHECK_VARIANTS, CHECK_MISSING})  # per album
+SAME_SONG_TOLERANCE = 2.0     # secondi: lo stesso brano in due file ha quasi la stessa durata
+AI_PAIRS_BATCH = 25
+AI_MAX_PAIRS = 400            # oltre, le coppie restano "da controllare" senza AI (un'AI locale è lenta)
+TITLE_EXTRA = re.compile(r"\s*[\(\[][^\)\]]*[\)\]]|\s+-\s+.*$")
 
 ProgressFn = Callable[[int, int, str], None]
 
@@ -577,17 +609,291 @@ def drop_repeated(ai_issues: list, found_by_rules: list) -> list:
 
 
 def rule_issues(tracks: list, check_files: bool, progress: Optional[ProgressFn] = None,
-                cancel: Optional[threading.Event] = None) -> list:
-    issues = detect_unreadable(tracks)
-    if check_files:
+                cancel: Optional[threading.Event] = None, checks: frozenset = ALL_CHECKS) -> list:
+    issues = []
+    if CHECK_UNREADABLE in checks:
+        issues += detect_unreadable(tracks)
+    if check_files and CHECK_FILES in checks:
         issues += detect_file_problems(tracks, progress, cancel)
-    issues += detect_duplicates(tracks)
-    issues += detect_missing_tags(tracks)
-    issues += detect_few_tracks(tracks)
-    issues += detect_split_folders(tracks)
-    issues += detect_split_names(tracks)
-    issues += detect_artist_variants(tracks)
+    if CHECK_DUPLICATES in checks:
+        issues += detect_duplicates(tracks)
+    if CHECK_MISSING in checks:
+        issues += detect_missing_tags(tracks)
+    if CHECK_FEW in checks:
+        issues += detect_few_tracks(tracks)
+    if CHECK_SPLIT in checks:
+        issues += detect_split_folders(tracks)
+        issues += detect_split_names(tracks)
+    if CHECK_VARIANTS in checks:
+        issues += detect_artist_variants(tracks)
     result = merge_overlapping(issues)
+    return result
+
+
+def enabled(issue: Issue, checks: frozenset) -> bool:
+    """Un problema trovato dall'AI o dal confronto con l'iPhone si tiene solo se il suo controllo è scelto."""
+    check = KIND_CHECK.get(issue.kind)
+    result = check is None or check in checks
+    return result
+
+
+# --------------------------------------------------------------------------- brani duplicati (stesso brano)
+
+def title_core(title: str) -> str:
+    """Il titolo senza le aggiunte tra parentesi o dopo " - " ("Brano (Remastered 2011)", "Brano - Live")."""
+    result = _plain(TITLE_EXTRA.sub("", title or "")) or _plain(title or "")
+    return result
+
+
+def _song_key(track) -> tuple:
+    result = (artist_norm(track.tags.artist or track.tags.album_artist), title_core(track.tags.title))
+    return result
+
+
+VERSION_WORDS = re.compile(
+    r"\b(live|dal vivo|en vivo|unplugged|remix|rmx|mix|edit|acoustic|acustic[ao]|demo|instrumental|strumentale|"
+    r"karaoke|reprise|extended|version|versione|cover|orchestral|piano)\b")
+
+
+def version_marks(track) -> frozenset:
+    """Le parole che distinguono una versione (live, remix, demo…) nel titolo o nell'album."""
+    found = set()
+    text = _plain(f"{track.tags.title} {track.tags.album}")
+    for match in VERSION_WORDS.finditer(text):
+        found.add(match.group(1))
+    result = frozenset(found)
+    return result
+
+
+def suspicious_pairs(tracks: list, fingerprints: dict) -> list:
+    """Le coppie di file che sembrano lo stesso brano con un audio diverso: stesso artista e titolo (senza le
+    aggiunte tra parentesi), durata entro SAME_SONG_TOLERANCE, impronta diversa o mancante. Le copie con la stessa
+    impronta contano una volta sola (quella è già certa)."""
+    by_song = {}
+    for track in tracks:
+        if not track.error and track.length > 0 and track.tags.title:
+            key = _song_key(track)
+            if key[0] and key[1]:
+                by_song.setdefault(key, []).append(track)
+    result = []
+    for group in by_song.values():
+        representatives = []
+        seen_prints = set()
+        for track in group:
+            value = fingerprints.get(str(track.path), "")
+            if not value or value not in seen_prints:
+                representatives.append(track)
+                if value:
+                    seen_prints.add(value)
+        if len(representatives) > 1:
+            representatives.sort(key=lambda track: (track.length, str(track.path).lower()))
+            for first_index, first in enumerate(representatives):
+                second_index = first_index + 1
+                while (second_index < len(representatives)
+                       and representatives[second_index].length - first.length <= SAME_SONG_TOLERANCE):
+                    result.append((first, representatives[second_index]))
+                    second_index += 1
+    return result
+
+
+AI_PAIRS_SYSTEM = """You help find duplicate songs in a personal music library. Each line is a pair of files with \
+the same artist, a similar title and almost the same duration, but different audio data and different version \
+words. Decide for each pair whether both files are the SAME recording (same performance: another format, bitrate or \
+encoding, a remaster of the same master, the same track on an album and on a compilation) or DIFFERENT versions \
+(live, remix, edit, acoustic, demo, re-recording, cover, another language). Use title details, album names and \
+folder names. Answer for every pair; confidence "high" only when the details agree. Write the reason in Italian, \
+short and concrete."""
+
+AI_PAIRS_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "pairs": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "pair": {"type": "string"},
+                    "same": {"type": "boolean"},
+                    "confidence": {"type": "string", "enum": ["high", "medium", "low"]},
+                    "reason": {"type": "string"},
+                },
+                "required": ["pair", "same", "confidence", "reason"],
+                "additionalProperties": False,
+            },
+        },
+    },
+    "required": ["pairs"],
+    "additionalProperties": False,
+}
+
+
+def _pair_side(track) -> str:
+    tags = track.tags
+    folder = "/".join(Path(track.path).parent.parts[-2:])
+    total = int(round(track.length))
+    result = (f"{tags.title} | artist: {tags.artist or tags.album_artist} | album: {tags.album} | "
+              f"{total // 60}:{total % 60:02d} | {Path(track.path).suffix.lower().lstrip('.')} | folder: {folder}")
+    return result
+
+
+def ai_pairs(provider, pairs: list, progress: Optional[ProgressFn] = None,
+             cancel: Optional[threading.Event] = None) -> tuple:
+    """({indice della coppia: (stesso brano, motivo)}, errori). Le coppie senza risposta non ci sono."""
+    from .ai import AIError
+    verdicts = {}
+    errors = []
+    start = 0
+    while start < len(pairs) and not is_cancelled(cancel) and not errors:
+        batch = pairs[start:start + AI_PAIRS_BATCH]
+        if progress is not None:
+            progress(start, len(pairs), f"l'AI confronta {len(batch)} coppie di versioni forse diverse")
+        lines = []
+        for offset, (first, second) in enumerate(batch):
+            lines.append(f"P{start + offset + 1}\n   A: {_pair_side(first)}\n   B: {_pair_side(second)}")
+        try:
+            reply = provider.ask_json(AI_PAIRS_SYSTEM, "PAIRS\n" + "\n".join(lines), AI_PAIRS_SCHEMA)
+            for answer in reply.get("pairs", []):
+                label = str(answer.get("pair", ""))
+                if label.startswith("P") and label[1:].isdigit():
+                    index = int(label[1:]) - 1
+                    if start <= index < start + len(batch):
+                        confidence = str(answer.get("confidence", "low"))
+                        reason = f"AI ({confidence}): {str(answer.get('reason', '')).strip()}"
+                        verdicts[index] = (bool(answer.get("same")), reason)
+        except AIError as exc:
+            errors.append(f"brani duplicati: {exc}")
+            log.warning("Confronto dei brani duplicati con l'AI non riuscito: %s", exc)
+        start += AI_PAIRS_BATCH
+    result = (verdicts, errors)
+    return result
+
+
+class _Clusters:
+    """Gruppi di file dello stesso brano (unione di coppie)."""
+
+    def __init__(self) -> None:
+        self.parent = {}
+        self.tracks = {}
+        self.notes = {}
+
+    def _root(self, key: str) -> str:
+        root = key
+        while self.parent[root] != root:
+            root = self.parent[root]
+        self.parent[key] = root
+        return root
+
+    def add(self, track) -> str:
+        key = str(track.path)
+        if key not in self.parent:
+            self.parent[key] = key
+            self.tracks[key] = track
+        result = self._root(key)
+        return result
+
+    def join(self, first, second, note: str = "") -> None:
+        first_root = self.add(first)
+        second_root = self.add(second)
+        notes = self.notes.pop(second_root, []) if first_root != second_root else []
+        if first_root != second_root:
+            self.parent[second_root] = first_root
+        merged = self.notes.setdefault(first_root, [])
+        for text in notes + ([note] if note else []):
+            if text not in merged:
+                merged.append(text)
+
+    def groups(self) -> list:
+        """[([Track], [note])], i file in ordine di percorso."""
+        by_root = {}
+        for key, track in self.tracks.items():
+            by_root.setdefault(self._root(key), []).append(track)
+        result = []
+        for root, members in by_root.items():
+            if len(members) > 1:
+                members.sort(key=lambda track: str(track.path).lower())
+                result.append((members, self.notes.get(root, [])))
+        result.sort(key=lambda entry: str(entry[0][0].path).lower())
+        return result
+
+
+def _copy_line(tracks: list, prints: dict) -> str:
+    places = []
+    for track in tracks:
+        places.append(f"{track.tags.album or _short(Path(track.path).parent)} "
+                      f"({Path(track.path).suffix.lower().lstrip('.')})")
+    values = set()
+    for track in tracks:
+        values.add(prints.get(str(track.path), "") or str(track.path))
+    how = "stesso audio" if len(values) == 1 else "stesso brano, file diversi"
+    result = f"«{tracks[0].tags.title}» — {how}: " + "; ".join(places)
+    return result
+
+
+def detect_same_songs(tracks: list, fingerprints: dict, provider=None, progress: Optional[ProgressFn] = None,
+                      cancel: Optional[threading.Event] = None, skip: frozenset = frozenset()) -> tuple:
+    """Lo stesso brano in più file, anche in album diversi: (problemi, errori dell'AI).
+      * stesso audio (impronta): certo;
+      * stesso artista e titolo, durata entro 2 secondi, audio diverso (un MP3 e un FLAC, due codifiche): lo stesso
+        brano, se titolo e album non nominano versioni diverse (live, remix, demo…);
+      * con versioni diverse nominate la coppia è dubbia: decide l'AI, se c'è (solo queste coppie, mai tutti i brani);
+        senza AI resta "da controllare".
+    Un problema per artista, una riga per brano; nessuna correzione: quale copia tenere lo decide l'utente. skip: i
+    file già segnalati come doppi nello stesso album."""
+    clusters = _Clusters()
+    by_print = {}
+    for track in tracks:
+        value = fingerprints.get(str(track.path), "")
+        if value and not track.error and str(track.path) not in skip:
+            by_print.setdefault(value, []).append(track)
+    for group in by_print.values():
+        for other in group[1:]:
+            clusters.join(group[0], other)
+    doubtful = []
+    for first, second in suspicious_pairs(tracks, fingerprints):
+        if str(first.path) not in skip and str(second.path) not in skip:
+            if version_marks(first) == version_marks(second):
+                clusters.join(first, second)
+            else:
+                doubtful.append((first, second))
+    verdicts = {}
+    errors = []
+    if provider is not None and doubtful and not is_cancelled(cancel):
+        verdicts, errors = ai_pairs(provider, doubtful[:AI_MAX_PAIRS], progress, cancel)
+    for index, (first, second) in enumerate(doubtful):
+        same, reason = verdicts.get(index, (True, "da controllare: forse versioni diverse"))
+        if same:
+            clusters.join(first, second, reason)
+    by_artist = {}
+    for members, notes in clusters.groups():
+        by_artist.setdefault(members[0].display_artist, []).append((members, notes))
+    issues = []
+    number = 0
+    for artist in sorted(by_artist, key=str.lower):
+        songs = by_artist[artist]
+        number += 1
+        files = []
+        lines = []
+        used_ai = False
+        for members, notes in songs:
+            for track in members:
+                files.append(track.path)
+            line = _copy_line(members, fingerprints)
+            if notes:
+                line += " (" + "; ".join(notes) + ")"
+                used_ai = used_ai or any(note.startswith("AI") for note in notes)
+            lines.append(line)
+        shown = lines[:10]
+        if len(lines) > 10:
+            shown.append(f"… e altri {len(lines) - 10}")
+        detail = ("Lo stesso brano in più file. Può essere giusto (l'album originale e una raccolta, un MP3 e un FLAC "
+                  "tenuti apposta) oppure un doppione da togliere: quale tenere lo decidi tu (Mostra i brani).\n"
+                  + "\n".join(shown))
+        issues.append(Issue(KIND_DUPLICATE, SEVERITY_LOW, f"{artist}: {_tracks_text(len(songs))} in più copie",
+                            detail, files, origin=ORIGIN_AI if used_ai else ORIGIN_RULE, rule_id=f"R15.{number}"))
+    if len(doubtful) > AI_MAX_PAIRS and provider is not None:
+        errors.append(f"brani duplicati: l'AI ha visto le prime {AI_MAX_PAIRS} coppie dubbie su {len(doubtful)}; le "
+                      "altre sono segnate \"da controllare\"")
+    result = (issues, errors)
     return result
 
 
@@ -839,17 +1145,34 @@ def ai_review(provider, tracks: list, issues: list, progress: Optional[ProgressF
 
 def scan_tracks(tracks: list, target: str, provider=None, check_files: bool = True,
                 phone_tracks: Optional[list] = None, library_tracks: Optional[list] = None,
-                progress: Optional[ProgressFn] = None, cancel: Optional[threading.Event] = None) -> ScanReport:
-    """La scansione: regole, poi l'AI se c'è un fornitore. Con phone_tracks (la musica dell'app Musica, i cui
-    brani sono anche tracks) la scansione è dell'iPhone, confrontato con library_tracks."""
+                progress: Optional[ProgressFn] = None, cancel: Optional[threading.Event] = None,
+                checks: frozenset = ALL_CHECKS, fingerprints: Optional[dict] = None) -> ScanReport:
+    """Il controllo: le regole dei controlli scelti (checks), poi l'AI se c'è un fornitore. Con phone_tracks (la
+    musica dell'app Musica, i cui brani sono anche tracks) è dell'iPhone, confrontato con library_tracks.
+    fingerprints: {percorso: impronta dell'audio} per i brani duplicati (senza, solo quelli sospetti per i tag)."""
     assign_groups(tracks)
     report = ScanReport(target=target, tracks_scanned=len(tracks), albums_scanned=len(group_by_album(tracks)))
-    issues = rule_issues(tracks, check_files, progress, cancel)
-    if provider is not None and not is_cancelled(cancel):
+    issues = rule_issues(tracks, check_files, progress, cancel, checks)
+    if provider is not None and not is_cancelled(cancel) and checks & AI_REVIEW_CHECKS:
         report.ai_profile = provider.profile.name
         found, errors = ai_review(provider, tracks, issues, progress, cancel)
-        issues += drop_repeated(found, issues)
+        for issue in drop_repeated(found, issues):
+            if enabled(issue, checks):
+                issues.append(issue)
         report.ai_errors = errors
+    if CHECK_DUPLICATES in checks and not is_cancelled(cancel):
+        skip = set()
+        for issue in issues:
+            if issue.kind == KIND_DUPLICATE:
+                for path in issue.files:
+                    skip.add(str(path))
+        if progress is not None:
+            progress(0, 0, "brani duplicati")
+        found, errors = detect_same_songs(tracks, fingerprints or {}, provider, progress, cancel, frozenset(skip))
+        issues += found
+        report.ai_errors += errors
+        if provider is not None:
+            report.ai_profile = provider.profile.name
     if phone_tracks is not None:
         # sull'iPhone il programma non scrive: le correzioni si fanno sui brani del PC
         for issue in issues:
@@ -857,7 +1180,9 @@ def scan_tracks(tracks: list, target: str, provider=None, check_files: bool = Tr
                 issue.fix = None
                 issue.detail += " Correggi i brani sul PC (scheda PC)."
         if library_tracks is not None:
-            issues += compare_with_library(phone_tracks, library_tracks)
+            for issue in compare_with_library(phone_tracks, library_tracks):
+                if enabled(issue, checks):
+                    issues.append(issue)
     issues.sort(key=lambda issue: issue.sort_key())
     report.issues = issues
     report.cancelled = is_cancelled(cancel)
@@ -865,14 +1190,14 @@ def scan_tracks(tracks: list, target: str, provider=None, check_files: bool = Tr
 
 
 def report_text(report: ScanReport) -> str:
-    lines = [f"Scansione di {report.target} — {time.strftime('%Y-%m-%d %H:%M')}",
+    lines = [f"Controllo di {report.target} — {time.strftime('%Y-%m-%d %H:%M')}",
              f"{report.tracks_scanned} brani, {report.albums_scanned} album, {len(report.issues)} problemi"]
     if report.ai_profile:
         lines.append(f"Analisi AI: {report.ai_profile}")
     for error in report.ai_errors:
         lines.append(f"Errore AI: {error}")
     if report.cancelled:
-        lines.append("Scansione interrotta: i risultati sono parziali")
+        lines.append("Controllo interrotto: i risultati sono parziali")
     for issue in report.issues:
         lines += ["", f"[{issue.severity}] {KIND_LABELS.get(issue.kind, issue.kind)} ({issue.origin}): {issue.title}",
                   f"    {issue.detail}"]

@@ -287,3 +287,61 @@ def test_compilation_flag_read_written_and_proposed(tmp_path):
     changes = scan._unify_changes(scan_folder(tmp_path), {"album_artist": scan.VARIOUS_ARTISTS})
     assert [(path.name, values) for path, values in changes] == [
         ("a.mp3", {"album_artist": scan.VARIOUS_ARTISTS, "compilation": True})]
+
+
+def _song(path, title, artist, album, length):
+    from pathlib import Path
+    from myeasymp3toiphone.library import Track
+    result = Track(path=Path(path), tags=TrackTags(title=title, artist=artist, album=album), length=length)
+    return result
+
+
+class PairsProvider:
+    """Un'AI finta per le coppie: "diverse" quando un lato dice live."""
+
+    def __init__(self):
+        self.profile = type("P", (), {"name": "finta"})()
+        self.seen = ""
+
+    def ask_json(self, system, user, schema):
+        self.seen += user
+        answers = []
+        lines = user.splitlines()
+        for index, line in enumerate(lines):
+            if line.startswith("P") and line[1:].isdigit():
+                live = "live" in (lines[index + 1] + lines[index + 2]).lower()
+                answers.append({"pair": line, "same": not live, "confidence": "high", "reason": "finta"})
+        return {"pairs": answers}
+
+
+def test_same_songs_by_fingerprint_and_by_tags_with_ai():
+    tracks = [_song("C:/m/Dalla/Album/01 - Caruso.mp3", "Caruso", "Lucio Dalla", "Album", 300.0),
+              _song("C:/m/Raccolte/Hits/07 - Caruso.mp3", "Caruso (remaster)", "Lucio Dalla", "Hits", 300.4),
+              _song("C:/m/Dalla/Album/02 - Caruso.flac", "Caruso", "Lucio Dalla", "Album", 301.0),
+              _song("C:/m/Dalla/Live/03 - Caruso.mp3", "Caruso (live)", "Lucio Dalla", "Live", 301.5),
+              _song("C:/m/Dalla/Album/03 - Altro.mp3", "Altro", "Lucio Dalla", "Album", 200.0)]
+    prints = {str(tracks[0].path): "mp3:a", str(tracks[1].path): "mp3:a", str(tracks[2].path): "flac:b",
+              str(tracks[3].path): "mp3:c", str(tracks[4].path): "mp3:d"}
+    pairs = scan.suspicious_pairs(tracks, prints)
+    names = sorted(sorted((a.path.name, b.path.name)) for a, b in pairs)
+    assert ["01 - Caruso.mp3", "07 - Caruso.mp3"] not in names                  # stesso audio: non è sospetto
+    assert ["02 - Caruso.flac", "03 - Caruso.mp3"] in names                     # entro 2 s, audio diverso
+    issues, errors = scan.detect_same_songs(tracks, prints, PairsProvider())
+    assert errors == [] and len(issues) == 1
+    issue = issues[0]
+    assert issue.kind == scan.KIND_DUPLICATE and issue.fix is None and issue.title.startswith("Lucio Dalla")
+    files = {path.name for path in issue.files}
+    assert {"01 - Caruso.mp3", "07 - Caruso.mp3", "02 - Caruso.flac"} <= files
+    assert "03 - Caruso.mp3" not in files and "03 - Altro.mp3" not in files    # la versione dal vivo no
+    plain, _errors = scan.detect_same_songs(tracks, prints)                       # senza AI: da controllare
+    assert "da controllare" in plain[0].detail and "03 - Caruso.mp3" in {p.name for p in plain[0].files}
+
+
+def test_only_chosen_checks_run(tmp_path):
+    _tagged(tmp_path / "a" / "1.mp3", title="X", artist="Queen", album="Uno", track_number=1)
+    _tagged(tmp_path / "a" / "2.mp3", title="Y", artist="queen", album="Due", track_number=5)
+    tracks = scan_folder(tmp_path)
+    everything = scan.scan_tracks(tracks, "prova", check_files=False)
+    only_variants = scan.scan_tracks(tracks, "prova", check_files=False, checks=frozenset({scan.CHECK_VARIANTS}))
+    assert len(everything.issues) > len(only_variants.issues) > 0
+    assert all(issue.rule_id.startswith("R14") for issue in only_variants.issues)

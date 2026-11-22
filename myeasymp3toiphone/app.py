@@ -169,8 +169,11 @@ def _scan(folder: str, profile_name: str) -> int:
             print(f"Cartella non trovata: {folder}", file=sys.stderr)
             result = 2
         else:
-            tracks = scan_folder(path)
-            report = scan_tracks(tracks, str(path), provider)
+            from .adoption import pc_fingerprints
+            from .tag_cache import TagCache
+            cache = TagCache(config_dir())
+            tracks = scan_folder(path, cache=cache)
+            report = scan_tracks(tracks, str(path), provider, fingerprints=pc_fingerprints(tracks, cache))
             print(report_text(report))
             print(f"Rapporto salvato in {save_report(report, config_dir() / 'scansioni')}")
     return result

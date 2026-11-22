@@ -122,9 +122,9 @@ class MainWindow(QMainWindow):
              "Copia i brani selezionati in una cartella, ordinati per Artista/Album", "Ctrl+E"),
             ("Verifica album", QStyle.SP_DialogApplyButton, self._check_albums,
              "Controlla su MusicBrainz che gli album selezionati (o tutti) siano completi", "F5"),
-            ("Scansione", QStyle.SP_FileDialogContentsView, self._scan,
+            ("Controlla la musica", QStyle.SP_FileDialogContentsView, self._scan,
              "Cerca i problemi nella cartella aperta o sull'iPhone: file non aggiornati, album con pochi brani, "
-             "collezioni divise su più album (con l'AI, se configurata)", "F6"),
+             "collezioni divise su più album, brani duplicati (con l'AI, se configurata)", "F6"),
             ("Impostazioni", QStyle.SP_FileDialogDetailedView, self._open_settings,
              "Cartella della Libreria, profili AI e chiavi", "Ctrl+,"),
             ("Informazioni", QStyle.SP_MessageBoxInformation, self._open_about,

@@ -24,22 +24,6 @@ nome. Risultato come problemi della scansione con la correzione, poi *Rimpiazza*
 con iniziali ("B.B. King"). Numeri misurati: 2.696 nomi, 4 per ordine delle parole, 56 "solo cognome", 33 quasi
 uguali, 47 con iniziali, 656 duetti.
 
-## Scansione: un nome chiaro e la scelta di cosa controllare (con i brani duplicati)
-
-- Il pulsante **"Scansione"** è ambiguo (la spiegazione nel suggerimento è buona, il nome no): diventa **"Controlla
-  la musica"** (deciso).
-- Nella finestra che si apre, dopo la scelta di *cosa* scansionare (cartella aperta o iPhone), una serie di **caselle**
-  per scegliere *quali controlli* fare, ognuna con una riga di spiegazione: file che non si aggiornano, album con pochi
-  brani, collezioni divise su più album, artisti scritti in modi diversi, tag mancanti, file illeggibili e **brani
-  duplicati**. Le scelte si ricordano tra un avvio e l'altro.
-- **Brani duplicati** = **lo stesso brano**, non necessariamente lo stesso file: con l'impronta dell'audio (già in
-  cache) le copie identiche anche con tag e nomi diversi; in più lo stesso brano in file diversi (un MP3 e un FLAC
-  dello stesso pezzo, due codifiche, un remaster uguale nella durata), senza confondere le versioni davvero diverse
-  (dal vivo, remix): l'AI (locale) vede **solo le coppie già sospette** per altri criteri (durata entro 2 s, titolo e
-  artista simili, audio diverso), mai tutti i brani. Oggi la regola "Brani doppi" cerca solo dentro lo stesso album. Nessuna
-  correzione automatica: quale tenere lo decide l'utente (*Mostra i brani*). Dato misurato: 2.718 brani dell'iPhone
-  hanno due o più copie con lo stesso audio nella cartella del PC.
-
 ## Brani "fantasma" sull'iPhone
 
 Brani nel database dell'app Musica il cui file non c'è (uno trovato: `F05/W0084007.mp3`, OBJECT_NOT_FOUND).

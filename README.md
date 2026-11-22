@@ -5,7 +5,7 @@ trovare i problemi della libreria (anche con l'AI) e trasferire la musica da e v
 
 - [Installazione](#installazione)
 - [Funzioni](#funzioni)
-- [La scansione](#la-scansione)
+- [Controlla la musica](#controlla-la-musica)
 - [L'iPhone](#liphone)
 - [L'AI: profili e chiavi](#lai-profili-e-chiavi)
 - [Il file delle variabili (myEasyMP3toIPhone.env)](#il-file-delle-variabili-myeasymp3toiphoneenv)
@@ -45,7 +45,7 @@ Due schede: **PC** (i brani della cartella aperta) e **iPhone** (la musica dell'
 | **Importa cartella** | copia una cartella nella Libreria in `Artista / Album (Anno) / NN - Titolo.ext`, con le modifiche in sospeso applicate alle copie |
 | **Esporta** | copia i brani selezionati (o quelli dell'artista o dell'album scelti negli elenchi) in una cartella, con la stessa struttura e le modifiche in sospeso |
 | **Verifica album** | controlla su [MusicBrainz](https://musicbrainz.org) che gli album siano completi, elenca i brani mancanti, propone i tag corretti e la copertina (in sospeso, per le copie) |
-| **Scansione** | cerca i problemi della cartella aperta o della musica sull'iPhone (vedi sotto) |
+| **Controlla la musica** | cerca i problemi della cartella aperta o della musica sull'iPhone, con i controlli che scegli (vedi sotto) |
 | **Impostazioni** | cartella della Libreria, AI della scansione, profili AI |
 | **Informazioni** | versione, cartella dati, variabili d'ambiente e da dove viene ciascuna, dove sono le chiavi |
 
@@ -59,7 +59,7 @@ sull'intestazione:
 - la riga **(Tutti …)**, sempre in cima, toglie il filtro; scegliere un artista (o "(Tutti)") azzera l'album scelto
   prima; la casella *Cerca* filtra ancora dentro la scelta;
 - **Formato** (accanto a *Cerca*): solo MP3, FLAC, M4A o OGG/Opus, con il numero di brani di ciascuno. Vale per gli
-  elenchi, la tabella, *Esporta*, *Verifica album*, la *Scansione* della cartella e l'invio all'app Musica.
+  elenchi, la tabella, *Esporta*, *Verifica album*, *Controlla la musica* e l'invio all'app Musica.
 
 La tabella dei brani si ordina cliccando sull'intestazione di una colonna (Artista, Album, Titolo, Anno…); finché non
 la clicchi i brani sono in ordine di artista, album, disco e traccia. *Esporta*, *Verifica album* e *Invia all'app Musica*
@@ -108,10 +108,11 @@ copia lo dice e si chiude.
 **File illeggibili.** Un file che non si riesce a leggere (danneggiato, bloccato, disponibile solo online in
 OneDrive…) compare in rosso, con il motivo nel suggerimento, e non interrompe la lettura della cartella.
 
-## La scansione
+## Controlla la musica
 
-*Scansione* (F6) analizza la cartella aperta, oppure la musica dell'app *Musica* dell'iPhone confrontata con la
-Libreria (si può fare anche a iPhone disconnesso, con l'ultimo elenco letto). Prima
+*Controlla la musica* (F6, la "scansione") analizza la cartella aperta, oppure la musica dell'app *Musica* dell'iPhone confrontata con la
+Libreria (si può fare anche a iPhone disconnesso, con l'ultimo elenco letto). Nella finestra scegli **quali controlli
+fare** (le caselle della tabella qui sotto, ognuna con una riga di spiegazione; le scelte si ricordano). Prima
 applica delle regole locali, veloci e gratuite; poi, se scegli di usarla, l'AI. Il rapporto resta in
 `.myEasyMP3toIPhone\scansioni\`. Ogni problema può avere una **correzione**: si applica dalla finestra dei risultati, dopo
 una conferma, come **modifiche in sospeso** (i file sul PC non cambiano; vanno sulle copie inviate all'iPhone); *Mostra
@@ -124,7 +125,7 @@ brani sul PC e poi si usa *Rimpiazza*, o si cambiano dalla scheda iPhone (tasto 
 | **Album con pochi brani** | numeri di traccia mancanti, meno brani del totale dichiarato, album di 1-2 brani; sull'iPhone, album con meno brani che sul PC | (Verifica album trova i titoli mancanti) |
 | **Collezioni divise su più album** | una cartella con brani in album diversi; lo stesso album scritto in modi diversi o con "CD 1"/"Disc 2" nel nome; una compilation senza *Artista album*; lo stesso artista scritto in modi diversi | unifica album e artista album ("Artisti vari" e la spunta *Compilation* per le compilation), sposta il numero del disco in *N. disco* |
 | **Solo sull'iPhone** | brani dell'app Musica senza un brano uguale (artista, album, titolo) nella Libreria del PC | nessuna: salvali sul PC dalla scheda iPhone (tasto destro → *Salva su PC*) |
-| **Brani doppi** | solo **dentro lo stesso album**: una copia "Titolo (2)" con lo stesso album, lo stesso brano (numero e titolo) due volte nell'album. Lo stesso brano in album diversi (l'album originale e una raccolta) è legittimo e non si segnala | nessuna automatica: quale copia tenere lo decidi tu (*Mostra i brani*) |
+| **Brani duplicati** | **lo stesso brano**, non per forza lo stesso file: nello stesso album una copia "Titolo (2)" o lo stesso numero e titolo due volte; ovunque, i file con lo **stesso audio** (impronta, anche con tag e nomi diversi) e i file con stesso artista e titolo e durata entro 2 secondi ma audio diverso (un MP3 e un FLAC, due codifiche). Se titolo o album nominano versioni diverse (live, remix, demo…) la coppia è dubbia e la guarda l'AI, se è accesa: solo quelle coppie, mai tutti i brani; senza AI resta "da controllare". Un problema per artista, una riga per brano. Può essere giusto (l'album e una raccolta): decidi tu | nessuna automatica: quale copia tenere lo decidi tu (*Mostra i brani*) |
 | Tag mancanti, file illeggibili | brani senza titolo/album/artista, file danneggiati | ricava i tag mancanti dai nomi di cartelle e file |
 
 **Con l'AI** l'AI riceve una tabella compatta degli album (artista album, album, anni, numero di brani, numeri presenti,
@@ -414,7 +415,7 @@ programma. La musica invece sta nella Libreria.
 | File | Contenuto |
 |---|---|
 | `myEasyMP3toIPhone.env` | le variabili d'ambiente (sopra) |
-| `settings.json` | cartella della Libreria, ultime cartelle usate, AI della scansione, posizione della finestra |
+| `settings.json` | cartella della Libreria, ultime cartelle usate, AI della scansione e controlli tolti, posizione della finestra |
 | `ai_profiles.json` | i profili AI (senza chiavi e senza indirizzi privati: quelli sono nella Gestione credenziali) |
 | `secrets.json` | solo senza credential store: le chiavi |
 | `scansioni\scansione_<data>.txt` | il rapporto di ogni scansione |
@@ -504,10 +505,21 @@ predefinita resta su questo computer.
 ### L'AI della scansione
 
 1. Il profilo scelto in *Impostazioni → Generale → AI della scansione* (salvato in `settings.json`); *(nessuna)* = solo
-   le regole. La casella *Usa l'AI* della finestra Scansione vale per quella scansione ed è ricordata per la prossima.
-2. Al primo avvio senza profili: "Ollama locale", creato e scelto automaticamente (vedi [La scansione](#la-scansione)).
+   le regole. La casella *Usa l'AI* della finestra *Controlla la musica* vale per quel controllo ed è ricordata per
+   la prossima.
+2. Al primo avvio senza profili: "Ollama locale", creato e scelto automaticamente (vedi
+   [Controlla la musica](#controlla-la-musica)).
    Se cancelli tutti i profili non viene ricreato.
 3. In console `--ai "<profilo>"` vale solo per quella scansione e non si salva; senza, la console usa solo le regole.
+
+### I controlli di "Controlla la musica"
+
+1. Le caselle della finestra: valgono per quel controllo; quelle tolte si ricordano in `settings.json`
+   (`scan_checks_off`), così un controllo nuovo di una versione futura parte acceso.
+2. Al primo uso, e con un `settings.json` senza `scan_checks_off`: tutti i controlli.
+3. In console `--scan`: sempre tutti i controlli.
+
+*File che non si aggiornano* sui file del PC si controlla solo per la cartella aperta, non per l'iPhone.
 
 ### La cartella della Libreria
 

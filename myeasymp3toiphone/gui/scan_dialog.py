@@ -2,8 +2,8 @@
 # Author: Antonio Romeo (with Claude Code et al.)
 # SPDX-License-Identifier: MIT (see the LICENSE file for the full terms)
 
-"""La scansione dall'interfaccia: cosa scansionare (la cartella aperta o la musica dell'app Musica dell'iPhone), l'avvio
-e la finestra dei risultati, da cui si applicano le correzioni."""
+"""Controlla la musica dall'interfaccia: cosa controllare (la cartella aperta o la musica dell'app Musica
+dell'iPhone) e quali controlli fare, l'avvio e la finestra dei risultati, da cui si applicano le correzioni."""
 
 from __future__ import annotations
 
@@ -12,27 +12,31 @@ from html import escape
 from PySide6.QtCore import QUrl, Qt
 from PySide6.QtGui import QBrush, QColor, QDesktopServices
 from PySide6.QtWidgets import (
-    QAbstractItemView, QCheckBox, QDialog, QDialogButtonBox, QHBoxLayout, QHeaderView, QLabel, QMessageBox,
-    QPushButton, QRadioButton, QSplitter, QStyle, QTextBrowser, QTreeWidget, QTreeWidgetItem, QVBoxLayout,
+    QAbstractItemView, QCheckBox, QDialog, QDialogButtonBox, QGridLayout, QGroupBox, QHBoxLayout, QHeaderView, QLabel,
+    QMessageBox, QPushButton, QRadioButton, QSplitter, QStyle, QTextBrowser, QTreeWidget, QTreeWidgetItem, QVBoxLayout,
 )
 
 from ..ai import make_provider
 from ..config import config_dir, load_profiles
 from ..library import scan_folder
 from ..phone_library import tracks_for_scan
-from ..scan import KIND_LABELS, ORIGIN_AI, SEVERITY_HIGH, SEVERITY_MEDIUM, save_report, scan_tracks, tag_changes_of
+from ..scan import (
+    CHECK_DUPLICATES, CHECK_FILES, CHECKS, KIND_LABELS, ORIGIN_AI, SEVERITY_HIGH, SEVERITY_MEDIUM, save_report,
+    scan_tracks, tag_changes_of,
+)
 
+TITLE = "Controlla la musica"
 REPORTS_FOLDER = "scansioni"
 GREEN = QColor(30, 140, 60)
 GREY = QColor(130, 130, 130)
 
 
 class ScanTargetDialog(QDialog):
-    """Cosa scansionare e se usare l'AI."""
+    """Cosa controllare, quali controlli fare (ricordati) e se usare l'AI."""
 
     def __init__(self, window, phone_count: int, profile_name: str) -> None:
         super().__init__(window)
-        self.setWindowTitle("Scansione")
+        self.setWindowTitle(TITLE)
         folder = window.root_folder
         self.local = QRadioButton(f"I brani della cartella aperta ({folder})" if folder else "Nessuna cartella aperta")
         self.local.setEnabled(folder is not None and bool(window.tracks))
@@ -46,26 +50,78 @@ class ScanTargetDialog(QDialog):
             self.local.setChecked(True)
         else:
             self.device.setChecked(self.device.isEnabled())
+
+        off = set(window.app_settings.scan_checks_off)
+        self.boxes = {}
+        grid = QGridLayout()
+        for row, (check_id, label, note) in enumerate(CHECKS):
+            box = QCheckBox(label)
+            box.setChecked(check_id not in off)
+            box.toggled.connect(self._update_start)
+            explanation = QLabel(note)
+            explanation.setWordWrap(True)
+            explanation.setStyleSheet("color: gray")
+            grid.addWidget(box, row, 0, Qt.AlignTop)
+            grid.addWidget(explanation, row, 1)
+            self.boxes[check_id] = box
+        grid.setColumnStretch(1, 1)
+        group = QGroupBox("Cosa controllare")
+        group.setLayout(grid)
+        all_button = QPushButton("Tutti")
+        all_button.clicked.connect(lambda: self._set_all(True))
+        none_button = QPushButton("Nessuno")
+        none_button.clicked.connect(lambda: self._set_all(False))
+        choose = QHBoxLayout()
+        choose.addWidget(all_button)
+        choose.addWidget(none_button)
+        choose.addStretch(1)
+
         self.use_ai = QCheckBox(f"Usa l'AI ({profile_name})" if profile_name else "Usa l'AI (scegli un profilo in "
                                 "Impostazioni → Generale)")
         self.use_ai.setEnabled(bool(profile_name))
         self.use_ai.setChecked(bool(profile_name) and window.app_settings.scan_use_ai)
-        note = QLabel("La scansione cerca: file che non si aggiornano, album con pochi brani, collezioni divise su più "
-                      "album, brani doppi e tag mancanti. Il rapporto resta nella cartella dati (scansioni).")
+        note = QLabel("Brani duplicati: la prima volta si legge l'impronta dell'audio di ogni file (qualche minuto per "
+                      "una collezione grande), poi si ricorda. Il rapporto resta nella cartella dati (scansioni).")
         note.setWordWrap(True)
         note.setStyleSheet("color: gray")
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        buttons.button(QDialogButtonBox.Ok).setText("Avvia")
-        buttons.button(QDialogButtonBox.Ok).setEnabled(self.local.isEnabled() or self.device.isEnabled())
+        self.start_button = buttons.button(QDialogButtonBox.Ok)
+        self.start_button.setText("Avvia")
+        buttons.button(QDialogButtonBox.Cancel).setText("Annulla")
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout = QVBoxLayout(self)
         layout.addWidget(self.local)
         layout.addWidget(self.device)
+        layout.addWidget(group)
+        layout.addLayout(choose)
         layout.addWidget(self.use_ai)
         layout.addWidget(note)
         layout.addWidget(buttons)
-        self.resize(620, 220)
+        self.resize(760, 520)
+        self._update_start()
+
+    def _set_all(self, checked: bool) -> None:
+        for box in self.boxes.values():
+            box.setChecked(checked)
+
+    def _update_start(self) -> None:
+        self.start_button.setEnabled((self.local.isEnabled() or self.device.isEnabled()) and bool(self.checks()))
+
+    def checks(self) -> frozenset:
+        chosen = set()
+        for check_id, box in self.boxes.items():
+            if box.isChecked():
+                chosen.add(check_id)
+        result = frozenset(chosen)
+        return result
+
+    def checks_off(self) -> list:
+        result = []
+        for check_id, box in self.boxes.items():
+            if not box.isChecked():
+                result.append(check_id)
+        return result
 
 
 class ScanLauncher:
@@ -87,28 +143,39 @@ class ScanLauncher:
         dialog = ScanTargetDialog(window, len(window.phone_tracks), profile.name if profile else "")
         if dialog.exec():
             window.app_settings.scan_use_ai = dialog.use_ai.isChecked()
+            window.app_settings.scan_checks_off = dialog.checks_off()
             window.save_settings()
             provider = None
             if dialog.use_ai.isChecked() and profile is not None:
                 provider = make_provider(profile)
             if dialog.device.isChecked():
-                self._start_device(provider)
+                self._start_device(provider, dialog.checks())
             else:
-                self._start_local(provider)
+                self._start_local(provider, dialog.checks())
 
-    def _start_local(self, provider) -> None:
+    def _start_local(self, provider, checks: frozenset) -> None:
+        from ..adoption import pc_fingerprints
         window = self.window
         tracks = window.format_tracks()
         target = str(window.root_folder)
         self.library_tracks = tracks
+        tag_cache = window.tag_cache
 
         def work(progress, cancel):
-            value = scan_tracks(tracks, target, provider, check_files=True, progress=progress, cancel=cancel)
+            prints = {}
+            if CHECK_DUPLICATES in checks:
+                progress(0, 0, "impronte dell'audio")
+                prints = pc_fingerprints(tracks, tag_cache, progress, cancel)
+            value = scan_tracks(tracks, target, provider, check_files=CHECK_FILES in checks, progress=progress,
+                                cancel=cancel, checks=checks, fingerprints=prints)
             return value
 
-        window.runner.run("Scansione", work, self._show)
+        window.runner.run("Controllo della musica", work, self._show)
 
-    def _start_device(self, provider) -> None:
+    def _start_device(self, provider, checks: frozenset) -> None:
+        from pathlib import Path
+
+        from ..provenance import PhoneFingerprints
         window = self.window
         library = window.library_dir()
         loaded = list(window.tracks) if window.root_folder == library else None
@@ -121,8 +188,15 @@ class ScanLauncher:
             if library_tracks is None:
                 library_tracks = scan_folder(library, progress, cancel, window.tag_cache) if library.is_dir() else []
             window.overlay.apply(library_tracks)
+            known = PhoneFingerprints(config_dir())
+            prints = {}
+            for item in phone_tracks:
+                value = known.get(item.remote_path, item.size)    # solo quelle già lette da Associa sorgenti
+                if value:
+                    prints[str(Path(item.remote_path))] = value
             report = scan_tracks(tracks, target, provider, check_files=False, phone_tracks=phone_tracks,
-                                 library_tracks=library_tracks, progress=progress, cancel=cancel)
+                                 library_tracks=library_tracks, progress=progress, cancel=cancel, checks=checks,
+                                 fingerprints=prints)
             value = (report, library_tracks)
             return value
 
@@ -131,21 +205,21 @@ class ScanLauncher:
             self.library_tracks = library_tracks
             self._show(report)
 
-        window.runner.run("Scansione dell'iPhone", work, done)
+        window.runner.run("Controllo della musica dell'iPhone", work, done)
 
     def _show(self, report) -> None:
         saved = None
         try:
             saved = save_report(report, config_dir() / REPORTS_FOLDER)
         except OSError as exc:
-            QMessageBox.warning(self.window, "Scansione", f"Rapporto non salvato: {exc}")
+            QMessageBox.warning(self.window, TITLE, f"Rapporto non salvato: {exc}")
         ScanDialog(report, saved, self).exec()
 
 
 class ScanDialog(QDialog):
     def __init__(self, report, saved, launcher: ScanLauncher) -> None:
         super().__init__(launcher.window)
-        self.setWindowTitle(f"Scansione: {report.target}")
+        self.setWindowTitle(f"{TITLE}: {report.target}")
         self.resize(1150, 680)
         self.report = report
         self.saved = saved
@@ -158,7 +232,7 @@ class ScanDialog(QDialog):
         if report.ai_profile:
             summary += f" — analisi AI con {escape(report.ai_profile)}"
         if report.cancelled:
-            summary += " — <b>scansione interrotta: risultati parziali</b>"
+            summary += " — <b>controllo interrotto: risultati parziali</b>"
         for error in report.ai_errors[:3]:
             summary += f"<br><span style='color:#c33'>Errore AI: {escape(error)}</span>"
         header = QLabel(summary)
@@ -250,7 +324,8 @@ class ScanDialog(QDialog):
         selected = self._selected_issues()
         if selected:
             index, issue = selected[0]
-            html = f"<h3>{escape(issue.title)}</h3><p>{escape(issue.detail)}</p>"
+            detail = escape(issue.detail).replace("\n", "<br>")
+            html = f"<h3>{escape(issue.title)}</h3><p>{detail}</p>"
             if issue.origin == ORIGIN_AI:
                 html += "<p><i>Trovato dall'AI.</i></p>"
             if issue.ai_note:
