@@ -2109,4 +2109,24 @@ CATALOG = {
         '{0}\nOn the iPhone this track has different tags: Align the tags (iPhone tab, right click) chooses which to keep',
     "<b>Come funziona.</b> Qui vedi la musica dell'app <b>Musica</b> dell'iPhone, con i titoli, gli artisti e gli album che mostra l'app. La colonna <b>Sul PC</b> la confronta con il PC: ✔ la sorgente, stessi tag; ⟳ la sorgente, tag diversi; ≈ da rivedere (un brano con gli stessi tag nella cartella aperta, non certo); ✖ la sorgente non c'è più; vuoto = non trovato. <b>Sorgente</b>: il file da cui viene il brano (questo PC, un altro computer, nessuna, telefono); <b>Associa sorgenti</b> la ritrova, <b>Mostra</b> filtra.<br>Tasto destro su uno o più brani: <b>Salva su PC</b>, <b>Mostra nella scheda PC</b>, <b>Rimpiazza con la versione del PC</b> (per i ⟳), <b>Cambia tag</b>, <b>Associa sorgente</b>, <b>Togli sorgente</b>, <b>Elimina dall'iPhone</b>. Per mandare brani nuovi: tasto destro nella scheda PC → <b>Invia all'iPhone</b>. PC e iPhone non si allineano da soli: <b>Allinea i tag</b> sceglie la direzione (i file del PC cambiano solo dopo la tua conferma).<br><b>Attenzione:</b> {0}":
         '<b>How it works.</b> Here you see the music of the iPhone <b>Music</b> app, with the titles, artists and albums the app shows. The <b>On the PC</b> column compares it with the PC: ✔ the source, same tags; ⟳ the source, different tags; ≈ to review (a track with the same tags in the open folder, not certain); ✖ the source is gone; empty = not found. <b>Source</b>: the file the track comes from (this PC, another computer, none, phone); <b>Link sources</b> finds it, <b>Show</b> filters.<br>Right click on one or more tracks: <b>Save to PC</b>, <b>Show in the PC tab</b>, <b>Replace with the PC version</b> (for ⟳), <b>Change tags</b>, <b>Link source</b>, <b>Remove source</b>, <b>Delete from the iPhone</b>. To send new tracks: right click in the PC tab → <b>Send to iPhone</b>. PC and iPhone do not align by themselves: <b>Align the tags</b> chooses the direction (the PC files change only after you confirm).<br><b>Warning:</b> {0}',
+    'Le cartelle nascoste con il tasto destro: qui le mostri di nuovo':
+        'The folders hidden with the right click: show them again here',
+    'Cartelle nascoste ({0})…':
+        'Hidden folders ({0})…',
+    'Nascoste {0} cartelle: le mostri di nuovo con Cartelle nascoste… in alto':
+        'Hid {0} folders: show them again with Hidden folders… at the top',
+    'Cartelle nascoste':
+        'Hidden folders',
+    'Spunta le cartelle da mostrare di nuovo nella scheda PC (i file non sono mai cambiati).':
+        'Check the folders to show again in the PC tab (the files never changed).',
+    'Mostra le spuntate':
+        'Show the checked ones',
+    '{0} brani caricati':
+        '{0} tracks loaded',
+    ' ({0} nelle cartelle nascoste)':
+        ' ({0} in the hidden folders)',
+    'Nascondi la cartella ({0})':
+        'Hide the folder ({0})',
+    'Non mostrare più i brani di questa cartella (e delle sue sottocartelle) nella scheda PC: i file non cambiano; Cartelle nascoste… in alto le mostra di nuovo':
+        'Stop showing the tracks of this folder (and its subfolders) in the PC tab: the files do not change; Hidden folders… at the top shows them again',
 }

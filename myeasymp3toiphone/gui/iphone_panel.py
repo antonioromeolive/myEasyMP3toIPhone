@@ -322,11 +322,11 @@ class IPhonePanel(QWidget):
         self._music_view.customContextMenuRequested.connect(self._show_menu)
         self._music_view.viewport().installEventFilter(self)    # il suggerimento di Sul PC, al passaggio del mouse
         header = self._music_view.header()
-        header.setSectionResizeMode(QHeaderView.Interactive)
-        header.setStretchLastSection(False)
+        header.setSectionResizeMode(QHeaderView.Interactive)   # tutte trascinabili, nei due versi
+        header.setStretchLastSection(True)
+        header.setMinimumSectionSize(30)
         for column, width in COLUMN_WIDTHS.items():
             self._music_view.setColumnWidth(column, width)
-        header.setSectionResizeMode(COL_TITLE, QHeaderView.Stretch)
 
         self._refresh_button = QPushButton("Aggiorna")
         self._refresh_button.setToolTip("Rilegge la musica dell'app Musica dall'iPhone connesso; senza iPhone rifà "

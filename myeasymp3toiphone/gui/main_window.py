@@ -5,14 +5,15 @@
 """Finestra principale di myEasyMP3toIPhone. Le cartelle aperte sono in sola lettura: le modifiche dei tag restano in
 sospeso (overlay) e vanno solo sulle copie inviate all'iPhone, esportate o importate."""
 
+import os
 from pathlib import Path
 from typing import Optional
 
 from PySide6.QtCore import QByteArray, QItemSelection, QItemSelectionModel, QSize, Qt, QTimer
 from PySide6.QtGui import QAction, QColor, QKeySequence
 from PySide6.QtWidgets import (
-    QAbstractItemView, QApplication, QComboBox, QFileDialog, QFrame, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMainWindow,
-    QMenu, QMessageBox, QPushButton, QScrollArea, QSplitter, QStyle, QTableView, QTabWidget,
+    QAbstractItemView, QApplication, QComboBox, QDialog, QDialogButtonBox, QFileDialog, QFrame, QHBoxLayout,
+    QHeaderView, QLabel, QLineEdit, QListWidget, QListWidgetItem, QMainWindow, QMenu, QMessageBox, QPushButton, QScrollArea, QSplitter, QStyle, QTableView, QTabWidget,
     QToolBar, QVBoxLayout, QWidget,
 )
 
@@ -95,7 +96,8 @@ class MainWindow(QMainWindow):
         self._album_results = []
         self._album_total = 0
         self._album_dialog = None
-        self.tracks = []
+        self.tracks = []           # i brani della cartella aperta, senza quelli delle cartelle nascoste
+        self._all_tracks = []      # tutti i brani letti, anche quelli nascosti
         self._visible = []
         self.root_folder: Optional[Path] = None
         self.check_results = {}
@@ -187,6 +189,11 @@ class MainWindow(QMainWindow):
         top.addWidget(self._format)
         top.addWidget(self._folder_label, 1)
         top.addWidget(self._reload_button)
+        self._hidden_button = QPushButton()
+        self._hidden_button.setToolTip("Le cartelle nascoste con il tasto destro: qui le mostri di nuovo")
+        self._hidden_button.clicked.connect(self._show_hidden_folders)
+        top.addWidget(self._hidden_button)
+        self._update_hidden_button()
 
         self.browser = LibraryBrowser()
         self.browser.filter_changed.connect(self._fill_table)
@@ -206,6 +213,7 @@ class MainWindow(QMainWindow):
         header = self._table.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.Interactive)
         header.setStretchLastSection(True)
+        header.setMinimumSectionSize(30)
         # nessun ordinamento iniziale: si mantiene l'ordine Artista/Album/Disco/Traccia finché l'utente non clicca
         # un'intestazione di colonna (Artista, Album, Titolo…), che poi mostra la freccia dell'ordinamento
         header.setSortIndicator(-1, Qt.AscendingOrder)
@@ -388,6 +396,93 @@ class MainWindow(QMainWindow):
             self.save_settings()
             self.load_folder(Path(folder))
 
+    # ------------------------------------------------------------------ cartelle nascoste
+
+    @staticmethod
+    def _folder_key(folder) -> str:
+        result = os.path.normcase(os.path.abspath(str(folder)))
+        return result
+
+    def _is_hidden(self, path: Path, hidden: list) -> bool:
+        """Il file è in una cartella nascosta o in una sua sottocartella."""
+        key = self._folder_key(path.parent)
+        result = False
+        for folder in hidden:
+            if key == folder or key.startswith(folder.rstrip("\\/") + os.sep):
+                result = True
+        return result
+
+    def _without_hidden(self, tracks: list) -> list:
+        hidden = []
+        for folder in self.app_settings.hidden_folders:
+            hidden.append(self._folder_key(folder))
+        result = []
+        for track in tracks:
+            if not hidden or not self._is_hidden(track.path, hidden):
+                result.append(track)
+        return result
+
+    def _update_hidden_button(self) -> None:
+        count = len(self.app_settings.hidden_folders)
+        self._hidden_button.setText(f"Cartelle nascoste ({count})…")
+        self._hidden_button.setVisible(count > 0)
+
+    def hide_folders(self, folders: list) -> None:
+        """Nasconde le cartelle (con le sottocartelle) nella scheda PC: i file non cambiano, si ricorda in
+        settings.json."""
+        known = set()
+        for folder in self.app_settings.hidden_folders:
+            known.add(self._folder_key(folder))
+        added = 0
+        for folder in folders:
+            if self._folder_key(folder) not in known:
+                self.app_settings.hidden_folders.append(str(folder))
+                known.add(self._folder_key(folder))
+                added += 1
+        self.save_settings()
+        self._apply_hidden()
+        self.statusBar().showMessage(f"Nascoste {added} cartelle: le mostri di nuovo con Cartelle nascoste… in alto",
+                                     10000)
+
+    def _apply_hidden(self) -> None:
+        before = len(self.tracks)
+        self.tracks = self._without_hidden(self._all_tracks)
+        self._update_hidden_button()
+        if len(self.tracks) != before:
+            self._rebuild_views()
+
+    def _show_hidden_folders(self) -> None:
+        """La finestra delle cartelle nascoste: quelle spuntate si mostrano di nuovo."""
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Cartelle nascoste")
+        dialog.resize(700, 360)
+        label = QLabel("Spunta le cartelle da mostrare di nuovo nella scheda PC (i file non sono mai cambiati).")
+        label.setWordWrap(True)
+        folders = QListWidget()
+        for folder in self.app_settings.hidden_folders:
+            item = QListWidgetItem(folder)
+            item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+            item.setCheckState(Qt.Unchecked)
+            folders.addItem(item)
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.button(QDialogButtonBox.Ok).setText("Mostra le spuntate")
+        buttons.button(QDialogButtonBox.Cancel).setText("Chiudi")
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        layout = QVBoxLayout(dialog)
+        layout.addWidget(label)
+        layout.addWidget(folders, 1)
+        layout.addWidget(buttons)
+        if dialog.exec():
+            kept = []
+            for index in range(folders.count()):
+                item = folders.item(index)
+                if item.checkState() != Qt.Checked:
+                    kept.append(item.text())
+            self.app_settings.hidden_folders = kept
+            self.save_settings()
+            self._apply_hidden()
+
     def reload_folder(self) -> None:
         """Aggiorna: rilegge la cartella aperta; con Maiusc premuto tutti i file, senza la cache dei tag."""
         if self.root_folder is None:
@@ -407,7 +502,8 @@ class MainWindow(QMainWindow):
         def done(tracks):
             protect_folder(folder)
             self.overlay.apply(tracks)
-            self.tracks = tracks
+            self._all_tracks = tracks
+            self.tracks = self._without_hidden(tracks)
             self.root_folder = folder
             self.app_settings.last_opened = str(folder)   # riaperta al prossimo avvio
             self.save_settings()
@@ -419,8 +515,11 @@ class MainWindow(QMainWindow):
             self._folder_label.setText(label)
             self._rebuild_views()
             self._tabs.setCurrentIndex(0)
-            self.statusBar().showMessage(f"{len(tracks)} brani caricati (sola lettura: i file non vengono "
-                                         "modificati)", 8000)
+            hidden = len(tracks) - len(self.tracks)
+            text = f"{len(self.tracks)} brani caricati"
+            if hidden:
+                text += f" ({hidden} nelle cartelle nascoste)"
+            self.statusBar().showMessage(text, 8000)
             self.iphone_panel.check_missing_sources()
 
         self.runner.run("Lettura brani", work, done)
@@ -766,6 +865,15 @@ class MainWindow(QMainWindow):
             for track in tracks:
                 paths.append(track.path)
             add_file_entries(menu, paths, lambda text: self.statusBar().showMessage(text, 8000))
+            menu.addSeparator()
+            distinct = []
+            for path in paths:
+                if path.parent not in distinct:
+                    distinct.append(path.parent)
+            hide = menu.addAction(f"Nascondi la cartella ({len(distinct)})")
+            hide.setToolTip("Non mostrare più i brani di questa cartella (e delle sue sottocartelle) nella scheda PC: "
+                            "i file non cambiano; Cartelle nascoste… in alto le mostra di nuovo")
+            hide.triggered.connect(lambda: self.hide_folders(distinct))
             menu.setToolTipsVisible(True)
             menu.exec(self._table.viewport().mapToGlobal(position))
 

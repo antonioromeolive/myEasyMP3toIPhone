@@ -121,3 +121,37 @@ def test_last_opened_folder_is_reopened(tmp_path):
     _wait(window, app)
     assert window.root_folder == library
     assert AppSettings.load().last_opened == str(library)   # ora l'ultima usata è la Libreria
+
+
+def test_hide_folder_in_pc_tab(tmp_path):
+    """Nascondi la cartella: i suoi brani (e quelli delle sottocartelle) spariscono dalla scheda PC, si ricorda, si
+    mostrano di nuovo. I file non cambiano."""
+    import os
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from pathlib import Path
+    from PySide6.QtWidgets import QApplication
+    from myeasymp3toiphone.config import AppSettings
+    from myeasymp3toiphone.gui.main_window import MainWindow
+    from myeasymp3toiphone.library import Track, assign_groups
+    from myeasymp3toiphone.tags import TrackTags
+    app = QApplication.instance() or QApplication([])
+    window = MainWindow()
+    try:
+        tracks = []
+        for folder, title in (("A", "Uno"), ("A/CD2", "Due"), ("AB", "Tre"), ("B", "Quattro")):
+            tracks.append(Track(path=Path(f"C:/musica/{folder}/{title}.mp3"),
+                                tags=TrackTags(title=title, artist="X", album="Y")))
+        assign_groups(tracks)
+        window._all_tracks = list(tracks)
+        window.tracks = list(tracks)
+        window._rebuild_views()
+        window.hide_folders([Path("C:/musica/A")])
+        assert sorted(track.title for track in window.tracks) == ["Quattro", "Tre"]     # "AB" non è dentro "A"
+        assert AppSettings.load().hidden_folders == [str(Path("C:/musica/A"))]
+        assert window._hidden_button.text().startswith("Cartelle nascoste (1)")
+        window.app_settings.hidden_folders = []
+        window._apply_hidden()
+        assert len(window.tracks) == 4
+    finally:
+        window.close()
+        app.processEvents()

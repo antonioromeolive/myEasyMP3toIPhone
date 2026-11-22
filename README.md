@@ -86,6 +86,13 @@ Generale → Mostra il percorso completo delle cartelle*. Il suggerimento di tut
 cartella** (negli appunti, una riga per brano; le cartelle una volta sola) e **Apri la cartella in Esplora risorse**
 (un file solo: selezionato; più cartelle: le prime 5).
 
+**Nascondi la cartella** (tasto destro sui brani): i brani delle cartelle che li contengono, sottocartelle comprese,
+spariscono dalla scheda PC (elenchi, tabella, controlli). I file non cambiano. Si ricorda tra un avvio e l'altro; il
+pulsante **Cartelle nascoste (N)…** in alto le elenca e mostra di nuovo quelle che spunti.
+
+**Larghezza delle colonne.** Ogni colonna si allarga e si stringe trascinando il bordo dell'intestazione, in tutte e due
+le schede e negli elenchi Artisti e Album; se non ci stanno tutte compare la barra di scorrimento.
+
 **Colonna iPhone.** Per ogni brano: **✔** nell'app *Musica* dell'iPhone c'è questo brano (la sua sorgente è questo
 file, dal registro della provenienza), con gli stessi tag; **⟳** c'è, ma con tag diversi; **≈** grigio, *da rivedere*:
 sull'iPhone c'è un brano con lo stesso titolo e album e un artista in comune, ma non è collegato a questo file, quindi
@@ -547,7 +554,7 @@ programma. La musica invece sta nella Libreria.
 | File | Contenuto |
 |---|---|
 | `myEasyMP3toIPhone.env` | le variabili d'ambiente (sopra) |
-| `settings.json` | cartella della Libreria, ultime cartelle usate, AI della scansione e controlli tolti, lingua, percorso completo delle cartelle, cataloghi di *Verifica album online*, posizione della finestra |
+| `settings.json` | cartella della Libreria, ultime cartelle usate, AI della scansione e controlli tolti, lingua, percorso completo delle cartelle, cartelle nascoste, cataloghi di *Verifica album online*, posizione della finestra |
 | `ai_profiles.json` | i profili AI (senza chiavi e senza indirizzi privati: quelli sono nella Gestione credenziali) |
 | `secrets.json` | solo senza credential store: le chiavi |
 | `scansioni\scansione_<data>.txt` | il rapporto di ogni scansione |
@@ -675,6 +682,13 @@ In inglese sono in inglese finestre, pulsanti, menu, messaggi, la barra di stato
 la colonna *Cartella* della scheda PC e *Cartella della sorgente* della scheda iPhone, subito. Senza: spento (il solo
 nome della cartella). Le colonne dei file mostrano sempre il solo nome; il suggerimento delle celle mostra sempre il
 percorso completo.
+
+### Le cartelle nascoste
+
+1. `hidden_folders` in `settings.json`: si aggiunge con tasto destro → *Nascondi la cartella* nella scheda PC e si
+   toglie con *Cartelle nascoste (N)…*. Vale subito, per ogni cartella aperta (anche la Libreria), con le sottocartelle;
+   le maiuscole non contano.
+2. Senza: nessuna cartella nascosta.
 
 ### I cataloghi di "Verifica album online"
 

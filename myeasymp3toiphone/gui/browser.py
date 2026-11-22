@@ -62,7 +62,9 @@ class SortableItem(QTreeWidgetItem):
         return result
 
 
-def _make_list(headers: list) -> QTreeWidget:
+def _make_list(headers: list, widths: list) -> QTreeWidget:
+    """Un elenco con le colonne tutte trascinabili, nei due versi (una colonna "Stretch" o "ResizeToContents" non si
+    può trascinare), con le larghezze iniziali date; se non ci stanno compare la barra di scorrimento."""
     widget = QTreeWidget()
     widget.setHeaderLabels(headers)
     widget.setRootIsDecorated(False)
@@ -72,10 +74,11 @@ def _make_list(headers: list) -> QTreeWidget:
     widget.setSortingEnabled(True)
     header = widget.header()
     header.setSortIndicatorShown(True)
-    header.setSectionResizeMode(0, QHeaderView.Stretch)
+    header.setSectionResizeMode(QHeaderView.Interactive)
     header.setStretchLastSection(False)
-    for column in range(1, len(headers)):
-        header.setSectionResizeMode(column, QHeaderView.ResizeToContents)
+    header.setMinimumSectionSize(30)
+    for column, width in enumerate(widths):
+        widget.setColumnWidth(column, width)
     widget.sortByColumn(0, Qt.AscendingOrder)
     return widget
 
@@ -89,8 +92,8 @@ class LibraryBrowser(QWidget):
         self._groups = {}
         self._check_results = {}
         self.phone_state = None            # brani -> (Qt.CheckState, in attesa) o None; lo imposta la finestra
-        self.artists = _make_list(["Artista", "Album", "Brani"])
-        self.albums = _make_list(["Album", "Artista", "Anno", "Brani"])
+        self.artists = _make_list(["Artista", "Album", "Brani"], [260, 55, 60])
+        self.albums = _make_list(["Album", "Artista", "Anno", "Brani"], [300, 220, 70, 55])
         self.artists.itemSelectionChanged.connect(self._artists_changed)
         self.albums.itemSelectionChanged.connect(self.filter_changed.emit)
         self.artists.itemChanged.connect(self._item_changed)
