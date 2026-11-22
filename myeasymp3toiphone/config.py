@@ -526,6 +526,7 @@ class AppSettings:
     scan_profile: str = ""          # il profilo AI della scansione; "" = senza AI
     scan_use_ai: bool = True
     scan_checks_off: list = field(default_factory=list)   # i controlli tolti in "Controlla la musica"
+    scan_musicbrainz: bool = False  # i nomi d'artista dubbi anche su MusicBrainz (lento)
     window_geometry: str = ""       # base64 di QMainWindow.saveGeometry
     extra: dict = field(default_factory=dict)
 

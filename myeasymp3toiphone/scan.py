@@ -34,6 +34,10 @@ from mutagen.apev2 import APENoHeaderError, APEv2
 from .library import (
     UNKNOWN_ALBUM, UNKNOWN_ARTIST, Track, assign_groups, best_spelling, group_by_album, is_cancelled,
 )
+from .artist_names import (
+    candidate_pairs, clusters, duet_parts, duet_proposal, musicbrainz_keys, variant_key, with_guests,
+)
+from .artist_names import ask_ai as ask_ai_names
 from .phone_library import DEVICE_ABSENT, DEVICE_STALE, PhoneIndex, device_status
 from .tags import TrackTags
 
@@ -535,12 +539,13 @@ def detect_split_names(tracks: list) -> list:
 
 
 def detect_artist_variants(tracks: list) -> list:
-    """Lo stesso artista scritto in modi diversi ("The Beatles"/"Beatles", "AC/DC"/"ACDC", maiuscole)."""
+    """Lo stesso artista scritto in modi diversi, certo: "The Beatles"/"Beatles", "AC/DC"/"ACDC", maiuscole, accenti,
+    "Battiato Franco"/"Franco Battiato" (artist_names.variant_key)."""
     by_norm = {}
     for track in tracks:
         name = track.display_artist
         if name != UNKNOWN_ARTIST:
-            by_norm.setdefault(artist_norm(name), []).append(track)
+            by_norm.setdefault(variant_key(name), []).append(track)
     issues = []
     number = 0
     for norm, artist_tracks in sorted(by_norm.items()):
@@ -553,7 +558,7 @@ def detect_artist_variants(tracks: list) -> list:
                 wanted = {}
                 if track.tags.album_artist and track.tags.album_artist != chosen:
                     wanted["album_artist"] = chosen
-                if track.tags.artist and artist_norm(track.tags.artist) == norm and track.tags.artist != chosen:
+                if track.tags.artist and variant_key(track.tags.artist) == norm and track.tags.artist != chosen:
                     wanted["artist"] = chosen
                 if wanted:
                     changes.append((track.path, wanted))
@@ -563,6 +568,175 @@ def detect_artist_variants(tracks: list) -> list:
                 [t.path for t in artist_tracks],
                 Fix(FIX_TAGS, f"Scrivi ovunque \"{chosen}\"", changes=changes), rule_id=f"R14.{number}"))
     return issues
+
+
+def _solo_names(tracks: list) -> dict:
+    """{variant_key: grafia più usata} degli artisti che non sono duetti."""
+    by_key = {}
+    for track in tracks:
+        name = track.display_artist
+        if name != UNKNOWN_ARTIST and len(duet_parts(name)) == 1:
+            by_key.setdefault(variant_key(name), []).append(name)
+    result = {}
+    for key, written in by_key.items():
+        result[key] = _most_common(written)
+    return result
+
+
+def detect_duets(tracks: list) -> list:
+    """I duetti ("A & B", "A feat. B", "A, B"): l'app Musica non gestisce più artisti, quindi artista e artista
+    dell'album diventano l'artista principale (il primo nome, se c'è anche da solo) e gli ospiti vanno nel titolo,
+    "Titolo (feat. B)". Un nome come "Simon & Garfunkel" (nessuno dei due da solo) resta com'è."""
+    solos = _solo_names(tracks)
+    by_principal = {}
+    for track in tracks:
+        wanted = {}
+        principal = ""
+        proposal = duet_proposal(track.tags.artist, solos) if track.tags.artist else None
+        if proposal is not None:
+            principal, guests = proposal
+            wanted["artist"] = principal
+            title = with_guests(track.tags.title, guests)
+            if title != track.tags.title:
+                wanted["title"] = title
+        album_proposal = duet_proposal(track.tags.album_artist, solos) if track.tags.album_artist else None
+        if album_proposal is not None:
+            wanted["album_artist"] = album_proposal[0]
+            principal = principal or album_proposal[0]
+        if wanted:
+            by_principal.setdefault(principal, []).append((track, wanted))
+    issues = []
+    number = 0
+    for principal in sorted(by_principal, key=str.lower):
+        found = by_principal[principal]
+        number += 1
+        changes = []
+        examples = []
+        for track, wanted in found:
+            changes.append((track.path, wanted))
+            if len(examples) < 6:
+                examples.append(f"{track.tags.artist or track.tags.album_artist} — {track.tags.title}")
+        issues.append(Issue(
+            KIND_SPLIT, SEVERITY_LOW, f"{principal}: {_tracks_text(len(found))} in duetto",
+            "L'app Musica non gestisce più artisti per brano: i duetti dividono la collezione dell'artista. "
+            f"Artista (e artista dell'album) diventano \"{principal}\", gli ospiti vanno nel titolo (feat. …).\n"
+            + "\n".join(examples), [track.path for track, _wanted in found],
+            Fix(FIX_TAGS, f"Artista \"{principal}\", ospiti nel titolo", changes=changes), rule_id=f"R17.{number}"))
+    return issues
+
+
+def _artist_context(tracks: list) -> tuple:
+    """({variant_key: grafia più usata}, {variant_key: (brani, "album (anno); …")}, {variant_key: [brani]})."""
+    by_key = {}
+    for track in tracks:
+        name = track.display_artist
+        if name != UNKNOWN_ARTIST and len(duet_parts(name)) == 1:
+            by_key.setdefault(variant_key(name), []).append(track)
+    names = {}
+    context = {}
+    for key, key_tracks in by_key.items():
+        names[key] = _most_common([track.display_artist for track in key_tracks])
+        albums = []
+        for track in key_tracks:
+            label = f"{track.tags.album} ({track.tags.year})" if track.tags.year else track.tags.album
+            if label and label not in albums and len(albums) < 3:
+                albums.append(label)
+        context[key] = (len(key_tracks), "; ".join(albums))
+    result = (names, context, by_key)
+    return result
+
+
+def _unify_artist(keys: list, names: dict, context: dict, by_key: dict) -> tuple:
+    """(grafia scelta, file, modifiche) per unire i nomi delle chiavi nella forma più usata (più brani)."""
+    chosen_key = keys[0]
+    for key in keys:
+        if context[key][0] > context[chosen_key][0]:
+            chosen_key = key
+    chosen = names[chosen_key]
+    files = []
+    changes = []
+    for key in keys:
+        for track in by_key[key]:
+            files.append(track.path)
+            wanted = {}
+            if track.tags.album_artist and variant_key(track.tags.album_artist) in keys \
+                    and track.tags.album_artist != chosen:
+                wanted["album_artist"] = chosen
+            if track.tags.artist and variant_key(track.tags.artist) in keys and track.tags.artist != chosen:
+                wanted["artist"] = chosen
+            if wanted:
+                changes.append((track.path, wanted))
+    result = (chosen, files, changes)
+    return result
+
+
+def detect_artist_doubts(tracks: list, provider=None, musicbrainz=None, progress: Optional[ProgressFn] = None,
+                         cancel: Optional[threading.Event] = None) -> tuple:
+    """I nomi forse dello stesso artista: solo il cognome ("Battiato"), iniziali ("F. Battiato"), errori di battitura.
+    Decide MusicBrainz (se chiesto: nome e alias dello stesso artista), poi l'AI (con album e anni); senza nessuno
+    dei due restano "da controllare". (problemi con la correzione verso la forma più usata, errori)."""
+    from .albumcheck import AlbumCheckError
+    names, context, by_key = _artist_context(tracks)
+    groups = clusters(candidate_pairs(names))
+    decided = {}
+    errors = []
+    if musicbrainz is not None:
+        index = 0
+        while index < len(groups) and not is_cancelled(cancel) and not errors:
+            members, _why = groups[index]
+            if progress is not None:
+                progress(index, len(groups), f"MusicBrainz: nomi d'artista dubbi ({index + 1} di {len(groups)})")
+            biggest = members[0]
+            for key in members:
+                if context[key][0] > context[biggest][0]:
+                    biggest = key
+            try:
+                known = musicbrainz_keys(musicbrainz, names[biggest])
+            except AlbumCheckError as exc:
+                errors.append(f"nomi degli artisti su MusicBrainz: {exc}")
+                known = set()
+            matched = []
+            for key in members:
+                if key in known:
+                    matched.append(key)
+            if len(matched) > 1:
+                decided[index] = ([matched], ORIGIN_RULE, "nomi o alias dello stesso artista su MusicBrainz")
+            index += 1
+    if provider is not None and not is_cancelled(cancel):
+        open_indexes = []
+        for index in range(len(groups)):
+            if index not in decided:
+                open_indexes.append(index)
+        asked = []
+        for index in open_indexes:
+            asked.append(groups[index])
+        answers, ai_errors = ask_ai_names(provider, asked, names, context, progress, cancel)
+        errors += ai_errors
+        for position, (sets, reason) in answers.items():
+            decided[open_indexes[position]] = (sets, ORIGIN_AI, f"AI: {reason}" if reason else "AI")
+    issues = []
+    number = 0
+    for index, (members, why) in enumerate(groups):
+        sets, origin, reason = decided.get(index, ([members], ORIGIN_RULE, ""))
+        confirmed = index in decided
+        if not confirmed:
+            reason = "da controllare: " + ", ".join(sorted(set(why.values())))
+        for keys in sets:
+            number += 1
+            chosen, files, changes = _unify_artist(keys, names, context, by_key)
+            written = []
+            for key in keys:
+                written.append(f"{names[key]} ({_tracks_text(context[key][0])})")
+            title = ("Lo stesso artista scritto in modi diversi: " if confirmed else "Forse lo stesso artista: ") \
+                + ", ".join(written)
+            issues.append(Issue(
+                KIND_SPLIT, SEVERITY_MEDIUM if confirmed else SEVERITY_LOW, title,
+                f"Le varianti dividono la collezione dell'artista negli elenchi e sull'iPhone ({reason}). Vince la "
+                "forma più usata.", files,
+                Fix(FIX_TAGS, f"Scrivi ovunque \"{chosen}\"", changes=changes) if changes else None,
+                origin=origin, rule_id=f"R16.{number}"))
+    result = (issues, errors)
+    return result
 
 
 def _file_set(issue: Issue) -> set:
@@ -626,6 +800,7 @@ def rule_issues(tracks: list, check_files: bool, progress: Optional[ProgressFn] 
         issues += detect_split_names(tracks)
     if CHECK_VARIANTS in checks:
         issues += detect_artist_variants(tracks)
+        issues += detect_duets(tracks)
     result = merge_overlapping(issues)
     return result
 
@@ -1163,10 +1338,12 @@ def ai_review(provider, tracks: list, issues: list, progress: Optional[ProgressF
 def scan_tracks(tracks: list, target: str, provider=None, check_files: bool = True,
                 phone_tracks: Optional[list] = None, library_tracks: Optional[list] = None,
                 progress: Optional[ProgressFn] = None, cancel: Optional[threading.Event] = None,
-                checks: frozenset = ALL_CHECKS, fingerprints: Optional[dict] = None) -> ScanReport:
+                checks: frozenset = ALL_CHECKS, fingerprints: Optional[dict] = None,
+                musicbrainz=None) -> ScanReport:
     """Il controllo: le regole dei controlli scelti (checks), poi l'AI se c'è un fornitore. Con phone_tracks (la
     musica dell'app Musica, i cui brani sono anche tracks) è dell'iPhone, confrontato con library_tracks.
-    fingerprints: {percorso: impronta dell'audio} per i brani duplicati (senza, solo quelli sospetti per i tag)."""
+    fingerprints: {percorso: impronta dell'audio} per i brani duplicati (senza, solo quelli sospetti per i tag).
+    musicbrainz: un albumcheck.MusicBrainzClient per controllare anche lì i nomi d'artista dubbi (lento)."""
     assign_groups(tracks)
     report = ScanReport(target=target, tracks_scanned=len(tracks), albums_scanned=len(group_by_album(tracks)))
     issues = rule_issues(tracks, check_files, progress, cancel, checks)
@@ -1177,6 +1354,12 @@ def scan_tracks(tracks: list, target: str, provider=None, check_files: bool = Tr
             if enabled(issue, checks):
                 issues.append(issue)
         report.ai_errors = errors
+    if CHECK_VARIANTS in checks and not is_cancelled(cancel):
+        if progress is not None:
+            progress(0, 0, "nomi d'artista dubbi")
+        found, errors = detect_artist_doubts(tracks, provider, musicbrainz, progress, cancel)
+        issues += found
+        report.ai_errors += errors
     if CHECK_DUPLICATES in checks and not is_cancelled(cancel):
         skip = set()
         for issue in issues:

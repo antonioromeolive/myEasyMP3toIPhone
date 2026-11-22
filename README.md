@@ -147,7 +147,8 @@ brani sul PC e poi si usa *Rimpiazza*, o si cambiano dalla scheda iPhone (tasto 
 |---|---|---|
 | **File che non si aggiornano** | sull'iPhone, brani con tag diversi da quelli del PC (o delle modifiche in sospeso); MP3 con un vecchio tag ID3v1 diverso o con un tag APE (solo informazione: le copie inviate ne sono ripulite) | sull'iPhone nessuna (la colonna *iPhone* della scheda PC mostra le differenze) |
 | **Album con pochi brani** | numeri di traccia mancanti, meno brani del totale dichiarato, album di 1-2 brani; sull'iPhone, album con meno brani che sul PC | (Verifica album trova i titoli mancanti) |
-| **Collezioni divise su più album** | una cartella con brani in album diversi; lo stesso album scritto in modi diversi o con "CD 1"/"Disc 2" nel nome; una compilation senza *Artista album*; lo stesso artista scritto in modi diversi | unifica album e artista album ("Artisti vari" e la spunta *Compilation* per le compilation), sposta il numero del disco in *N. disco* |
+| **Collezioni divise su più album** | una cartella con brani in album diversi; lo stesso album scritto in modi diversi o con "CD 1"/"Disc 2" nel nome; una compilation senza *Artista album* | unifica album e artista album ("Artisti vari" e la spunta *Compilation* per le compilation), sposta il numero del disco in *N. disco* |
+| **Artisti scritti in modi diversi** | **certo**: le stesse parole a parte maiuscole, accenti, punteggiatura, "The" e ordine ("Battiato Franco" = "Franco Battiato", "AC/DC" = "ACDC"); **dubbio**: solo il cognome ("Battiato"), le iniziali ("F. Battiato"), un errore di battitura: decide l'AI (con album e anni) e, se lo chiedi, MusicBrainz (nomi e alias dell'artista), solo per questi gruppi; senza nessuno dei due restano "forse lo stesso artista", da controllare. **Duetti** ("A & B", "A feat. B", "A, B"): se A c'è anche da solo, artista e artista album diventano A e gli ospiti vanno nel titolo, "Titolo (feat. B)" (l'app Musica non gestisce più artisti); un nome come "Simon & Garfunkel" resta com'è | scrive ovunque la forma **più usata** (quella con più brani); per l'iPhone poi *Rimpiazza* (o *Applica*) |
 | **Solo sull'iPhone** | brani dell'app Musica senza un brano uguale (artista, album, titolo) nella Libreria del PC | nessuna: salvali sul PC dalla scheda iPhone (tasto destro → *Salva su PC*) |
 | **Brani duplicati** | **lo stesso brano**, non per forza lo stesso file: nello stesso album una copia "Titolo (2)" o lo stesso numero e titolo due volte; ovunque, i file con lo **stesso audio** (impronta, anche con tag e nomi diversi) e i file con stesso artista e titolo e durata entro 2 secondi ma audio diverso (un MP3 e un FLAC, due codifiche). Se titolo o album nominano versioni diverse (live, remix, demo…) la coppia è dubbia e la guarda l'AI, se è accesa: solo quelle coppie, mai tutti i brani; senza AI resta "da controllare". Un problema per artista, una riga per brano. Può essere giusto (l'album e una raccolta): decidi tu | nessuna automatica: quale copia tenere lo decidi tu (*Mostra i brani*) |
 | Tag mancanti, file illeggibili | brani senza titolo/album/artista, file danneggiati | ricava i tag mancanti dai nomi di cartelle e file |
@@ -549,6 +550,9 @@ predefinita resta su questo computer.
 1. Le caselle della finestra: valgono per quel controllo; quelle tolte si ricordano in `settings.json`
    (`scan_checks_off`), così un controllo nuovo di una versione futura parte acceso.
 2. Al primo uso, e con un `settings.json` senza `scan_checks_off`: tutti i controlli.
+
+La casella *…e i nomi dubbi anche su MusicBrainz* (sotto *Artisti scritti in modi diversi*) si ricorda in `settings.json`
+(`scan_musicbrainz`); al primo uso è spenta. In console MusicBrainz non si usa.
 3. In console `--scan`: sempre tutti i controlli.
 
 *File che non si aggiornano* sui file del PC si controlla solo per la cartella aperta, non per l'iPhone.

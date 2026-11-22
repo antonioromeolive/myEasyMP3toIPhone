@@ -21,7 +21,7 @@ from ..config import config_dir, load_profiles
 from ..library import scan_folder
 from ..phone_library import tracks_for_scan
 from ..scan import (
-    CHECK_DUPLICATES, CHECK_FILES, CHECKS, KIND_LABELS, ORIGIN_AI, SEVERITY_HIGH, SEVERITY_MEDIUM, save_report,
+    CHECK_DUPLICATES, CHECK_FILES, CHECK_VARIANTS, CHECKS, KIND_LABELS, ORIGIN_AI, SEVERITY_HIGH, SEVERITY_MEDIUM, save_report,
     scan_tracks, tag_changes_of,
 )
 
@@ -64,6 +64,12 @@ class ScanTargetDialog(QDialog):
             grid.addWidget(box, row, 0, Qt.AlignTop)
             grid.addWidget(explanation, row, 1)
             self.boxes[check_id] = box
+        self.musicbrainz = QCheckBox("…e i nomi dubbi anche su MusicBrainz (nomi e alias dell'artista; lento: un "
+                                     "artista al secondo, serve internet)")
+        self.musicbrainz.setChecked(window.app_settings.scan_musicbrainz)
+        self.boxes[CHECK_VARIANTS].toggled.connect(self.musicbrainz.setEnabled)
+        self.musicbrainz.setEnabled(self.boxes[CHECK_VARIANTS].isChecked())
+        grid.addWidget(self.musicbrainz, len(CHECKS), 0, 1, 2)
         grid.setColumnStretch(1, 1)
         group = QGroupBox("Cosa controllare")
         group.setLayout(grid)
@@ -128,6 +134,7 @@ class ScanLauncher:
     def __init__(self, window) -> None:
         self.window = window
         self.library_tracks = []
+        self.musicbrainz = None
 
     def _profile(self):
         result = None
@@ -144,14 +151,19 @@ class ScanLauncher:
         if dialog.exec():
             window.app_settings.scan_use_ai = dialog.use_ai.isChecked()
             window.app_settings.scan_checks_off = dialog.checks_off()
+            window.app_settings.scan_musicbrainz = dialog.musicbrainz.isChecked()
             window.save_settings()
             provider = None
             if dialog.use_ai.isChecked() and profile is not None:
                 provider = make_provider(profile)
+            checks = dialog.checks()
+            self.musicbrainz = None
+            if dialog.musicbrainz.isChecked() and CHECK_VARIANTS in checks:
+                self.musicbrainz = window.mb_client
             if dialog.device.isChecked():
-                self._start_device(provider, dialog.checks())
+                self._start_device(provider, checks)
             else:
-                self._start_local(provider, dialog.checks())
+                self._start_local(provider, checks)
 
     def _start_local(self, provider, checks: frozenset) -> None:
         from ..adoption import pc_fingerprints
@@ -160,6 +172,7 @@ class ScanLauncher:
         target = str(window.root_folder)
         self.library_tracks = tracks
         tag_cache = window.tag_cache
+        musicbrainz = self.musicbrainz
 
         def work(progress, cancel):
             prints = {}
@@ -167,7 +180,7 @@ class ScanLauncher:
                 progress(0, 0, "impronte dell'audio")
                 prints = pc_fingerprints(tracks, tag_cache, progress, cancel)
             value = scan_tracks(tracks, target, provider, check_files=CHECK_FILES in checks, progress=progress,
-                                cancel=cancel, checks=checks, fingerprints=prints)
+                                cancel=cancel, checks=checks, fingerprints=prints, musicbrainz=musicbrainz)
             return value
 
         window.runner.run("Controllo della musica", work, self._show)
@@ -181,6 +194,7 @@ class ScanLauncher:
         loaded = list(window.tracks) if window.root_folder == library else None
         phone_tracks = list(window.phone_tracks)
         target = f"iPhone, app Musica ({window.phone_label})"
+        musicbrainz = self.musicbrainz
 
         def work(progress, cancel):
             tracks = tracks_for_scan(phone_tracks)
@@ -196,7 +210,7 @@ class ScanLauncher:
                     prints[str(Path(item.remote_path))] = value
             report = scan_tracks(tracks, target, provider, check_files=False, phone_tracks=phone_tracks,
                                  library_tracks=library_tracks, progress=progress, cancel=cancel, checks=checks,
-                                 fingerprints=prints)
+                                 fingerprints=prints, musicbrainz=musicbrainz)
             value = (report, library_tracks)
             return value
 

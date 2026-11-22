@@ -202,6 +202,22 @@ class MusicBrainzClient:
                 raise AlbumCheckError(f"MusicBrainz ha risposto con l'errore {response.status_code}")
         return payload
 
+    def search_artists(self, name: str, min_score: int = 90) -> list:
+        """Il primo artista trovato per name, se il punteggio è almeno min_score: [[nome, nome per l'ordinamento,
+        alias…]] (al più uno); [] se non c'è."""
+        data = self._get(API_ROOT + "artist/", {"query": f"artist:{_lucene_phrase(name)}", "fmt": "json",
+                                                "limit": 3})
+        result = []
+        artists = data.get("artists", [])
+        if artists and int(artists[0].get("score", 0) or 0) >= min_score:
+            first = artists[0]
+            names = [first.get("name", ""), first.get("sort-name", "")]
+            for alias in first.get("aliases", []) or []:
+                names.append(alias.get("name", ""))
+                names.append(alias.get("sort-name", ""))
+            result.append(names)
+        return result
+
     def search_releases(self, artist: str, album: str, limit: int = 15) -> list:
         query = f"release:{_lucene_phrase(album)}"
         if artist and artist != UNKNOWN_ARTIST:
