@@ -529,12 +529,14 @@ def _year(text: str) -> int:
 
 def update_track(sync_id: int, item: dict) -> dict:
     """Solo i campi sicuri (vedi rustunes, docs/05 §2): titolo con sort_name e album_pid attuale, genere, anno,
-    numeri; l'album con sort_album e album_pid. Mai artista o artista dell'album: per quelli si rimpiazza il brano."""
+    numeri, la spunta compilation (un booleano); l'album con sort_album e album_pid. Mai artista o artista
+    dell'album: per quelli si rimpiazza il brano."""
     allowed = {"title", "sort_name", "album", "sort_album", "album_pid", "genre", "year", "track_number",
-               "track_count", "disc_number", "disc_count"}
+               "track_count", "disc_number", "disc_count", "is_compilation"}
     _require(sync_id != 0 and bool(item), "aggiornamento vuoto")
     for key in item:
         _require(key in allowed, f"campo {key} non modificabile così")
+    _require(isinstance(item.get("is_compilation", False), bool), "is_compilation vuole un booleano")
     _require(("title" in item) == ("sort_name" in item), "titolo e sort_name vanno insieme")
     _require(("album" in item) == ("sort_album" in item), "album e sort_album vanno insieme")
     _require("album_pid" in item or not ({"title", "album"} & set(item)),

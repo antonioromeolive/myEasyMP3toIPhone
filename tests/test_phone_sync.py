@@ -345,3 +345,8 @@ def test_tag_edit_rules():
                       "track_count": 0}
     with pytest.raises(ps.PhoneSyncError):
         phone_actions._update_item(track, {"genre": " "}, snapshot, {})
+    flagged = phone_actions._update_item(track, {"compilation": True}, snapshot, {})
+    assert flagged == {"is_compilation": True}                   # solo il brano: niente album_pid
+    assert ps.update_track(9, flagged)["item"] == {"is_compilation": True}
+    with pytest.raises(ps.PhoneSyncError):
+        ps.update_track(9, {"is_compilation": 1})

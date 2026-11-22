@@ -1,17 +1,5 @@
 # TODO
 
-## "Cambia tag" sull'iPhone: manca la spunta Compilation
-
-La finestra *Cambia tag* della scheda iPhone (titolo, album, genere, anno, numeri) non ha la casella
-**Compilation**, che invece c'è nell'editor dei tag della scheda PC. Va aggiunta, a tre stati come nell'editor (sì,
-no, valori diversi), con l'artista dell'album: una compilation vuole anche "Artisti vari".
-- Sul telefono `update_track` accetta `is_compilation` (campo sicuro secondo rustunes, docs/05 §2), ma cambia solo
-  il brano: la riga dell'album resta com'è. Va provato sul telefono se basta a tenere insieme l'album nell'app
-  Musica; se non basta, per i brani già sull'iPhone la strada è *Rimpiazza con la versione del PC* (che manda brano e
-  album con la spunta, provato).
-- Anche l'**artista dell'album** non si cambia oggi da *Cambia tag* (rinominerebbe l'artista per tutti i suoi brani):
-  per una compilation va spiegato nella finestra che "Artisti vari" si mette nella scheda PC e poi *Rimpiazza*.
-
 ## Cambiare i tag da una parte propone di cambiarli anche dall'altra
 
 Quando un brano è collegato (registro della provenienza), una modifica dei tag da un lato chiede se va fatta anche

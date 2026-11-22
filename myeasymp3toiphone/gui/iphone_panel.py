@@ -8,7 +8,7 @@ from pathlib import Path
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QBrush, QColor
 from PySide6.QtWidgets import (
-    QAbstractItemView, QComboBox, QDialog, QDialogButtonBox, QFileDialog, QFormLayout, QGroupBox, QHBoxLayout, QHeaderView,
+    QAbstractItemView, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFileDialog, QFormLayout, QGroupBox, QHBoxLayout, QHeaderView,
     QLabel, QLineEdit, QMenu, QMessageBox, QPushButton, QTreeWidget, QVBoxLayout, QWidget,
 )
 
@@ -113,9 +113,24 @@ class PhoneTagDialog(QDialog):
         self._original = {}
         for name, edit in self.fields.items():
             self._original[name] = edit.text()
+        flags = set()
+        for item in phone_tracks:
+            flags.add(bool(item.tags.compilation))
+        self.compilation = QCheckBox("Compilation (album di artisti vari)")
+        if len(flags) > 1:
+            self.compilation.setTristate(True)
+            self.compilation.setCheckState(Qt.PartiallyChecked)
+            self.compilation.setToolTip("Valori diversi tra i brani scelti: lasciala così per non cambiarla.")
+        else:
+            self.compilation.setChecked(True in flags)
+        self._original_compilation = self.compilation.checkState()
+        form.addRow("", self.compilation)
         note = QLabel(f"{len(phone_tracks)} brani. Artista e artista dell'album non si cambiano qui: sull'iPhone "
                       "rinominerebbero l'artista per tutti i suoi brani. Cambiali nella scheda PC, poi usa "
-                      "<i>Rimpiazza con la versione del PC</i>. Anno o numero 0: lo svuota.")
+                      "<i>Rimpiazza con la versione del PC</i>. Anno o numero 0: lo svuota.<br>Una compilation "
+                      "vuole anche l'artista dell'album <i>Artisti vari</i>: se nell'app Musica i brani non si "
+                      "raccolgono in un solo album, metti la spunta e \"Artisti vari\" nella scheda PC e usa "
+                      "<i>Rimpiazza con la versione del PC</i>.")
         note.setWordWrap(True)
         note.setTextFormat(Qt.RichText)
         note.setStyleSheet("color: gray")
@@ -143,6 +158,9 @@ class PhoneTagDialog(QDialog):
                         problem = f"{name.replace('_', ' ')}: serve un numero"
                 else:
                     values[name] = text
+        state = self.compilation.checkState()
+        if state != self._original_compilation and state != Qt.PartiallyChecked:
+            values["compilation"] = state == Qt.Checked
         if problem:
             QMessageBox.warning(self, "Cambia tag", problem)
         elif not values:

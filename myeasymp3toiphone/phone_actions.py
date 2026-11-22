@@ -419,7 +419,7 @@ def delete_tracks(phone_tracks: list, progress: Optional[ProgressFn] = None,
 
 # --------------------------------------------------------------------------- modifica dei tag
 
-EDITABLE_FIELDS = ("title", "album", "genre", "year", "track_number", "disc_number")
+EDITABLE_FIELDS = ("title", "album", "genre", "year", "track_number", "disc_number", "compilation")
 
 
 def _update_item(phone_track, values: dict, snapshot: _Snapshot, new_albums: dict) -> Optional[dict]:
@@ -468,6 +468,8 @@ def _update_item(phone_track, values: dict, snapshot: _Snapshot, new_albums: dic
         item["disc_number"] = 1      # l'iPhone tiene il disco 1 per un brano che non ne nomina
     if item.get("track_number") == 0:
         item["track_count"] = 0      # si svuotano insieme, come fa l'host di Apple
+    if values.get("compilation") is not None:
+        item["is_compilation"] = bool(values["compilation"])
     result = None if deferred else item
     return result
 

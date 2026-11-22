@@ -182,7 +182,7 @@ CopyTrans Manager (*AirTrafficControl*), senza iTunes e senza sincronizzare tutt
 | Scheda **PC** | **Invia all'iPhone** | i brani selezionati che non sono sull'iPhone: una copia con i tag e la copertina modificati (i file del PC non cambiano) |
 | Scheda **PC** | **Rimpiazza sull'iPhone** | i brani selezionati che sull'iPhone hanno tag diversi (⟳): vedi *Rimpiazza* qui sotto |
 | Scheda **iPhone** | **Rimpiazza con la versione del PC** | lo stesso, partendo dai brani dell'iPhone |
-| Scheda **iPhone** | **Cambia tag…** | titolo (un brano alla volta), album, genere, anno, numero di traccia e di disco; un campo vuoto non cambia, 0 svuota anno o numero |
+| Scheda **iPhone** | **Cambia tag…** | titolo (un brano alla volta), album, genere, anno, numero di traccia e di disco, la spunta **Compilation** (a tre stati con brani diversi); un campo vuoto non cambia, 0 svuota anno o numero |
 | Scheda **iPhone** | **Elimina dall'iPhone…** | toglie i brani dall'app Musica; l'iPhone cancella i loro file da solo, entro qualche minuto |
 
 - **L'app Musica non si aggiorna da sola** se è aperta durante l'invio: chiudila del tutto (scorri via la sua scheda)
@@ -198,6 +198,9 @@ CopyTrans Manager (*AirTrafficControl*), senza iTunes e senza sincronizzare tutt
   rimpiazzato perde il conteggio degli ascolti e la presenza nelle playlist fatte sull'iPhone.
 - **Artista e artista dell'album** non si cambiano con *Cambia tag*: sull'iPhone cambiarli rinominerebbe l'artista per
   tutti i suoi brani. Si cambiano nella scheda PC, poi *Rimpiazza*.
+- La spunta **Compilation** di *Cambia tag* cambia solo il brano. Una compilation vuole anche l'artista dell'album
+  *Artisti vari*: se nell'app Musica i brani non si raccolgono in un solo album, metti spunta e "Artisti vari"
+  nella scheda PC e usa *Rimpiazza*, che manda brano e album insieme.
 - Si possono aggiornare ed eliminare solo i brani messi sull'iPhone da un computer (iTunes, CopyTrans, questo
   programma), non quelli acquistati o scaricati sul telefono.
 - Serve l'iPhone connesso e sbloccato, con la gestione manuale della musica attiva (in *Dispositivi Apple* o in
