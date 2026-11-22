@@ -255,3 +255,19 @@ def test_adoption_dialogs(tmp_path):
     dialog.close()
     options.close()
     app.processEvents()
+
+
+def test_album_folder_matches_needs_one_folder_for_the_whole_album():
+    """La sorgente proposta: tutti i brani dell'album dell'iPhone nella stessa cartella del PC, stesso titolo e
+    durata; un album sparso in più cartelle non ha proposte."""
+    phone = [_numbered(1, "Uno", "Disco Primo", 1, 100.0), _numbered(2, "Due (remaster)", "Disco Primo", 2, 120.0),
+             _numbered(3, "Tre", "Sparso", 1, 140.0), _numbered(4, "Quattro", "Sparso", 2, 160.0),
+             _numbered(5, "Cinque", "Doppio", 1, 180.0)]
+    pc = [_numbered_pc("C:/m/Anna/Disco Primo/01 Uno.mp3", "Uno", 1, 100.5),
+          _numbered_pc("C:/m/Anna/Disco Primo/02 - Due.mp3", "", 2, 119.0),          # titolo solo nel nome del file
+          _numbered_pc("C:/m/Raccolta/01 Uno.mp3", "Uno", 7, 100.0),                 # l'altro brano non c'è
+          _numbered_pc("C:/m/A/Tre.mp3", "Tre", 1, 140.0),
+          _numbered_pc("C:/m/B/Quattro.mp3", "Quattro", 2, 160.0),
+          _numbered_pc("C:/m/C/Cinque.mp3", "Cinque", 1, 250.0)]                     # durata diversa
+    matches = adoption.album_folder_matches(phone, pc)
+    assert matches == {1: pc[0], 2: pc[1]}

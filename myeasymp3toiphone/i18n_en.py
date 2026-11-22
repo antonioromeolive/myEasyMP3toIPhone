@@ -2043,4 +2043,40 @@ CATALOG = {
         'All already read: fast',
     "Impronta dell'audio, per i brani non trovati dal nome della cartella":
         'Audio fingerprint, for the tracks the folder name did not find',
+    'Con una sorgente proposta (in rosso)':
+        'With a proposed source (in red)',
+    "Sorgente proposta, non ancora associata:\n{0}\nTutti i brani di questo album dell'iPhone sono in questa cartella del PC, con lo stesso titolo e la stessa durata. Tasto destro → Associa questa sorgente.":
+        'Proposed source, not linked yet:\n{0}\nAll the tracks of this iPhone album are in this PC folder, with the same title and duration. Right click → Link this source.',
+    "tutto l'album nella stessa cartella, stesso titolo e durata":
+        'the whole album in the same folder, same title and duration',
+    'Allinea i tag':
+        'Align the tags',
+    "Copiare i tag dell'iPhone su {0} file del PC?\n\nSul PC le modifiche restano in sospeso (i file non cambiano) e valgono per le copie inviate, esportate o importate.":
+        'Copy the iPhone tags to {0} PC files?\n\nOn the PC the changes stay pending (the files do not change) and apply to the copies sent, exported or imported.',
+    "Sull'iPhone non c'è niente da cambiare.":
+        'Nothing to change on the iPhone.',
+    "Scrivere sull'iPhone i tag del PC di {0} brani?\n":
+        'Write the PC tags of {0} tracks on the iPhone?\n',
+    "\n• {0} con Rimpiazza (artista o artista dell'album): perdono ascolti e playlist; alla fine ti dico in quali playlist rimetterli.":
+        '\n• {0} with Replace (artist or album artist): they lose plays and playlists; at the end I tell you which playlists to put them back in.',
+    'Associa questa sorgente, proposta in rosso ({0} brani)':
+        'Link this source, proposed in red ({0} tracks)',
+    'Allinea i tag ({0} brani ⟳)':
+        'Align the tags ({0} tracks ⟳)',
+    "Usa i tag dell'iPhone: aggiorna il PC (in sospeso)":
+        'Use the iPhone tags: update the PC (pending)',
+    "Usa i tag del PC: aggiorna l'iPhone":
+        'Use the PC tags: update the iPhone',
+    'Solo per i brani con la sorgente certa e tag diversi (⟳): quale parte vale':
+        'Only for the tracks with a certain source and different tags (⟳): which side wins',
+    'Cartella della sorgente':
+        'Source folder',
+    'Mostra il percorso completo delle cartelle':
+        'Show the full path of the folders',
+    'Colonna Cartella della scheda PC e Cartella della sorgente della scheda iPhone: il percorso completo invece del solo nome della cartella':
+        'Folder column of the PC tab and Source folder of the iPhone tab: the full path instead of the folder name only',
+    'Colonne delle cartelle':
+        'Folder columns',
+    'Cartella':
+        'Folder',
 }

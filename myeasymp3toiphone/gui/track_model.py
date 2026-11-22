@@ -18,9 +18,10 @@ from ..i18n import tr
 from ..pending import wanted
 from ..phone_library import DEVICE_ABSENT, DEVICE_SAME, DEVICE_STALE
 
-COLUMNS = ["#", "iPhone", "Titolo", "Artista", "Artista album", "Album", "Anno", "Genere", "Durata", "File"]
+COLUMNS = ["#", "iPhone", "Titolo", "Artista", "Artista album", "Album", "Anno", "Genere", "Durata", "Cartella",
+           "File"]
 (COL_NUMBER, COL_DEVICE, COL_TITLE, COL_ARTIST, COL_ALBUM_ARTIST, COL_ALBUM, COL_YEAR, COL_GENRE, COL_LENGTH,
- COL_FILE) = range(len(COLUMNS))
+ COL_FOLDER, COL_FILE) = range(len(COLUMNS))
 DEVICE_TEXT = {DEVICE_SAME: "✔", DEVICE_STALE: "⟳", DEVICE_ABSENT: ""}
 DEVICE_COLOR = {DEVICE_SAME: QColor(30, 140, 60), DEVICE_STALE: QColor(220, 140, 0)}
 DEVICE_ORDER = {DEVICE_SAME: 0, DEVICE_STALE: 1, DEVICE_ABSENT: 3}
@@ -111,14 +112,18 @@ class TrackTableModel(QAbstractTableModel):
             result = tags.genre
         elif column == COL_LENGTH:
             result = format_length(track.length)
+        elif column == COL_FOLDER:
+            result = self._folder_text(track)
         else:
-            result = self._file_text(track)
+            result = track.path.name
         return result
 
-    def _file_text(self, track) -> str:
-        """Il file: il percorso completo o il solo nome (Impostazioni → Mostra il percorso completo dei file)."""
+    def _folder_text(self, track) -> str:
+        """La cartella del file: il percorso completo o il solo nome (Impostazioni → Mostra il percorso completo delle
+        cartelle)."""
         settings = getattr(self.owner, "app_settings", None)
-        result = str(track.path) if settings is not None and settings.show_full_path else track.path.name
+        folder = track.path.parent
+        result = str(folder) if settings is not None and settings.show_full_path else folder.name
         return result
 
     def _foreground(self, track, column: int):
@@ -143,7 +148,7 @@ class TrackTableModel(QAbstractTableModel):
         result = None
         if track.error:
             result = tr(track.error)
-        elif column == COL_FILE:
+        elif column in (COL_FILE, COL_FOLDER):
             result = str(track.path)
         elif column == COL_TITLE and self.owner.overlay.is_edited(track.path):
             result = tr("Modificato per l'iPhone (il file sul PC non cambia):\n" + self.owner.overlay.describe(track))
@@ -207,7 +212,9 @@ class TrackTableModel(QAbstractTableModel):
         elif column == COL_LENGTH:
             result = lambda track: track.length   # noqa: E731
         elif column == COL_FILE:
-            result = lambda track: self._file_text(track).lower()   # noqa: E731
+            result = lambda track: track.path.name.lower()   # noqa: E731
+        elif column == COL_FOLDER:
+            result = lambda track: str(track.path).lower()   # noqa: E731
         else:
             result = lambda track: self._text(track, column).lower()   # noqa: E731
         return result

@@ -546,6 +546,106 @@ def rank_sources(phone_track, pc_tracks: list, home: Path, tag_cache=None, provi
     return proposals
 
 
+# --------------------------------------------------------------------------- sorgenti proposte (scheda iPhone)
+
+def _album_key(phone_track) -> tuple:
+    from .library import group_name
+    tags = phone_track.tags
+    result = (group_name(tags.album or ""), group_name(tags.album_artist or tags.artist or ""))
+    return result
+
+
+def _title_index(pc_tracks: list) -> dict:
+    """{titolo semplificato: [Track]}: dal tag del titolo e dal nome del file ("01 - Titolo" -> "titolo")."""
+    result = {}
+    for track in pc_tracks:
+        if not track.error:
+            keys = {normalize(track.tags.title or ""), normalize(track.path.stem)}
+            for key in keys:
+                if key:
+                    result.setdefault(key, []).append(track)
+    return result
+
+
+def _same_song(phone_track, track) -> bool:
+    """Stessa durata (entro DURATION_TOLERANCE), se le due durate si conoscono."""
+    result = (phone_track.length <= 0 or track.length <= 0
+              or abs(phone_track.length - track.length) <= DURATION_TOLERANCE)
+    return result
+
+
+def _folder_rank(folder: str, group: list, candidates: dict) -> tuple:
+    """Più alto = cartella migliore per l'album: più numeri di traccia uguali, poi il percorso più corto."""
+    same_numbers = 0
+    for item in group:
+        for track in candidates[item.pid]:
+            if str(track.path.parent) == folder and item.tags.track_number and \
+                    item.tags.track_number == track.tags.track_number:
+                same_numbers += 1
+    result = (same_numbers, -len(folder), folder.lower())
+    return result
+
+
+def _pick_in_folder(item, tracks: list, folder: str):
+    """Il file del brano nella cartella: lo stesso numero di traccia, poi la durata più vicina."""
+    best = None
+    best_key = None
+    for track in tracks:
+        if str(track.path.parent) == folder:
+            same_number = bool(item.tags.track_number) and item.tags.track_number == track.tags.track_number
+            key = (same_number, -abs(item.length - track.length), str(track.path).lower())
+            if best_key is None or key > best_key:
+                best = track
+                best_key = key
+    return best
+
+
+def album_folder_matches(phone_tracks: list, pc_tracks: list) -> dict:
+    """{pid: Track}: la sorgente proposta per i brani dell'iPhone, album per album. I brani di un album vengono da
+    una cartella sola: per ogni brano si cercano i file del PC con lo stesso titolo (senza maiuscole, accenti,
+    punteggiatura e parentesi; anche dal nome del file) e la stessa durata, e se una cartella li contiene per TUTTI i
+    brani dell'album (dell'iPhone) quelli sono la proposta. Se nessuna cartella li ha tutti, o due brani cadrebbero
+    sullo stesso file, l'album non ha proposte. Solo una proposta: si conferma a mano (registro)."""
+    index = _title_index(pc_tracks)
+    groups = {}
+    for item in phone_tracks:
+        groups.setdefault(_album_key(item), []).append(item)
+    result = {}
+    for group in groups.values():
+        candidates = {}
+        common = None
+        for item in group:
+            found = []
+            for track in index.get(normalize(item.tags.title or ""), []):
+                if _same_song(item, track) and track not in found:
+                    found.append(track)
+            candidates[item.pid] = found
+            folders = set()
+            for track in found:
+                folders.add(str(track.path.parent))
+            common = folders if common is None else common & folders
+        if common:
+            best = None
+            best_rank = None
+            for folder in common:
+                rank = _folder_rank(folder, group, candidates)
+                if best_rank is None or rank > best_rank:
+                    best = folder
+                    best_rank = rank
+            chosen = {}
+            used = set()
+            distinct = True
+            for item in group:
+                track = _pick_in_folder(item, candidates[item.pid], best)
+                if id(track) in used:
+                    distinct = False
+                used.add(id(track))
+                chosen[item.pid] = track
+            if distinct:
+                result.update(chosen)
+    return result
+
+
 def link_for(proposal: Proposal, overlay=None, fingerprint: str = ""):
     """La riga del registro per una proposta confermata."""
     path = proposal.pc.path

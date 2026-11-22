@@ -210,7 +210,7 @@ class MainWindow(QMainWindow):
         # un'intestazione di colonna (Artista, Album, Titolo…), che poi mostra la freccia dell'ordinamento
         header.setSortIndicator(-1, Qt.AscendingOrder)
         header.setSortIndicatorShown(True)
-        widths = [40, 50, 230, 160, 140, 180, 50, 90, 55]
+        widths = [40, 50, 230, 160, 140, 180, 50, 90, 55, 220]
         for column, width in enumerate(widths):
             self._table.setColumnWidth(column, width)
         self._table.selectionModel().selectionChanged.connect(lambda _new, _old: self._selection_changed())
@@ -364,7 +364,7 @@ class MainWindow(QMainWindow):
         before = self.library_dir()
         dialog = SettingsDialog(self.app_settings, self)
         if dialog.exec():
-            self._model.refresh()                  # il percorso completo dei file, se è cambiato
+            self._model.refresh()                  # il percorso completo delle cartelle, se è cambiato
             self.iphone_panel.pc_changed()
             if self.library_dir() != before:
                 self.open_library()

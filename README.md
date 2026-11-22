@@ -73,8 +73,9 @@ Artisti e album che differiscono solo per maiuscole, accenti o spazi ("Queen" e 
 con la grafia più usata (a parità, quella con le maiuscole). I tag dei file non cambiano: la scansione segnala la
 variante, perché l'iPhone la considera un artista diverso.
 
-**Colonne.** #, iPhone, Titolo, Artista, **Artista album**, Album, Anno, Genere, Durata, File. *File* mostra il nome
-del file, o il percorso completo con *Impostazioni → Generale → Mostra il percorso completo dei file*.
+**Colonne.** #, iPhone, Titolo, Artista, **Artista album**, Album, Anno, Genere, Durata, **Cartella**, File. *File*
+è il nome del file; *Cartella* è il nome della cartella che lo contiene, o il suo percorso completo con *Impostazioni →
+Generale → Mostra il percorso completo delle cartelle*. Il suggerimento di tutte e due mostra il percorso completo.
 
 **Tasto destro sui brani**, oltre ai comandi per l'iPhone: **Copia nome file**, **Copia percorso completo**, **Copia
 cartella** (negli appunti, una riga per brano; le cartelle una volta sola) e **Apri la cartella in Esplora risorse**
@@ -235,9 +236,16 @@ titoli, gli artisti e gli album che mostra l'app: il programma ne copia sul PC i
 e lo legge, perché sul telefono i file hanno nomi casuali (`F12/ABCD.mp3`). Sono solo i brani con un file
 sull'iPhone, non quelli in streaming da Apple Music. *Cerca* filtra per titolo, artista o album.
 
-- **Colonne:** N., Sul PC, Sorgente, Titolo, Artista, **Artista album**, Album, Anno, Genere, Durata e **File della
-  sorgente** (il file del PC da cui viene il brano: il nome, o il percorso completo con *Impostazioni → Mostra il
-  percorso completo dei file*; per una sorgente su un altro computer, `COMPUTER: percorso`).
+- **Colonne:** N., Sul PC, Sorgente, Titolo, Artista, **Artista album**, Album, Anno, Genere, Durata, **Cartella della
+  sorgente** e **File della sorgente** (il file del PC da cui viene il brano: la cartella, con il solo nome o il
+  percorso completo come nella scheda PC, e il nome del file; per una sorgente su un altro computer la cartella è
+  `COMPUTER: cartella`). Per un brano senza
+  sorgente può mostrare **in rosso una sorgente proposta**: i brani di un album vengono da una cartella sola, quindi per
+  ogni album dell'iPhone si cercano nella cartella aperta i file con lo stesso titolo (anche dal nome del file, senza
+  maiuscole, accenti, punteggiatura e parentesi) e la stessa durata (entro 2 secondi), e **solo se una cartella li ha
+  tutti** quelli sono la proposta (con più cartelle così, quella con più numeri di traccia uguali). Un album sparso in
+  più cartelle non ha proposte. La proposta non è ancora una sorgente: tasto destro → **Associa questa sorgente** la
+  scrive nel registro e cartella e nome tornano del colore normale.
 - **Sul PC:**
 
   | Segno | Significato |
@@ -260,6 +268,11 @@ accenti non sono evidenziati: sull'iPhone sono lo stesso gruppo.
   ordinati in `Artista/Album (Anno)/NN - Titolo` con i nomi che mostra l'app; crea solo file nuovi, un file già
   presente sul PC non viene mai sostituito. **Mostra nella scheda PC** seleziona i brani corrispondenti del PC.
   **Associa le probabili ≈** rende certi i brani ≈ scelti (li collega al file con gli stessi tag, dopo una conferma).
+  **Associa questa sorgente, proposta in rosso** collega i brani scelti alla loro proposta (come *cartella*).
+  **Allinea i tag** (per i brani con la sorgente certa e tag diversi, ⟳) sceglie quale parte vale: *Usa i tag
+  dell'iPhone: aggiorna il PC* li copia sui file del PC come modifiche in sospeso (i file non cambiano, valgono per le
+  copie); *Usa i tag del PC: aggiorna l'iPhone* li scrive sull'iPhone (iPhone connesso), con *Cambia tag* dove basta
+  (restano ascolti e playlist) e *Rimpiazza* per artista e artista dell'album.
   **File della sorgente** → *Copia nome file*, *Copia percorso completo*, *Copia cartella*, *Apri la cartella in
   Esplora risorse*, come nella scheda PC.
 - L'elenco letto resta in `iphone_musica.json` nella cartella dati: scheda iPhone, colonna *iPhone* e scansione
@@ -335,7 +348,8 @@ Nella scheda iPhone la colonna **Sorgente** dice da quale file viene ogni brano:
 | *senza file* | un brano "fantasma": è nell'elenco dell'app Musica ma il suo file sull'iPhone non c'è (non si può ascoltare); toglilo con *Elimina dall'iPhone* |
 
 Il menu **Mostra** filtra l'elenco per sorgente (per esempio solo i brani *senza sorgente*), e per la colonna *Sul PC*:
-*Da rivedere: abbinati solo per i tag (≈)* e *Sorgente con tag diversi (⟳)*. Quando un brano ha la
+*Da rivedere: abbinati solo per i tag (≈)*, *Sorgente con tag diversi (⟳)* e *Con una sorgente proposta (in
+rosso)*. Quando un brano ha la
 sorgente, il confronto delle colonne *Sul PC* e *iPhone* usa quel file esatto: un doppione sul PC con gli stessi tag
 non prende il suo posto. **Salva su PC** associa ogni brano salvato al suo file nuovo (verificato con l'impronta),
 anche quando un file con lo stesso audio c'era già. Tasto destro:
@@ -531,7 +545,7 @@ programma. La musica invece sta nella Libreria.
 | File | Contenuto |
 |---|---|
 | `myEasyMP3toIPhone.env` | le variabili d'ambiente (sopra) |
-| `settings.json` | cartella della Libreria, ultime cartelle usate, AI della scansione e controlli tolti, lingua, percorso completo dei file, cataloghi di *Verifica album online*, posizione della finestra |
+| `settings.json` | cartella della Libreria, ultime cartelle usate, AI della scansione e controlli tolti, lingua, percorso completo delle cartelle, cataloghi di *Verifica album online*, posizione della finestra |
 | `ai_profiles.json` | i profili AI (senza chiavi e senza indirizzi privati: quelli sono nella Gestione credenziali) |
 | `secrets.json` | solo senza credential store: le chiavi |
 | `scansioni\scansione_<data>.txt` | il rapporto di ogni scansione |
@@ -653,11 +667,12 @@ prima versione nel registro di Windows si copiano una volta, solo se `settings.j
 
 In inglese sono in inglese finestre, pulsanti, menu, messaggi, la barra di stato, i problemi e il rapporto di *Controlla la musica* e i motivi scritti dall'AI (il prompt le chiede l'inglese). Restano come sono i dati (titoli, artisti, album, percorsi), la console e questo README. Il codice resta scritto in italiano: i testi si traducono quando arrivano allo schermo con il catalogo `myeasymp3toiphone/i18n_en.py` (un testo nuovo nel codice va aggiunto lì: `tools/i18n_catalog.py` elenca quelli mancanti e un test lo controlla).
 
-### Il percorso completo dei file
+### Il percorso completo delle cartelle
 
-*Impostazioni → Generale → Mostra il percorso completo dei file* (`show_full_path` in `settings.json`): vale per la
-colonna *File* della scheda PC e *File della sorgente* della scheda iPhone, subito. Senza: spento (il solo nome del
-file). Il suggerimento della cella mostra sempre il percorso completo.
+*Impostazioni → Generale → Mostra il percorso completo delle cartelle* (`show_full_path` in `settings.json`): vale per
+la colonna *Cartella* della scheda PC e *Cartella della sorgente* della scheda iPhone, subito. Senza: spento (il solo
+nome della cartella). Le colonne dei file mostrano sempre il solo nome; il suggerimento delle celle mostra sempre il
+percorso completo.
 
 ### I cataloghi di "Verifica album online"
 

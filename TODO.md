@@ -45,6 +45,8 @@ musica vera:
   *molto probabile* sono giusti. Provare anche *Tutta la Libreria* e i brani selezionati che hanno già una sorgente.
 - **Sul PC** nella scheda iPhone: ✔/⟳ per le sorgenti fuori dalla cartella aperta (quanto ci mette con migliaia di
   brani su un disco esterno), ≈ e il filtro *Da rivedere*, ✖, *Associa le probabili*.
+- **Sorgenti proposte in rosso** (album intero in una cartella): quante ne trova sulla Libreria vera, se sono giuste,
+  *Associa questa sorgente*. **Allinea i tag** nei due versi, con l'iPhone attaccato (solo brani PROVA).
 - **Verifica album online**: Deezer e Apple Music sulla Libreria vera (album italiani: il negozio Apple è quello di
   Windows), l'ordine dei servizi, *Ferma*, la finestra dei risultati non modale. Discogs con `DISCOGS_TOKEN`
   impostata. L'AI per le edizioni dubbie con Ollama acceso.

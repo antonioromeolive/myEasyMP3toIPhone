@@ -227,6 +227,12 @@ def test_iphone_tab_shows_music_and_pc_status(tmp_path):
         for row in range(window._model.rowCount()):
             table_status.add(window._model.data(window._model.index(row, COL_DEVICE)))
         assert table_status == {"≈"}
+        from myeasymp3toiphone.gui.track_model import COL_FILE, COL_FOLDER
+        assert window._model.data(window._model.index(0, COL_FOLDER)) == "Album Primo"      # la cartella, poi il file
+        assert window._model.data(window._model.index(0, COL_FILE)).endswith(".mp3")
+        window.app_settings.show_full_path = True
+        assert window._model.data(window._model.index(0, COL_FOLDER)) == str(window._model.track(0).path.parent)
+        window.app_settings.show_full_path = False
         panel._search.setText("solo")
         assert panel._count.text() == "1 di 3 brani"
     finally:
@@ -425,7 +431,13 @@ def test_pc_column_states_source_outside_open_folder_and_probable(tmp_path):
             states[pid] = row.text(iphone_panel.COL_PC)
             files[pid] = row.text(iphone_panel.COL_SOURCE_FILE)
         assert states == {1: "⟳", 2: "✖", 3: "≈", 4: "✔"}
-        assert files[1] == "Fuori.mp3" and files[3] == ""
+        assert files[1] == "Fuori.mp3" and files[3] == "Per tag.mp3"        # 3: una proposta, in rosso
+        texts = [text for text, _rule in iphone_panel.SHOW_FILTERS]
+        panel._show.setCurrentIndex(texts.index("Con una sorgente proposta (in rosso)"))
+        assert panel._count.text() == "1 di 4 brani"
+        panel._show.setCurrentIndex(0)
+        assert [item.pid for item in panel._with_proposal(phone)] == [3]
+        assert [item.pid for item, _track in panel._aligned_pairs(phone)] == [1]
         assert "fuori dalla cartella aperta" in panel.pc_tooltip(1) and "non c'è più" in panel.pc_tooltip(2)
         assert [item.pid for item, _track in panel._stale_pairs(phone)] == [1]
         window.app_settings.show_full_path = True
@@ -434,7 +446,9 @@ def test_pc_column_states_source_outside_open_folder_and_probable(tmp_path):
         for index in range(view.topLevelItemCount()):
             row = view.topLevelItem(index)
             if row.data(iphone_panel.COL_TITLE, iphone_panel.PID_ROLE) == 1:
-                assert row.text(iphone_panel.COL_SOURCE_FILE) == str(outside)
+                assert row.text(iphone_panel.COL_SOURCE_FOLDER) == str(outside.parent)
+                assert row.text(iphone_panel.COL_SOURCE_FILE) == "Fuori.mp3"
+        window.app_settings.show_full_path = False
         texts = [text for text, _rule in iphone_panel.SHOW_FILTERS]
         panel._show.setCurrentIndex(texts.index("Da rivedere: abbinati solo per i tag (≈)"))
         assert panel._count.text() == "1 di 4 brani"
@@ -443,6 +457,42 @@ def test_pc_column_states_source_outside_open_folder_and_probable(tmp_path):
         panel._link_probable(panel._probable(phone))           # QMessageBox.question dei test risponde Sì
         app.processEvents()
         assert window.registry.get(33) is not None and window.registry.get(33).how == provenance.HOW_RULES
+        panel.pc_changed()
+        panel._refresh_pc_column()
+        assert panel._with_proposal(phone) == []                 # associata: non è più una proposta
+        panel._align_to_pc(panel._aligned_pairs(phone))          # vale l'iPhone: l'anno 1990 va sul PC (in sospeso)
+        assert window.overlay.is_edited(outside)
+    finally:
+        window.close()
+        app.processEvents()
+
+
+def test_link_proposed_source(tmp_path):
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtWidgets import QApplication
+    from myeasymp3toiphone import provenance
+    from myeasymp3toiphone.gui import iphone_panel
+    from myeasymp3toiphone.gui.main_window import MainWindow
+    app = QApplication.instance() or QApplication([])
+    window = MainWindow()
+    try:
+        window.tracks = [_pc("Canzone A", "Artista Uno", "Album Primo")]
+        window._rebuild_views()
+        phone = [_phone(1, "Canzone A", "Artista Uno", "Album Primo")]
+        phone[0].sync_id = 41
+        window.set_phone_tracks(phone, "iPhone di prova")
+        panel = window.iphone_panel
+        row = panel._music_view.topLevelItem(0)
+        assert row.data(iphone_panel.COL_SOURCE_FILE, iphone_panel.PROPOSED_ROLE)
+        assert row.foreground(iphone_panel.COL_SOURCE_FILE).color() == iphone_panel.PROPOSED_COLOR
+        panel._link_proposed(panel._with_proposal(phone))
+        app.processEvents()
+        assert window.registry.get(41).how == provenance.HOW_FOLDER
+        panel.pc_changed()
+        panel._refresh_pc_column()
+        row = panel._music_view.topLevelItem(0)
+        assert not row.data(iphone_panel.COL_SOURCE_FILE, iphone_panel.PROPOSED_ROLE)
+        assert row.text(iphone_panel.COL_SOURCE_FILE) == "Canzone A.mp3"
     finally:
         window.close()
         app.processEvents()
