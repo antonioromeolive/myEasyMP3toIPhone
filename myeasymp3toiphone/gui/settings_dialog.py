@@ -79,6 +79,12 @@ class SettingsDialog(QDialog):
         self.g_full_path.setToolTip("Colonna Cartella della scheda PC e Cartella della sorgente della scheda iPhone: "
                                     "il percorso completo invece del solo nome della cartella")
         self.g_full_path.setChecked(self.settings.show_full_path)
+        self.g_preferred = QLineEdit("; ".join(self.settings.preferred_folders))
+        self.g_preferred.setPlaceholderText("es. Musica buona; Musica FLAC; Raccolte")
+        self.g_preferred.setToolTip("Quando un brano c'è in più copie sul PC, le associazioni (proposta in rosso, "
+                                    "Associa sorgente, Associa sorgenti) scelgono la copia nella prima di queste "
+                                    "cartelle, poi nella seconda… Nomi di cartella (valgono in qualsiasi punto del "
+                                    "percorso) o percorsi interi, separati da punto e virgola.")
         note = QLabel("La scansione usa sempre le regole locali (gratuite). Con un profilo AI, l'AI riceve una tabella "
                       "degli album (artisti, titoli, numeri di traccia, nomi delle cartelle) e propone altri problemi e "
                       "le correzioni. Con un'AI nel cloud questi dati escono dal computer; con Ollama restano qui.")
@@ -89,6 +95,7 @@ class SettingsDialog(QDialog):
         form.addRow("AI della scansione", self.g_scan_profile)
         form.addRow("Lingua dell'interfaccia", self.g_language)
         form.addRow("Colonne delle cartelle", self.g_full_path)
+        form.addRow("Cartelle preferite", self.g_preferred)
         form.addRow(note)
         widget = QWidget()
         widget.setLayout(form)
@@ -445,7 +452,12 @@ class SettingsDialog(QDialog):
         self.settings.library_dir = library
         self.settings.language = self.g_language.currentData() or DEFAULT_LANGUAGE
         self.settings.show_full_path = self.g_full_path.isChecked()
-        chosen = self.g_scan_profile.currentText()
+        preferred = []
+        for entry in self.g_preferred.text().split(";"):
+            if entry.strip():
+                preferred.append(entry.strip())
+        self.settings.preferred_folders = preferred
+        chosen =self.g_scan_profile.currentText()
         if chosen == tr(NO_AI):
             self.settings.scan_profile = ""
         else:

@@ -533,6 +533,7 @@ class AppSettings:
     album_services: list = field(default_factory=lambda: ["deezer", "apple"])   # Verifica album online, in ordine
     album_ai: bool = False          # Verifica album online: l'AI sceglie tra edizioni dubbie
     hidden_folders: list = field(default_factory=list)   # cartelle nascoste nella scheda PC (con le sottocartelle)
+    preferred_folders: list = field(default_factory=list)  # con più copie di un brano, in ordine (library.preference)
     extra: dict = field(default_factory=dict)
 
     def library_path(self) -> Path:

@@ -439,6 +439,14 @@ dell'iPhone (messi da CopyTrans, da un altro computer…) e lo scrive nel regist
    **cartella**, e dice quale è la stessa registrazione, o nessuno, con la sicurezza e il motivo. Spuntato solo se
    l'AI è sicura. Senza AI, i dubbi si mostrano da controllare.
 
+**Più copie dello stesso brano sul PC.** Con *Impostazioni → Generale → Cartelle preferite* (in ordine, separate da
+punto e virgola: nomi di cartella, che valgono in qualsiasi punto del percorso, o percorsi interi) ogni associazione
+sceglie la copia nella prima di quelle cartelle, poi nella seconda…: la proposta in rosso, *Associa sorgente*,
+*Associa sorgenti* (nome della cartella, impronta, regole). Le copie con stessi tag e durata in cartelle diverse
+contano come un candidato solo, quindi non sono un dubbio da far decidere all'AI. Senza cartelle preferite, vince il
+percorso più corto. Un album diviso in cartelle `CD 1 …`, `CD 2 …` ha come cartella quella sopra: la proposta in
+rosso lo trova intero, disco per disco.
+
 Prima di scrivere mostra **una lista sola** con tutte le proposte: brano dell'iPhone, file del PC, **certezza** (certo,
 molto probabile, probabile, da controllare), come e perché, con le spunte già messe per quelle certe o molto
 probabili. Si può togliere o mettere ogni spunta (**un brano senza spunta resta com'è**) e, per la riga selezionata,
@@ -707,6 +715,14 @@ percorso completo.
    toglie con *Cartelle nascoste (N)…*. Vale subito, per ogni cartella aperta (anche la Libreria), con le sottocartelle;
    le maiuscole non contano.
 2. Senza: nessuna cartella nascosta.
+
+### Le cartelle preferite
+
+1. *Impostazioni → Generale → Cartelle preferite* (`preferred_folders` in `settings.json`, una lista in ordine): con
+   più copie di un brano sul PC, le associazioni scelgono la copia nella prima cartella della lista, poi nella
+   seconda…; una voce con `\`, `/` o `:` è un percorso (con le sottocartelle), senza è il nome di una cartella in
+   qualsiasi punto del percorso; le maiuscole non contano. Vale subito.
+2. Senza, o per le copie fuori da tutte: il percorso più corto (con l'impronta, prima la copia con i tag più simili).
 
 ### I cataloghi di "Verifica album online"
 

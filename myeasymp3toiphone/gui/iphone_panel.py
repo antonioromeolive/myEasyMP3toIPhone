@@ -434,7 +434,8 @@ class IPhonePanel(QWidget):
         for item in self._phone_tracks:
             if item.from_computer and item.sync_id and self._window.registry.get(item.sync_id) is None:
                 unlinked.append(item)
-        self._proposed = adoption.album_folder_matches(unlinked, self._window.tracks)
+        self._proposed = adoption.album_folder_matches(unlinked, self._window.tracks,
+                                                       tuple(self._window.app_settings.preferred_folders))
         self._pc_dirty = False
 
     def _pc_state(self, item) -> tuple:
@@ -1226,6 +1227,7 @@ class IPhonePanel(QWidget):
         registry = window.registry
         tag_cache = window.tag_cache
         read_phone = self._connected
+        preferred = tuple(window.app_settings.preferred_folders)
 
         def work(progress, cancel):
             if opened is None:
@@ -1238,7 +1240,7 @@ class IPhonePanel(QWidget):
                     if track.path.is_relative_to(folder):
                         pc_tracks.append(track)
             value = adoption.adopt(items, pc_tracks, registry, config_dir(), tag_cache, provider, progress, cancel,
-                                   use_fingerprint, read_phone, replace_known)
+                                   use_fingerprint, read_phone, replace_known, preferred)
             return value
 
         window.runner.run("Associazione delle sorgenti", work, self._adopted)
@@ -1368,11 +1370,12 @@ class IPhonePanel(QWidget):
         provider = self._ai_provider()
         read_phone = self._connected
         tag_cache = window.tag_cache
+        preferred = tuple(window.app_settings.preferred_folders)
 
         def work(progress, cancel):
             progress(0, 0, "ricerca dei file possibili")
             value = adoption.rank_sources(item, pc_tracks, config_dir(), tag_cache, provider, read_phone, progress,
-                                          cancel)
+                                          cancel, preferred)
             return value
 
         window.runner.run("Associa sorgente", work, lambda proposals: self._choose_source(item, proposals))

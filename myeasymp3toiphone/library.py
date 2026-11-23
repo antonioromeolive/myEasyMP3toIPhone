@@ -107,6 +107,31 @@ def album_folder(path) -> str:
     return result
 
 
+def preference(path, preferred) -> int:
+    """Il posto di un file (o di una cartella) nell'ordine delle cartelle preferite (Impostazioni): 0 nella prima,
+    1 nella seconda…, len(preferred) in nessuna. Una voce con una barra o i due punti è un percorso (vale con le
+    sottocartelle); senza, è il nome di una cartella, in qualsiasi punto del percorso. Maiuscole e minuscole non
+    contano."""
+    parts = set()
+    for part in Path(path).parts:
+        parts.add(part.rstrip("\\/").casefold())
+    text = str(Path(path)).casefold()
+    result = len(preferred)
+    index = 0
+    while index < len(preferred) and result == len(preferred):
+        entry = str(preferred[index]).strip()
+        if entry:
+            if "/" in entry or "\\" in entry or ":" in entry:
+                folder = str(Path(entry)).casefold().rstrip("\\/")
+                found = text == folder or text.startswith(folder + os.sep)
+            else:
+                found = entry.casefold() in parts
+            if found:
+                result = index
+        index += 1
+    return result
+
+
 def is_cancelled(cancel: Optional[threading.Event]) -> bool:
     result = cancel is not None and cancel.is_set()
     return result

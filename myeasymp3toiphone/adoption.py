@@ -32,6 +32,7 @@ from typing import Callable, Optional
 
 from . import iphone, provenance
 from .albumcheck import normalize, similarity
+from .library import preference
 from .phone_library import differences
 
 log = logging.getLogger(__name__)
@@ -153,12 +154,14 @@ def pc_fingerprints(tracks: list, tag_cache, progress: Optional[ProgressFn] = No
 
 # --------------------------------------------------------------------------- regole
 
-def _closest_copy(phone_track, copies: list):
-    """Tra più copie dello stesso audio sul PC, quella con meno tag diversi (a parità, il percorso più corto)."""
+def _closest_copy(phone_track, copies: list, preferred: tuple = ()):
+    """Tra più copie dello stesso audio sul PC: quella nella prima delle cartelle preferite (Impostazioni), poi quella
+    con meno tag diversi, poi il percorso più corto."""
     best = None
     best_key = None
     for track in copies:
-        key = (len(differences(track.tags, phone_track.tags)), len(str(track.path)), str(track.path).lower())
+        key = (preference(track.path, preferred), len(differences(track.tags, phone_track.tags)),
+               len(str(track.path)), str(track.path).lower())
         if best_key is None or key < best_key:
             best = track
             best_key = key
@@ -178,8 +181,18 @@ def _score(phone_track, track) -> float:
     return result
 
 
-def candidates(phone_track, by_length: list) -> list:
-    """[(punteggio, Track)] in ordine, i più simili, con durata entro DURATION_TOLERANCE."""
+def _copy_key(score: float, track) -> tuple:
+    """Due file con questa chiave uguale sono copie dello stesso brano (stessi tag e durata, cartelle diverse)."""
+    tags = track.tags
+    result = (round(score, 4), normalize(tags.title or track.path.stem), normalize(tags.artist or ""),
+              normalize(tags.album or ""), round(track.length))
+    return result
+
+
+def candidates(phone_track, by_length: list, preferred: tuple = ()) -> list:
+    """[(punteggio, Track)] in ordine, i più simili, con durata entro DURATION_TOLERANCE. Le copie dello stesso brano
+    in cartelle diverse contano una volta sola: quella nella prima delle cartelle preferite (a parità, il percorso
+    più corto)."""
     import bisect
     lengths = [length for length, _index, _track in by_length]
     start = bisect.bisect_left(lengths, phone_track.length - DURATION_TOLERANCE)
@@ -188,8 +201,16 @@ def candidates(phone_track, by_length: list) -> list:
     for _length, _index, track in by_length[start:end]:
         if similarity(phone_track.tags.title, track.tags.title or track.path.stem) >= MIN_TITLE:
             scored.append((_score(phone_track, track), track))
-    scored.sort(key=lambda pair: (-pair[0], str(pair[1].path).lower()))
-    result = scored[:MAX_CANDIDATES]
+    scored.sort(key=lambda pair: (-pair[0], preference(pair[1].path, preferred), len(str(pair[1].path)),
+                                  str(pair[1].path).lower()))
+    seen = set()
+    distinct = []
+    for score, track in scored:
+        key = _copy_key(score, track)
+        if key not in seen:
+            seen.add(key)
+            distinct.append((score, track))
+    result = distinct[:MAX_CANDIDATES]
     return result
 
 
@@ -330,9 +351,10 @@ def _folder_text(track) -> str:
     return result
 
 
-def folder_proposals(phone_tracks: list, pc_tracks: list) -> dict:
+def folder_proposals(phone_tracks: list, pc_tracks: list, preferred: tuple = ()) -> dict:
     """{sync_id: Proposal} dal nome delle cartelle: il nome dell'album nel nome della cartella del file (o di quella
-    sopra) e dentro un file con titolo e durata uguali. Veloce: non legge l'audio."""
+    sopra) e dentro un file con titolo e durata uguali. Veloce: non legge l'audio. A parità, il file nella prima
+    delle cartelle preferite."""
     by_folder = {}
     texts = {}
     for track in pc_tracks:
@@ -359,7 +381,8 @@ def folder_proposals(phone_tracks: list, pc_tracks: list) -> dict:
                     title = similarity(item.tags.title, track.tags.title or track.path.stem)
                     same_length = abs(track.length - item.length) <= DURATION_TOLERANCE
                     same_number = bool(item.tags.track_number) and item.tags.track_number == track.tags.track_number
-                    key = (title >= FOLDER_TITLE, same_length, same_number, title)
+                    key = (title >= FOLDER_TITLE, same_length, same_number, title,
+                           -preference(track.path, preferred), -len(str(track.path)))
                     if title >= FOLDER_TITLE_DOUBT and same_length and (best_key is None or key > best_key):
                         best = track
                         best_key = key
@@ -398,10 +421,12 @@ def _near_in_length(pc_tracks: list, phone_tracks: list) -> list:
 
 def adopt(phone_tracks: list, pc_tracks: list, registry, home: Path, tag_cache=None, provider=None,
           progress: Optional[ProgressFn] = None, cancel: Optional[threading.Event] = None,
-          use_fingerprint: bool = True, read_phone: bool = True, replace_known: bool = False) -> AdoptionResult:
+          use_fingerprint: bool = True, read_phone: bool = True, replace_known: bool = False,
+          preferred: tuple = ()) -> AdoptionResult:
     """Le sorgenti dei brani dell'iPhone tra i file pc_tracks. use_fingerprint: anche l'impronta dell'audio (lenta la
     prima volta); read_phone: le impronte che mancano si leggono dall'iPhone (connesso), altrimenti solo quelle
-    ricordate. replace_known: anche i brani che hanno già una sorgente (scelti a mano)."""
+    ricordate. replace_known: anche i brani che hanno già una sorgente (scelti a mano). preferred: le cartelle
+    preferite, in ordine, quando un brano c'è in più copie (library.preference)."""
     outcome = AdoptionResult()
     unknown = []
     for item in phone_tracks:
@@ -418,7 +443,7 @@ def adopt(phone_tracks: list, pc_tracks: list, registry, home: Path, tag_cache=N
     if unknown and usable:
         if progress is not None:
             progress(0, 0, "nomi delle cartelle")
-        by_folder = folder_proposals(unknown, usable)
+        by_folder = folder_proposals(unknown, usable, preferred)
         remaining = []
         for item in unknown:
             proposal = by_folder.get(item.sync_id)
@@ -428,7 +453,7 @@ def adopt(phone_tracks: list, pc_tracks: list, registry, home: Path, tag_cache=N
             else:
                 remaining.append(item)
         _adopt_remaining(remaining, usable, by_folder, home, tag_cache, provider, progress, cancel, use_fingerprint,
-                         read_phone, outcome)
+                         read_phone, outcome, preferred)
     elif unknown:
         outcome.foreign += unknown          # nessun file sul PC con cui confrontare
     outcome.cancelled = _cancelled(cancel)
@@ -441,7 +466,7 @@ def adopt(phone_tracks: list, pc_tracks: list, registry, home: Path, tag_cache=N
 
 
 def _adopt_remaining(unknown: list, usable: list, by_folder: dict, home: Path, tag_cache, provider, progress, cancel,
-                     use_fingerprint: bool, read_phone: bool, outcome: AdoptionResult) -> None:
+                     use_fingerprint: bool, read_phone: bool, outcome: AdoptionResult, preferred: tuple = ()) -> None:
     """Impronta, regole e AI per i brani che il nome della cartella non ha trovato con sicurezza."""
     pc_prints = {}
     phone_prints = {}
@@ -469,14 +494,14 @@ def _adopt_remaining(unknown: list, usable: list, by_folder: dict, home: Path, t
             copies = by_print.get(phone_prints.get(item.sync_id, ""), [])
             folder = by_folder.get(item.sync_id)
             if copies:
-                chosen = _closest_copy(item, copies)
-                note = "stesso audio" if len(copies) == 1 else f"stesso audio (la più simile di {len(copies)} copie)"
+                chosen = _closest_copy(item, copies, preferred)
+                note = "stesso audio" if len(copies) == 1 else f"stesso audio (la preferita di {len(copies)} copie)"
                 outcome.certain.append(Proposal(item, chosen, provenance.HOW_FINGERPRINT, note, level=LEVEL_CERTAIN))
             elif folder is not None:
                 outcome.proposals.append(folder)
                 outcome.by_folder += 1
             else:
-                scored = candidates(item, by_length)
+                scored = candidates(item, by_length, preferred)
                 if not scored:
                     outcome.foreign.append(item)
                 elif scored[0][0] >= RULE_SCORE and (len(scored) == 1 or scored[1][0] <= scored[0][0] - RULE_MARGIN):
@@ -528,7 +553,7 @@ def _by_length(tracks: list) -> list:
 
 def rank_sources(phone_track, pc_tracks: list, home: Path, tag_cache=None, provider=None,
                  read_phone: bool = True, progress: Optional[ProgressFn] = None,
-                 cancel: Optional[threading.Event] = None):
+                 cancel: Optional[threading.Event] = None, preferred: tuple = ()):
     """I file del PC che possono essere la sorgente del brano, il più probabile per primo (Proposal):
       1. stesso audio (impronta), tra tutti i file con durata entro DURATION_TOLERANCE, senza filtro sul titolo
          (le compilation con titoli diversi): certo;
@@ -547,14 +572,15 @@ def rank_sources(phone_track, pc_tracks: list, home: Path, tag_cache=None, provi
         for track in near:
             if prints.get(str(track.path)) == printed:
                 exact.append(track)
-    exact.sort(key=lambda track: (len(differences(track.tags, phone_track.tags)), str(track.path).lower()))
+    exact.sort(key=lambda track: (preference(track.path, preferred), len(differences(track.tags, phone_track.tags)),
+                                  str(track.path).lower()))
     for track in exact:
         proposals.append(Proposal(phone_track, track, provenance.HOW_FINGERPRINT, "stesso audio (impronta): certo"))
     exact_ids = set()
     for track in exact:
         exact_ids.add(id(track))
     scored = []
-    for score, track in candidates(phone_track, _by_length(pc_tracks)):
+    for score, track in candidates(phone_track, _by_length(pc_tracks), preferred):
         if id(track) not in exact_ids:
             scored.append((score, track))
     close = len(scored) > 1 and scored[1][0] > scored[0][0] - RULE_MARGIN
@@ -612,15 +638,16 @@ def _same_position(item, track) -> bool:
     return result
 
 
-def _folder_rank(folder: str, group: list, candidates: dict) -> tuple:
-    """Più alto = cartella migliore per l'album: più numeri di traccia uguali, poi il percorso più corto."""
+def _folder_rank(folder: str, group: list, candidates: dict, preferred: tuple = ()) -> tuple:
+    """Più alto = cartella migliore per l'album: più numeri di traccia uguali, poi la prima delle cartelle preferite,
+    poi il percorso più corto."""
     from .library import album_folder
     same_numbers = 0
     for item in group:
         for track in candidates[item.pid]:
             if album_folder(track.path) == folder and _same_position(item, track):
                 same_numbers += 1
-    result = (same_numbers, -len(folder), folder.lower())
+    result = (same_numbers, -preference(folder, preferred), -len(folder), folder.lower())
     return result
 
 
@@ -638,7 +665,7 @@ def _pick_in_folder(item, tracks: list, folder: str):
     return best
 
 
-def album_folder_matches(phone_tracks: list, pc_tracks: list) -> dict:
+def album_folder_matches(phone_tracks: list, pc_tracks: list, preferred: tuple = ()) -> dict:
     """{pid: Track}: la sorgente proposta per i brani dell'iPhone, album per album. I brani di un album vengono da
     una cartella sola (library.album_folder: con le sue cartelle "CD1", "cd 2 - studio"… se è su più dischi): per
     ogni brano si cercano i file del PC con lo stesso titolo (senza maiuscole, accenti,
@@ -668,7 +695,7 @@ def album_folder_matches(phone_tracks: list, pc_tracks: list) -> dict:
             best = None
             best_rank = None
             for folder in common:
-                rank = _folder_rank(folder, group, candidates)
+                rank = _folder_rank(folder, group, candidates, preferred)
                 if best_rank is None or rank > best_rank:
                     best = folder
                     best_rank = rank

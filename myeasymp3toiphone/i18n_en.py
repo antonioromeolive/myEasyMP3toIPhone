@@ -23,8 +23,8 @@ CATALOG = {
         "PC file fingerprints",
     "stesso audio":
         "same audio",
-    "stesso audio (la più simile di {0} copie)":
-        "same audio (the most similar of {0} copies)",
+    "stesso audio (la preferita di {0} copie)":
+        "same audio (the preferred of {0} copies)",
     "stessa durata, titolo e artista quasi uguali (audio diverso: forse un'altra codifica)":
         "same duration, almost the same title and artist (different audio: maybe another encoding)",
     "il più simile di {0} candidati: controlla":
@@ -2195,4 +2195,10 @@ CATALOG = {
         'playlist name',
     'una playlist fatta sul telefono non si cancella dal computer':
         'a playlist made on the phone cannot be deleted from the computer',
+    'es. Musica buona; Musica FLAC; Raccolte':
+        'e.g. Good music; FLAC music; Collections',
+    "Quando un brano c'è in più copie sul PC, le associazioni (proposta in rosso, Associa sorgente, Associa sorgenti) scelgono la copia nella prima di queste cartelle, poi nella seconda… Nomi di cartella (valgono in qualsiasi punto del percorso) o percorsi interi, separati da punto e virgola.":
+        'When a track is on the PC in several copies, the links (red proposal, Link source, Link sources) choose the copy in the first of these folders, then in the second… Folder names (valid anywhere in the path) or full paths, separated by semicolons.',
+    'Cartelle preferite':
+        'Preferred folders',
 }

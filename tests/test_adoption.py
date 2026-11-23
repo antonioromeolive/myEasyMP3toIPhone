@@ -326,3 +326,42 @@ def test_album_folder_matches_album_on_several_disc_folders():
     from myeasymp3toiphone.library import album_folder
     assert album_folder("C:/m/A/Disco/CD2/01.mp3") == str(Path("C:/m/A/Disco"))
     assert album_folder("C:/m/A/Disco/Cdrom/01.mp3") == str(Path("C:/m/A/Disco/Cdrom"))
+
+
+# --------------------------------------------------------------------------- cartelle preferite
+
+PREFERRED = ("musica.buona", "musica.flac", "C:/raccolte")
+
+
+def test_preference_order_names_and_paths():
+    from myeasymp3toiphone.library import preference
+    assert preference("D:/x/Musica.Buona/Anna/01.mp3", PREFERRED) == 0           # nome, maiuscole a parte
+    assert preference("D:/x/musica.flac/Anna/01.flac", PREFERRED) == 1
+    assert preference("C:/Raccolte/Estate/01.mp3", PREFERRED) == 2               # percorso, con le sottocartelle
+    assert preference("C:/raccolte2/Estate/01.mp3", PREFERRED) == 3              # un altro nome: in nessuna
+    assert preference("D:/x/musica.buona.vecchia/01.mp3", PREFERRED) == 3        # il nome intero, non un pezzo
+    assert preference("D:/x/a.mp3", ()) == 0
+
+
+def test_preferred_copy_wins_everywhere():
+    phone = [_numbered(1, "Uno", "Disco", 1, 100.0), _numbered(2, "Due", "Disco", 2, 120.0)]
+    near = [_numbered_pc("C:/m/Anna/Disco/01 Uno.mp3", "Uno", 1, 100.0),
+            _numbered_pc("C:/m/Anna/Disco/02 Due.mp3", "Due", 2, 120.0)]
+    far = [_numbered_pc("D:/archivio/musica.buona/Anna/Disco/01 Uno.mp3", "Uno", 1, 100.0),
+           _numbered_pc("D:/archivio/musica.buona/Anna/Disco/02 Due.mp3", "Due", 2, 120.0)]
+    assert adoption.album_folder_matches(phone, near + far) == {1: near[0], 2: near[1]}       # il più corto
+    assert adoption.album_folder_matches(phone, near + far, PREFERRED) == {1: far[0], 2: far[1]}
+    # copie uguali: un candidato solo, quello preferito, e la regola è sicura (niente AI)
+    by_length = adoption._by_length(near + far)
+    assert [track for _score, track in adoption.candidates(phone[0], by_length, PREFERRED)] == [far[0]]
+    outcome = _run_preferred(phone[:1], near + far)
+    assert outcome.proposals[0].pc is far[0] and outcome.proposals[0].level == adoption.LEVEL_VERY_LIKELY
+    # stesso audio in più copie: la preferita, anche con un tag in più di differenza
+    far[0].tags.album = "Disco (remaster)"
+    assert adoption._closest_copy(phone[0], [near[0], far[0]], PREFERRED) is far[0]
+    assert adoption._closest_copy(phone[0], [near[0], far[0]]) is near[0]
+
+
+def _run_preferred(phone, pc):
+    result = adoption.adopt(phone, pc, Registry(), Path("."), None, None, None, None, False, False, False, PREFERRED)
+    return result
