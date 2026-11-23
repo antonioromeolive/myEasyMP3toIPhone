@@ -97,7 +97,7 @@ class SourceDialog(QDialog):
             tags = track.tags
             reason = proposal.reason
             if index == 0:
-                reason = "consigliato — " + reason
+                reason = f"consigliato — {reason}"
             row = QTreeWidgetItem([tags.title or track.path.stem, tags.artist or tags.album_artist, tags.album,
                                    _duration(track.length), str(track.path), tr(reason)])
             row.setData(0, Qt.UserRole, index)

@@ -548,6 +548,30 @@ def update_track(sync_id: int, item: dict) -> dict:
     return result
 
 
+def insert_playlist(pid: int, name: str, members: list, when) -> dict:
+    """Una playlist nuova (rustunes, docs/02 §10.1, provato su un telefono): members sono i sync_id dei brani, in
+    ordine; when la data di creazione (datetime UTC). Come l'esempio di rustunes: ordine della playlist, niente
+    ripetizione né casuale."""
+    _require(bool(members), "playlist senza brani")
+    items = []
+    for member in members:
+        _require(member != 0, "un brano senza sync_id non può stare in una playlist mandata da un computer")
+        items.append(_signed(member))
+    container = {"name": _text(name, "nome della playlist"), "date_created": when, "date_modified": when}
+    ui = {"play_order": 1, "album_field_order": 0, "repeat_mode": 0, "is_reversed": False, "shuffle_items": False,
+          "has_been_shuffled": False}
+    result = {"operation": "insert_playlist", "pid": _signed(pid), "container": container, "container_ui": ui,
+              "item_to_container": items}
+    return result
+
+
+def delete_playlist(sync_id: int) -> dict:
+    """Cancella una playlist messa da un computer (rustunes, docs/02 §10.3, provato su un telefono): i brani restano."""
+    _require(sync_id != 0, "una playlist fatta sul telefono non si cancella dal computer")
+    result = {"operation": "delete_playlist", "pid": _signed(sync_id)}
+    return result
+
+
 def delete_track(sync_id: int) -> dict:
     _require(sync_id != 0, "brano senza sync_id")
     result = {"operation": "delete_track", "pid": _signed(sync_id)}

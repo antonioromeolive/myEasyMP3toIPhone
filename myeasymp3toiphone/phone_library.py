@@ -63,6 +63,31 @@ ORDER BY c.name, ci.position
 """
 
 
+# le stesse playlist normali, con il loro sync_id: diverso da 0 se le ha messe un computer (solo quelle un computer
+# può cancellare); 0 se fatte sul telefono (rustunes, docs/05)
+_CONTAINER_QUERY = """
+SELECT c.container_pid, c.sync_id, c.name, COUNT(ci.item_pid)
+FROM container c
+LEFT JOIN container_item ci ON ci.container_pid = c.container_pid
+WHERE c.distinguished_kind = 0 AND c.is_hidden = 0 AND c.smart_criteria IS NULL AND c.smart_is_folder = 0
+GROUP BY c.container_pid
+ORDER BY c.name
+"""
+
+
+@dataclass
+class PhonePlaylist:
+    pid: int                  # container_pid nel database dell'iPhone
+    sync_id: int              # 0: fatta sul telefono
+    name: str
+    count: int                # brani
+
+    @property
+    def from_computer(self) -> bool:
+        result = self.sync_id != 0
+        return result
+
+
 class PhoneLibraryError(Exception):
     """Il database dell'app Musica non si legge (versione di iOS diversa, copia incompleta…)."""
 
@@ -156,6 +181,45 @@ def read_music_database(path: Path) -> list:
                                   item.tags.disc_number or 1, item.tags.track_number or 9999,
                                   group_name(item.tags.title)))
     return tracks
+
+
+def read_playlists(path: Path) -> list:
+    """Le playlist normali dell'iPhone (PhonePlaylist: non la libreria, non le smart, non le cartelle), dalla copia del
+    database in path; mai la playlist principale della libreria (db_info)."""
+    try:
+        connection = sqlite3.connect(str(path))
+        try:
+            rows = connection.execute(_CONTAINER_QUERY).fetchall()
+            primary = set()
+            for (value,) in connection.execute("SELECT primary_container_pid FROM db_info"):
+                primary.add(_unsigned(value))
+        finally:
+            connection.close()
+    except sqlite3.Error as exc:
+        raise PhoneLibraryError(f"le playlist dell'app Musica non si leggono ({exc})") from exc
+    result = []
+    for pid, sync_id, name, count in rows:
+        if _unsigned(pid) not in primary and _text(name):
+            result.append(PhonePlaylist(pid=_unsigned(pid), sync_id=_unsigned(sync_id), name=_text(name),
+                                        count=int(count or 0)))
+    return result
+
+
+def container_ids(path: Path) -> set:
+    """Tutti gli identificativi delle playlist dell'iPhone (container_pid e sync_id): uno nuovo non deve essere tra
+    questi."""
+    result = set()
+    try:
+        connection = sqlite3.connect(str(path))
+        try:
+            for pid, sync_id in connection.execute("SELECT container_pid, sync_id FROM container"):
+                result.add(_unsigned(pid))
+                result.add(_unsigned(sync_id))
+        finally:
+            connection.close()
+    except sqlite3.Error as exc:
+        raise PhoneLibraryError(f"le playlist dell'app Musica non si leggono ({exc})") from exc
+    return result
 
 
 # --------------------------------------------------------------------------- elenco nella cartella dati

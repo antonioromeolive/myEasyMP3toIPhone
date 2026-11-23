@@ -22,6 +22,10 @@ Fatto e provato senza telefono (test e finestre di prova); da confermare sul tel
 - **Applica** (passo 5): invio, eliminazione e aggiornamento in una volta, poi le spunte in attesa che spariscono.
 - **Modifica dei tag dal PC** su un brano collegato: Cambia tag per titolo e album, Rimpiazza per l'artista, il
   promemoria delle playlist.
+- **Playlist per artista** (`insert_playlist`, `delete_playlist`: rustunes li ha provati su un telefono, ma solo
+  con playlist di 1-42 brani): prima **Prova** ("♪ PROVA", una playlist vera di decine o centinaia di brani, in
+  ordine?), poi il piano completo. Controllare che le playlist di CopyTrans abbiano un `sync_id` (se risultano tutte
+  "fatte sull'iPhone", il computer non le può cancellare) e il messaggio finale se Sincronizza libreria è attiva.
 - **App Musica che non si aggiorna da sola**: dopo ogni scrittura il programma manda l'avviso di fine
   sincronizzazione di iTunes (`com.apple.itunes-mobdev.syncDidFinish`, `iphone.post_sync_finished`). Con l'app
   Musica aperta: se si aggiorna da sola, togliere dal messaggio finale l'invito a chiuderla e riaprirla; se no,

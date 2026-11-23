@@ -7,6 +7,7 @@ from typing import Callable, Optional
 from PySide6.QtCore import QObject, QRunnable, QThreadPool, Signal, Slot
 from PySide6.QtWidgets import QLabel, QProgressBar, QPushButton, QStatusBar
 
+from ..i18n import tr
 from ..iphone import IPhoneError
 
 log = logging.getLogger(__name__)
@@ -101,13 +102,19 @@ class TaskRunner(QObject):
         if self._task is not None:
             self._task.cancel.set()
             self._cancel_button.setEnabled(False)
-            self._label.setText(self._title + ": annullamento…")
+            self._label.setText(self._step_text("annullamento…"))
+
+    def _step_text(self, text: str) -> str:
+        """"Titolo: passo", con le due parti tradotte una per una: insieme, un modello generico del catalogo (come
+        "{0} brani {1}") prenderebbe il testo intero e ne tradurrebbe solo un pezzo."""
+        result = f"{tr(self._title)}: {tr(text)}"
+        return result
 
     def _on_progress(self, index: int, total: int, text: str) -> None:
         if total > 0:
             self._bar.setRange(0, total)
             self._bar.setValue(index)
-        self._label.setText(f"{self._title}: {text}")
+        self._label.setText(self._step_text(text))
 
     def _done(self) -> None:
         self._task = None

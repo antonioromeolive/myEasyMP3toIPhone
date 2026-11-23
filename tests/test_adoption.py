@@ -123,7 +123,7 @@ def test_link_for_records_how_and_file(tmp_path):
 # --------------------------------------------------------------------------- Associa sorgente
 
 def _fake_prints(monkeypatch, phone_print, pc_prints):
-    monkeypatch.setattr(adoption, "_phone_print", lambda track, home, read_phone: phone_print)
+    monkeypatch.setattr(adoption, "_phone_print", lambda track, home, read_phone, cancel=None: phone_print)
     monkeypatch.setattr(adoption, "pc_fingerprints", lambda tracks, cache, progress=None, cancel=None: dict(pc_prints))
 
 
@@ -147,12 +147,43 @@ def test_rank_sources_asks_ai_only_when_close(monkeypatch):
     provider = FakeProvider("Carla/Live", "medium")
     ranked = adoption.rank_sources(phone, pc, Path("."), provider=provider)
     assert ranked[0].pc is pc[1] and ranked[0].how == provenance.HOW_AI
+    assert ranked[0].reason == "AI (media): scelta finta"                               # la sicurezza in italiano
     assert [proposal.pc for proposal in ranked[1:]] == [pc[0]]
     clear = _phone(3, "Estate", "Bruno", "Estate", length=180.0)
     silent = FakeProvider("Bruno", "high")
     ranked = adoption.rank_sources(clear, [_pc("C:/m/Bruno/01 - Estate.mp3", "Estate", "Bruno", "Estate", 181.0)],
                                    Path("."), provider=silent)
     assert ranked[0].how == provenance.HOW_RULES and silent.seen == ""                 # un solo candidato sicuro
+
+
+class StuckProvider(FakeProvider):
+    """Un'AI che non risponde finché il test non la libera (un server lento o bloccato)."""
+
+    def __init__(self):
+        super().__init__("", "high")
+        self.release = threading.Event()
+
+    def ask_json(self, system, user, schema):
+        self.release.wait(30)
+        result = super().ask_json(system, user, schema)
+        return result
+
+
+def test_rank_sources_cancel_does_not_wait_for_the_ai(monkeypatch):
+    phone = _phone(2, "Notte", "Carla", "Raccolta", length=240.0)
+    pc = [_pc("C:/m/Carla/Notte/01 - Notte.mp3", "Notte", "Carla", "Notte", length=239.5),
+          _pc("C:/m/Carla/Live/07 - Notte.mp3", "Notte", "Carla", "Live", length=241.0)]
+    _fake_prints(monkeypatch, "", {})
+    provider = StuckProvider()
+    cancel = threading.Event()
+    timer = threading.Timer(0.3, cancel.set)
+    timer.start()
+    try:
+        ranked = adoption.rank_sources(phone, pc, Path("."), provider=provider, cancel=cancel)
+        assert ranked is None and not provider.release.is_set()      # annullato mentre l'AI non rispondeva ancora
+    finally:
+        provider.release.set()
+        timer.cancel()
 
 
 def _numbered(sync_id, title, album, number, length):
@@ -271,3 +302,27 @@ def test_album_folder_matches_needs_one_folder_for_the_whole_album():
           _numbered_pc("C:/m/C/Cinque.mp3", "Cinque", 1, 250.0)]                     # durata diversa
     matches = adoption.album_folder_matches(phone, pc)
     assert matches == {1: pc[0], 2: pc[1]}
+
+
+def test_album_folder_matches_album_on_several_disc_folders():
+    """Un album su più dischi, una cartella per disco ("cd 1 - studio", "cd 2 - live") e i numeri che ricominciano:
+    la cartella dell'album è quella sopra; una seconda copia più lontana non vince."""
+    phone = []
+    pc = []
+    copy = []
+    songs = [(1, 1, "Prima", 200.0), (1, 2, "Seconda", 210.0), (2, 1, "Terza", 220.0), (2, 2, "Prima", 300.0)]
+    for index, (disc, number, title, length) in enumerate(songs):
+        item = _numbered(index + 1, title, "Tutto Questo", number, length)
+        item.tags.disc_number = disc
+        phone.append(item)
+        folder = "cd 1 - studio" if disc == 1 else "cd 2 - live"
+        track = _numbered_pc(f"C:/m/Anna/Tutto Questo/{folder}/{number:02d} - {title}.mp3", title, number, length)
+        track.tags.disc_number = disc
+        pc.append(track)
+        copy.append(_numbered_pc(f"C:/copia/vecchi/Anna/Tutto Questo/{folder}/{number:02d} - {title}.mp3",
+                                 title, number, length))
+    matches = adoption.album_folder_matches(phone, copy + pc)
+    assert matches == {1: pc[0], 2: pc[1], 3: pc[2], 4: pc[3]}        # il percorso più corto, disco per disco
+    from myeasymp3toiphone.library import album_folder
+    assert album_folder("C:/m/A/Disco/CD2/01.mp3") == str(Path("C:/m/A/Disco"))
+    assert album_folder("C:/m/A/Disco/Cdrom/01.mp3") == str(Path("C:/m/A/Disco/Cdrom"))

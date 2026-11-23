@@ -52,6 +52,15 @@ def test_translations():
                        "messa da un altro programma, iTunes la toglierebbe dall'iPhone.").startswith("Replace\n\nNever")
         assert i18n.tr("<b>3</b> brani dell'iPhone ritrovati sul PC con l'impronta dell'audio: si associano alla loro "
                        "sorgente senza chiedere.").startswith("<b>3</b> iPhone tracks found")
+        assert i18n.tr("consigliato — AI (alta): stesso brano") == "recommended — AI (high): stesso brano"
+        assert i18n.tr("<b>Rossi — Caruso</b><br>Scegli il file del PC da cui viene questo brano (il primo è il più "
+                       "probabile):") == ("<b>Rossi — Caruso</b><br>Choose the PC file this track comes from (the "
+                                          "first is the most probable):")
+        composed = ("<b>3 playlist da creare</b> (quelle spuntate) e <b>2 da cancellare</b>: x.<br>4 brani non messi "
+                    "da un computer (o senza file) non possono stare in queste playlist.")
+        assert i18n.tr(composed) == ("<b>3 playlists to create</b> (the ticked ones) and <b>2 to delete</b>: x.<br>4 "
+                                     "tracks not put there by a computer (or without a file) cannot be in these "
+                                     "playlists.")             # pezzo per pezzo, non con il modello "{0} brani {1}"
         assert i18n.tr("Caruso") == "Caruso"                  # un dato resta com'è
         assert i18n.tr_exact("questo PC") == "this PC" and i18n.tr_exact("Rossi — Disco") == "Rossi — Disco"
         assert "in English" in i18n.prompt("Write the reason in Italian.")

@@ -114,6 +114,37 @@ def _report_text(report, verb: str) -> str:
     return message
 
 
+def _playlist_report_text(report, phone_playlists: list) -> str:
+    """L'esito di Playlist per artista; controlla sulla musica riletta che le playlist create ci siano davvero."""
+    present = set()
+    for playlist in phone_playlists:
+        if playlist.from_computer:
+            present.add(playlist.name)
+    missing = []
+    for name in report.created:
+        if name not in present:
+            missing.append(name)
+    message = f"{len(report.created)} playlist create, {len(report.deleted)} cancellate."
+    if missing and len(missing) == len(report.created):
+        message += ("\n\nMa sull'iPhone le playlist create non ci sono. Se è attiva Sincronizza libreria (iCloud: "
+                    "Impostazioni, Musica), l'iPhone accetta le playlist da un computer senza crearle.")
+    elif missing:
+        message += f"\n\nNon risultano sull'iPhone: {', '.join(missing[:10])}"
+    for title, items in (("Saltate", report.skipped), ("Non riuscite", report.errors)):
+        if items:
+            lines = []
+            for name, reason in items[:10]:
+                lines.append(f"• {name}: {reason}")
+            if len(items) > 10:
+                lines.append(f"… e altri {len(items) - 10}")
+            message += f"\n\n{title}:\n" + "\n".join(lines)
+    if report.cancelled:
+        message += "\n\nOperazione annullata."
+    if report.created or report.deleted:
+        message += "\n\n" + MUSIC_APP_REFRESH
+    return message
+
+
 def _playlist_note(phone_tracks: list) -> str:
     """Il promemoria delle playlist da sistemare a mano dopo un rimpiazzo ("" se non ce ne sono)."""
     reminder = playlist_reminder(phone_tracks)
@@ -340,12 +371,18 @@ class IPhonePanel(QWidget):
                                       "dell'audio, regole e AI per i dubbi. Scrive solo il registro della "
                                       "provenienza: né i brani né i file cambiano.")
         self._adopt_button.clicked.connect(self._adopt)
+        self._playlist_button = QPushButton("Playlist per artista…")
+        self._playlist_button.setToolTip("Rifà le playlist dell'iPhone: una per artista dell'album (con più album) e "
+                                         "una per compilation; cancella quelle messe da un computer. Prima mostra "
+                                         "tutto; c'è anche una prova. I brani non cambiano.")
+        self._playlist_button.clicked.connect(self._plan_playlists)
         self._listing_note = QLabel()
         self._listing_note.setStyleSheet("color: gray")
         buttons = QHBoxLayout()
         buttons.addWidget(self._refresh_button)
         buttons.addWidget(self._save_button)
         buttons.addWidget(self._adopt_button)
+        buttons.addWidget(self._playlist_button)
         buttons.addStretch(1)
         buttons.addWidget(self._listing_note)
 
@@ -1255,6 +1292,60 @@ class IPhonePanel(QWidget):
 
         window.runner.run("Registro della provenienza", work, done)
 
+    # ------------------------------------------------------------------ playlist per artista
+
+    def _plan_playlists(self) -> None:
+        """Legge musica e playlist dall'iPhone e prepara il piano (playlists.plan), poi lo mostra."""
+        from ..playlists import plan, source_paths
+
+        def work(progress, _cancel):
+            progress(0, 0, "lettura della musica e delle playlist dell'iPhone")
+            tracks, phone_playlists = iphone.list_music_app_playlists()
+            registry = provenance.Registry.load(config_dir())
+            value = (tracks, plan(tracks, phone_playlists, source_paths(registry)))
+            return value
+
+        self._window.runner.run("Playlist per artista", work, self._show_playlist_plan)
+
+    def _show_playlist_plan(self, value) -> None:
+        from .playlist_dialog import ACTION_TEST, TEST_NAME, PlaylistDialog
+        tracks, plan = value
+        self._window.set_phone_tracks(tracks, self._device_name)
+        dialog = PlaylistDialog(self, plan)
+        if dialog.exec():
+            if dialog.action == ACTION_TEST:
+                test = dialog.test_playlist()
+                create = [test]
+                delete = []
+                text = (f"Creare sull'iPhone la playlist di prova \"{TEST_NAME}\" ({len(test.tracks)} brani)? Non "
+                        "si cancella niente.")
+            else:
+                create = dialog.chosen()
+                delete = list(plan.delete)
+                text = (f"Creare {len(create)} playlist e cancellare {len(delete)} playlist messe da un computer?\n\n"
+                        "Le playlist cancellate non si possono recuperare; i brani restano sull'iPhone.")
+            if self._confirm("Playlist per artista", text):
+                self._rebuild_playlists(create, delete)
+
+    def _rebuild_playlists(self, create: list, delete: list) -> None:
+        window = self._window
+
+        def work(progress, cancel):
+            report = phone_actions.rebuild_playlists(create, delete, progress, cancel)
+            if report.created or report.deleted:
+                iphone.post_sync_finished()
+            progress(0, 0, "rilettura della musica dell'iPhone")
+            tracks, phone_playlists = iphone.list_music_app_playlists()
+            value = (report, tracks, phone_playlists)
+            return value
+
+        def done(value):
+            report, tracks, phone_playlists = value
+            window.set_phone_tracks(tracks, self._device_name)
+            QMessageBox.information(self, "Playlist per artista", _playlist_report_text(report, phone_playlists))
+
+        window.runner.run("Playlist sull'iPhone", work, done)
+
     # ------------------------------------------------------------------ associa sorgente
 
     def _link_sources(self, items: list) -> None:
@@ -1278,14 +1369,23 @@ class IPhonePanel(QWidget):
         read_phone = self._connected
         tag_cache = window.tag_cache
 
-        def work(progress, _cancel):
+        def work(progress, cancel):
             progress(0, 0, "ricerca dei file possibili")
-            value = adoption.rank_sources(item, pc_tracks, config_dir(), tag_cache, provider, read_phone)
+            value = adoption.rank_sources(item, pc_tracks, config_dir(), tag_cache, provider, read_phone, progress,
+                                          cancel)
             return value
 
         window.runner.run("Associa sorgente", work, lambda proposals: self._choose_source(item, proposals))
 
-    def _choose_source(self, item, proposals: list) -> None:
+    def _choose_source(self, item, proposals) -> None:
+        """proposals: None se la ricerca è stata annullata (si ferma anche la coda dei brani da associare)."""
+        if proposals is None:
+            self._source_queue = []
+            self._window.statusBar().showMessage("Associa sorgente annullata", 8000)
+        else:
+            self._show_sources(item, proposals)
+
+    def _show_sources(self, item, proposals: list) -> None:
         from .source_dialog import SourceDialog
         window = self._window
         current = window.registry.get(item.sync_id)
@@ -1434,6 +1534,7 @@ class IPhonePanel(QWidget):
         self._refresh_button.setEnabled(True)
         self._save_button.setEnabled(self._connected)
         self._adopt_button.setEnabled(True)
+        self._playlist_button.setEnabled(self._connected)
         self._show_connection(CONNECTED if self._connected else NOT_CONNECTED_STATE)
 
     def _show_connection(self, state: str) -> None:

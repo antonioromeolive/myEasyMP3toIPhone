@@ -21,6 +21,11 @@ LANGUAGES = {"it": "Italiano", "en": "English"}
 DEFAULT_LANGUAGE = "it"
 PLACEHOLDER = re.compile(r"(?<!\{)\{(\d+)\}(?!\})")
 MIN_FRAGMENT = 12          # i pezzi di testo tradotti dentro un testo più lungo: almeno questi caratteri
+MIN_PIECE = 4              # i testi tra i tag di una voce HTML del catalogo: almeno questi caratteri fissi
+MAX_DEPTH = 2              # le parti variabili si traducono fin qui ("consigliato — {0}" → "AI ({0}): {1}" → "alta")
+TAG = re.compile(r"<[^<>]+>")
+GROUP = re.compile(r"\(\?P<g\d+>\.\*\?\)")     # le parti variabili nella regex di un modello
+LETTER = re.compile(r"[A-Za-zÀ-ÿ]")
 
 _state = {"language": DEFAULT_LANGUAGE, "tables": None}
 
@@ -45,13 +50,31 @@ def _unescape(text: str) -> str:
     return result
 
 
+def _html_pieces(catalog: dict) -> dict:
+    """I testi tra i tag delle voci HTML del catalogo, ognuno con il suo pezzo inglese (se i pezzi sono tanti quanti):
+    un testo HTML composto da più voci ("<b>…</b>" + "<br>Scegli…") si traduce così pezzo per pezzo (_html)."""
+    result = {}
+    for italian, translated in catalog.items():
+        if TAG.search(italian):
+            italian_pieces = TAG.split(italian)
+            english_pieces = TAG.split(translated)
+            if len(italian_pieces) == len(english_pieces):
+                for index, piece in enumerate(italian_pieces):
+                    plain = PLACEHOLDER.sub("", piece).strip()
+                    if len(plain) >= MIN_PIECE and LETTER.search(plain) and piece.strip() not in catalog:
+                        result[piece.strip()] = english_pieces[index].strip()
+    return result
+
+
 def _tables() -> tuple:
     """(testi fissi {italiano: inglese}, modelli [(lunghezza del testo fisso, pezzo più lungo, regex, inglese)])."""
     if _state["tables"] is None:
         from .i18n_en import CATALOG
         exact = {}
         patterns = []
-        for italian, translated in CATALOG.items():
+        entries = dict(_html_pieces(CATALOG))
+        entries.update(CATALOG)
+        for italian, translated in entries.items():
             if PLACEHOLDER.search(italian):
                 pieces = PLACEHOLDER.split(italian)
                 expression = "^"
@@ -77,19 +100,20 @@ def _tables() -> tuple:
     return result
 
 
-def _part(text: str) -> str:
+def _part(text: str, depth: int) -> str:
     """Una parte variabile: tradotta se è a sua volta un testo del catalogo, altrimenti com'è (un titolo, un numero)."""
     exact, _patterns = _tables()
     result = exact.get(text)
     if result is None:
-        result = _whole(text, nested=True)
+        result = _whole(text, depth)
     if result is None:
         result = text
     return result
 
 
-def _whole(text: str, nested: bool = False) -> str | None:
-    """Il testo intero come uno dei modelli; None se nessuno corrisponde."""
+def _whole(text: str, depth: int = 0) -> str | None:
+    """Il testo intero come uno dei modelli; None se nessuno corrisponde. Le parti variabili si traducono a loro
+    volta fino a MAX_DEPTH livelli."""
     exact, patterns = _tables()
     result = exact.get(text)
     index = 0
@@ -97,10 +121,13 @@ def _whole(text: str, nested: bool = False) -> str | None:
         _literal, longest, expression, translated = patterns[index]
         if longest in text:
             match = expression.match(text)
+            if match is not None and not TAG.search(GROUP.sub("", expression.pattern)) and \
+                    TAG.search("".join(match.groups())):
+                match = None        # un modello senza HTML non prende pezzi di HTML: si traduce tra i tag (_html)
             if match is not None:
                 values = {}
                 for name, value in match.groupdict().items():
-                    values[name[1:]] = value if nested else _part(value)
+                    values[name[1:]] = _part(value, depth + 1) if depth < MAX_DEPTH else value
                 result = PLACEHOLDER.sub(lambda found: "\x00" + found.group(1) + "\x00", translated)
                 result = _unescape(result)
                 for number, value in values.items():

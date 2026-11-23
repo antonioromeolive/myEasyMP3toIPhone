@@ -600,3 +600,97 @@ def update_from_pc(edits: list, replacements: list, overlay, progress: Optional[
     if replacements and not is_cancelled(cancel):
         report.add(replace_tracks(replacements, overlay, progress, cancel, home))
     return report
+
+
+# --------------------------------------------------------------------------- playlist
+
+BATCH_PLAYLISTS = 100     # playlist create o cancellate per sessione
+
+
+@dataclass
+class PlaylistReport:
+    created: list = field(default_factory=list)      # nomi delle playlist create
+    deleted: list = field(default_factory=list)      # nomi delle playlist cancellate
+    skipped: list = field(default_factory=list)      # (nome, motivo)
+    errors: list = field(default_factory=list)       # (che cosa, errore)
+    sessions: int = 0
+    cancelled: bool = False
+
+
+def _playlist_operations(batch: list, snapshot: _Snapshot, folder: Path, report: PlaylistReport) -> tuple:
+    """Le operazioni di un gruppo [(crea?, playlist)], controllate sul database appena scaricato: (operazioni,
+    [(crea?, nome)])."""
+    from .phone_library import DATABASE_NAME, container_ids, read_playlists
+    used = container_ids(folder / DATABASE_NAME)
+    deletable = set()
+    for playlist in read_playlists(folder / DATABASE_NAME):
+        if playlist.from_computer:
+            deletable.add(playlist.sync_id)
+    operations = []
+    names = []
+    for create, playlist in batch:
+        if create:
+            members = []
+            for sync_id in playlist.members:
+                if sync_id in snapshot.track_ids:
+                    members.append(sync_id)
+            if members:
+                operations.append(phone_sync.insert_playlist(_Snapshot._fresh(used), playlist.name, members, _now()))
+                names.append((True, playlist.name))
+            else:
+                report.skipped.append((playlist.name, "nessuno dei suoi brani è più sull'iPhone"))
+        elif playlist.sync_id in deletable:
+            operations.append(phone_sync.delete_playlist(playlist.sync_id))
+            names.append((False, playlist.name))
+        else:
+            report.skipped.append((playlist.name, "non è più sull'iPhone"))
+    result = (operations, names)
+    return result
+
+
+async def _playlist_batches(steps: list, progress: Optional[ProgressFn], cancel, report: PlaylistReport) -> None:
+    work = Path(tempfile.mkdtemp(prefix="myEasyMP3toIPhone_playlist_"))
+    lockdown = await iphone._open_lockdown()
+    try:
+        start = 0
+        failed = False
+        while start < len(steps) and not failed and not is_cancelled(cancel):
+            batch = steps[start:start + BATCH_PLAYLISTS]
+            if progress is not None:
+                progress(start, len(steps), f"playlist: {start} di {len(steps)}")
+            snapshot = await _snapshot(lockdown, work)
+            operations, names = _playlist_operations(batch, snapshot, work, report)
+            if operations:
+                try:
+                    await _run(lockdown, snapshot, operations, [], report)
+                    for create, name in names:
+                        if create:
+                            report.created.append(name)
+                        else:
+                            report.deleted.append(name)
+                except PhoneSyncError as exc:
+                    failed = True
+                    report.errors.append((f"{len(operations)} playlist", str(exc)))
+            start += BATCH_PLAYLISTS
+        report.cancelled = is_cancelled(cancel)
+    finally:
+        await lockdown.close()
+        shutil.rmtree(work, ignore_errors=True)
+
+
+def rebuild_playlists(create: list, delete: list, progress: Optional[ProgressFn] = None,
+                      cancel: Optional[threading.Event] = None) -> PlaylistReport:
+    """Crea le playlist create (playlists.PlannedPlaylist), poi cancella quelle in delete (PhonePlaylist messe da un
+    computer). Prima le nuove: se una sessione non riesce, le vecchie ci sono ancora. I brani non cambiano."""
+    report = PlaylistReport()
+    steps = []
+    for playlist in create:
+        steps.append((True, playlist))
+    for playlist in delete:
+        if playlist.from_computer:
+            steps.append((False, playlist))
+        else:
+            report.skipped.append((playlist.name, "fatta sul telefono: il computer non la può cancellare"))
+    if steps:
+        iphone._run(_playlist_batches(steps, progress, cancel, report))
+    return report

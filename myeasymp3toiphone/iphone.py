@@ -35,7 +35,7 @@ from pymobiledevice3.lockdown import create_using_usbmux
 from pymobiledevice3.services.afc import AfcService
 from pymobiledevice3.usbmux import list_devices
 
-from .phone_library import DATABASE_NAME, PhoneLibraryError, read_music_database
+from .phone_library import DATABASE_NAME, PhoneLibraryError, read_music_database, read_playlists
 from .phone_sync import PhoneSyncError
 
 USBMUXD_ADDRESS = ("127.0.0.1", 27015)
@@ -179,9 +179,9 @@ def mark_missing_files(tracks: list, files: Optional[set]) -> None:
             item.missing_file = path.startswith(prefix) and path not in files
 
 
-async def _list_music_app() -> list:
+async def _list_music_app(with_playlists: bool = False):
     """Scarica una copia del database dell'app Musica in una cartella temporanea e la legge; segna i brani il cui
-    file non c'è sull'iPhone."""
+    file non c'è sull'iPhone. with_playlists: (brani, playlist normali) invece dei soli brani."""
     folder = Path(tempfile.mkdtemp(prefix="myEasyMP3toIPhone_musica_"))
     lockdown = await _open_lockdown()
     try:
@@ -194,11 +194,13 @@ async def _list_music_app() -> list:
         if not (folder / DATABASE_NAME).is_file():
             raise IPhoneError(NO_MUSIC_MESSAGE)
         try:
-            result = read_music_database(folder / DATABASE_NAME)
+            tracks = read_music_database(folder / DATABASE_NAME)
+            playlists = read_playlists(folder / DATABASE_NAME) if with_playlists else None
         except PhoneLibraryError as exc:
             raise IPhoneError(f"Non riesco a leggere la musica dell'iPhone: {exc}. Riprova; se succede ancora, "
                               "la versione di iOS potrebbe usare un formato diverso.") from exc
-        mark_missing_files(result, files)
+        mark_missing_files(tracks, files)
+        result = (tracks, playlists) if with_playlists else tracks
     finally:
         await lockdown.close()
         shutil.rmtree(folder, ignore_errors=True)
@@ -257,6 +259,12 @@ def get_device_info() -> DeviceInfo:
 def list_music_app() -> list:
     """I brani dell'app Musica (phone_library.PhoneTrack) con un file sull'iPhone, con i tag che mostra l'app."""
     result = _run(_list_music_app())
+    return result
+
+
+def list_music_app_playlists() -> tuple:
+    """(brani come list_music_app, playlist normali dell'app Musica: phone_library.PhonePlaylist)."""
+    result = _run(_list_music_app(True))
     return result
 
 

@@ -1071,8 +1071,10 @@ CATALOG = {
         "<br>Choose the PC file this track comes from (the first is the most probable):",
     "Percorso":
         "Path",
-    "consigliato — ":
-        "recommended — ",
+    "consigliato — {0}":
+        "recommended — {0}",
+    "Associa sorgente annullata":
+        "Link source cancelled",
     "Nessun file simile nella cartella aperta: scegli un file con il pulsante qui sotto.":
         "No similar file in the open folder: choose a file with the button below.",
     "Scegli un altro file…":
@@ -1141,8 +1143,8 @@ CATALOG = {
         "Operation running",
     "Attendi la fine dell'operazione in corso.":
         "Wait for the running operation to finish.",
-    ": annullamento…":
-        ": cancelling…",
+    "annullamento…":
+        "cancelling…",
     "version":
         "version",
     "{0} NON scritto ({1}): una copia futura della cartella dati potrebbe non dire con quale versione usarla. Controlla che la cartella sia scrivibile":
@@ -2129,4 +2131,68 @@ CATALOG = {
         'Hide the folder ({0})',
     'Non mostrare più i brani di questa cartella (e delle sue sottocartelle) nella scheda PC: i file non cambiano; Cartelle nascoste… in alto le mostra di nuovo':
         'Stop showing the tracks of this folder (and its subfolders) in the PC tab: the files do not change; Hidden folders… at the top shows them again',
+    '{0} playlist create, {1} cancellate.':
+        '{0} playlists created, {1} deleted.',
+    "\n\nMa sull'iPhone le playlist create non ci sono. Se è attiva Sincronizza libreria (iCloud: Impostazioni, Musica), l'iPhone accetta le playlist da un computer senza crearle.":
+        '\n\nBut the created playlists are not on the iPhone. If Sync Library (iCloud: Settings, Music) is on, the iPhone accepts playlists from a computer without creating them.',
+    "\n\nNon risultano sull'iPhone: {0}":
+        '\n\nNot found on the iPhone: {0}',
+    'Saltate':
+        'Skipped',
+    'Non riuscite':
+        'Failed',
+    'Playlist per artista…':
+        'Playlists by artist…',
+    "Rifà le playlist dell'iPhone: una per artista dell'album (con più album) e una per compilation; cancella quelle messe da un computer. Prima mostra tutto; c'è anche una prova. I brani non cambiano.":
+        'Rebuilds the iPhone playlists: one per album artist (with several albums) and one per compilation; deletes those put there by a computer. It shows everything first; there is also a test. The tracks do not change.',
+    "lettura della musica e delle playlist dell'iPhone":
+        'reading the iPhone music and playlists',
+    'Playlist per artista':
+        'Playlists by artist',
+    'Creare sull\'iPhone la playlist di prova "{0}" ({1} brani)? Non si cancella niente.':
+        'Create the test playlist "{0}" on the iPhone ({1} tracks)? Nothing is deleted.',
+    "Creare {0} playlist e cancellare {1} playlist messe da un computer?\n\nLe playlist cancellate non si possono recuperare; i brani restano sull'iPhone.":
+        'Create {0} playlists and delete {1} playlists put there by a computer?\n\nDeleted playlists cannot be recovered; the tracks stay on the iPhone.',
+    "Playlist sull'iPhone":
+        'Playlists on the iPhone',
+    'Playlist per artista e per compilation':
+        'Playlists by artist and by compilation',
+    "<b>{0} playlist da creare</b> (quelle spuntate) e <b>{1} da cancellare</b>: tutte quelle messe da un computer (CopyTrans, iTunes, questo programma), comprese quelle fatte le volte prima.<br>Per artista: gli artisti dell'album con almeno {2} album e {3} brani. Per compilation: i volumi della stessa serie insieme, o un album solo con almeno {4} brani.<br>I brani non cambiano: cambiano solo le playlist. Prima si creano le nuove, poi si cancellano le vecchie.":
+        '<b>{0} playlists to create</b> (the ticked ones) and <b>{1} to delete</b>: all those put there by a computer (CopyTrans, iTunes, this program), including those made the previous times.<br>By artist: the album artists with at least {2} albums and {3} tracks. By compilation: the volumes of the same series together, or a single album with at least {4} tracks.<br>The tracks do not change: only the playlists do. The new ones are created first, then the old ones are deleted.',
+    "<br>{0} playlist fatte sull'iPhone restano: il computer non le può toccare (cancellale a mano, se vuoi).":
+        '<br>{0} playlists made on the iPhone stay: a computer cannot touch them (delete them by hand, if you like).',
+    '<br>{0} brani non messi da un computer (o senza file) non possono stare in queste playlist.':
+        '<br>{0} tracks not put there by a computer (or without a file) cannot be in these playlists.',
+    'Playlist':
+        'Playlist',
+    'Da creare ({0})':
+        'To create ({0})',
+    'Da cancellare: messe da un computer ({0})':
+        'To delete: put there by a computer ({0})',
+    "Restano: fatte sull'iPhone ({0})":
+        'Staying: made on the iPhone ({0})',
+    'Crea e cancella…':
+        'Create and delete…',
+    'Prova':
+        'Test',
+    'Crea solo "{0}", una copia della prima playlist spuntata, e non cancella niente: guarda sul telefono che ci sia, con i brani in ordine. La cancella la prossima volta, con le altre messe da un computer.':
+        'Creates only "{0}", a copy of the first ticked playlist, and deletes nothing: check on the phone that it is there, with the tracks in order. It is deleted next time, with the others put there by a computer.',
+    "nessuno dei suoi brani è più sull'iPhone":
+        'none of its tracks is on the iPhone any more',
+    'playlist: {0} di {1}':
+        'playlists: {0} of {1}',
+    '{0} playlist':
+        '{0} playlists',
+    'fatta sul telefono: il computer non la può cancellare':
+        'made on the phone: a computer cannot delete it',
+    "le playlist dell'app Musica non si leggono ({0})":
+        'the Music app playlists cannot be read ({0})',
+    'playlist senza brani':
+        'playlist without tracks',
+    'un brano senza sync_id non può stare in una playlist mandata da un computer':
+        'a track without sync_id cannot be in a playlist sent by a computer',
+    'nome della playlist':
+        'playlist name',
+    'una playlist fatta sul telefono non si cancella dal computer':
+        'a playlist made on the phone cannot be deleted from the computer',
 }

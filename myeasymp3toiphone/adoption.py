@@ -46,6 +46,8 @@ FOLDER_TITLE_DOUBT = 0.75     # …o almeno simile: da controllare
 MIN_ALBUM_NAME = 3            # un album più corto ("A") si troverebbe in troppe cartelle
 AI_BATCH = 25
 SAVE_EVERY = 100
+CANCEL_POLL = 0.2             # secondi: ogni quanto, durante una richiesta all'AI, si guarda se è stata annullata
+CONFIDENCE_TEXT = {"high": "alta", "medium": "media", "low": "bassa"}
 
 ProgressFn = Callable[[int, int, str], None]
 
@@ -255,6 +257,28 @@ def ai_lines(batch: list) -> tuple:
     return result
 
 
+def ask_json_cancellable(provider, system: str, user: str, schema: dict, cancel: Optional[threading.Event]):
+    """provider.ask_json, ma si può annullare: la richiesta va in un thread a parte e, se si annulla, non si aspetta
+    la risposta (la richiesta finisce da sola, al più al timeout del profilo, e la risposta si butta). None se
+    annullata; un errore dell'AI si solleva qui."""
+    box = {}
+
+    def call():
+        try:
+            box["reply"] = provider.ask_json(system, user, schema)
+        except Exception as exc:  # noqa: BLE001 - si solleva di nuovo nel thread che ha chiesto
+            box["error"] = exc
+
+    worker = threading.Thread(target=call, name="ask_json", daemon=True)
+    worker.start()
+    while worker.is_alive() and not _cancelled(cancel):
+        worker.join(CANCEL_POLL)
+    if "error" in box:
+        raise box["error"]
+    result = box.get("reply")
+    return result
+
+
 def ask_ai(provider, doubtful: list, progress: Optional[ProgressFn], cancel, outcome: AdoptionResult) -> list:
     """Le proposte dell'AI per i brani dubbi [(PhoneTrack, [(punteggio, Track)])]. Chi non ha risposta resta dubbio."""
     from .ai import AIError
@@ -268,8 +292,9 @@ def ask_ai(provider, doubtful: list, progress: Optional[ProgressFn], cancel, out
             progress(start, len(doubtful), f"l'AI confronta {len(batch)} brani dubbi")
         text, ids = ai_lines(batch)
         try:
-            reply = provider.ask_json(AI_SYSTEM, "TRACKS\n" + text, AI_SCHEMA)
-            for match in reply.get("matches", []):
+            reply = ask_json_cancellable(provider, AI_SYSTEM, "TRACKS\n" + text, AI_SCHEMA, cancel)
+            matches = reply.get("matches", []) if reply is not None else []
+            for match in matches:
                 entry = ids.get(str(match.get("track", "")))
                 if entry is not None and entry[0].sync_id not in answered:
                     phone_track, options = entry
@@ -277,8 +302,9 @@ def ask_ai(provider, doubtful: list, progress: Optional[ProgressFn], cancel, out
                     chosen = options.get(str(match.get("candidate", "")))
                     if chosen is not None:
                         confidence = str(match.get("confidence", "low"))
+                        shown = CONFIDENCE_TEXT.get(confidence, confidence)
                         proposals.append(Proposal(phone_track, chosen, provenance.HOW_AI,
-                                                  f"AI ({confidence}): {str(match.get('reason', '')).strip()}",
+                                                  f"AI ({shown}): {str(match.get('reason', '')).strip()}",
                                                   checked=confidence == "high",
                                                   level=LEVEL_LIKELY if confidence == "high" else LEVEL_CHECK))
         except AIError as exc:
@@ -479,12 +505,12 @@ def _adopt_remaining(unknown: list, usable: list, by_folder: dict, home: Path, t
 
 # --------------------------------------------------------------------------- Associa sorgente (uno o una cartella)
 
-def _phone_print(phone_track, home: Path, read_phone: bool) -> str:
+def _phone_print(phone_track, home: Path, read_phone: bool, cancel: Optional[threading.Event] = None) -> str:
     """L'impronta di un brano dell'iPhone: dalla memoria, o letta dal telefono se read_phone (iPhone connesso)."""
     result = provenance.PhoneFingerprints(home).get(phone_track.remote_path, phone_track.size)
-    if not result and read_phone and phone_track.sync_id:
+    if not result and read_phone and phone_track.sync_id and not _cancelled(cancel):
         try:
-            result = phone_fingerprints([phone_track], home).get(phone_track.sync_id, "")
+            result = phone_fingerprints([phone_track], home, None, cancel).get(phone_track.sync_id, "")
         except Exception as exc:  # noqa: BLE001 - senza impronta si va avanti con titolo e durata
             log.warning("Impronta non letta dall'iPhone: %s", exc)
             result = ""
@@ -501,21 +527,23 @@ def _by_length(tracks: list) -> list:
 
 
 def rank_sources(phone_track, pc_tracks: list, home: Path, tag_cache=None, provider=None,
-                 read_phone: bool = True) -> list:
+                 read_phone: bool = True, progress: Optional[ProgressFn] = None,
+                 cancel: Optional[threading.Event] = None):
     """I file del PC che possono essere la sorgente del brano, il più probabile per primo (Proposal):
       1. stesso audio (impronta), tra tutti i file con durata entro DURATION_TOLERANCE, senza filtro sul titolo
          (le compilation con titoli diversi): certo;
       2. titolo, artista e durata (candidates);
-      3. se non c'è un'impronta uguale e i primi candidati sono vicini, l'AI sceglie (se c'è un fornitore)."""
+      3. se non c'è un'impronta uguale e i primi candidati sono vicini, l'AI sceglie (se c'è un fornitore).
+    None se annullato (cancel): ogni passo lo controlla, anche durante la richiesta all'AI."""
     proposals = []
     near = []
     for track in pc_tracks:
         if not track.error and track.length > 0 and abs(track.length - phone_track.length) <= DURATION_TOLERANCE:
             near.append(track)
-    printed = _phone_print(phone_track, home, read_phone) if near else ""
+    printed = _phone_print(phone_track, home, read_phone, cancel) if near else ""
     exact = []
-    if printed:
-        prints = pc_fingerprints(near, tag_cache)
+    if printed and not _cancelled(cancel):
+        prints = pc_fingerprints(near, tag_cache, progress, cancel)
         for track in near:
             if prints.get(str(track.path)) == printed:
                 exact.append(track)
@@ -530,9 +558,10 @@ def rank_sources(phone_track, pc_tracks: list, home: Path, tag_cache=None, provi
         if id(track) not in exact_ids:
             scored.append((score, track))
     close = len(scored) > 1 and scored[1][0] > scored[0][0] - RULE_MARGIN
-    if not exact and provider is not None and scored and (close or scored[0][0] < RULE_SCORE):
+    if not exact and provider is not None and scored and (close or scored[0][0] < RULE_SCORE) \
+            and not _cancelled(cancel):
         outcome = AdoptionResult()
-        chosen = ask_ai(provider, [(phone_track, scored)], None, None, outcome)
+        chosen = ask_ai(provider, [(phone_track, scored)], progress, cancel, outcome)
         if chosen:
             proposals.append(Proposal(phone_track, chosen[0].pc, provenance.HOW_AI, chosen[0].reason))
             remaining = []
@@ -543,7 +572,8 @@ def rank_sources(phone_track, pc_tracks: list, home: Path, tag_cache=None, provi
     for score, track in scored:
         proposals.append(Proposal(phone_track, track, provenance.HOW_RULES,
                                   f"titolo, artista e durata simili ({score:.0%})"))
-    return proposals
+    result = None if _cancelled(cancel) else proposals
+    return result
 
 
 # --------------------------------------------------------------------------- sorgenti proposte (scheda iPhone)
@@ -574,26 +604,34 @@ def _same_song(phone_track, track) -> bool:
     return result
 
 
+def _same_position(item, track) -> bool:
+    """Stesso numero di traccia e, se tutti e due lo dicono, stesso disco (ogni CD ricomincia da 1)."""
+    same_disc = not item.tags.disc_number or not track.tags.disc_number or \
+        item.tags.disc_number == track.tags.disc_number
+    result = bool(item.tags.track_number) and item.tags.track_number == track.tags.track_number and same_disc
+    return result
+
+
 def _folder_rank(folder: str, group: list, candidates: dict) -> tuple:
     """Più alto = cartella migliore per l'album: più numeri di traccia uguali, poi il percorso più corto."""
+    from .library import album_folder
     same_numbers = 0
     for item in group:
         for track in candidates[item.pid]:
-            if str(track.path.parent) == folder and item.tags.track_number and \
-                    item.tags.track_number == track.tags.track_number:
+            if album_folder(track.path) == folder and _same_position(item, track):
                 same_numbers += 1
     result = (same_numbers, -len(folder), folder.lower())
     return result
 
 
 def _pick_in_folder(item, tracks: list, folder: str):
-    """Il file del brano nella cartella: lo stesso numero di traccia, poi la durata più vicina."""
+    """Il file del brano nella cartella dell'album: lo stesso disco e numero di traccia, poi la durata più vicina."""
+    from .library import album_folder
     best = None
     best_key = None
     for track in tracks:
-        if str(track.path.parent) == folder:
-            same_number = bool(item.tags.track_number) and item.tags.track_number == track.tags.track_number
-            key = (same_number, -abs(item.length - track.length), str(track.path).lower())
+        if album_folder(track.path) == folder:
+            key = (_same_position(item, track), -abs(item.length - track.length), str(track.path).lower())
             if best_key is None or key > best_key:
                 best = track
                 best_key = key
@@ -602,10 +640,12 @@ def _pick_in_folder(item, tracks: list, folder: str):
 
 def album_folder_matches(phone_tracks: list, pc_tracks: list) -> dict:
     """{pid: Track}: la sorgente proposta per i brani dell'iPhone, album per album. I brani di un album vengono da
-    una cartella sola: per ogni brano si cercano i file del PC con lo stesso titolo (senza maiuscole, accenti,
+    una cartella sola (library.album_folder: con le sue cartelle "CD1", "cd 2 - studio"… se è su più dischi): per
+    ogni brano si cercano i file del PC con lo stesso titolo (senza maiuscole, accenti,
     punteggiatura e parentesi; anche dal nome del file) e la stessa durata, e se una cartella li contiene per TUTTI i
     brani dell'album (dell'iPhone) quelli sono la proposta. Se nessuna cartella li ha tutti, o due brani cadrebbero
     sullo stesso file, l'album non ha proposte. Solo una proposta: si conferma a mano (registro)."""
+    from .library import album_folder
     index = _title_index(pc_tracks)
     groups = {}
     for item in phone_tracks:
@@ -622,7 +662,7 @@ def album_folder_matches(phone_tracks: list, pc_tracks: list) -> dict:
             candidates[item.pid] = found
             folders = set()
             for track in found:
-                folders.add(str(track.path.parent))
+                folders.add(album_folder(track.path))
             common = folders if common is None else common & folders
         if common:
             best = None

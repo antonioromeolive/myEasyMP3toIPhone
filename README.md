@@ -332,6 +332,24 @@ CopyTrans Manager (*AirTrafficControl*), senza iTunes e senza sincronizzare tutt
 - La spunta **Compilation** di *Cambia tag* cambia solo il brano. Una compilation vuole anche l'artista dell'album
   *Artisti vari*: se nell'app Musica i brani non si raccolgono in un solo album, metti spunta e "Artisti vari"
   nella scheda PC e usa *Rimpiazza*, che manda brano e album insieme.
+- **Playlist per artista…** (scheda iPhone, sotto l'elenco) rifà le playlist dell'iPhone. Prima legge musica e
+  playlist dall'iPhone e mostra il piano; non scrive niente finché non confermi:
+  - **per artista**: una playlist per ogni *artista dell'album* (non l'artista dei singoli brani) con almeno 2 album
+    e 5 brani; i dischi di un album ("CD 1", "CD 2") contano come un album solo. Dentro: gli album per anno, poi
+    disco e numero di traccia;
+  - **per compilation**: gli album "AA.VV." / "Artisti vari", con la spunta *Compilation* o con tanti artisti
+    diversi. I volumi della stessa serie vanno in una playlist sola: quelli nella stessa cartella sul PC con il nome
+    della cartella nel loro nome (es. `Raccolta Ottanta\Raccolta Ottanta Vol. 3\…`, la playlist prende il nome della
+    cartella), poi quelli con lo stesso nome a parte "Vol. N" e "CD N". Un album solo ha la sua playlist se ha almeno
+    20 brani;
+  - i nomi cominciano con **♪** ("♪ Rosa Neri"); ogni playlist si può togliere dal piano con la sua spunta;
+  - **si cancellano tutte le playlist messe da un computer** (CopyTrans, iTunes, questo programma, comprese le ♪ della
+    volta prima). Quelle fatte sull'iPhone, le smart e le cartelle restano: un computer non le può toccare;
+  - prima si creano le nuove, poi si cancellano le vecchie; i brani non cambiano. In una playlist possono stare solo
+    i brani messi da un computer (non quelli acquistati sul telefono);
+  - **Prova** crea solo "♪ PROVA", una copia della prima playlist spuntata, e non cancella niente: per vedere sul
+    telefono che va, prima di farlo davvero. La volta dopo si cancella con le altre.
+  Va fatto dopo aver aggiornato i brani: un brano rimpiazzato è un brano nuovo e non è più nelle playlist vecchie.
 - Si possono aggiornare ed eliminare solo i brani messi sull'iPhone da un computer (iTunes, CopyTrans, questo
   programma), non quelli acquistati o scaricati sul telefono.
 - Serve l'iPhone connesso e sbloccato, con la gestione manuale della musica attiva (in *Dispositivi Apple* o in

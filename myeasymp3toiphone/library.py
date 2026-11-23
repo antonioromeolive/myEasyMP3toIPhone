@@ -94,6 +94,19 @@ class CopyReport:
         return result
 
 
+DISC_FOLDER = re.compile(r"^\W*(?:cd|disc|disco|disk|dvd)\W*\d+(?:\W|$)", re.IGNORECASE)
+
+
+def album_folder(path) -> str:
+    """La cartella dell'album di un file: quella del file, o quella sopra se il file sta in una cartella di un disco
+    ("CD1", "cd 2 - studio", "Disc 3"): un album su più dischi è un album solo."""
+    parent = Path(path).parent
+    if DISC_FOLDER.match(parent.name) and parent.parent != parent:
+        parent = parent.parent
+    result = str(parent)
+    return result
+
+
 def is_cancelled(cancel: Optional[threading.Event]) -> bool:
     result = cancel is not None and cancel.is_set()
     return result
