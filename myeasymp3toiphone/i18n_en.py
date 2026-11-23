@@ -2201,4 +2201,28 @@ CATALOG = {
         'When a track is on the PC in several copies, the links (red proposal, Link source, Link sources) choose the copy in the first of these folders, then in the second… Folder names (valid anywhere in the path) or full paths, separated by semicolons.',
     'Cartelle preferite':
         'Preferred folders',
+    'Salva i selezionati sul PC (iPhone → PC)…':
+        'Save the selected ones to the PC (iPhone → PC)…',
+    'Salva su PC (iPhone → PC)… ({0} brani)':
+        'Save to PC (iPhone → PC)… ({0} tracks)',
+    'Rimpiazza con la versione del PC (PC → iPhone): {0} brani associati ⟳':
+        'Replace with the PC version (PC → iPhone): {0} linked tracks ⟳',
+    "Usa i tag dell'iPhone (iPhone → PC): modifica i file del PC…":
+        'Use the iPhone tags (iPhone → PC): change the PC files…',
+    "Usa i tag del PC (PC → iPhone): aggiorna l'iPhone":
+        'Use the PC tags (PC → iPhone): update the iPhone',
+    'Applica (PC → iPhone)…':
+        'Apply (PC → iPhone)…',
+    "<b>In attesa per l'iPhone (PC → iPhone):</b> {0} da inviare, {1} da togliere, {2} da aggiornare":
+        '<b>Pending for the iPhone (PC → iPhone):</b> {0} to send, {1} to remove, {2} to update',
+    "Invia all'iPhone (PC → iPhone): {0} brani che non ci sono":
+        'Send to iPhone (PC → iPhone): {0} tracks that are not there',
+    "Rimpiazza sull'iPhone (PC → iPhone): {0} brani associati ⟳":
+        'Replace on the iPhone (PC → iPhone): {0} linked tracks ⟳',
+    "Aggiorna l'iPhone più tardi (PC → iPhone): {0} brani associati ⟳ in attesa":
+        'Update the iPhone later (PC → iPhone): {0} linked tracks ⟳ pending',
+    '{0} brani con tag diversi abbinati solo per i tag: non si aggiornano, prima associa la sorgente (scheda iPhone)':
+        '{0} tracks with different tags matched only by tags: they are not updated, link the source first (iPhone tab)',
+    'Sorgente proposta, non ancora associata ({0}):\n{1}\n{2}. Tasto destro → Associa questa sorgente.':
+        'Proposed source, not linked yet ({0}):\n{1}\n{2}. Right-click → Link this source.',
 }

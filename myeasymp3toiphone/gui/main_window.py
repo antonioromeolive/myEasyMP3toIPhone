@@ -265,7 +265,7 @@ class MainWindow(QMainWindow):
         self._pending_label = QLabel()
         undo = QPushButton("Annulla le modifiche")
         undo.clicked.connect(self._undo_pending)
-        self._apply_button = QPushButton("Applica…")
+        self._apply_button = QPushButton("Applica (PC → iPhone)…")
         self._apply_button.setProperty("role", "go")
         self._apply_button.clicked.connect(self._apply_pending)
         row = QHBoxLayout(self._pending_bar)
@@ -674,9 +674,11 @@ class MainWindow(QMainWindow):
                     "prima la sorgente (scheda iPhone, tasto destro), oppure eliminali dalla scheda iPhone.", 15000)
 
     def mark_for_update(self, tracks: list) -> None:
-        """I brani ⟳ (sull'iPhone con tag diversi) in attesa di aggiornamento."""
+        """I brani ⟳ associati (registro: sull'iPhone con tag diversi) in attesa di aggiornamento PC → iPhone. Un
+        brano abbinato solo per i tag non si aggiorna: prima si associa la sorgente."""
         for track in tracks:
-            if self._device_state(track)[0] == DEVICE_STALE:
+            status, _phone_track, linked = self._device_state(track)
+            if status == DEVICE_STALE and linked:
                 self.pending.set(track.path, UPDATE)
         self._save_pending()
         self._restyle_rows(tracks)
@@ -729,8 +731,8 @@ class MainWindow(QMainWindow):
                     sends.append(track)
                 elif action == REMOVE and phone_track is not None and linked and phone_track.from_computer:
                     removes.append(phone_track)
-                elif action == UPDATE and status == DEVICE_STALE and phone_track.from_computer:
-                    updates.append((phone_track, track))
+                elif action == UPDATE and status == DEVICE_STALE and linked and phone_track.from_computer:
+                    updates.append((phone_track, track))       # solo i brani associati (registro)
         result = (sends, removes, updates)
         return result
 
@@ -740,8 +742,8 @@ class MainWindow(QMainWindow):
         self._pending_bar.setVisible(total > 0)
         if total:
             self._pending_label.setText(
-                f"<b>In attesa per l'iPhone:</b> {counts[SEND]} da inviare, {counts[REMOVE]} da togliere, "
-                f"{counts[UPDATE]} da aggiornare")
+                f"<b>In attesa per l'iPhone (PC → iPhone):</b> {counts[SEND]} da inviare, {counts[REMOVE]} da "
+                f"togliere, {counts[UPDATE]} da aggiornare")
             ready = self.iphone_panel.connected and not self.runner.is_busy
             self._apply_button.setEnabled(ready)
             self._apply_button.setToolTip("" if ready else "Connetti l'iPhone")
@@ -823,37 +825,43 @@ class MainWindow(QMainWindow):
         return result
 
     def _table_menu(self, position) -> None:
-        """Tasto destro sui brani: invia all'iPhone quelli che non ci sono, rimpiazza quelli con tag diversi."""
+        """Tasto destro sui brani: invia all'iPhone quelli che non ci sono, rimpiazza o aggiorna quelli associati con
+        tag diversi (PC → iPhone). Quelli abbinati solo per i tag si contano a parte: prima si associano."""
         tracks = self._selected_table_tracks()
         if tracks:
             absent = []
             stale = []
+            unlinked = 0
             present = 0
             for track in tracks:
-                status = DEVICE_ABSENT
-                phone_track = None
-                if self._phone_index is not None:
-                    status, phone_track, _found = device_status(track, self._phone_index)
+                status, phone_track, linked = self._device_state(track)
                 if status == DEVICE_ABSENT:
                     absent.append(track)
-                elif status == DEVICE_STALE and phone_track.from_computer:
+                elif status == DEVICE_STALE and phone_track.from_computer and linked:
                     stale.append((phone_track, track))
+                elif status == DEVICE_STALE and phone_track.from_computer:
+                    unlinked += 1
                 else:
                     present += 1
             ready = self.iphone_panel.connected and not self.runner.is_busy
             menu = QMenu(self)
-            send = menu.addAction(f"Invia all'iPhone ({len(absent)} brani che non ci sono)")
+            send = menu.addAction(f"Invia all'iPhone (PC → iPhone): {len(absent)} brani che non ci sono")
             send.setEnabled(ready and bool(absent))
             send.triggered.connect(lambda: self.iphone_panel.send_tracks(absent))
-            replace = menu.addAction(f"Rimpiazza sull'iPhone ({len(stale)} brani con tag diversi ⟳)")
+            replace = menu.addAction(f"Rimpiazza sull'iPhone (PC → iPhone): {len(stale)} brani associati ⟳")
             replace.setEnabled(ready and bool(stale))
             replace.triggered.connect(lambda: self.iphone_panel.replace_pairs(stale))
             later_tracks = []
             for _phone_track, track in stale:
                 later_tracks.append(track)
-            later = menu.addAction(f"Aggiorna più tardi: in attesa ({len(stale)} brani ⟳)")
+            later = menu.addAction(f"Aggiorna l'iPhone più tardi (PC → iPhone): {len(stale)} brani associati ⟳ "
+                                   "in attesa")
             later.setEnabled(bool(stale) and not self.runner.is_busy)
             later.triggered.connect(lambda: self.mark_for_update(later_tracks))
+            if unlinked:
+                note = menu.addAction(f"{unlinked} brani con tag diversi abbinati solo per i tag: non si aggiornano, "
+                                      "prima associa la sorgente (scheda iPhone)")
+                note.setEnabled(False)
             if present:
                 note = menu.addAction(f"{present} brani già sull'iPhone uguali ✔")
                 note.setEnabled(False)

@@ -24,7 +24,7 @@ from dataclasses import dataclass, field
 from pathlib import Path, PureWindowsPath
 
 from .albumcheck import normalize
-from .library import album_folder, best_spelling, group_name
+from .library import album_folder, best_spelling, group_name, is_various_artists
 
 MARK = "♪ "                   # davanti al nome delle playlist fatte qui
 MIN_ALBUMS = 2
@@ -35,7 +35,6 @@ MAX_MAIN_SHARE = 0.5          # …e nessuno con questa parte dei brani o più
 MIN_ROOT_NAME = 3
 KIND_ARTIST = "artista"
 KIND_COMPILATION = "compilation"
-VARIOUS_KEYS = {"aavv", "artistivari", "variousartists", "various", "va", "autorivari", "vari", "variartisti"}
 DISC_WORDS = r"(?:cd|disc|disco|disk|dvd)"
 VOLUME_WORDS = r"(?:vol|volume|parte|part|pt)"
 DISC_KEY = re.compile(rf"\b{DISC_WORDS}\s*\d+\b")
@@ -98,8 +97,8 @@ def series_name(album: str) -> str:
 
 
 def is_various(name: str) -> bool:
-    """"AA.VV.", "Artisti vari", "Various Artists"…"""
-    result = re.sub(r"[^a-z0-9]", "", group_name(name or "")) in VARIOUS_KEYS
+    """"AA.VV.", "Artisti vari", "Various Artists"… (library.is_various_artists)."""
+    result = is_various_artists(name)
     return result
 
 

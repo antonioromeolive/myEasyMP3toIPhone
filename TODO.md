@@ -26,6 +26,11 @@ Fatto e provato senza telefono (test e finestre di prova); da confermare sul tel
   con playlist di 1-42 brani): prima **Prova** ("♪ PROVA", una playlist vera di decine o centinaia di brani, in
   ordine?), poi il piano completo. Controllare che le playlist di CopyTrans abbiano un `sync_id` (se risultano tutte
   "fatte sull'iPhone", il computer non le può cancellare) e il messaggio finale se Sincronizza libreria è attiva.
+- **Album e artisti che l'iPhone tiene con il nome vecchio**: dopo *Rimpiazza* i brani nuovi finiscono nell'album
+  che c'era ("Raccolta 1" invece di "Raccolta 01", "Artisti Vari" invece di "AA.VV.", e anche un album con un altro
+  artista dell'album). Ipotesi: l'iPhone attacca il brano al gruppo con il nome "uguale" che c'è già, e Rimpiazza
+  toglie il vecchio solo dopo. Prova con un album PROVA: togliere prima tutti i brani dell'album e poi inviarli; se
+  l'album prende il nome nuovo, offrirlo come *Rimpiazza l'album intero* per le differenze vere (artista dell'album).
 - **App Musica che non si aggiorna da sola**: dopo ogni scrittura il programma manda l'avviso di fine
   sincronizzazione di iTunes (`com.apple.itunes-mobdev.syncDidFinish`, `iphone.post_sync_finished`). Con l'app
   Musica aperta: se si aggiorna da sola, togliere dal messaggio finale l'invito a chiuderla e riaprirla; se no,

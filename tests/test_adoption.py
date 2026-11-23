@@ -365,3 +365,33 @@ def test_preferred_copy_wins_everywhere():
 def _run_preferred(phone, pc):
     result = adoption.adopt(phone, pc, Registry(), Path("."), None, None, None, None, False, False, False, PREFERRED)
     return result
+
+
+def test_disc_number_at_the_end_of_the_folder_and_phone_duplicates():
+    from myeasymp3toiphone.library import album_folder
+    assert album_folder("C:/m/Anna/Dal vivo (Disc 2)/01.mp3") == str(Path("C:/m/Anna/Dal vivo"))
+    assert album_folder("C:/m/Anna/Il meglio CD1/01.mp3") == str(Path("C:/m/Anna/Il meglio"))
+    assert album_folder("C:/m/Anna/Canzoni 1999/01.mp3") == str(Path("C:/m/Anna/Canzoni 1999"))     # un anno resta
+    phone = []
+    pc = []
+    for disc in (1, 2):
+        item = _numbered(disc, f"Brano {disc}", "Dal vivo", 1, 200.0 + disc * 10)
+        item.tags.disc_number = disc
+        phone.append(item)
+        track = _numbered_pc(f"C:/m/Anna/Dal vivo (Disc {disc})/01 Brano {disc}.mp3", f"Brano {disc}", 1,
+                             200.0 + disc * 10)
+        track.tags.disc_number = disc
+        pc.append(track)
+    double = _numbered(3, "Brano 1", "Dal vivo", 1, 211.0)           # doppione sull'iPhone
+    double.tags.disc_number = 1
+    matches = adoption.album_folder_matches(phone + [double], pc)
+    assert matches == {1: pc[0], 2: pc[1]}                            # l'album resta proposto, il doppione no
+
+
+def test_automatic_proposals_folder_name_and_taken_files():
+    from myeasymp3toiphone.overlay import path_key
+    phone = [_numbered(1, "Uno", "Disco", 1, 100.0), _numbered(2, "Solo qui", "Disco", 2, 300.0)]
+    pc = [_numbered_pc("C:/m/Anna/Disco/01 Uno.mp3", "Uno", 1, 100.0)]
+    found = adoption.automatic_proposals(phone, pc)
+    assert list(found) == [1] and found[1].how == provenance.HOW_FOLDER     # l'album intero no, la cartella sì
+    assert adoption.automatic_proposals(phone, pc, (), {path_key(pc[0].path)}) == {}   # già di un altro brano

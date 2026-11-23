@@ -16,6 +16,7 @@ import time
 import unicodedata
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
+from functools import lru_cache
 from typing import Optional
 
 import requests
@@ -148,8 +149,10 @@ class AlbumCheckResult:
 
 # --------------------------------------------------------------------------- confronto testi
 
+@lru_cache(maxsize=65536)
 def normalize(text: str) -> str:
-    """Testo semplificato per il confronto: minuscolo, senza accenti, parentesi e punteggiatura."""
+    """Testo semplificato per il confronto: minuscolo, senza accenti, parentesi e punteggiatura. Ricordato: gli
+    stessi titoli tornano in migliaia di confronti."""
     lowered = unicodedata.normalize("NFKD", text.lower())
     plain = ""
     for char in lowered:
@@ -164,15 +167,21 @@ def normalize(text: str) -> str:
     return result
 
 
-def similarity(first: str, second: str) -> float:
-    a = normalize(first)
-    b = normalize(second)
+def similarity(first: str, second: str, floor: float = 0.0) -> float:
+    """Da 0 a 1, sui testi semplificati. floor: sotto questa soglia il valore esatto non serve, e si restituisce 0
+    appena i limiti rapidi di difflib (real_quick_ratio, quick_ratio) dicono che non la si raggiunge."""
+    a = normalize(first or "")
+    b = normalize(second or "")
     if not a or not b:
         result = 0.0
     elif a == b:
         result = 1.0
     else:
-        result = SequenceMatcher(None, a, b).ratio()
+        matcher = SequenceMatcher(None, a, b)
+        if floor > 0 and (matcher.real_quick_ratio() < floor or matcher.quick_ratio() < floor):
+            result = 0.0
+        else:
+            result = matcher.ratio()
     return result
 
 

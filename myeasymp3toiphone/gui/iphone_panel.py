@@ -16,7 +16,7 @@ from .. import adoption, iphone, phone_actions, provenance
 from ..config import config_dir
 from ..i18n import tr
 from ..library import Track, copy_organized, scan_folder
-from ..phone_library import DEVICE_SAME, DEVICE_STALE, comparison, differences, pc_matches, playlist_reminder
+from ..phone_library import DEVICE_SAME, comparison, differences, pc_matches, playlist_reminder
 from .compare_tip import comparison_html, show_on_tooltip
 from .file_actions import add_file_entries
 from .theme import set_role
@@ -291,7 +291,7 @@ class IPhonePanel(QWidget):
         self._by_pid = {}
         self._matches = {}
         self._pc_states = {}          # pid -> (PC_*, Track del PC o None): la colonna Sul PC
-        self._proposed = {}           # pid -> Track: la sorgente proposta (album intero in una cartella), in rosso
+        self._proposed = {}           # pid -> adoption.Proposal: la sorgente proposta, in rosso
         self._pc_dirty = True
 
         self._status = QLabel(NOT_CONNECTED)
@@ -363,7 +363,7 @@ class IPhonePanel(QWidget):
         self._refresh_button.setToolTip("Rilegge la musica dell'app Musica dall'iPhone connesso; senza iPhone rifà "
                                         "il confronto con il PC")
         self._refresh_button.clicked.connect(self._refresh_music)
-        self._save_button = QPushButton("Salva i selezionati sul PC…")
+        self._save_button = QPushButton("Salva i selezionati sul PC (iPhone → PC)…")
         self._save_button.clicked.connect(self._save_selected)
         self._adopt_button = QPushButton("Associa sorgenti…")
         self._adopt_button.setToolTip("Ritrova sul PC la sorgente (il file) dei brani dell'iPhone, di quelli "
@@ -434,8 +434,11 @@ class IPhonePanel(QWidget):
         for item in self._phone_tracks:
             if item.from_computer and item.sync_id and self._window.registry.get(item.sync_id) is None:
                 unlinked.append(item)
-        self._proposed = adoption.album_folder_matches(unlinked, self._window.tracks,
-                                                       tuple(self._window.app_settings.preferred_folders))
+        # album intero, nome della cartella, regole: senza leggere l'audio (circa un secondo e mezzo per 500 brani
+        # non associati e 15.000 file sul PC)
+        self._proposed = adoption.automatic_proposals(unlinked, self._window.tracks,
+                                                      tuple(self._window.app_settings.preferred_folders),
+                                                      set(self._window.registry.links_here()))
         self._pc_dirty = False
 
     def _pc_state(self, item) -> tuple:
@@ -528,15 +531,15 @@ class IPhonePanel(QWidget):
         row.setToolTip(COL_ORIGIN, tip)
         row.setToolTip(COL_TITLE, tip)
         folder, name = self._source_texts(item)
-        proposed = self._proposed.get(item.pid)
+        proposal = self._proposed.get(item.pid)
         tip = self._source_path(item)
-        is_proposal = not name and proposed is not None
+        is_proposal = not name and proposal is not None
         if is_proposal:
+            proposed = proposal.pc
             folder = self._folder_text(str(proposed.path.parent))
             name = proposed.path.name
-            tip = (f"Sorgente proposta, non ancora associata:\n{proposed.path}\nTutti i brani di questo album "
-                   "dell'iPhone sono in questa cartella del PC, con lo stesso titolo e la stessa durata. Tasto destro "
-                   "→ Associa questa sorgente.")
+            tip = (f"Sorgente proposta, non ancora associata ({proposal.level}):\n{proposed.path}\n"
+                   f"{proposal.reason}. Tasto destro → Associa questa sorgente.")
         different = not is_proposal and self._pc_states.get(item.pid, (PC_NONE, None))[0] == PC_STALE
         if different:
             tip += ("\nI tag sono diversi da quelli dell'iPhone: il file resta la sorgente. Tasto destro → Allinea i "
@@ -705,15 +708,13 @@ class IPhonePanel(QWidget):
         return result
 
     def _stale_pairs(self, items: list) -> list:
-        """(brano dell'iPhone, brano del PC) per i brani selezionati con ⟳ (la sorgente, anche fuori dalla cartella
-        aperta) o ≈ con tag diversi."""
+        """(brano dell'iPhone, brano del PC) per i brani selezionati con ⟳: solo quelli associati (la sorgente nel
+        registro, anche fuori dalla cartella aperta). Un brano ≈, abbinato solo per i tag, non si aggiorna dal PC:
+        prima si associa."""
         result = []
         for item in items:
             state, track = self._pc_states.get(item.pid, (PC_NONE, None))
-            match = self._matches.get(item.pid)
             if state == PC_STALE and item.from_computer:
-                result.append((item, track))
-            elif state == PC_PROBABLE and match[0] == DEVICE_STALE and item.from_computer:
                 result.append((item, track))
         return result
 
@@ -754,10 +755,9 @@ class IPhonePanel(QWidget):
         window = self._window
         registry = window.registry
         for item in items:
-            track = self._proposed[item.pid]
-            proposal = adoption.Proposal(item, track, provenance.HOW_FOLDER,
-                                         "tutto l'album nella stessa cartella, stesso titolo e durata")
-            registry.record(adoption.link_for(proposal, window.overlay, window.tag_cache.fingerprint(track.path)))
+            proposal = self._proposed[item.pid]
+            registry.record(adoption.link_for(proposal, window.overlay,
+                                              window.tag_cache.fingerprint(proposal.pc.path)))
         self._store_registry(registry, f"Sorgente associata a {len(items)} brani")
 
     def _aligned_pairs(self, items: list) -> list:
@@ -889,11 +889,11 @@ class IPhonePanel(QWidget):
                 source_text = f"Associa sorgenti… ({len(writable)} brani)"
             menu = QMenu(self)
             entries = [
-                (f"Salva su PC… ({len(items)} brani)", self._save_selected, ready),
+                (f"Salva su PC (iPhone → PC)… ({len(items)} brani)", self._save_selected, ready),
                 (f"Mostra nella scheda PC ({len(on_pc)} brani)",
                  lambda: self._window.show_tracks({str(track.path) for track in on_pc}), bool(on_pc)),
                 None,
-                (f"Rimpiazza con la versione del PC ({len(stale)} brani ⟳)", self._replace_selected,
+                (f"Rimpiazza con la versione del PC (PC → iPhone): {len(stale)} brani associati ⟳", self._replace_selected,
                  ready and bool(stale)),
                 (f"Cambia tag… ({len(writable)} brani)", self._edit_selected, ready and bool(writable)),
                 None,
@@ -920,10 +920,10 @@ class IPhonePanel(QWidget):
                     action.triggered.connect(slot)
             menu.addSeparator()
             align = QMenu(f"Allinea i tag ({len(aligned)} brani ⟳)", menu)
-            to_pc = align.addAction("Usa i tag dell'iPhone: modifica i file del PC…")
+            to_pc = align.addAction("Usa i tag dell'iPhone (iPhone → PC): modifica i file del PC…")
             to_pc.triggered.connect(lambda: self._align_to_pc(aligned))
             to_pc.setEnabled(not self._window.runner.is_busy)
-            to_phone = align.addAction("Usa i tag del PC: aggiorna l'iPhone")
+            to_phone = align.addAction("Usa i tag del PC (PC → iPhone): aggiorna l'iPhone")
             to_phone.triggered.connect(lambda: self._align_to_phone(aligned))
             to_phone.setEnabled(ready)
             if not self._connected:

@@ -19,7 +19,7 @@ from dataclasses import asdict, dataclass, fields
 from pathlib import Path
 from typing import Optional
 
-from .library import Track, group_name, target_relative_path
+from .library import Track, group_name, phone_group_key, target_relative_path
 from .tags import TrackTags
 
 DATABASE_NAME = "MediaLibrary.sqlitedb"
@@ -278,7 +278,7 @@ def load_listing(home: Path) -> dict:
 # --------------------------------------------------------------------------- confronto con il PC
 
 def _match_key(tags: TrackTags) -> tuple:
-    result = (group_name(tags.title), group_name(tags.album))
+    result = (group_name(tags.title), phone_group_key(tags.album))
     return result
 
 
@@ -286,7 +286,7 @@ def _artist_names(tags: TrackTags) -> set:
     names = set()
     for value in (tags.artist, tags.album_artist):
         if value:
-            names.add(group_name(value))
+            names.add(phone_group_key(value))
     return names
 
 
@@ -374,15 +374,16 @@ def _shown(name: str, value) -> str:
 def comparison(pc_tags: TrackTags, phone_tags: TrackTags) -> list:
     """(nome del campo, valore sul PC, valore sull'iPhone, diverso) per ogni campo confrontato. "Artista album" si
     confronta solo se almeno uno dei due ce l'ha (altrimenti ripete la differenza dell'artista). Artisti e album si
-    confrontano senza maiuscole, accenti e spazi: sull'iPhone sono gruppi, e l'invio si unisce al gruppo che c'è già con
-    la sua grafia ("Artisti Vari" per "Artisti vari"), quindi quella differenza non si può né si deve correggere."""
+    confrontano come li confronta l'iPhone (library.phone_group_key: senza maiuscole, accenti, spazi e zeri davanti ai
+    numeri; "AA.VV." = "Artisti Vari"): sull'iPhone sono gruppi, e l'invio si unisce al gruppo che c'è già con la sua
+    grafia, quindi quella differenza non si può correggere con un invio."""
     result = []
     for name, label in COMPARED_FIELDS:
         pc_value = _comparable(name, pc_tags)
         phone_value = _comparable(name, phone_tags)
         relevant = name != "album_artist" or bool(pc_tags.album_artist or phone_tags.album_artist)
         if name in GROUPED_FIELDS:
-            same = group_name(str(pc_value)) == group_name(str(phone_value))
+            same = phone_group_key(str(pc_value)) == phone_group_key(str(phone_value))
         else:
             same = pc_value == phone_value
         if relevant:

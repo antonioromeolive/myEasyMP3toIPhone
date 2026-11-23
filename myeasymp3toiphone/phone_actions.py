@@ -26,7 +26,7 @@ from pathlib import Path
 from typing import Callable, Optional
 
 from . import iphone, phone_sync, provenance
-from .library import UNKNOWN_ALBUM, UNKNOWN_ARTIST, group_name, is_cancelled
+from .library import UNKNOWN_ALBUM, UNKNOWN_ARTIST, is_cancelled, phone_group_key
 from .phone_sync import PhoneSyncError
 from .scan import VARIOUS_ARTISTS
 from .tags import TagError, prepare_copy, read_cover
@@ -92,13 +92,13 @@ class _Snapshot:
             self.artists = {}
             for name, sync_id in connection.execute("SELECT album_artist, sync_id FROM album_artist"):
                 if name and sync_id:
-                    self.artists.setdefault(group_name(str(name)), (_unsigned(sync_id), str(name)))
+                    self.artists.setdefault(phone_group_key(str(name)), (_unsigned(sync_id), str(name)))
             self.albums = {}
             for album, artist, sync_id in connection.execute(
                     "SELECT a.album, aa.album_artist, a.sync_id FROM album a "
                     "LEFT JOIN album_artist aa ON aa.album_artist_pid = a.album_artist_pid"):
                 if album and sync_id:
-                    key = (group_name(str(album)), group_name(str(artist or "")))
+                    key = (phone_group_key(str(album)), phone_group_key(str(artist or "")))
                     self.albums.setdefault(key, (_unsigned(sync_id), str(album)))
             self.folders = []
             for (path,) in connection.execute("SELECT path FROM base_location"):
@@ -263,8 +263,8 @@ async def _send_batches(pending: list, progress: Optional[ProgressFn], cancel, r
                         tags.album_artist = VARIOUS_ARTISTS   # l'iPhone vuole la compilation con l'artista dell'album
                     artist_name = tags.album_artist or tags.artist or UNKNOWN_ARTIST
                     album_name = tags.album or UNKNOWN_ALBUM
-                    artist_key = group_name(artist_name)
-                    album_key = (group_name(album_name), artist_key)
+                    artist_key = phone_group_key(artist_name)
+                    album_key = (phone_group_key(album_name), artist_key)
                     if artist_key in snapshot.artists:
                         artist_pid, phone_name = snapshot.artists[artist_key]
                         if tags.album_artist:
@@ -442,7 +442,7 @@ def _update_item(phone_track, values: dict, snapshot: _Snapshot, new_albums: dic
         if not album:
             raise PhoneSyncError("l'album non può essere vuoto")
         artist = phone_track.tags.album_artist or phone_track.tags.artist
-        key = (group_name(album), group_name(artist))
+        key = (phone_group_key(album), phone_group_key(artist))
         if key in snapshot.albums:
             album_pid, album = snapshot.albums[key]
         elif key in new_albums:

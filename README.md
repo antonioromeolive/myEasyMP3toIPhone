@@ -113,17 +113,20 @@ quelli delle cose fatte e la riga appena colorata:
 | ≈ grigio | forse c'è: abbinato solo per i tag, da rivedere |
 | **＋ blu** | in attesa: da inviare |
 | **－ rosso** | in attesa: da togliere dall'iPhone |
-| **⟳ blu** | in attesa: da aggiornare (tasto destro → *Aggiorna più tardi*) |
+| **⟳ blu** | in attesa: da aggiornare (tasto destro → *Aggiorna l'iPhone più tardi (PC → iPhone)*) |
 
 - Una spunta cambiata su una riga selezionata vale per tutte le righe selezionate. Anche **artisti e album** negli
   elenchi in alto hanno la spunta, a tre stati (tutti i brani sull'iPhone, alcuni, nessuno), in corsivo blu se
   dentro c'è qualcosa in attesa: cliccarla mette o toglie tutti i loro brani.
 - **Togliere** una spunta vale solo per i brani che sull'iPhone vengono da quel file (colonna *Sorgente* della scheda
   iPhone): un brano abbinato solo per i tag non si toglie mai così (la sua spunta non si può togliere).
-- Quando c'è qualcosa in attesa compare una barra in fondo: *In attesa per l'iPhone: N da inviare, N da togliere,
-  N da aggiornare* con **Annulla le modifiche** e **Applica…** (a iPhone connesso). *Applica* mostra il riepilogo,
+- Quando c'è qualcosa in attesa compare una barra in fondo: *In attesa per l'iPhone (PC → iPhone): N da inviare, N
+  da togliere, N da aggiornare* con **Annulla le modifiche** e **Applica (PC → iPhone)…** (a iPhone connesso). *Applica* mostra il riepilogo,
   chiede conferma e fa tutto insieme: invio, eliminazione, aggiornamento (con *Cambia tag* o *Rimpiazza*, come per
   una modifica dei tag; alla fine ricorda le playlist dei brani rimpiazzati).
+- **Si aggiornano dal PC solo i brani associati** (registro della provenienza: quel file è quel brano). Un brano
+  abbinato solo per i tag (≈, anche se ha tag diversi) non si aggiorna, non si rimpiazza e non va in attesa: il menu
+  lo conta a parte. Prima lo si associa (scheda iPhone: *Associa sorgenti*, *Associa le probabili ≈*).
 - Le modifiche in attesa restano nella cartella dati (`iphone_in_attesa.json`) anche chiudendo il programma; quelle
   già fatte si tolgono da sole a ogni lettura dell'iPhone. *Applica* fa quelle dei brani della cartella aperta.
 
@@ -252,12 +255,18 @@ sull'iPhone, non quelli in streaming da Apple Music. *Cerca* filtra per titolo, 
   sorgente** e **File della sorgente** (il file del PC da cui viene il brano: la cartella, con il solo nome o il
   percorso completo come nella scheda PC, e il nome del file; per una sorgente su un altro computer la cartella è
   `COMPUTER: cartella`). Per un brano senza
-  sorgente può mostrare **in rosso una sorgente proposta**: i brani di un album vengono da una cartella sola, quindi per
-  ogni album dell'iPhone si cercano nella cartella aperta i file con lo stesso titolo (anche dal nome del file, senza
-  maiuscole, accenti, punteggiatura e parentesi) e la stessa durata (entro 2 secondi), e **solo se una cartella li ha
-  tutti** quelli sono la proposta (con più cartelle così, quella con più numeri di traccia uguali). Un album sparso in
-  più cartelle non ha proposte. La proposta non è ancora una sorgente: tasto destro → **Associa questa sorgente** la
-  scrive nel registro e cartella e nome tornano del colore normale.
+  sorgente può mostrare **in rosso una sorgente proposta**, cercata tra i file della cartella aperta senza leggere
+  l'audio (circa un secondo e mezzo per 500 brani senza sorgente e 15.000 file):
+  1. **album intero**: per ogni album dell'iPhone i file con lo stesso titolo (anche dal nome del file, senza
+     maiuscole, accenti, punteggiatura e parentesi) e la stessa durata (entro 2 secondi), se una cartella li ha tutti
+     (con più cartelle così, quella con più numeri di traccia uguali, poi le *cartelle preferite*). Un album su più
+     dischi conta come una cartella sola: `Album\CD 1 …`, `Album\CD 2 …` e anche `Album (Disc 1)`, `Album CD2`. Un
+     doppione sull'iPhone (lo stesso brano due volte) non fa perdere l'album: il file va a uno solo;
+  2. per gli altri brani, come **Associa sorgenti** senza impronta né AI: il **nome della cartella** e le **regole**
+     (vedi sotto), solo le proposte *molto probabili* e *probabili*.
+  Un file già associato a un altro brano non si propone. Il suggerimento sul nome dice la certezza e il motivo. La
+  proposta non è ancora una sorgente: tasto destro → **Associa questa sorgente** la scrive nel registro e cartella e
+  nome tornano del colore normale.
 - **Sul PC:**
 
   | Segno | Significato |
@@ -301,9 +310,9 @@ CopyTrans Manager (*AirTrafficControl*), senza iTunes e senza sincronizzare tutt
 
 | Dove | Tasto destro | Cosa fa |
 |---|---|---|
-| Scheda **PC** | **Invia all'iPhone** | i brani selezionati che non sono sull'iPhone: una copia con i tag e la copertina modificati (i file del PC non cambiano) |
-| Scheda **PC** | **Rimpiazza sull'iPhone** | i brani selezionati che sull'iPhone hanno tag diversi (⟳): vedi *Rimpiazza* qui sotto |
-| Scheda **iPhone** | **Rimpiazza con la versione del PC** | lo stesso, partendo dai brani dell'iPhone |
+| Scheda **PC** | **Invia all'iPhone (PC → iPhone)** | i brani selezionati che non sono sull'iPhone: una copia con i tag e la copertina modificati (i file del PC non cambiano) |
+| Scheda **PC** | **Rimpiazza sull'iPhone (PC → iPhone)** | i brani selezionati **associati** che sull'iPhone hanno tag diversi (⟳): vedi *Rimpiazza* qui sotto |
+| Scheda **iPhone** | **Rimpiazza con la versione del PC (PC → iPhone)** | lo stesso, partendo dai brani dell'iPhone (solo quelli associati) |
 | Scheda **iPhone** | **Cambia tag…** | titolo (un brano alla volta), album, genere, anno, numero di traccia e di disco, la spunta **Compilation** (a tre stati con brani diversi); un campo vuoto non cambia, 0 svuota anno o numero |
 | Scheda **iPhone** | **Elimina dall'iPhone…** | toglie i brani dall'app Musica; l'iPhone cancella i loro file da solo, entro qualche minuto |
 
@@ -313,9 +322,14 @@ CopyTrans Manager (*AirTrafficControl*), senza iTunes e senza sincronizzare tutt
   e riaprila; i brani si trovano nella tua libreria (*Libreria → Artisti* o *Brani*), non cercando in Apple Music.
 - **Formati:** MP3, FLAC (l'iPhone li suona così come sono) e M4A in AAC. Gli M4A in Apple Lossless non ancora.
 - **Copertine:** quella modificata, o altrimenti quella del file, se è JPEG o PNG.
-- **Album e artisti:** un brano va nell'album e nell'artista già presenti sull'iPhone con lo stesso nome (senza badare
-  a maiuscole, accenti e spazi), con la grafia dell'iPhone: niente doppioni. Per lo stesso motivo la colonna *iPhone*
-  confronta artisti e album senza badare a maiuscole e accenti ("Artisti vari" e "Artisti Vari" sono uguali).
+- **Album e artisti:** sull'iPhone album e artisti dell'album sono gruppi: un brano va nel gruppo che c'è già con un
+  nome "uguale", e il gruppo tiene la sua grafia, anche dopo un *Rimpiazza* (il brano nuovo arriva prima che il
+  vecchio se ne vada, quindi il gruppo non resta mai vuoto). Per l'iPhone sono uguali i nomi che differiscono per
+  maiuscole, accenti, spazi o zeri davanti ai numeri ("Raccolta 01" = "Raccolta 1"), e "AA.VV." = "Artisti vari" =
+  "Various Artists". Il programma invia con la grafia dell'iPhone (niente doppioni) e la colonna *iPhone* e il
+  giallo della scheda iPhone confrontano allo stesso modo: queste differenze non contano, perché un invio non le
+  cambierebbe. Una differenza vera (un altro artista dell'album) resta ⟳ anche quando l'iPhone tiene il gruppo
+  vecchio: per ora si corregge solo togliendo dall'iPhone tutto l'album e inviandolo di nuovo.
 - **Compilation:** si invia la spunta, con l'artista dell'album ("Artisti vari" se manca): l'album resta intero
   nell'app Musica.
 - **Rimpiazza** prima invia la versione del PC, poi toglie quella vecchia, solo se l'invio è riuscito. Il brano
@@ -326,7 +340,7 @@ CopyTrans Manager (*AirTrafficControl*), senza iTunes e senza sincronizzare tutt
   *Verifica album online*, *Torna ai tag del file*) l'iPhone resta com'è; con **Cambia tag** nella scheda **iPhone** i
   file del PC restano come sono. I brani con la sorgente su questo PC diventano ⟳, con il nome del file **in giallo**
   (scheda iPhone, colonne della sorgente; scheda PC, colonne Cartella e File), e restano associati. Si allineano a mano:
-  scheda iPhone, tasto destro → **Allinea i tag**, oppure *Rimpiazza* / *Aggiorna più tardi* dalla scheda PC.
+  scheda iPhone, tasto destro → **Allinea i tag**, oppure *Rimpiazza* / *Aggiorna l'iPhone più tardi* (PC → iPhone) dalla scheda PC.
 - **Artista e artista dell'album** non si cambiano con *Cambia tag*: sull'iPhone cambiarli rinominerebbe l'artista per
   tutti i suoi brani. Si cambiano nella scheda PC, poi *Rimpiazza*.
 - La spunta **Compilation** di *Cambia tag* cambia solo il brano. Una compilation vuole anche l'artista dell'album
@@ -444,8 +458,7 @@ punto e virgola: nomi di cartella, che valgono in qualsiasi punto del percorso, 
 sceglie la copia nella prima di quelle cartelle, poi nella seconda…: la proposta in rosso, *Associa sorgente*,
 *Associa sorgenti* (nome della cartella, impronta, regole). Le copie con stessi tag e durata in cartelle diverse
 contano come un candidato solo, quindi non sono un dubbio da far decidere all'AI. Senza cartelle preferite, vince il
-percorso più corto. Un album diviso in cartelle `CD 1 …`, `CD 2 …` ha come cartella quella sopra: la proposta in
-rosso lo trova intero, disco per disco.
+percorso più corto.
 
 Prima di scrivere mostra **una lista sola** con tutte le proposte: brano dell'iPhone, file del PC, **certezza** (certo,
 molto probabile, probabile, da controllare), come e perché, con le spunte già messe per quelle certe o molto

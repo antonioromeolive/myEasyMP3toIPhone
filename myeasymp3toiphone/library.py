@@ -95,15 +95,43 @@ class CopyReport:
 
 
 DISC_FOLDER = re.compile(r"^\W*(?:cd|disc|disco|disk|dvd)\W*\d+(?:\W|$)", re.IGNORECASE)
+DISC_SUFFIX = re.compile(r"[\s\-_,.]*[\(\[]?\s*(?:cd|disc|disco|disk|dvd)\s*\d+\s*[\)\]]?\s*$", re.IGNORECASE)
 
 
 def album_folder(path) -> str:
-    """La cartella dell'album di un file: quella del file, o quella sopra se il file sta in una cartella di un disco
-    ("CD1", "cd 2 - studio", "Disc 3"): un album su più dischi è un album solo."""
+    """La cartella dell'album di un file (un album su più dischi è un album solo):
+      * "Album\\CD1\\01.mp3", "Album\\cd 2 - studio\\01.mp3": la cartella sopra, "Album";
+      * "Artista\\Album (Disc 1)\\01.mp3", "Artista\\Album CD2\\01.mp3": "Artista\\Album", il nome senza il disco
+        (una cartella che magari non esiste: serve a mettere insieme i dischi);
+      * altrimenti la cartella del file."""
     parent = Path(path).parent
+    stripped = DISC_SUFFIX.sub("", parent.name)
     if DISC_FOLDER.match(parent.name) and parent.parent != parent:
-        parent = parent.parent
-    result = str(parent)
+        result = str(parent.parent)
+    elif stripped and stripped != parent.name and parent.parent != parent:
+        result = str(parent.parent / stripped)
+    else:
+        result = str(parent)
+    return result
+
+
+VARIOUS_ARTIST_KEYS = {"aavv", "artistivari", "variousartists", "various", "va", "autorivari", "vari",
+                       "variartisti"}
+LEADING_ZEROS = re.compile(r"(?<!\d)0+(?=\d)")
+
+
+def is_various_artists(name: str) -> bool:
+    """"AA.VV.", "Artisti vari", "Various Artists"…: l'artista di una compilation."""
+    result = re.sub(r"[^a-z0-9]", "", group_name(name or "")) in VARIOUS_ARTIST_KEYS
+    return result
+
+
+def phone_group_key(text: str) -> str:
+    """Il nome di un artista o di un album come lo confronta l'iPhone, che con un nome "uguale" attacca il brano
+    all'album o all'artista che ha già e ne tiene la grafia: senza maiuscole, accenti e spazi, gli zeri davanti ai
+    numeri non contano ("Raccolta 01" = "Raccolta 1"), e "AA.VV." = "Artisti vari" = "Various Artists"."""
+    key = LEADING_ZEROS.sub("", group_name(text or ""))
+    result = "\x00" if is_various_artists(key) else key      # tutti gli "artisti vari" hanno la stessa chiave
     return result
 
 

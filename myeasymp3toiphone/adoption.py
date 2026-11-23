@@ -173,8 +173,10 @@ def _artist_of(tags) -> str:
     return result
 
 
-def _score(phone_track, track) -> float:
-    title = similarity(phone_track.tags.title, track.tags.title or track.path.stem)
+def _score(phone_track, track, title: Optional[float] = None) -> float:
+    """0,6 titolo + 0,4 artista; title: la somiglianza del titolo, se è già calcolata."""
+    if title is None:
+        title = similarity(phone_track.tags.title, track.tags.title or track.path.stem)
     artist = max(similarity(_artist_of(phone_track.tags), track.tags.artist),
                  similarity(_artist_of(phone_track.tags), track.tags.album_artist or ""))
     result = 0.6 * title + 0.4 * artist
@@ -199,8 +201,9 @@ def candidates(phone_track, by_length: list, preferred: tuple = ()) -> list:
     end = bisect.bisect_right(lengths, phone_track.length + DURATION_TOLERANCE)
     scored = []
     for _length, _index, track in by_length[start:end]:
-        if similarity(phone_track.tags.title, track.tags.title or track.path.stem) >= MIN_TITLE:
-            scored.append((_score(phone_track, track), track))
+        title = similarity(phone_track.tags.title, track.tags.title or track.path.stem, MIN_TITLE)
+        if title >= MIN_TITLE:
+            scored.append((_score(phone_track, track, title), track))
     scored.sort(key=lambda pair: (-pair[0], preference(pair[1].path, preferred), len(str(pair[1].path)),
                                   str(pair[1].path).lower()))
     seen = set()
@@ -670,8 +673,10 @@ def album_folder_matches(phone_tracks: list, pc_tracks: list, preferred: tuple =
     una cartella sola (library.album_folder: con le sue cartelle "CD1", "cd 2 - studio"… se è su più dischi): per
     ogni brano si cercano i file del PC con lo stesso titolo (senza maiuscole, accenti,
     punteggiatura e parentesi; anche dal nome del file) e la stessa durata, e se una cartella li contiene per TUTTI i
-    brani dell'album (dell'iPhone) quelli sono la proposta. Se nessuna cartella li ha tutti, o due brani cadrebbero
-    sullo stesso file, l'album non ha proposte. Solo una proposta: si conferma a mano (registro)."""
+    brani dell'album (dell'iPhone) quelli sono la proposta. Se nessuna cartella li ha tutti, l'album non ha proposte.
+    Se due brani dell'iPhone cadrebbero sullo stesso file (un doppione sull'iPhone), il file va a quello con stesso
+    disco e numero e la durata più vicina; l'altro resta senza proposta. Solo una proposta: si conferma a mano
+    (registro)."""
     from .library import album_folder
     index = _title_index(pc_tracks)
     groups = {}
@@ -699,17 +704,72 @@ def album_folder_matches(phone_tracks: list, pc_tracks: list, preferred: tuple =
                 if best_rank is None or rank > best_rank:
                     best = folder
                     best_rank = rank
-            chosen = {}
-            used = set()
-            distinct = True
+            owners = {}
             for item in group:
                 track = _pick_in_folder(item, candidates[item.pid], best)
-                if id(track) in used:
-                    distinct = False
-                used.add(id(track))
-                chosen[item.pid] = track
-            if distinct:
-                result.update(chosen)
+                key = (_same_position(item, track), -abs(item.length - track.length), -item.pid)
+                owner = owners.get(id(track))
+                if owner is None or key > owner[0]:
+                    owners[id(track)] = (key, item, track)
+            for _key, item, track in owners.values():
+                result[item.pid] = track
+    return result
+
+
+AUTOMATIC_LEVELS = (LEVEL_VERY_LIKELY, LEVEL_LIKELY)
+WHOLE_ALBUM_REASON = "tutto l'album nella stessa cartella, stesso titolo e durata"
+
+
+def album_proposals(phone_tracks: list, pc_tracks: list, preferred: tuple = (), taken=frozenset()) -> dict:
+    """{pid: Proposal}: la prima parte delle proposte in rosso, l'album intero nella stessa cartella
+    (album_folder_matches). Veloce: si fa subito. Un file già associato (taken: overlay.path_key) non si propone."""
+    from .overlay import path_key
+    by_pid = {}
+    for item in phone_tracks:
+        by_pid[item.pid] = item
+    result = {}
+    used = set(taken)
+    for pid, track in album_folder_matches(phone_tracks, pc_tracks, preferred).items():
+        if path_key(track.path) not in used:
+            used.add(path_key(track.path))
+            result[pid] = Proposal(by_pid[pid], track, provenance.HOW_FOLDER, WHOLE_ALBUM_REASON,
+                                   level=LEVEL_VERY_LIKELY)
+    return result
+
+
+def more_proposals(phone_tracks: list, pc_tracks: list, preferred: tuple = (), taken=frozenset(),
+                   cancel: Optional[threading.Event] = None) -> dict:
+    """{pid: Proposal}: la seconda parte, per i brani che l'album intero non ha trovato: come Associa sorgenti senza
+    impronta né AI (nome della cartella e regole), solo le proposte molto probabili e probabili. Più lenta (i
+    confronti dei titoli): la scheda iPhone la fa in background. {} se annullata."""
+    from .overlay import path_key
+    result = {}
+    used = set(taken)
+    if phone_tracks:
+        outcome = adopt(phone_tracks, pc_tracks, provenance.Registry(), Path("."), None, None, None, cancel, False,
+                        False, False, preferred)
+        for proposal in outcome.proposals:
+            key = path_key(proposal.pc.path)
+            if proposal.level in AUTOMATIC_LEVELS and proposal.phone.pid not in result and key not in used:
+                used.add(key)
+                result[proposal.phone.pid] = proposal
+    return result
+
+
+def automatic_proposals(phone_tracks: list, pc_tracks: list, preferred: tuple = (), taken=frozenset()) -> dict:
+    """{pid: Proposal}: le sorgenti proposte in rosso nella scheda iPhone, senza leggere l'audio, tutte e due le
+    parti insieme (album_proposals, poi more_proposals per gli altri brani). Un file del PC va a un brano solo, e mai
+    a uno già associato a un altro brano (taken: le overlay.path_key dei file già nel registro)."""
+    from .overlay import path_key
+    result = album_proposals(phone_tracks, pc_tracks, preferred, taken)
+    used = set(taken)
+    for proposal in result.values():
+        used.add(path_key(proposal.pc.path))
+    rest = []
+    for item in phone_tracks:
+        if item.pid not in result:
+            rest.append(item)
+    result.update(more_proposals(rest, pc_tracks, preferred, used))
     return result
 
 

@@ -15,7 +15,7 @@ from myeasymp3toiphone import phone_library, scan
 from myeasymp3toiphone.config import config_dir
 from myeasymp3toiphone.library import Track, scan_folder
 from myeasymp3toiphone.phone_library import (
-    DEVICE_ABSENT, DEVICE_SAME, DEVICE_STALE, PhoneIndex, PhoneTrack, device_status, read_music_database,
+    DEVICE_ABSENT, DEVICE_SAME, DEVICE_STALE, PhoneIndex, PhoneTrack, device_status, differences, read_music_database,
 )
 from myeasymp3toiphone.tags import TrackTags, write_tags
 
@@ -514,3 +514,85 @@ def test_link_proposed_source(tmp_path):
     finally:
         window.close()
         app.processEvents()
+
+
+def test_only_linked_tracks_are_updated_from_the_pc(tmp_path):
+    """Aggiornare l'iPhone (PC → iPhone) vale solo per i brani associati dal registro; un brano abbinato solo per i
+    tag, anche con tag diversi, non va in attesa e non si aggiorna."""
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtWidgets import QApplication
+    from myeasymp3toiphone import provenance
+    from myeasymp3toiphone.gui.main_window import MainWindow
+    from myeasymp3toiphone.pending import UPDATE
+    app = QApplication.instance() or QApplication([])
+    window = MainWindow()
+    try:
+        linked = _pc("Canzone A", "Artista Uno", "Album Primo", year="1991")
+        by_tags = _pc("Canzone B", "Artista Uno", "Album Primo", year="1991")
+        window.tracks = [linked, by_tags]
+        window._rebuild_views()
+        phone = [_phone(1, "Canzone A", "Artista Uno", "Album Primo", year="1990"),
+                 _phone(2, "Canzone B", "Artista Uno", "Album Primo", year="1990")]
+        phone[0].sync_id = 11
+        phone[1].sync_id = 22
+        window.set_phone_tracks(phone, "iPhone di prova")
+        registry = provenance.Registry()
+        registry.record(provenance.Link(sync_id=11, pc=provenance.computer_name(), path=str(linked.path)))
+        window.set_registry(registry)
+        assert window.device_state(linked)[2] and not window.device_state(by_tags)[2]
+        window.mark_for_update([linked, by_tags])
+        assert window.pending.get(linked.path) == UPDATE and not window.pending.get(by_tags.path)
+        window.pending.set(by_tags.path, UPDATE)               # rimasto da una versione precedente
+        _sends, _removes, updates = window.pending_work()
+        assert updates == [(phone[0], linked)]
+    finally:
+        window.close()
+        app.processEvents()
+
+
+def test_red_proposal_from_folder_name_without_whole_album(tmp_path):
+    """Un brano che l'album intero non trova (l'altro brano dell'album sull'iPhone non è sul PC) ha comunque la
+    proposta in rosso dal nome della cartella."""
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtWidgets import QApplication
+    from myeasymp3toiphone.gui import iphone_panel
+    from myeasymp3toiphone.gui.main_window import MainWindow
+    app = QApplication.instance() or QApplication([])
+    window = MainWindow()
+    try:
+        track = _pc("Canzone A", "Artista Uno", "Album Primo", track_number=1)
+        track.length = 200.0
+        window.tracks = [track]
+        window._rebuild_views()
+        phone = [_phone(1, "Canzone A", "Artista Uno", "Album Primo", track_number=1),
+                 _phone(2, "Non sul PC", "Artista Uno", "Album Primo", track_number=2)]
+        phone[0].sync_id = 51
+        phone[1].sync_id = 52
+        panel = window.iphone_panel
+        window.set_phone_tracks(phone, "iPhone di prova")
+        assert panel._proposed[1].pc is track and panel._proposed[1].how == "cartella" and 2 not in panel._proposed
+        rows = {}
+        for index in range(panel._music_view.topLevelItemCount()):
+            row = panel._music_view.topLevelItem(index)
+            rows[row.text(iphone_panel.COL_TITLE)] = row
+        assert rows["Canzone A"].data(iphone_panel.COL_SOURCE_FILE, iphone_panel.PROPOSED_ROLE)
+        assert not rows["Non sul PC"].data(iphone_panel.COL_SOURCE_FILE, iphone_panel.PROPOSED_ROLE)
+    finally:
+        window.close()
+        app.processEvents()
+
+
+def test_comparison_like_the_iphone_groups_albums_and_artists():
+    """L'iPhone tiene la grafia del suo album o artista "uguale": "01" = "1", "AA.VV." = "Artisti Vari". Quelle
+    differenze non si possono correggere con un invio e non fanno giallo; le altre sì."""
+    from myeasymp3toiphone.library import phone_group_key
+    assert phone_group_key("Raccolta 01 - Estate") == phone_group_key("Raccolta 1 - Estate")
+    assert phone_group_key("AA.VV.") == phone_group_key("Artisti Vari") == phone_group_key("Various Artists")
+    assert phone_group_key("Festival 1990") != phone_group_key("Festival 199")
+    assert phone_group_key("Disco 10") != phone_group_key("Disco 1")
+    pc = TrackTags(title="Uno", artist="Anna", album="Raccolta 01 - Estate", album_artist="AA.VV.", compilation=True)
+    phone = TrackTags(title="Uno", artist="Anna", album="Raccolta 1 - Estate", album_artist="Artisti Vari",
+                      compilation=True)
+    assert differences(pc, phone) == []
+    phone.album_artist = "Michael Rossi"
+    assert [label for label, _a, _b in differences(pc, phone)] == ["Artista album"]
