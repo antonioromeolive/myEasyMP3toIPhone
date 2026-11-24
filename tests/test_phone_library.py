@@ -754,8 +754,9 @@ def test_right_click_menus_on_artists_and_albums(monkeypatch):
         entries = panel.browser_menu_entries(phone_browser.menu_tracks)
         assert "rimpiazza 2 brani con i file del PC" in entries[0][0]
         assert "TAG" in entries[1][0] and "1 brani con tag diversi" in entries[1][0]
-        assert "Sistema le copertine" in entries[2][0] and not entries[2][1]  # nessun album senza immagine
-        assert "Rimuovi dall'iPhone: 2 brani" in entries[3][0]
+        assert "Completa l'album" in entries[2][0] and "invia 1 brani" in entries[2][0]   # "Tre" manca
+        assert "Sistema le copertine" in entries[3][0] and not entries[3][1]  # nessun album senza immagine
+        assert "Rimuovi dall'iPhone: 2 brani" in entries[4][0]
         phone.append(_phone(3, "Senza sorgente", "Gruppo Finto", "Disco Uno"))
         phone[2].sync_id = 13
         window.set_phone_tracks(phone, "iPhone di prova")
@@ -1227,6 +1228,89 @@ def test_link_source_to_a_file_that_is_gone_does_not_crash(tmp_path, monkeypatch
         monkeypatch.setattr(panel, "_next_source", lambda: moved_on.append(True))
         panel._show_sources(item, [])
         assert moved_on == [True] and window.registry.get(11) is None   # niente nel registro, si va avanti
+    finally:
+        window._exit_checked = True
+        window.close()
+        app.processEvents()
+
+
+def test_keys_f5_and_delete(tmp_path, monkeypatch):
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtWidgets import QApplication
+    from myeasymp3toiphone import provenance
+    from myeasymp3toiphone.gui.main_window import MainWindow
+    app = QApplication.instance() or QApplication([])
+    window = MainWindow()
+    try:
+        panel = window.iphone_panel
+        calls = []
+        monkeypatch.setattr(window, "reload_folder", lambda: calls.append("PC"))
+        monkeypatch.setattr(panel, "refresh", lambda: calls.append("iPhone"))
+        window._tabs.setCurrentIndex(0)
+        window._refresh_current_tab()
+        window._tabs.setCurrentWidget(panel)
+        window._refresh_current_tab()
+        assert calls == ["PC", "iPhone"]                              # F5: Aggiorna della scheda che si vede
+
+        here = [_pc("Uno", "Gruppo Finto", "Disco"), _pc("Due", "Gruppo Finto", "Disco")]
+        window.tracks = here
+        phone = [_phone(1, "Uno", "Gruppo Finto", "Disco")]
+        phone[0].sync_id = 11
+        registry = provenance.Registry()
+        registry.record(provenance.Link(sync_id=11, pc=provenance.computer_name(), path=str(here[0].path)))
+        window.registry = registry
+        window.set_phone_tracks(phone, "iPhone di prova")
+        window._rebuild_views()
+        removed = []
+        monkeypatch.setattr(panel, "delete_items", lambda items: removed.append([item.pid for item in items]))
+        window._table.selectAll()
+        window._remove_selected_from_phone()                         # iPhone non connesso: solo un messaggio
+        assert removed == [] and "connetti" in window.statusBar().currentMessage()
+        monkeypatch.setattr(type(panel), "connected", property(lambda self: True))
+        window._remove_selected_from_phone()                         # Canc: solo quello sull'iPhone, associato
+        assert removed == [[1]]
+
+        deleted = []
+        monkeypatch.setattr(panel, "_delete_selected", lambda: deleted.append(len(panel._selected_phone_tracks())))
+        monkeypatch.setattr(panel, "_connected", True)
+        panel._music_view.setCurrentItem(panel._music_view.topLevelItem(0))
+        panel._music_view.clearSelection()
+        panel._delete_current()                                      # Canc nella scheda iPhone: Elimina, con conferma
+        assert deleted == [1]
+    finally:
+        window._exit_checked = True
+        window.close()
+        app.processEvents()
+
+
+def test_complete_the_album_sends_only_the_missing_tracks_of_that_copy(tmp_path):
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtWidgets import QApplication
+    from myeasymp3toiphone import provenance
+    from myeasymp3toiphone.gui.main_window import MainWindow
+    app = QApplication.instance() or QApplication([])
+    window = MainWindow()
+    try:
+        def track(folder, title, number, suffix=".mp3"):
+            result = Track(path=Path(f"D:/{folder}/Disco Finto/{number:02d}{suffix}"),
+                           tags=TrackTags(title=title, artist="Gruppo Finto", album="Disco Finto", track_number=number))
+            return result
+
+        mp3 = [track("musica", "Uno", 1), track("musica", "Due", 2), track("musica", "Tre", 3)]
+        flac = [track("musica.flac", "Due", 2, ".flac")]                # un'altra copia: non si manda
+        window.tracks = mp3 + flac
+        phone = [_phone(1, "Uno", "Gruppo Finto", "Disco Finto", track_number=1),
+                 _phone(2, "Altro", "Gruppo Finto", "Altro Disco")]
+        phone[0].sync_id, phone[1].sync_id = 11, 12
+        registry = provenance.Registry()
+        registry.record(provenance.Link(sync_id=11, pc=provenance.computer_name(), path=str(mp3[0].path)))
+        window.registry = registry
+        window.set_phone_tracks(phone, "iPhone di prova")
+        window._rebuild_views()
+        panel = window.iphone_panel
+        sends, albums = panel.complete_plan([phone[0]])
+        assert [item.title for item in sends] == ["Due", "Tre"] and albums == 1
+        assert panel.complete_plan([phone[1]]) == ([], 0)          # senza sorgente associata: niente
     finally:
         window._exit_checked = True
         window.close()

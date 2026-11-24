@@ -157,7 +157,7 @@ class MainWindow(QMainWindow):
              "Copia i brani selezionati in una cartella, ordinati per Artista/Album", "Ctrl+E"),
             ("Verifica album online", QStyle.SP_DialogApplyButton, self._check_albums,
              "Confronta gli album scelti (o tutti) con i cataloghi online (Deezer, Apple Music, Discogs, "
-             "MusicBrainz): brani mancanti, tag giusti, copertina. In background", "F5"),
+             "MusicBrainz): brani mancanti, tag giusti, copertina. In background", "F7"),
             ("Controlla la musica", QStyle.SP_FileDialogContentsView, self._scan,
              "Cerca i problemi confrontando i tuoi brani tra loro (cartella aperta o iPhone), senza cataloghi "
              "online: file non aggiornati, album con pochi brani, collezioni divise, artisti scritti in modi "
@@ -251,6 +251,12 @@ class MainWindow(QMainWindow):
         # resta una lettera)
         edit_shortcut = QShortcut(QKeySequence("E"), self._table, context=Qt.WidgetShortcut)
         edit_shortcut.activated.connect(self._edit_current_track)
+        # Canc sulla tabella: i brani selezionati via dall'iPhone (dopo la conferma; i file del PC mai)
+        delete_shortcut = QShortcut(QKeySequence(Qt.Key_Delete), self._table, context=Qt.WidgetShortcut)
+        delete_shortcut.activated.connect(self._remove_selected_from_phone)
+        # F5, in tutta la finestra: Aggiorna della scheda che si vede
+        refresh_shortcut = QShortcut(QKeySequence(Qt.Key_F5), self)
+        refresh_shortcut.activated.connect(self._refresh_current_tab)
         editor_scroll = QScrollArea()
         self._editor_scroll = editor_scroll
         editor_scroll.setWidget(self.editor)
@@ -1040,6 +1046,35 @@ class MainWindow(QMainWindow):
         if rows:
             self._table.scrollTo(self._model.index(rows[0], COL_TITLE))
         self.activateWindow()
+
+    def _refresh_current_tab(self) -> None:
+        """F5: Aggiorna della scheda che si vede (PC: rilegge la cartella; iPhone: rilegge la sua musica)."""
+        if self._tabs.currentWidget() is self.iphone_panel:
+            self.iphone_panel.refresh()
+        else:
+            self.reload_folder()
+
+    def _remove_selected_from_phone(self) -> None:
+        """Canc sulla tabella: i brani selezionati (o quello su cui si è) che sono sull'iPhone con la sorgente certa
+        si tolgono dall'iPhone, dopo la conferma. Sul PC non cambia niente."""
+        current = self._table.currentIndex()
+        if not self._selected_rows() and current.isValid():
+            self._table.selectRow(current.row())
+        removable = []
+        seen = set()
+        for track in self._selected_table_tracks():
+            if not track.error and self._phone_index is not None:
+                status, phone_track, linked = self._device_state(track)
+                if status != DEVICE_ABSENT and linked and phone_track.from_computer and phone_track.pid not in seen:
+                    seen.add(phone_track.pid)
+                    removable.append(phone_track)
+        if not self.iphone_panel.connected or self.runner.is_busy:
+            self.statusBar().showMessage("Togliere dall'iPhone: connetti l'iPhone (e attendi la fine dell'operazione "
+                                         "in corso)", 8000)
+        elif not removable:
+            self.statusBar().showMessage("Nessuno dei brani selezionati è sull'iPhone con la sorgente associata", 8000)
+        else:
+            self.iphone_panel.delete_items(removable)
 
     def _edit_current_track(self) -> None:
         """Il tasto E sulla tabella: il brano su cui si è (se nessuno è selezionato, quello con il cursore) nell'editor,

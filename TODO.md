@@ -61,9 +61,10 @@ Sull'iPhone 59 album su 234 non avevano l'immagine dell'album: tutti messi da al
 copertina, all'album manca la riga `best_artwork_token`); i 90 album con brani inviati da qui ce l'hanno tutti.
 Due album veri rimpiazzati dal PC: l'immagine c'è, confermato nell'app. Fatto *Sistema le
 copertine (PC → iPhone)*. Restano:
-- 8 album senza sorgente sul PC: prima *Associa sorgenti*;
-- 2 album con la copertina in scala di grigi: rustunes dice che l'iPhone ne fa una miniatura vuota; controllare
-  nell'app e, se è così, convertire in colore la copertina della copia inviata;
+- 7 album senza sorgente sul PC (non c'erano più): l'utente li ha salvati dall'iPhone sul PC, ora associati e con
+  la copertina nei file; manca *Sistema le copertine* su quei 56 brani;
+- i 2 album con la copertina in scala di grigi si vedono nell'app (controllato dall'utente il 24/11/2026): il
+  problema delle miniature vuote che rustunes descrive qui non c'è, niente da fare;
 - le copertine in un'immagine a parte nella cartella (`folder.jpg`, `cover.jpg`) non si usano ancora; sui dati veri
   nessun album senza immagine ne aveva bisogno.
 

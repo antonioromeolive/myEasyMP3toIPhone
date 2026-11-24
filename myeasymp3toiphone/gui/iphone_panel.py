@@ -15,9 +15,9 @@ from PySide6.QtWidgets import (
 from .. import adoption, estimate, iphone, phone_actions, provenance
 from ..config import config_dir
 from ..i18n import tr
-from ..library import Track, album_groups, copy_organized, scan_folder, short_folder
+from ..library import Track, album_folder, album_groups, copy_organized, group_name, scan_folder, short_folder
 from ..phone_library import (
-    DEVICE_SAME, comparison, differences, pc_matches, playlist_reminder, spelling_differences,
+    DEVICE_ABSENT, DEVICE_SAME, comparison, differences, pc_matches, playlist_reminder, spelling_differences,
 )
 from .compare_tip import comparison_html, show_on_tooltip
 from .file_actions import add_file_entries
@@ -433,6 +433,8 @@ class IPhonePanel(QWidget):
         self._music_view.viewport().installEventFilter(self)    # il suggerimento di Sul PC, al passaggio del mouse
         edit_shortcut = QShortcut(QKeySequence("E"), self._music_view, context=Qt.WidgetShortcut)
         edit_shortcut.activated.connect(self._edit_current)       # E: Cambia tag sul brano su cui si è
+        delete_shortcut = QShortcut(QKeySequence(Qt.Key_Delete), self._music_view, context=Qt.WidgetShortcut)
+        delete_shortcut.activated.connect(self._delete_current)   # Canc: Elimina dall'iPhone (con la conferma)
         header = self._music_view.header()
         # dopo l'ordinamento (che la vista fa su questo stesso segnale) le tinte degli album si rifanno
         header.sortIndicatorChanged.connect(lambda _column, _order: QTimer.singleShot(0, self._update_bands))
@@ -876,6 +878,41 @@ class IPhonePanel(QWidget):
         result = (pairs, blocked)
         return result
 
+    def complete_plan(self, items: list) -> tuple:
+        """Completa l'album: (brani del PC da inviare, album). Per i brani scelti con la sorgente certa (✔, ⟳) la loro
+        copia dell'album sul PC (stessa cartella, con i dischi insieme, e stesso album) e, di quella, i brani che
+        sull'iPhone non ci sono. Un brano abbinato solo per i tag (≈) non conta: potrebbe portare all'album
+        sbagliato. Solo i formati che si inviano (MP3, FLAC, M4A AAC)."""
+        from ..phone_sync import AUDIO_READERS
+        window = self._window
+        wanted = set()
+        for item in items:
+            state, track = self._pc_states.get(item.pid, (PC_NONE, None))
+            if state in (PC_SAME, PC_STALE) and track is not None:
+                wanted.add((album_folder(track.path).lower(), group_name(track.tags.album)))
+        sends = []
+        albums = set()
+        if wanted:
+            for track in window.tracks:
+                key = (album_folder(track.path).lower(), group_name(track.tags.album))
+                if key in wanted and not track.error and track.path.suffix.lower() in AUDIO_READERS and \
+                        window.device_state(track)[0] == DEVICE_ABSENT:
+                    sends.append(track)
+                    albums.add(key)
+        result = (sends, len(albums))
+        return result
+
+    def _complete_entry(self, items: list) -> tuple:
+        """La voce di menu Completa l'album per i brani scelti: (testo, attiva, funzione)."""
+        sends, albums = self.complete_plan(items)
+        if sends:
+            text = f"Completa l'album (PC → iPhone): invia {len(sends)} brani che mancano ({albums} album)"
+        else:
+            text = "Completa l'album (PC → iPhone): sull'iPhone non manca niente (o i brani non hanno la sorgente)"
+        ready = self._connected and not self._window.runner.is_busy
+        result = (text, ready and bool(sends), lambda: self.send_tracks(sends))
+        return result
+
     def cover_plan(self, items: list) -> tuple:
         """Sistema le copertine per i brani scelti: (coppie (PhoneTrack, Track) da rimpiazzare dal PC, album che non
         si possono). Gli album senza immagine sull'iPhone, interi: tutti i loro brani con la sorgente certa su questo
@@ -1210,6 +1247,7 @@ class IPhonePanel(QWidget):
         result = [
             (update_text, ready and not missing and bool(pairs), lambda: self.replace_pairs(pairs)),
             (tags_text, ready and bool(stale), lambda: self.update_pairs(stale, "Aggiorna TAG dal PC")),
+            self._complete_entry(items),
             self._cover_entry(items),
             (f"Rimuovi dall'iPhone: {len(writable)} brani", ready and bool(writable),
              lambda: self.delete_items(writable)),
@@ -1251,6 +1289,8 @@ class IPhonePanel(QWidget):
                 source_text = f"Associa sorgenti… ({len(writable)} brani)"
             text, enabled, slot = self._cover_entry(items)
             cover_entry = (text, slot, enabled)
+            text, enabled, slot = self._complete_entry(items)
+            complete_entry = (text, slot, enabled)
             menu = QMenu(self)
             entries = [
                 (f"Salva su PC (iPhone → PC)… ({len(items)} brani)", self._save_selected, ready),
@@ -1260,6 +1300,7 @@ class IPhonePanel(QWidget):
                 (f"Rimpiazza con la versione del PC (PC → iPhone): {len(stale)} brani associati ⟳", self._replace_selected,
                  ready and bool(stale)),
                 (f"Cambia tag… ({len(writable)} brani)", self._edit_selected, ready and bool(writable)),
+                complete_entry,
                 cover_entry,
                 None,
                 (source_text, lambda: self._link_sources(writable),
@@ -1585,6 +1626,22 @@ class IPhonePanel(QWidget):
         pairs = self._stale_pairs(self._selected_phone_tracks())
         if pairs:
             self.replace_pairs(pairs)
+
+    def refresh(self) -> None:
+        """Il pulsante Aggiorna (e F5): rilegge la musica dell'iPhone, o senza iPhone rifà il confronto con il PC."""
+        self._refresh_music()
+
+    def _delete_current(self) -> None:
+        """Il tasto Canc sull'elenco: Elimina dall'iPhone i brani selezionati (se nessuno lo è, quello con il
+        cursore), dopo la conferma."""
+        current = self._music_view.currentItem()
+        if not self._music_view.selectedItems() and current is not None:
+            current.setSelected(True)
+        if self._connected and not self._window.runner.is_busy:
+            self._delete_selected()
+        else:
+            self._window.statusBar().showMessage("Elimina dall'iPhone: connetti l'iPhone (e attendi la fine "
+                                                 "dell'operazione in corso)", 8000)
 
     def _edit_current(self) -> None:
         """Il tasto E sull'elenco: Cambia tag sui brani selezionati (se nessuno lo è, su quello con il cursore)."""

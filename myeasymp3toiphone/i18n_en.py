@@ -2339,6 +2339,16 @@ CATALOG = {
         '• {0} tracks to send again with their whole album, for the spelling (they lose plays and playlists)',
     'Ritrovati e associati {0} file spostati':
         'Found and linked {0} moved files',
+    "Completa l'album (PC → iPhone): invia {0} brani che mancano ({1} album)":
+        'Complete the album (PC → iPhone): send the {0} missing tracks ({1} albums)',
+    "Completa l'album (PC → iPhone): sull'iPhone non manca niente (o i brani non hanno la sorgente)":
+        'Complete the album (PC → iPhone): nothing is missing on the iPhone (or the tracks have no source)',
+    "Elimina dall'iPhone: connetti l'iPhone (e attendi la fine dell'operazione in corso)":
+        'Delete from the iPhone: connect the iPhone (and wait for the current operation to finish)',
+    "Togliere dall'iPhone: connetti l'iPhone (e attendi la fine dell'operazione in corso)":
+        'Remove from the iPhone: connect the iPhone (and wait for the current operation to finish)',
+    "Nessuno dei brani selezionati è sull'iPhone con la sorgente associata":
+        'None of the selected tracks is on the iPhone with a linked source',
     "Impronte dell'audio in sottofondo: {0} file (servono per ritrovare i file spostati o rinominati)":
         'Audio fingerprints in the background: {0} files (they help find moved or renamed files)',
     "Impronte dell'audio calcolate: {0} file":

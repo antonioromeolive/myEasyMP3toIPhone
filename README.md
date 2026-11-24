@@ -91,9 +91,14 @@ La tabella dei brani si ordina cliccando sull'intestazione di una colonna (Artis
 la clicchi i brani sono in ordine di artista, album, disco e traccia. *Esporta*, *Verifica album online* e *Invia all'app Musica*
 senza brani selezionati in tabella usano l'artista o l'album scelti negli elenchi.
 
-**Tasto E** sulla tabella dei brani: il cursore va nell'editor dei tag (campo *Titolo*, già selezionato) per i brani
-selezionati o, se non ce n'è nessuno, per quello su cui sei. Nella scheda iPhone lo stesso tasto apre **Cambia tag…**
-(a iPhone connesso). Mentre scrivi in *Cerca* la E resta una lettera.
+**Scorciatoie** sulla tabella dei brani (per i brani selezionati o, se non ce n'è nessuno, per quello su cui sei;
+mentre scrivi in *Cerca* o nell'editor valgono come tasti normali):
+- **E**: il cursore nell'editor dei tag (campo *Titolo*, già selezionato); nella scheda iPhone apre **Cambia tag…**
+  (a iPhone connesso);
+- **Canc**: toglie i brani dall'iPhone, dopo la conferma (nella scheda PC quelli che ci sono con la sorgente
+  associata). I file del PC non si cancellano mai;
+- **F5**, in tutta la finestra: **Aggiorna** della scheda che vedi (PC: rilegge la cartella; iPhone: rilegge la sua
+  musica). *Verifica album online* è **F7**, *Controlla la musica* **F6**.
 
 Artisti e album che differiscono solo per maiuscole, accenti o spazi ("Queen" e "queen") sono un gruppo solo, mostrato
 con la grafia più usata (a parità, quella con le maiuscole). Anche "AA.VV.", "Artisti vari", "Various Artists", "VA" e
@@ -246,7 +251,7 @@ In console: `myEasyMP3toIPhone-cli --scan <cartella> [--ai "<profilo>"]`.
 
 ## Verifica album online
 
-*Verifica album online* (F5) confronta gli album scelti negli elenchi (o tutti) con un **catalogo su internet**: dice
+*Verifica album online* (F7) confronta gli album scelti negli elenchi (o tutti) con un **catalogo su internet**: dice
 se manca qualche brano e propone i tag giusti e la copertina. È diverso da *Controlla la musica*, che confronta i tuoi
 brani tra loro (e con l'iPhone), senza cataloghi.
 
@@ -450,6 +455,12 @@ con brani senza sorgente associata non si può reinviare intero: i suoi brani si
 restano con la grafia dell'iPhone (la conferma lo dice). Il reinvio si fa sempre, anche se l'iPhone tenesse i nomi
 vecchi (allora lo dice). Come *Rimpiazza*, i brani reinviati perdono ascolti e playlist. Un brano di servizio
 rimasto da un'operazione interrotta si toglie alla successiva.
+
+**Completa l'album (PC → iPhone)** (tasto destro sui brani, o su un artista o un album): per un album di cui
+sull'iPhone ci sono solo alcuni brani, invia gli altri. Dai brani scelti con la sorgente associata (✔, ⟳) risale alla
+loro copia dell'album sul PC (la stessa cartella, con i dischi "CD1", "CD2" insieme, e lo stesso album) e manda
+quelli che sull'iPhone non ci sono, dopo la conferma con il tempo stimato. Una copia in un'altra cartella (per
+esempio in FLAC) non si manda; un brano abbinato solo per i tag (≈) non conta.
 
 **Sistema le copertine (PC → iPhone)** (tasto destro sui brani, o su un artista o un album, anche "(Tutti gli
 artisti)"; *Mostra → Album senza immagine sull'iPhone*): gli
