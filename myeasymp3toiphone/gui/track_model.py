@@ -13,7 +13,7 @@ from __future__ import annotations
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt
 from PySide6.QtGui import QBrush, QColor, QFont
 
-from ..library import track_sort_key
+from ..library import album_folder, short_folder, track_sort_key
 from ..i18n import tr
 from ..pending import wanted
 from ..phone_library import DEVICE_ABSENT, DEVICE_SAME, DEVICE_STALE
@@ -61,9 +61,16 @@ class TrackTableModel(QAbstractTableModel):
         self.endResetModel()
 
     def _update_bands(self) -> None:
+        """La tinta cambia con l'album e, per lo stesso album in due copie, con la copia: la cartella
+        (library.album_folder: "CD1" e "CD2" dello stesso album restano insieme) e il formato (FLAC e MP3 nella stessa
+        cartella sono due copie)."""
         keys = []
+        folders = {}
         for track in self.rows:
-            keys.append(track.album_key)
+            parent = track.path.parent
+            if parent not in folders:
+                folders[parent] = album_folder(track.path).lower()
+            keys.append((track.album_key, folders[parent], track.path.suffix.lower()))
         self._bands = album_bands(keys)
 
     def _background(self, row: int, track):
@@ -140,10 +147,10 @@ class TrackTableModel(QAbstractTableModel):
 
     def _folder_text(self, track) -> str:
         """La cartella del file: il percorso completo o il solo nome (Impostazioni → Mostra il percorso completo delle
-        cartelle)."""
+        cartelle); per una cartella di disco anche quella sopra ("Album\\CD1", library.short_folder)."""
         settings = getattr(self.owner, "app_settings", None)
         folder = track.path.parent
-        result = str(folder) if settings is not None and settings.show_full_path else folder.name
+        result = str(folder) if settings is not None and settings.show_full_path else short_folder(folder)
         return result
 
     def _foreground(self, track, column: int):

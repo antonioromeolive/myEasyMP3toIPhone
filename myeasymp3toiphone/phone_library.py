@@ -52,6 +52,16 @@ LEFT JOIN base_location b ON b.base_location_id = i.base_location_id
 WHERE e.location IS NOT NULL AND e.location != '' AND b.path IS NOT NULL AND b.path != ''
 """
 
+# gli album (sync_id) senza l'immagine dell'album: nessuna riga best_artwork_token dell'album (entity_type 4) con
+# un'immagine. Succede agli album messi da altri programmi anche se i brani hanno la copertina (24/11/2026: 59 album
+# su 234, nessuno di quelli inviati da qui); un rimpiazzo dal PC la fa scegliere all'iPhone
+_COVERLESS_ALBUM_QUERY = """
+SELECT a.sync_id FROM album a
+WHERE NOT EXISTS (SELECT 1 FROM best_artwork_token b
+                  WHERE b.entity_pid = a.album_pid AND b.entity_type = 4
+                        AND COALESCE(b.available_artwork_token, '') != '')
+"""
+
 # le playlist normali: non la libreria (nascosta), non le smart (si aggiornano da sole), non le cartelle
 _PLAYLIST_QUERY = """
 SELECT ci.item_pid, c.name
@@ -104,6 +114,7 @@ class PhoneTrack:
     artist_sync_id: int = 0   # dell'artista dell'album
     playlists: tuple = ()     # le playlist fatte a mano che lo contengono (non le smart)
     missing_file: bool = False   # "fantasma": nel database dell'app Musica, ma il suo file sull'iPhone non c'è
+    album_without_cover: bool = False   # il suo album sull'iPhone non ha l'immagine (_COVERLESS_ALBUM_QUERY)
 
     @property
     def from_computer(self) -> bool:
@@ -155,6 +166,13 @@ def read_music_database(path: Path) -> list:
                 playlist_rows = connection.execute(_PLAYLIST_QUERY).fetchall()
             except sqlite3.Error:
                 playlist_rows = []      # senza le playlist si va avanti: servono solo come promemoria
+            coverless = set()
+            try:
+                for (album_sync_id,) in connection.execute(_COVERLESS_ALBUM_QUERY):
+                    if album_sync_id:
+                        coverless.add(_unsigned(album_sync_id))
+            except sqlite3.Error:
+                coverless = set()       # tabella diversa (un altro iOS): nessun album segnato
         finally:
             connection.close()
     except sqlite3.Error as exc:
@@ -176,7 +194,8 @@ def read_music_database(path: Path) -> list:
         tracks.append(PhoneTrack(pid=int(pid), remote_path=remote, size=int(file_size or 0),
                                  length=(_number(total_ms) or 0) / 1000.0, tags=tags, sync_id=_unsigned(sync_id),
                                  album_sync_id=_unsigned(album_sync_id), artist_sync_id=_unsigned(artist_sync_id),
-                                 playlists=tuple(playlists.get(int(pid), ()))))
+                                 playlists=tuple(playlists.get(int(pid), ())),
+                                 album_without_cover=_unsigned(album_sync_id) in coverless))
     tracks.sort(key=lambda item: (group_name(item.display_artist), group_name(item.tags.album),
                                   item.tags.disc_number or 1, item.tags.track_number or 9999,
                                   group_name(item.tags.title)))
@@ -228,6 +247,7 @@ def save_listing(home: Path, device: str, tracks: list) -> None:
     rows = []
     playlists = {}
     missing = []
+    coverless = []
     for item in tracks:
         rows.append([item.pid, item.remote_path, item.size, item.length, asdict(item.tags), item.sync_id,
                      item.album_sync_id, item.artist_sync_id])
@@ -235,9 +255,12 @@ def save_listing(home: Path, device: str, tracks: list) -> None:
             playlists[str(item.pid)] = list(item.playlists)
         if item.missing_file:
             missing.append(item.pid)
-    # playlist e fantasmi a parte: le righe restano quelle che le versioni precedenti sanno leggere
+        if item.album_without_cover:
+            coverless.append(item.pid)
+    # playlist, fantasmi e album senza immagine a parte: le righe restano quelle che le versioni precedenti sanno
+    # leggere
     data = {"version": LISTING_VERSION, "device": device, "saved_at": time.strftime("%Y-%m-%d %H:%M"),
-            "tracks": rows, "playlists": playlists, "missing_files": missing}
+            "tracks": rows, "playlists": playlists, "missing_files": missing, "albums_without_cover": coverless}
     home.mkdir(parents=True, exist_ok=True)
     path = home / LISTING_FILE
     temporary = path.with_name(path.name + ".tmp")
@@ -256,6 +279,9 @@ def load_listing(home: Path) -> dict:
             missing = set()
             for pid in data.get("missing_files") or []:
                 missing.add(int(pid))
+            coverless = set()
+            for pid in data.get("albums_without_cover") or []:
+                coverless.add(int(pid))
             for pid, remote, size, length, values, sync_id, album_sync_id, artist_sync_id in data.get("tracks", []):
                 known = {}
                 for name, value in values.items():
@@ -267,7 +293,8 @@ def load_listing(home: Path) -> dict:
                 tracks.append(PhoneTrack(pid=int(pid), remote_path=str(remote), size=int(size),
                                          length=float(length), tags=TrackTags(**known), sync_id=int(sync_id),
                                          album_sync_id=int(album_sync_id), artist_sync_id=int(artist_sync_id),
-                                         playlists=tuple(names), missing_file=int(pid) in missing))
+                                         playlists=tuple(names), missing_file=int(pid) in missing,
+                                         album_without_cover=int(pid) in coverless))
             result = {"device": str(data.get("device", "")), "saved_at": str(data.get("saved_at", "")),
                       "tracks": tracks}
     except (OSError, ValueError, TypeError, AttributeError):

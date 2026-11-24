@@ -9,7 +9,7 @@ import unicodedata
 from collections import Counter
 from dataclasses import dataclass, field
 from functools import lru_cache
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import Callable, Optional
 
 from .tags import TagError, TrackTags, is_audio_file, read_tags
@@ -96,6 +96,20 @@ class CopyReport:
 
 DISC_FOLDER = re.compile(r"^\W*(?:cd|disc|disco|disk|dvd)\W*\d+(?:\W|$)", re.IGNORECASE)
 DISC_SUFFIX = re.compile(r"[\s\-_,.]*[\(\[]?\s*(?:cd|disc|disco|disk|dvd)\s*\d+\s*[\)\]]?\s*$", re.IGNORECASE)
+
+
+def short_folder(folder) -> str:
+    """Il nome di una cartella come si mostra senza il percorso completo: il solo nome, ma per una cartella di disco
+    ("CD1", "Disk 2", "cd 2 - studio", DISC_FOLDER) anche quella sopra, "Album\\CD1", che altrimenti non dice di che
+    album è. Vale per i percorsi di Windows (anche di un altro computer) con \\ o /."""
+    parts = PureWindowsPath(str(folder)).parts
+    name = parts[-1] if parts else ""
+    # sopra serve una cartella vera, non l'unità ("C:\\" finisce con la barra)
+    if len(parts) >= 2 and DISC_FOLDER.match(name) and not parts[-2].endswith(("\\", "/")):
+        result = parts[-2] + "\\" + name
+    else:
+        result = name
+    return result
 
 
 def album_folder(path) -> str:

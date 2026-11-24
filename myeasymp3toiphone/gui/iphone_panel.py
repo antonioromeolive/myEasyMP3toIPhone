@@ -15,7 +15,7 @@ from PySide6.QtWidgets import (
 from .. import adoption, estimate, iphone, phone_actions, provenance
 from ..config import config_dir
 from ..i18n import tr
-from ..library import Track, album_groups, copy_organized, scan_folder
+from ..library import Track, album_groups, copy_organized, scan_folder, short_folder
 from ..phone_library import (
     DEVICE_SAME, comparison, differences, pc_matches, playlist_reminder, spelling_differences,
 )
@@ -56,18 +56,19 @@ ORIGIN_ROLE = Qt.UserRole + 7     # l'origine com'è nel codice (il testo della 
 ORIGIN_NO_FILE = "senza file"     # brano "fantasma": il suo file sull'iPhone non c'è
 # il filtro "Mostra": (testo, funzione (origine, stato di Sul PC) -> visibile)
 SHOW_FILTERS = [
-    ("Tutti i brani", lambda origin, pc, proposed, spelling: True),
-    ("Senza sorgente (solo sull'iPhone)", lambda origin, pc, proposed, spelling: origin == ORIGIN_UNKNOWN),
-    ("Con la sorgente su questo PC", lambda origin, pc, proposed, spelling: origin == ORIGIN_HERE),
-    ("Da altri computer", lambda origin, pc, proposed, spelling: origin not in (ORIGIN_HERE, ORIGIN_UNKNOWN, ORIGIN_PHONE, ORIGIN_MISSING,
+    ("Tutti i brani", lambda origin, pc, proposed, spelling, coverless: True),
+    ("Senza sorgente (solo sull'iPhone)", lambda origin, pc, proposed, spelling, coverless: origin == ORIGIN_UNKNOWN),
+    ("Con la sorgente su questo PC", lambda origin, pc, proposed, spelling, coverless: origin == ORIGIN_HERE),
+    ("Da altri computer", lambda origin, pc, proposed, spelling, coverless: origin not in (ORIGIN_HERE, ORIGIN_UNKNOWN, ORIGIN_PHONE, ORIGIN_MISSING,
                                                             ORIGIN_NO_FILE)),
-    ("File del PC non trovato", lambda origin, pc, proposed, spelling: origin == ORIGIN_MISSING),
-    ("Acquistati o scaricati sul telefono", lambda origin, pc, proposed, spelling: origin == ORIGIN_PHONE),
-    ("Senza file sull'iPhone (fantasmi)", lambda origin, pc, proposed, spelling: origin == ORIGIN_NO_FILE),
-    ("Da rivedere: abbinati solo per i tag (≈)", lambda origin, pc, proposed, spelling: pc == PC_PROBABLE),
-    ("Sorgente con tag diversi (⟳)", lambda origin, pc, proposed, spelling: pc == PC_STALE),
-    ("Con una sorgente proposta (in rosso)", lambda origin, pc, proposed, spelling: bool(proposed)),
-    ("Album o artista scritti diversamente dal PC (Aa)", lambda origin, pc, proposed, spelling: spelling),
+    ("File del PC non trovato", lambda origin, pc, proposed, spelling, coverless: origin == ORIGIN_MISSING),
+    ("Acquistati o scaricati sul telefono", lambda origin, pc, proposed, spelling, coverless: origin == ORIGIN_PHONE),
+    ("Senza file sull'iPhone (fantasmi)", lambda origin, pc, proposed, spelling, coverless: origin == ORIGIN_NO_FILE),
+    ("Da rivedere: abbinati solo per i tag (≈)", lambda origin, pc, proposed, spelling, coverless: pc == PC_PROBABLE),
+    ("Sorgente con tag diversi (⟳)", lambda origin, pc, proposed, spelling, coverless: pc == PC_STALE),
+    ("Con una sorgente proposta (in rosso)", lambda origin, pc, proposed, spelling, coverless: bool(proposed)),
+    ("Album o artista scritti diversamente dal PC (Aa)", lambda origin, pc, proposed, spelling, coverless: spelling),
+    ("Album senza immagine sull'iPhone", lambda origin, pc, proposed, spelling, coverless: coverless),
 ]
 PC_TIP = {PC_SAME: "Sul PC c'è la sorgente di questo brano, con gli stessi tag",
           PC_STALE: "Sul PC c'è la sorgente di questo brano, ma con tag diversi",
@@ -641,9 +642,9 @@ class IPhonePanel(QWidget):
         return result
 
     def _folder_text(self, folder: str) -> str:
-        """Una cartella come si mostra: il percorso completo o il solo nome (Impostazioni)."""
-        plain = folder.replace("\\", "/")
-        result = folder if self._window.app_settings.show_full_path else Path(plain).name
+        """Una cartella come si mostra: il percorso completo o il solo nome (Impostazioni); per una cartella di disco
+        anche quella sopra ("Album\\CD1", library.short_folder)."""
+        result = folder if self._window.app_settings.show_full_path else short_folder(folder)
         return result
 
     def _source_texts(self, item) -> tuple:
@@ -752,8 +753,11 @@ class IPhonePanel(QWidget):
         for index in range(view.topLevelItemCount()):
             row = view.topLevelItem(index)
             text = " ".join([row.text(COL_TITLE), row.text(COL_ARTIST), row.text(COL_ALBUM)]).casefold()
+            pid = row.data(COL_TITLE, PID_ROLE)
+            item = self._by_pid.get(pid)
             visible = rule(row.data(COL_ORIGIN, ORIGIN_ROLE), row.data(COL_PC, PC_STATE_ROLE),
-                           row.data(COL_SOURCE_FILE, PROPOSED_ROLE), row.data(COL_TITLE, PID_ROLE) in self._spelling)
+                           row.data(COL_SOURCE_FILE, PROPOSED_ROLE), pid in self._spelling,
+                           item is not None and item.album_without_cover)
             for word in words:
                 if word not in text:
                     visible = False
@@ -825,6 +829,42 @@ class IPhonePanel(QWidget):
             if item.album_sync_id in chosen and item.album_sync_id:
                 pairs.append((item, self._pc_states[item.pid][1]))
         result = (pairs, blocked)
+        return result
+
+    def cover_plan(self, items: list) -> tuple:
+        """Sistema le copertine per i brani scelti: (coppie (PhoneTrack, Track) da rimpiazzare dal PC, album che non
+        si possono). Gli album senza immagine sull'iPhone, interi: tutti i loro brani con la sorgente certa su questo
+        PC; un rimpiazzo dal PC fa scegliere all'iPhone l'immagine dell'album (provato il 24/11/2026). Un album senza
+        nessun brano con la sorgente non si può."""
+        albums = set()
+        for item in items:
+            if item.album_without_cover and item.album_sync_id:
+                albums.add(item.album_sync_id)
+        pairs = []
+        linked_albums = set()
+        for item in self._phone_tracks:
+            if item.album_sync_id in albums and item.from_computer:
+                state, track = self._pc_states.get(item.pid, (PC_NONE, None))
+                if state in (PC_SAME, PC_STALE):
+                    pairs.append((item, track))
+                    linked_albums.add(item.album_sync_id)
+        result = (pairs, len(albums) - len(linked_albums))
+        return result
+
+    def _cover_entry(self, items: list) -> tuple:
+        """La voce di menu Sistema le copertine per i brani scelti: (testo, attiva, funzione)."""
+        pairs, blocked = self.cover_plan(items)
+        albums = set()
+        for item, _track in pairs:
+            albums.add(item.album_sync_id)
+        text = f"Sistema le copertine (PC → iPhone): {len(albums)} album senza immagine"
+        if blocked:
+            text += f"; {blocked} non si possono, nessun brano ha la sorgente associata"
+        reason = (f"{len(albums)} album sull'iPhone non hanno l'immagine dell'album, anche se i brani hanno la "
+                  "copertina (succede agli album messi da altri programmi). Rimpiazzando i loro brani con i file del "
+                  "PC, l'iPhone la sceglie.")
+        ready = self._connected and not self._window.runner.is_busy
+        result = (text, ready and bool(pairs), lambda: self.replace_pairs(pairs, reason, "Sistema le copertine"))
         return result
 
     def _spelling_entry(self, items: list) -> tuple:
@@ -1092,6 +1132,7 @@ class IPhonePanel(QWidget):
             (update_text, ready and not missing and bool(pairs), lambda: self.replace_pairs(pairs)),
             (tags_text, ready and bool(stale), lambda: self.update_pairs(stale, "Aggiorna TAG dal PC")),
             self._spelling_entry(items),
+            self._cover_entry(items),
             (f"Rimuovi dall'iPhone: {len(writable)} brani", ready and bool(writable),
              lambda: self.delete_items(writable)),
         ]
@@ -1132,6 +1173,8 @@ class IPhonePanel(QWidget):
                 source_text = f"Associa sorgenti… ({len(writable)} brani)"
             text, enabled, slot = self._spelling_entry(items)
             spelling_entry = (text, slot, enabled)
+            text, enabled, slot = self._cover_entry(items)
+            cover_entry = (text, slot, enabled)
             menu = QMenu(self)
             entries = [
                 (f"Salva su PC (iPhone → PC)… ({len(items)} brani)", self._save_selected, ready),
@@ -1142,6 +1185,7 @@ class IPhonePanel(QWidget):
                  ready and bool(stale)),
                 (f"Cambia tag… ({len(writable)} brani)", self._edit_selected, ready and bool(writable)),
                 spelling_entry,
+                cover_entry,
                 None,
                 (source_text, lambda: self._link_sources(writable),
                  bool(writable) and not self._window.runner.is_busy),
@@ -1331,28 +1375,31 @@ class IPhonePanel(QWidget):
 
             self._write("Invio all'iPhone", "inviati", action)
 
-    def replace_pairs(self, pairs: list) -> None:
-        """(brano dell'iPhone, brano del PC): la versione del PC prende il posto di quella dell'iPhone."""
+    def replace_pairs(self, pairs: list, reason: str = "", title: str = "Rimpiazza") -> None:
+        """(brano dell'iPhone, brano del PC): la versione del PC prende il posto di quella dell'iPhone. reason, se
+        c'è, va in testa alla domanda (perché si rimpiazza)."""
         phone_tracks = []
         sizes = []
         for phone_track, track in pairs:
             phone_tracks.append(phone_track)
             sizes.append(estimate.file_size(track.path))
-        text = (f"Rimpiazzare {len(pairs)} brani dell'iPhone con la versione del PC (PC → iPhone)?\n\n"
+        text = ((reason + "\n\n" if reason else "") +
+                f"Rimpiazzare {len(pairs)} brani dell'iPhone con la versione del PC (PC → iPhone)?\n\n"
                 + estimate.summary(len(pairs), estimate.seconds(sizes, removes=len(pairs))) + "\n\n"
                 "Prima si invia la versione del PC, poi si toglie quella vecchia. I brani rimpiazzati perdono "
                 "il conteggio degli ascolti e spariscono dalle playlist fatte sull'iPhone.")
         reminder = playlist_reminder(phone_tracks)
         if reminder:
             text += "\n\nSono nelle playlist (alla fine te le ricordo, per rimetterli a mano):\n" + reminder
-        if self._confirm("Rimpiazza", text):
+        if self._confirm(title, text):
             overlay = self._window.overlay
 
             def action(progress, cancel):
                 value = phone_actions.replace_tracks(pairs, overlay, progress, cancel, config_dir())
                 return value
 
-            self._write("Rimpiazzo sull'iPhone", "rimpiazzati", action, _playlist_note(phone_tracks))
+            self._write(title if reason else "Rimpiazzo sull'iPhone", "rimpiazzati", action,
+                        _playlist_note(phone_tracks))
 
     @staticmethod
     def pending_seconds(sends: list, removes: list, updates: list) -> float:

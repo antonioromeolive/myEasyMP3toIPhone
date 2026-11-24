@@ -44,16 +44,28 @@ Fatto e provato senza telefono (test e finestre di prova); da confermare sul tel
     session"; la regola esatta non è nota: rustunes ha visto pulire anche con 16 brani e non pulire con 90). Dopo,
     l'album reinviato come "PROVA Raccolta 1" di "PROVA Artista" ha preso il nome nuovo.
   - ***Allinea la grafia (PC → iPhone)*** è fatto (`phone_actions.align_spelling`, scheda iPhone: tasto destro
-    sui brani o su artisti e album, filtro *Mostra → Album o artista scritti diversamente dal PC*), provato solo con
-    i test. **Da provare sul telefono** (l'iPhone si era staccato): inviare "PROVA Raccolta 01" di "PROVA ARTISTA"
-    con lo script della prova (si attacca alla riga vuota "PROVA Raccolta 1" di "PROVA Artista" rimasta), poi
-    `align_spelling` con la grafia del PC; il nome deve tornare "PROVA Raccolta 01" di "PROVA ARTISTA" e i brani
-    "myEasyMP3toIPhone servizio" non devono restare. Sull'iPhone restano vuoti (invisibili) "PROVA Raccolta 1",
-    "PROVA Artista" e "PROVA Misura".
+    sui brani o su artisti e album, filtro *Mostra → Album o artista scritti diversamente dal PC*) e **provato sul
+    telefono** il 24/11/2026: "PROVA Raccolta 1" di "PROVA Artista" è diventato "PROVA Raccolta 01" di "PROVA
+    ARTISTA" (album e artista dell'album insieme), 97 brani di servizio inviati e tolti, nessuno rimasto, 17 s in
+    tutto; la sessione ha cancellato anche le altre righe vuote. L'utente ha visto il nome nuovo nell'app. Restano
+    da provare dalla finestra (build nuova) e su un album vero. Sull'iPhone restano vuoti (invisibili) "PROVA
+    Raccolta 01" e "PROVA ARTISTA".
 - **App Musica che non si aggiorna da sola**: dopo ogni scrittura il programma manda l'avviso di fine
   sincronizzazione di iTunes (`com.apple.itunes-mobdev.syncDidFinish`, `iphone.post_sync_finished`). Con l'app
   Musica aperta: se si aggiorna da sola, togliere dal messaggio finale l'invito a chiuderla e riaprirla; se no,
   provare anche `syncWillStart` all'inizio della sessione.
+
+## Copertine degli album (24/11/2026)
+
+Sull'iPhone 59 album su 234 non avevano l'immagine dell'album: tutti messi da altri programmi (i brani hanno la
+copertina, all'album manca la riga `best_artwork_token`); i 90 album con brani inviati da qui ce l'hanno tutti.
+Due album veri rimpiazzati dal PC: l'immagine c'è, confermato nell'app. Fatto *Sistema le
+copertine (PC → iPhone)*. Restano:
+- 8 album senza sorgente sul PC: prima *Associa sorgenti*;
+- 2 album con la copertina in scala di grigi: rustunes dice che l'iPhone ne fa una miniatura vuota; controllare
+  nell'app e, se è così, convertire in colore la copertina della copia inviata;
+- le copertine in un'immagine a parte nella cartella (`folder.jpg`, `cover.jpg`) non si usano ancora; sui dati veri
+  nessun album senza immagine ne aveva bisogno.
 
 ## Da provare con l'AI locale (Ollama acceso)
 

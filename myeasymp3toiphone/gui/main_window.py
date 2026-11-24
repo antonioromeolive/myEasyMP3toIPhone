@@ -24,7 +24,8 @@ from ..albumcheck import (
 from ..config import PRODUCT, AppSettings, config_dir
 from ..i18n import tr
 from ..library import (
-    assign_groups, copy_organized, group_by_album, load_track, scan_folder, set_various_artist_names, track_sort_key,
+    album_folder, assign_groups, copy_organized, group_by_album, load_track, scan_folder, set_various_artist_names,
+    track_sort_key,
 )
 from .. import estimate, provenance
 from ..phone_library import (
@@ -601,7 +602,10 @@ class MainWindow(QMainWindow):
                 shown = needle in haystack
             if shown:
                 visible.append(track)
-        visible.sort(key=lambda t: (t.album_key[0].lower(), t.album_key[1].lower()) + track_sort_key(t))
+        # lo stesso album in due copie (due cartelle, o FLAC e MP3 nella stessa cartella): prima tutta una copia, poi
+        # l'altra, non mescolate
+        visible.sort(key=lambda t: (t.album_key[0].lower(), t.album_key[1].lower(), album_folder(t.path).lower(),
+                                    t.path.suffix.lower()) + track_sort_key(t))
         return visible
 
     def _fill_table(self, keep_tracks: Optional[set] = None) -> None:

@@ -2319,4 +2319,14 @@ CATALOG = {
         '{0} albums and {1} artists',
     "l'iPhone non ha cancellato i nomi vecchi: i brani sono tornati con la grafia dell'iPhone (si può riprovare più tardi)":
         'the iPhone did not delete the old names: the tracks came back with the iPhone spelling (you can try again later)',
+    "Album senza immagine sull'iPhone":
+        'Albums without artwork on the iPhone',
+    'Sistema le copertine (PC → iPhone): {0} album senza immagine':
+        'Fix the artwork (PC → iPhone): {0} albums without artwork',
+    '; {0} non si possono, nessun brano ha la sorgente associata':
+        '; {0} cannot be fixed, no track has a linked source',
+    "{0} album sull'iPhone non hanno l'immagine dell'album, anche se i brani hanno la copertina (succede agli album messi da altri programmi). Rimpiazzando i loro brani con i file del PC, l'iPhone la sceglie.":
+        '{0} albums on the iPhone have no album artwork, even though the tracks have a cover (it happens to albums put there by other programs). Replacing their tracks with the PC files makes the iPhone choose one.',
+    'Sistema le copertine':
+        'Fix the artwork',
 }

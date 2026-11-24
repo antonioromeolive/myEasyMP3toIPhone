@@ -752,7 +752,8 @@ def test_right_click_menus_on_artists_and_albums(monkeypatch):
         assert "rimpiazza 2 brani con i file del PC" in entries[0][0]
         assert "TAG" in entries[1][0] and "1 brani con tag diversi" in entries[1][0]
         assert "Allinea la grafia" in entries[2][0] and not entries[2][1]     # niente scritto diversamente
-        assert "Rimuovi dall'iPhone: 2 brani" in entries[3][0]
+        assert "Sistema le copertine" in entries[3][0] and not entries[3][1]  # nessun album senza immagine
+        assert "Rimuovi dall'iPhone: 2 brani" in entries[4][0]
         phone.append(_phone(3, "Senza sorgente", "Gruppo Finto", "Disco Uno"))
         phone[2].sync_id = 13
         window.set_phone_tracks(phone, "iPhone di prova")
@@ -849,12 +850,128 @@ def test_spelling_differences_and_alignment_plan(tmp_path):
         pairs, blocked = panel.spelling_plan([phone[0]])
         assert sorted(item.pid for item, _track in pairs) == [1, 2]     # l'album intero, non l'altro dell'artista
         assert blocked == 0
-        panel._show.setCurrentIndex(panel._show.count() - 1)         # Mostra: scritti diversamente
+        panel._show.setCurrentIndex(panel._show.count() - 2)         # Mostra: scritti diversamente
         assert panel._count.text() == "2 di 3 brani"
         registry.forget(12)                                          # un brano dell'album senza sorgente
         window.set_phone_tracks(phone, "iPhone di prova")
         pairs, blocked = panel.spelling_plan([phone[0]])
         assert pairs == [] and blocked == 1
     finally:
+        window.close()
+        app.processEvents()
+
+
+def test_short_folder_names_disc_folders_with_their_album():
+    from myeasymp3toiphone.library import short_folder
+    assert short_folder(r"D:\musica\Album Finto\CD1") == r"Album Finto\CD1"
+    assert short_folder("D:/musica/Album Finto/Disk 2") == r"Album Finto\Disk 2"
+    assert short_folder(r"D:\musica\Album Finto\cd 2 - studio") == r"Album Finto\cd 2 - studio"
+    assert short_folder(r"D:\musica\Album Finto") == "Album Finto"
+    assert short_folder(r"D:\musica\Album Finto (Disc 1)") == "Album Finto (Disc 1)"   # il nome dice già l'album
+    assert short_folder(r"D:\CD1") == "CD1"                                           # sopra c'è solo l'unità
+    assert short_folder(r"D:\musica\Cdrom raccolta") == "Cdrom raccolta"             # non è un disco
+
+
+def test_same_album_in_two_folders_one_after_the_other_with_own_tint():
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtCore import Qt
+    from PySide6.QtWidgets import QApplication
+    from myeasymp3toiphone.gui.main_window import MainWindow
+    from myeasymp3toiphone.gui.theme import ALBUM_BANDS
+    app = QApplication.instance() or QApplication([])
+    window = MainWindow()
+    try:
+        def copy(folder, title, number):
+            result = Track(path=Path(f"D:/{folder}/Disco Finto/{number:02d}.mp3"),
+                           tags=TrackTags(title=title, artist="Gruppo Finto", album="Disco Finto",
+                                          track_number=number))
+            return result
+
+        window.tracks = [copy("musica.flac", "Uno", 1), copy("musica.mp3", "Uno", 1),
+                         copy("musica.flac", "Due", 2), copy("musica.mp3", "Due", 2),
+                         Track(path=Path("D:/insieme/Terzo Finto/01.flac"),
+                               tags=TrackTags(title="F", artist="Gruppo Finto", album="Terzo Finto", track_number=1)),
+                         Track(path=Path("D:/insieme/Terzo Finto/01.mp3"),
+                               tags=TrackTags(title="F", artist="Gruppo Finto", album="Terzo Finto", track_number=1)),
+                         Track(path=Path("D:/insieme/Terzo Finto/02.flac"),
+                               tags=TrackTags(title="G", artist="Gruppo Finto", album="Terzo Finto", track_number=2)),
+                         Track(path=Path("D:/musica.mp3/Doppio Finto/CD1/01.mp3"),
+                               tags=TrackTags(title="A", artist="Gruppo Finto", album="Doppio Finto", track_number=1)),
+                         Track(path=Path("D:/musica.mp3/Doppio Finto/CD2/01.mp3"),
+                               tags=TrackTags(title="B", artist="Gruppo Finto", album="Doppio Finto",
+                                              track_number=1, disc_number=2))]
+        window._rebuild_views()
+        model = window._model
+        order = []
+        colors = []
+        for row in range(model.rowCount()):
+            order.append(str(model.track(row).path.parent.parent.name) + "/" + model.track(row).title)
+            colors.append(model.data(model.index(row, 0), Qt.BackgroundRole).color())
+        assert order == ["musica.flac/Uno", "musica.flac/Due", "musica.mp3/Uno", "musica.mp3/Due",
+                         "Doppio Finto/A", "Doppio Finto/B", "insieme/F", "insieme/G", "insieme/F"]
+        assert colors == [ALBUM_BANDS[0][0], ALBUM_BANDS[0][1], ALBUM_BANDS[1][0], ALBUM_BANDS[1][1],
+                          ALBUM_BANDS[0][0], ALBUM_BANDS[0][1],          # CD1 e CD2: un album, una tinta
+                          ALBUM_BANDS[1][0], ALBUM_BANDS[1][1],          # stessa cartella: prima i FLAC...
+                          ALBUM_BANDS[0][0]]                             # ...poi gli MP3, con l'altra tinta
+    finally:
+        window._exit_checked = True
+        window.close()
+        app.processEvents()
+
+
+def test_albums_without_cover_read_saved_and_planned(tmp_path):
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtWidgets import QApplication
+    from myeasymp3toiphone import provenance
+    from myeasymp3toiphone.gui.main_window import MainWindow
+    path = tmp_path / "MediaLibrary.sqlitedb"
+    connection = _database(path)
+    connection.executescript("CREATE TABLE best_artwork_token (entity_pid INTEGER, entity_type INTEGER, "
+                             "artwork_type INTEGER, available_artwork_token TEXT);"
+                             "INSERT INTO best_artwork_token VALUES (2, 4, 6, '700');"      # "Raccolta": immagine
+                             "INSERT INTO best_artwork_token VALUES (1, 4, 6, '');")        # "Album Primo": vuota
+    connection.commit()
+    connection.close()
+    tracks = read_music_database(path)
+    flags = {}
+    for item in tracks:
+        flags[item.tags.title] = item.album_without_cover
+    assert flags == {"Canzone A": True, "Canzone B": True, "Canzone C": False}
+    phone_library.save_listing(tmp_path, "iPhone di prova", tracks)
+    again = {}
+    for item in phone_library.load_listing(tmp_path)["tracks"]:
+        again[item.tags.title] = item.album_without_cover
+    assert again == flags
+
+    app = QApplication.instance() or QApplication([])
+    window = MainWindow()
+    try:
+        files = []
+        for name in ("a", "b"):
+            file = tmp_path / f"{name}.mp3"
+            write_mp3(file)
+            files.append(file)
+        window.tracks = [Track(path=files[0], tags=TrackTags(title="Uno", artist="Gruppo Finto", album="Disco")),
+                         Track(path=files[1], tags=TrackTags(title="Due", artist="Gruppo Finto", album="Disco"))]
+        phone = [_phone(1, "Uno", "Gruppo Finto", "Disco"), _phone(2, "Due", "Gruppo Finto", "Disco"),
+                 _phone(3, "Tre", "Gruppo Finto", "Altro")]
+        for item, sync_id, album in zip(phone, (11, 12, 13), (700, 700, 701)):
+            item.sync_id = sync_id
+            item.album_sync_id = album
+            item.album_without_cover = True
+        registry = provenance.Registry()
+        for item, track in zip(phone, window.tracks):
+            registry.record(provenance.Link(sync_id=item.sync_id, pc=provenance.computer_name(),
+                                            path=str(track.path)))
+        window.registry = registry
+        window.set_phone_tracks(phone, "iPhone di prova")
+        panel = window.iphone_panel
+        pairs, blocked = panel.cover_plan([phone[0], phone[2]])
+        assert sorted(item.pid for item, _track in pairs) == [1, 2]    # l'album intero
+        assert blocked == 1                                            # "Altro": nessun brano con la sorgente
+        panel._show.setCurrentIndex(panel._show.count() - 1)          # Mostra: album senza immagine
+        assert panel._count.text() == "3 di 3 brani"
+    finally:
+        window._exit_checked = True
         window.close()
         app.processEvents()

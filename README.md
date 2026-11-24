@@ -97,7 +97,10 @@ segnala la variante, perché l'iPhone la considera un artista diverso.
 La riga scelta è **blu con il testo bianco** in tutti gli elenchi e le tabelle, anche in quello che non stai usando
 (negli elenchi Artisti e Album si vede sempre cosa è scelto). Nelle tabelle dei brani (schede PC e iPhone) **ogni
 album ha il suo sfondo**: azzurro e ambra si alternano da un album all'altro, con un tono chiaro e uno scuro a righe
-alterne dentro l'album; la tinta di una modifica in attesa (scheda PC) vince su quella dell'album.
+alterne dentro l'album; la tinta di una modifica in attesa (scheda PC) vince su quella dell'album. Nella scheda PC lo
+stesso album in due copie (due cartelle, o FLAC e MP3 nella stessa cartella) non si mescola: prima tutti i brani di
+una copia, poi quelli dell'altra, ognuna con la sua tinta (le cartelle dei dischi, "CD1" e "CD2" dello stesso album,
+restano un album solo).
 
 **Colonne.** #, iPhone, Titolo, Artista, **Artista album**, Album, Anno, Genere, Durata, **Cartella**, File. *File*
 è il nome del file; *Cartella* è il nome della cartella che lo contiene, o il suo percorso completo con *Impostazioni →
@@ -441,6 +444,13 @@ menu conta gli album che non si possono. Il reinvio si fa sempre, anche se l'iPh
 lo dice). Come *Rimpiazza*, i brani reinviati perdono ascolti e playlist. Un brano di servizio rimasto da
 un'operazione interrotta si toglie alla successiva.
 
+**Sistema le copertine (PC → iPhone)** (tasto destro, come sopra; *Mostra → Album senza immagine sull'iPhone*): gli
+album messi sull'iPhone da altri programmi (CopyTrans, iTunes) possono non avere l'immagine dell'album anche se i
+loro brani hanno la copertina: l'iPhone non ne ha scelta una. Gli album inviati da questo programma ce l'hanno
+sempre. Il comando rimpiazza i brani di quegli album con i file del PC (quelli con la sorgente associata) e l'iPhone
+sceglie l'immagine (provato il 24/11/2026). Come *Rimpiazza*: perdono ascolti e playlist. Il programma copia sempre
+la copertina che sta *dentro* il file (JPEG o PNG); un'immagine a parte nella cartella (`folder.jpg`) non si usa.
+
 Quando un brano ha la
 sorgente, il confronto delle colonne *Sul PC* e *iPhone* usa quel file esatto: un doppione sul PC con gli stessi tag
 non prende il suo posto. **Salva su PC** associa ogni brano salvato al suo file nuovo (verificato con l'impronta),
@@ -770,8 +780,8 @@ In inglese sono in inglese finestre, pulsanti, menu, messaggi, la barra di stato
 
 *Impostazioni → Generale → Mostra il percorso completo delle cartelle* (`show_full_path` in `settings.json`): vale per
 la colonna *Cartella* della scheda PC e *Cartella della sorgente* della scheda iPhone, subito. Senza: spento (il solo
-nome della cartella). Le colonne dei file mostrano sempre il solo nome; il suggerimento delle celle mostra sempre il
-percorso completo.
+nome della cartella; per una cartella di disco, "CD1", "Disk 2", "cd 2 - studio", anche quella sopra: `Album\CD1`).
+Le colonne dei file mostrano sempre il solo nome; il suggerimento delle celle mostra sempre il percorso completo.
 
 ### Le cartelle nascoste
 
