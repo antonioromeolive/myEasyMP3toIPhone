@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Optional
 
 from PySide6.QtCore import QByteArray, QItemSelection, QItemSelectionModel, QSize, Qt, QTimer
-from PySide6.QtGui import QAction, QColor, QKeySequence
+from PySide6.QtGui import QAction, QColor, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QAbstractItemView, QApplication, QComboBox, QDialog, QDialogButtonBox, QFileDialog, QFrame, QHBoxLayout,
     QHeaderView, QLabel, QLineEdit, QListWidget, QListWidgetItem, QMainWindow, QMenu, QMessageBox, QPushButton, QScrollArea, QSplitter, QStyle, QTableView, QTabWidget,
@@ -242,7 +242,12 @@ class MainWindow(QMainWindow):
         self.editor.cover_provider = self._cover_of
         self.editor.edited_check = lambda track: self.overlay.is_edited(track.path)
         self.editor.renumber_requested.connect(self._renumber_selection)
+        # E sulla tabella dei brani: il cursore nell'editor dei tag (solo quando la tabella ha il fuoco: in Cerca la E
+        # resta una lettera)
+        edit_shortcut = QShortcut(QKeySequence("E"), self._table, context=Qt.WidgetShortcut)
+        edit_shortcut.activated.connect(self._edit_current_track)
         editor_scroll = QScrollArea()
+        self._editor_scroll = editor_scroll
         editor_scroll.setWidget(self.editor)
         editor_scroll.setWidgetResizable(True)
         editor_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
@@ -980,6 +985,15 @@ class MainWindow(QMainWindow):
         if rows:
             self._table.scrollTo(self._model.index(rows[0], COL_TITLE))
         self.activateWindow()
+
+    def _edit_current_track(self) -> None:
+        """Il tasto E sulla tabella: il brano su cui si è (se nessuno è selezionato, quello con il cursore) nell'editor,
+        con il cursore nel primo campo."""
+        current = self._table.currentIndex()
+        if not self._selected_rows() and current.isValid():
+            self._table.selectRow(current.row())
+        if self.editor.focus_first_field():
+            self._editor_scroll.ensureWidgetVisible(self.editor.focusWidget() or self.editor)
 
     def _selection_changed(self) -> None:
         """L'editor dei brani selezionati; senza brani selezionati ma con un album scelto negli elenchi, la copertina

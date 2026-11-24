@@ -2339,6 +2339,8 @@ CATALOG = {
         '• {0} tracks to send again with their whole album, for the spelling (they lose plays and playlists)',
     'Campi da scrivere:':
         'Fields to write:',
+    "Cambia tag: connetti l'iPhone (e attendi la fine dell'operazione in corso)":
+        'Change tags: connect the iPhone (and wait for the current operation to finish)',
     '{0} ({1} file)':
         '{0} ({1} files)',
     "<b>Questi {0} file del PC verranno modificati</b>: si scrivono nel file i tag dell'iPhone dei campi scelti. Non si può annullare.":

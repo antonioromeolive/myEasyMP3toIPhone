@@ -134,6 +134,16 @@ class TagEditor(QWidget):
             self._header.setText(f"{artist} — {tags.album}\n{len(tracks)} brani: selezionali in tabella per "
                                  "modificarli")
 
+    def focus_first_field(self) -> bool:
+        """Il cursore nel primo campo (Titolo), con il testo selezionato, pronto da modificare (il tasto E della
+        tabella). False se non c'è niente da modificare (nessun brano, o file in sola lettura)."""
+        editor = self._editors[TAG_FIELDS[0][0]]
+        result = editor.isEnabled()
+        if result:
+            editor.setFocus(Qt.ShortcutFocusReason)
+            editor.selectAll()
+        return result
+
     def has_unsaved_changes(self) -> bool:
         result = bool(self._dirty) or self._new_cover is not None
         return result

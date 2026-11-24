@@ -6,7 +6,7 @@ import shutil
 from pathlib import Path
 
 from PySide6.QtCore import QRect, Qt, QTimer
-from PySide6.QtGui import QBrush, QColor
+from PySide6.QtGui import QBrush, QColor, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QAbstractItemView, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFileDialog, QFormLayout, QGroupBox, QHBoxLayout, QHeaderView,
     QLabel, QLineEdit, QMenu, QMessageBox, QPushButton, QSplitter, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget,
@@ -431,6 +431,8 @@ class IPhonePanel(QWidget):
         self._music_view.setContextMenuPolicy(Qt.CustomContextMenu)
         self._music_view.customContextMenuRequested.connect(self._show_menu)
         self._music_view.viewport().installEventFilter(self)    # il suggerimento di Sul PC, al passaggio del mouse
+        edit_shortcut = QShortcut(QKeySequence("E"), self._music_view, context=Qt.WidgetShortcut)
+        edit_shortcut.activated.connect(self._edit_current)       # E: Cambia tag sul brano su cui si è
         header = self._music_view.header()
         # dopo l'ordinamento (che la vista fa su questo stesso segnale) le tinte degli album si rifanno
         header.sortIndicatorChanged.connect(lambda _column, _order: QTimer.singleShot(0, self._update_bands))
@@ -1552,6 +1554,17 @@ class IPhonePanel(QWidget):
         pairs = self._stale_pairs(self._selected_phone_tracks())
         if pairs:
             self.replace_pairs(pairs)
+
+    def _edit_current(self) -> None:
+        """Il tasto E sull'elenco: Cambia tag sui brani selezionati (se nessuno lo è, su quello con il cursore)."""
+        current = self._music_view.currentItem()
+        if not self._music_view.selectedItems() and current is not None:
+            current.setSelected(True)
+        if self._connected and not self._window.runner.is_busy:
+            self._edit_selected()
+        else:
+            self._window.statusBar().showMessage("Cambia tag: connetti l'iPhone (e attendi la fine dell'operazione "
+                                                 "in corso)", 8000)
 
     def _edit_selected(self) -> None:
         items = []

@@ -91,6 +91,10 @@ La tabella dei brani si ordina cliccando sull'intestazione di una colonna (Artis
 la clicchi i brani sono in ordine di artista, album, disco e traccia. *Esporta*, *Verifica album online* e *Invia all'app Musica*
 senza brani selezionati in tabella usano l'artista o l'album scelti negli elenchi.
 
+**Tasto E** sulla tabella dei brani: il cursore va nell'editor dei tag (campo *Titolo*, già selezionato) per i brani
+selezionati o, se non ce n'è nessuno, per quello su cui sei. Nella scheda iPhone lo stesso tasto apre **Cambia tag…**
+(a iPhone connesso). Mentre scrivi in *Cerca* la E resta una lettera.
+
 Artisti e album che differiscono solo per maiuscole, accenti o spazi ("Queen" e "queen") sono un gruppo solo, mostrato
 con la grafia più usata (a parità, quella con le maiuscole). Anche "AA.VV.", "Artisti vari", "Various Artists", "VA" e
 simili sono **un artista solo**, e i loro album con lo stesso nome un album solo; altri nomi che valgono come loro si

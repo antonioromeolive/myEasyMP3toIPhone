@@ -1048,3 +1048,37 @@ def test_align_to_pc_writes_only_the_chosen_fields():
     assert dialog.chosen_plan() == [] and not dialog._buttons.button(QDialogButtonBox.Ok).isEnabled()
     dialog.close()
     app.processEvents()
+
+
+def test_key_e_goes_to_the_tag_editor(monkeypatch):
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtWidgets import QApplication
+    from myeasymp3toiphone.gui.main_window import MainWindow
+    app = QApplication.instance() or QApplication([])
+    window = MainWindow()
+    try:
+        window.tracks = [_pc("Uno", "Gruppo Finto", "Disco Uno", track_number=1),
+                         _pc("Due", "Gruppo Finto", "Disco Uno", track_number=2)]
+        window._rebuild_views()
+        window._table.setCurrentIndex(window._model.index(1, 0))
+        window._table.clearSelection()
+        window._edit_current_track()                                 # E: il brano con il cursore, nell'editor
+        assert [track.title for track in window._selected_table_tracks()] == ["Due"]
+        title = window.editor._editors["title"]
+        assert title.text() == "Due" and title.selectedText() == "Due"
+
+        panel = window.iphone_panel
+        window.set_phone_tracks([_phone(1, "Uno", "Gruppo Finto", "Disco Uno")], "iPhone di prova")
+        opened = []
+        monkeypatch.setattr(panel, "_edit_selected", lambda: opened.append(len(panel._selected_phone_tracks())))
+        panel._music_view.setCurrentItem(panel._music_view.topLevelItem(0))
+        panel._music_view.clearSelection()
+        panel._edit_current()                                        # iPhone non connesso: solo un messaggio
+        assert opened == [] and "connetti" in window.statusBar().currentMessage()
+        monkeypatch.setattr(panel, "_connected", True)
+        panel._edit_current()                                        # connesso: Cambia tag sul brano
+        assert opened == [1]
+    finally:
+        window._exit_checked = True
+        window.close()
+        app.processEvents()
