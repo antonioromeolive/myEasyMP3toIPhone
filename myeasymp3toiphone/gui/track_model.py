@@ -17,6 +17,7 @@ from ..library import track_sort_key
 from ..i18n import tr
 from ..pending import wanted
 from ..phone_library import DEVICE_ABSENT, DEVICE_SAME, DEVICE_STALE
+from .theme import album_band, album_bands
 
 COLUMNS = ["#", "iPhone", "Titolo", "Artista", "Artista album", "Album", "Anno", "Genere", "Durata", "Cartella",
            "File"]
@@ -49,13 +50,31 @@ class TrackTableModel(QAbstractTableModel):
         self.device_header_tip = ""
         self._italic = QFont()
         self._italic.setItalic(True)
+        self._bands = []                      # per riga: (tinta, chiara/scura) del suo album (theme.album_bands)
 
     # ------------------------------------------------------------------ dati
 
     def set_tracks(self, tracks: list) -> None:
         self.beginResetModel()
         self.rows = list(tracks)
+        self._update_bands()
         self.endResetModel()
+
+    def _update_bands(self) -> None:
+        keys = []
+        for track in self.rows:
+            keys.append(track.album_key)
+        self._bands = album_bands(keys)
+
+    def _background(self, row: int, track):
+        """La tinta di un'azione in attesa, se c'è; altrimenti quella dell'album."""
+        action = self._action(track)
+        if action:
+            result = QBrush(self.pending_look[action][2])
+        else:
+            band, shade = self._bands[row]
+            result = QBrush(album_band(band, shade))
+        return result
 
     def track(self, row: int):
         result = self.rows[row]
@@ -196,8 +215,7 @@ class TrackTableModel(QAbstractTableModel):
                 status = self.owner.device_state(track)[0]
                 result = Qt.Checked if wanted(status, self._action(track)) else Qt.Unchecked
             elif role == Qt.BackgroundRole:
-                action = self._action(track)
-                result = QBrush(self.pending_look[action][2]) if action else None
+                result = self._background(index.row(), track)
         return result
 
     def flags(self, index):
@@ -247,6 +265,7 @@ class TrackTableModel(QAbstractTableModel):
             for index in persistent:
                 before.append((self.rows[index.row()], index.column()))
             self.rows.sort(key=self._sort_key(column), reverse=order == Qt.DescendingOrder)
+            self._update_bands()
             position = {}
             for row, track in enumerate(self.rows):
                 position[id(track)] = row

@@ -616,44 +616,245 @@ def test_album_groups_of_phone_tracks():
     assert ("AA.VV.", "Raccolta Finta") in groups                 # l'artista dell'album vince su quello del brano
 
 
-def test_artist_and_album_lists_and_grouping_in_both_tabs(tmp_path):
+def test_artist_and_album_lists_and_album_bands_in_both_tabs(tmp_path):
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtCore import Qt
     from PySide6.QtWidgets import QApplication
-    from myeasymp3toiphone.config import AppSettings
-    from myeasymp3toiphone.gui.browser import GROUP_ALBUM, GROUP_ARTIST_ALBUM
+    from myeasymp3toiphone.gui import iphone_panel
     from myeasymp3toiphone.gui.main_window import MainWindow
+    from myeasymp3toiphone.gui.theme import ALBUM_BANDS, album_bands
     app = QApplication.instance() or QApplication([])
     window = MainWindow()
     try:
+        assert album_bands(["a", "a", "a", "b", "c", "c"]) == [(0, 0), (0, 1), (0, 0), (1, 0), (0, 0), (0, 1)]
         phone = [_phone(1, "Uno", "Gruppo Finto", "Disco Uno"), _phone(2, "Due", "Gruppo Finto", "Disco Due"),
-                 _phone(3, "Tre", "Altro Finto", "Disco Tre")]
+                 _phone(3, "Tre", "Altro Finto", "Disco Tre"), _phone(4, "Quattro", "Altro Finto", "Disco Tre")]
         window.set_phone_tracks(phone, "iPhone di prova")
         panel = window.iphone_panel
         browser = panel._browser
         assert browser.artists.topLevelItemCount() == 3               # "(Tutti…)" e due artisti
         assert browser.albums.topLevelItemCount() == 4                # "(Tutti…)" e tre album
+        view = panel._music_view
+        view.sortByColumn(iphone_panel.COL_ALBUM, Qt.AscendingOrder)
+        app.processEvents()
+        shown = []
+        for index in range(view.topLevelItemCount()):
+            shown.append(view.bands[view.topLevelItem(index).data(iphone_panel.COL_TITLE, iphone_panel.PID_ROLE)])
+        # Disco Due, Disco Tre (due brani), Disco Uno
+        assert shown == [ALBUM_BANDS[0][0], ALBUM_BANDS[1][0], ALBUM_BANDS[1][1], ALBUM_BANDS[0][0]]
         for index in range(browser.artists.topLevelItemCount()):
             item = browser.artists.topLevelItem(index)
             if item.text(0) == "Gruppo Finto":
                 item.setSelected(True)
-        assert panel._count.text() == "2 di 3 brani"
+        assert panel._count.text() == "2 di 4 brani"
         assert browser.albums.topLevelItemCount() == 3                # solo i suoi album
-        browser.grouping.setCurrentIndex(1)                           # Solo album
-        assert browser.grouping_value() == GROUP_ALBUM
-        assert browser._artist_column.isHidden()
-        assert browser.albums.topLevelItemCount() == 4                # di nuovo tutti gli album
-        assert panel._count.text() == "3 brani"
+        assert len(view.bands) == 2                                   # le tinte solo per le righe che si vedono
         for index in range(browser.albums.topLevelItemCount()):
             item = browser.albums.topLevelItem(index)
-            if item.text(0) == "Disco Tre":
+            if item.text(0) == "Disco Due":
                 item.setSelected(True)
-        assert panel._count.text() == "1 di 3 brani"
-        assert AppSettings.load().iphone_grouping == GROUP_ALBUM      # si ricorda
-        window.browser.grouping.setCurrentIndex(1)
-        assert AppSettings.load().pc_grouping == GROUP_ALBUM
-        window.browser.set_grouping(GROUP_ARTIST_ALBUM)
-        assert not window.browser._artist_column.isHidden()
-        assert AppSettings.load().pc_grouping == GROUP_ALBUM          # set_grouping non salva: solo la scelta a mano
+        assert panel._count.text() == "1 di 4 brani"
+
+        model = window._model
+        model.set_tracks([_pc("Uno", "Gruppo Finto", "Disco Uno"), _pc("Due", "Gruppo Finto", "Disco Uno"),
+                          _pc("Tre", "Altro Finto", "Disco Tre")])
+        colors = []
+        for row in range(model.rowCount()):
+            colors.append(model.data(model.index(row, 0), Qt.BackgroundRole).color())
+        assert colors == [ALBUM_BANDS[0][0], ALBUM_BANDS[0][1], ALBUM_BANDS[1][0]]
+    finally:
+        window.close()
+        app.processEvents()
+
+
+def test_various_artists_are_one_artist_with_extra_names():
+    from myeasymp3toiphone.library import album_groups, assign_groups, phone_group_key, set_various_artist_names
+    phone = [_phone(1, "Uno", "Cantante Finto", "Raccolta Finta", album_artist="AA.VV."),
+             _phone(2, "Due", "Altro Finto", "Raccolta Finta", album_artist="Various Artists"),
+             _phone(3, "Tre", "Terzo Finto", "Altra Raccolta", album_artist="AA.VV."),
+             _phone(4, "Quattro", "Quarto Finto", "Disco Strano", album_artist="Misti Finti")]
+    groups = album_groups(phone)
+    artists = set()
+    for artist, _album in groups:
+        artists.add(artist)
+    assert artists == {"AA.VV.", "Misti Finti"}                  # la grafia più usata
+    assert len(groups) == 3                                        # "Raccolta Finta" è un album solo
+    pc = [_pc("Uno", "Cantante Finto", "Raccolta Finta", album_artist="Various Artists"),
+          _pc("Due", "Altro Finto", "Raccolta Finta", album_artist="VA")]
+    assign_groups(pc)
+    assert pc[0].album_key == pc[1].album_key
+    try:
+        set_various_artist_names(["Misti Finti", " "])
+        artists = set()
+        for artist, _album in album_groups(phone):
+            artists.add(artist)
+        assert artists == {"AA.VV."}
+        assert phone_group_key("Misti Finti") != phone_group_key("AA.VV.")   # l'iPhone non conosce i nomi aggiunti
+    finally:
+        set_various_artist_names([])
+
+
+def test_right_click_menus_on_artists_and_albums(monkeypatch):
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtCore import QPoint
+    from PySide6.QtWidgets import QApplication
+    from myeasymp3toiphone import provenance
+    from myeasymp3toiphone.gui import iphone_panel, main_window
+    from myeasymp3toiphone.gui.main_window import MainWindow
+    app = QApplication.instance() or QApplication([])
+    for module in (iphone_panel, main_window):          # nessun menu che aspetta un clic
+        monkeypatch.setattr(module, "show_entries_menu", lambda *args: None)
+    window = MainWindow()
+    try:
+        here = [_pc("Uno", "Gruppo Finto", "Disco Uno"), _pc("Due", "Gruppo Finto", "Disco Uno"),
+                _pc("Tre", "Gruppo Finto", "Disco Uno")]
+        window.tracks = here
+        phone = [_phone(1, "Uno", "Gruppo Finto", "Disco Uno"), _phone(2, "Due", "Gruppo Finto", "Disco Uno",
+                                                                       year="1999")]
+        phone[0].sync_id, phone[1].sync_id = 11, 12
+        registry = provenance.Registry()
+        for item, track in zip(phone, here):
+            registry.record(provenance.Link(sync_id=item.sync_id, pc=provenance.computer_name(),
+                                            path=str(track.path)))
+        window.registry = registry
+        window.set_phone_tracks(phone, "iPhone di prova")
+        window._rebuild_views()
+        browser = window.browser
+        browser.show()
+        app.processEvents()
+        target = None
+        for index in range(browser.albums.topLevelItemCount()):
+            item = browser.albums.topLevelItem(index)
+            if item.text(0) == "Disco Uno":
+                target = item
+        browser._menu_at(browser.albums, browser.albums.visualItemRect(target).center())
+        assert browser.selected_albums() == {("Gruppo Finto", "Disco Uno")}
+        assert len(browser.menu_tracks) == 3                          # l'album intero
+        texts = []
+        for text, enabled, _slot in window.browser_menu_entries(browser.menu_tracks):
+            texts.append((text, enabled))
+        assert texts[0][0].endswith("1 brani che non ci sono")      # "Tre" non è sull'iPhone
+        assert "Rimuovi dall'iPhone: 2 brani" in texts[1][0]          # i due con la sorgente certa
+        assert "rimpiazza 2 brani con i file del PC" in texts[2][0]   # Aggiorna: i file, tutti e due
+        assert "TAG" in texts[3][0] and "1 brani con tag diversi" in texts[3][0]     # "Due": anno diverso
+        assert not texts[0][1]                                        # iPhone non connesso: tutto spento
+
+        panel = window.iphone_panel
+        phone_browser = panel._browser
+        phone_browser.show()
+        app.processEvents()
+        for index in range(phone_browser.albums.topLevelItemCount()):
+            item = phone_browser.albums.topLevelItem(index)
+            if item.text(0) == "Disco Uno":
+                target = item
+        phone_browser._menu_at(phone_browser.albums, phone_browser.albums.visualItemRect(target).center())
+        entries = panel.browser_menu_entries(phone_browser.menu_tracks)
+        assert "rimpiazza 2 brani con i file del PC" in entries[0][0]
+        assert "TAG" in entries[1][0] and "1 brani con tag diversi" in entries[1][0]
+        assert "Allinea la grafia" in entries[2][0] and not entries[2][1]     # niente scritto diversamente
+        assert "Rimuovi dall'iPhone: 2 brani" in entries[3][0]
+        phone.append(_phone(3, "Senza sorgente", "Gruppo Finto", "Disco Uno"))
+        phone[2].sync_id = 13
+        window.set_phone_tracks(phone, "iPhone di prova")
+        entries = panel.browser_menu_entries(phone)
+        assert "non si può, 1 brani su 3" in entries[0][0]           # non tutti associati: Aggiorna spento
+        assert not entries[0][1]
+        before = phone_browser.menu_tracks
+        phone_browser._menu_at(phone_browser.albums, QPoint(-50, -50))     # fuori dalle righe: niente menu
+        assert phone_browser.menu_tracks is before
+    finally:
+        window.close()
+        app.processEvents()
+
+
+def test_time_estimate():
+    from myeasymp3toiphone import estimate
+    assert estimate.seconds([]) == 0
+    assert estimate.describe(estimate.seconds([8_000_000] * 10)) == "meno di un minuto"
+    # 40 sessioni da 3 s, 1000 x 0,2 s, 8 GB a 12 MB/s, 2 s per rileggere: 989 s
+    assert estimate.describe(estimate.seconds([8_000_000] * 1000)) == "circa 17 minuti"
+    assert estimate.describe(3600) == "circa 1 ora"
+    assert estimate.describe(3601) == "circa 1 ora e 1 minuti"
+    assert estimate.summary(3, 30) == "Brani: 3. Tempo stimato: meno di un minuto."
+    assert estimate.file_size("C:/non/esiste.mp3") == estimate.DEFAULT_SIZE
+
+
+def test_exit_with_pending_changes_asks_first(tmp_path, monkeypatch):
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtWidgets import QApplication
+    from myeasymp3toiphone.gui import main_window
+    from myeasymp3toiphone.gui.main_window import MainWindow
+    app = QApplication.instance() or QApplication([])
+    window = MainWindow()
+    try:
+        assert window._ask_pending_on_exit() == main_window.EXIT_NOW              # niente in attesa
+        track = _pc("Nuovo", "Gruppo Finto", "Disco Uno")
+        monkeypatch.setattr(window, "pending_work", lambda: ([track], [], []))
+        # iPhone non collegato: solo "Esci senza applicare" e "Annulla" (i test scelgono il primo)
+        assert window._ask_pending_on_exit() == main_window.EXIT_NOW
+        monkeypatch.setattr(type(window.iphone_panel), "connected", property(lambda self: True))
+        applied = []
+        monkeypatch.setattr(window.iphone_panel, "apply_pending",
+                            lambda *args, **kwargs: applied.append(kwargs))
+        assert window._ask_pending_on_exit() == main_window.EXIT_AFTER_APPLY       # "Applica ed esci"
+        window.close()
+        assert applied and applied[0]["closing"] and window._exit_checked
+    finally:
+        window._exit_checked = True
+        window.close()
+        app.processEvents()
+
+
+def test_spelling_differences_and_alignment_plan(tmp_path):
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtWidgets import QApplication
+    from myeasymp3toiphone import phone_actions, provenance
+    from myeasymp3toiphone.gui.main_window import MainWindow
+    from myeasymp3toiphone.phone_library import spelling_differences
+    pc = TrackTags(title="Uno", artist="Gruppo Finto", album="Raccolta 1")
+    assert spelling_differences(pc, TrackTags(title="Uno", artist="GRUPPO FINTO", album="Raccolta 01")) ==         ["album", "album_artist"]
+    assert spelling_differences(pc, TrackTags(title="Uno", artist="Gruppo Finto", album="Raccolta 1")) == []
+    assert spelling_differences(pc, TrackTags(title="Uno", artist="Altro", album="Altra raccolta")) == []
+    assert phone_actions.service_padding(3) == 97
+    assert phone_actions.service_padding(100) == 0
+    assert phone_actions.service_padding(450) == 50           # l'ultima sessione toglie 50 + 50
+    assert phone_actions.service_padding(0) == 100
+
+    app = QApplication.instance() or QApplication([])
+    window = MainWindow()
+    try:
+        files = []
+        for name in ("uno", "due", "tre"):
+            path = tmp_path / f"{name}.mp3"
+            write_mp3(path)
+            files.append(path)
+        here = [Track(path=files[0], tags=TrackTags(title="Uno", artist="Gruppo Finto", album="Raccolta 1")),
+                Track(path=files[1], tags=TrackTags(title="Due", artist="Gruppo Finto", album="Raccolta 1")),
+                Track(path=files[2], tags=TrackTags(title="Tre", artist="Gruppo Finto", album="Altro disco"))]
+        window.tracks = here
+        phone = [_phone(1, "Uno", "Gruppo Finto", "Raccolta 01"), _phone(2, "Due", "Gruppo Finto", "Raccolta 01"),
+                 _phone(3, "Tre", "Gruppo Finto", "Altro disco")]
+        for item, sync_id in zip(phone, (11, 12, 13)):
+            item.sync_id = sync_id
+            item.artist_sync_id = 500
+        phone[0].album_sync_id = phone[1].album_sync_id = 700
+        phone[2].album_sync_id = 701
+        registry = provenance.Registry()
+        for item, track in zip(phone, here):
+            registry.record(provenance.Link(sync_id=item.sync_id, pc=provenance.computer_name(),
+                                            path=str(track.path)))
+        window.registry = registry
+        window.set_phone_tracks(phone, "iPhone di prova")
+        panel = window.iphone_panel
+        pairs, blocked = panel.spelling_plan([phone[0]])
+        assert sorted(item.pid for item, _track in pairs) == [1, 2]     # l'album intero, non l'altro dell'artista
+        assert blocked == 0
+        panel._show.setCurrentIndex(panel._show.count() - 1)         # Mostra: scritti diversamente
+        assert panel._count.text() == "2 di 3 brani"
+        registry.forget(12)                                          # un brano dell'album senza sorgente
+        window.set_phone_tracks(phone, "iPhone di prova")
+        pairs, blocked = panel.spelling_plan([phone[0]])
+        assert pairs == [] and blocked == 1
     finally:
         window.close()
         app.processEvents()

@@ -64,9 +64,20 @@ sull'intestazione:
   solo quei brani;
 - la riga **(Tutti …)**, sempre in cima, toglie il filtro; scegliere un artista (o "(Tutti)") azzera l'album scelto
   prima; la casella *Cerca* filtra ancora dentro la scelta;
-- **Raggruppa** (sopra l'elenco Album): *Artista e album* mostra i due elenchi; *Solo album* nasconde quello degli
-  artisti e mostra tutti gli album (l'artista scelto prima non conta più). Ci sono gli stessi due elenchi, con la
-  loro scelta, anche nella scheda iPhone, sopra i brani;
+- **tasto destro** su un artista o un album (anche più righe scelte, o "(Tutti …)"): la riga diventa la scelta e il
+  comando vale per **tutti i suoi brani** (artista o album interi, anche quelli che *Cerca* nasconde), subito, dopo
+  una conferma:
+  - **Invia all'iPhone (PC → iPhone)**: i brani che non ci sono;
+  - **Rimuovi dall'iPhone**: i brani che ci sono con la sorgente certa (registro); grigio se non ce n'è nessuno;
+  - **Aggiorna sull'iPhone (PC → iPhone)**: rimpiazza i brani che ci sono con la sorgente certa con i file del PC
+    (prima invia il file del PC, poi toglie quello vecchio: perdono ascolti e playlist);
+  - **Aggiorna TAG sull'iPhone (PC → iPhone)**: solo i tag, per quelli con tag diversi (⟳): Cambia tag dove basta,
+    Rimpiazza per artisti e copertina; grigio se non ce n'è nessuno. I brani abbinati solo per i tag (≈) non si
+    toccano: il menu li conta e invita ad associarli prima;
+- gli stessi due elenchi ci sono anche nella scheda iPhone, sopra i brani; lì il tasto destro offre **Aggiorna dal
+  PC (PC → iPhone)** (rimpiazza ogni brano con il file del PC, solo se *tutti* i brani dell'artista o dell'album
+  hanno la sorgente associata: altrimenti grigio, con quanti mancano), **Aggiorna TAG dal PC (PC → iPhone)** (i
+  brani associati con tag diversi ⟳) e **Rimuovi dall'iPhone** (i brani messi da un computer);
 - **Formato** (accanto a *Cerca*): solo MP3, FLAC, M4A, OGG/Opus o WMA/WAV/AIFF, con il numero di brani di
   ciascuno. Vale per gli elenchi, la tabella, *Esporta*, *Verifica album online*, *Controlla la musica* e l'invio
   all'app Musica.
@@ -78,8 +89,15 @@ la clicchi i brani sono in ordine di artista, album, disco e traccia. *Esporta*,
 senza brani selezionati in tabella usano l'artista o l'album scelti negli elenchi.
 
 Artisti e album che differiscono solo per maiuscole, accenti o spazi ("Queen" e "queen") sono un gruppo solo, mostrato
-con la grafia più usata (a parità, quella con le maiuscole). I tag dei file non cambiano: la scansione segnala la
-variante, perché l'iPhone la considera un artista diverso.
+con la grafia più usata (a parità, quella con le maiuscole). Anche "AA.VV.", "Artisti vari", "Various Artists", "VA" e
+simili sono **un artista solo**, e i loro album con lo stesso nome un album solo; altri nomi che valgono come loro si
+aggiungono in *Impostazioni → Generale → Altri nomi per "Artisti vari"*. I tag dei file non cambiano: la scansione
+segnala la variante, perché l'iPhone la considera un artista diverso.
+
+La riga scelta è **blu con il testo bianco** in tutti gli elenchi e le tabelle, anche in quello che non stai usando
+(negli elenchi Artisti e Album si vede sempre cosa è scelto). Nelle tabelle dei brani (schede PC e iPhone) **ogni
+album ha il suo sfondo**: azzurro e ambra si alternano da un album all'altro, con un tono chiaro e uno scuro a righe
+alterne dentro l'album; la tinta di una modifica in attesa (scheda PC) vince su quella dell'album.
 
 **Colonne.** #, iPhone, Titolo, Artista, **Artista album**, Album, Anno, Genere, Durata, **Cartella**, File. *File*
 è il nome del file; *Cartella* è il nome della cartella che lo contiene, o il suo percorso completo con *Impostazioni →
@@ -132,6 +150,14 @@ quelli delle cose fatte e la riga appena colorata:
   lo conta a parte. Prima lo si associa (scheda iPhone: *Associa sorgenti*, *Associa le probabili ≈*).
 - Le modifiche in attesa restano nella cartella dati (`iphone_in_attesa.json`) anche chiudendo il programma; quelle
   già fatte si tolgono da sole a ogni lettura dell'iPhone. *Applica* fa quelle dei brani della cartella aperta.
+- **Uscendo dal programma** con modifiche in attesa (tra i brani della cartella aperta) un avviso dice quante sono e
+  il tempo stimato: **Applica ed esci** (a iPhone connesso: il programma si chiude alla fine, con un messaggio solo se
+  qualcosa non riesce), **Esci senza applicare** (restano in attesa per la prossima volta) o **Annulla**.
+
+Ogni azione sull'iPhone (invio, rimpiazzo, eliminazione, aggiornamento, *Applica*) chiede prima **Conferma** o
+**Annulla**, con il numero di brani e il **tempo stimato**. La stima viene da una misura su un iPhone vero via cavo
+(circa 17 MB al secondo, 1 secondo per sessione, qualche migliaio di brani nella libreria), resa un po' più
+prudente: circa 1 minuto ogni 60 brani da inviare, pochi secondi per togliere o cambiare i tag di centinaia di brani.
 
 **Tag.** A destra si modificano titolo, artista, artista album, album, numero di traccia e di disco, anno, genere,
 la spunta **Compilation** e la copertina (MP3, M4A, FLAC, OGG, Opus; copertina per MP3, M4A, FLAC). Con più brani
@@ -391,13 +417,31 @@ Nella scheda iPhone la colonna **Sorgente** dice da quale file viene ogni brano:
 | *telefono* | acquistato o scaricato sull'iPhone: non si gestisce da un computer |
 | *senza file* | un brano "fantasma": è nell'elenco dell'app Musica ma il suo file sull'iPhone non c'è (non si può ascoltare); toglilo con *Elimina dall'iPhone* |
 
-Sopra l'elenco dei brani ci sono gli elenchi **Artisti** e **Album**, come nella scheda PC (senza le spunte), con
-**Raggruppa** (*Artista e album* o *Solo album*): un artista o un album scelto mostra solo i suoi brani, insieme a
-*Cerca* e *Mostra*.
+Sopra l'elenco dei brani ci sono gli elenchi **Artisti** e **Album**, come nella scheda PC (senza le spunte): un
+artista o un album scelto mostra solo i suoi brani, insieme a *Cerca* e *Mostra*.
 
 Il menu **Mostra** filtra l'elenco per sorgente (per esempio solo i brani *senza sorgente*), e per la colonna *Sul PC*:
-*Da rivedere: abbinati solo per i tag (≈)*, *Sorgente con tag diversi (⟳)* e *Con una sorgente proposta (in
-rosso)*. Quando un brano ha la
+*Da rivedere: abbinati solo per i tag (≈)*, *Sorgente con tag diversi (⟳)*, *Con una sorgente proposta (in
+rosso)* e *Album o artista scritti diversamente dal PC (Aa)*.
+
+**Allinea la grafia (PC → iPhone)** (tasto destro sui brani, o su un artista o un album, anche "(Tutti gli
+artisti)" per tutti insieme): per gli album che il PC scrive in modo diverso ma che l'iPhone considera uguali
+(maiuscole, zeri davanti ai numeri, "AA.VV." / "Artisti vari"). L'iPhone tiene il nome che ha già per un album o un
+artista finché la sua riga esiste, anche vuota (provato il 24/11/2026: né un nuovo invio, né *Cambia tag*, né il
+riavvio lo cambiano), e cancella le righe vuote solo in certe sessioni di eliminazione (con 100 brani tolti insieme
+sì). Quindi il programma, in un'operazione sola per tutti gli album scelti:
+1. invia i brani di servizio che servono (3 secondi di silenzio, album "myEasyMP3toIPhone servizio");
+2. toglie in una sessione i brani degli album insieme a quelli di servizio (almeno 100 nell'ultima sessione);
+3. controlla nel database dell'iPhone che i nomi vecchi siano spariti;
+4. reinvia gli album dal PC, con la sua grafia, e aggiorna il registro della provenienza.
+
+Si prende sempre l'album intero; se è scritto diversamente l'artista dell'album, tutti gli album di quell'artista
+(sull'iPhone la sua riga è una sola). Si può solo se tutti quei brani hanno la sorgente associata su questo PC; il
+menu conta gli album che non si possono. Il reinvio si fa sempre, anche se l'iPhone tenesse i nomi vecchi (allora
+lo dice). Come *Rimpiazza*, i brani reinviati perdono ascolti e playlist. Un brano di servizio rimasto da
+un'operazione interrotta si toglie alla successiva.
+
+Quando un brano ha la
 sorgente, il confronto delle colonne *Sul PC* e *iPhone* usa quel file esatto: un doppione sul PC con gli stessi tag
 non prende il suo posto. **Salva su PC** associa ogni brano salvato al suo file nuovo (verificato con l'impronta),
 anche quando un file con lo stesso audio c'era già. Tasto destro:
@@ -729,13 +773,6 @@ la colonna *Cartella* della scheda PC e *Cartella della sorgente* della scheda i
 nome della cartella). Le colonne dei file mostrano sempre il solo nome; il suggerimento delle celle mostra sempre il
 percorso completo.
 
-### Raggruppa (Artista e album, Solo album)
-
-1. La scelta di **Raggruppa** sopra l'elenco Album, una per scheda: `pc_grouping` e `iphone_grouping` in
-   `settings.json` (`artista` = *Artista e album*, `album` = *Solo album*), salvata appena la cambi e ripresa al
-   prossimo avvio.
-2. Senza, o con un valore sconosciuto: *Artista e album*.
-
 ### Le cartelle nascoste
 
 1. `hidden_folders` in `settings.json`: si aggiunge con tasto destro → *Nascondi la cartella* nella scheda PC e si
@@ -750,6 +787,15 @@ percorso completo.
    seconda…; una voce con `\`, `/` o `:` è un percorso (con le sottocartelle), senza è il nome di una cartella in
    qualsiasi punto del percorso; le maiuscole non contano. Vale subito.
 2. Senza, o per le copie fuori da tutte: il percorso più corto (con l'impronta, prima la copia con i tag più simili).
+
+### Gli altri nomi per "Artisti vari"
+
+1. *Impostazioni → Generale → Altri nomi per "Artisti vari"* (`various_artists` in `settings.json`, separati da punto e
+   virgola nel campo): valgono come "AA.VV." negli elenchi Artisti e Album delle due schede e per le playlist delle
+   compilation, subito. Maiuscole, accenti, spazi e punteggiatura non contano.
+2. Sempre, anche senza: "AA.VV.", "Artisti vari", "Autori vari", "Vari artisti", "Various Artists", "Various", "VA",
+   "Vari". Solo questi valgono nel confronto con l'iPhone (colonna *Sul PC*), perché l'iPhone non conosce gli altri. In
+   console i nomi aggiunti non valgono.
 
 ### I cataloghi di "Verifica album online"
 

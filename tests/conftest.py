@@ -54,6 +54,19 @@ def isolated(tmp_path, monkeypatch):
     from PySide6.QtWidgets import QMessageBox
     for kind in ("warning", "information", "question", "critical"):
         monkeypatch.setattr(QMessageBox, kind, staticmethod(lambda *args, **kwargs: QMessageBox.Yes))
+
+    def answer(box) -> int:
+        """Una finestra con i suoi pulsanti (Conferma/Annulla…): si sceglie quello che conferma, come "Sì" sopra."""
+        chosen = box.defaultButton()
+        for role in (QMessageBox.DestructiveRole, QMessageBox.YesRole, QMessageBox.AcceptRole):
+            for button in box.buttons():
+                if box.buttonRole(button) == role:
+                    chosen = button
+        if chosen is not None:
+            chosen.click()
+        return 0
+
+    monkeypatch.setattr(QMessageBox, "exec", answer)
     yield memory
     keyring.set_keyring(previous)
     env_file._from_file.clear()

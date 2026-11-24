@@ -7,11 +7,22 @@ colorati quando si possono premere e grigi quando no, rossi quelli che cancellan
 (QPushButton con la proprietà role="danger": mark_danger).
 
 Lo stile Fusion serve perché lo stile nativo di Windows ignora in parte i colori dei pulsanti. I grigi sono
-semitrasparenti e il testo sul blu è bianco: si leggono sia con il tema chiaro sia con quello scuro di Windows."""
+semitrasparenti e il testo sul blu è bianco: si leggono sia con il tema chiaro sia con quello scuro di Windows.
+
+La selezione negli elenchi e nelle tabelle è blu pieno con il testo bianco, uguale anche quando l'elenco non ha il
+fuoco (Qt la mostrerebbe grigia: con due elenchi affiancati non si vedeva cosa era scelto). Nelle tabelle dei brani
+gli album si distinguono dallo sfondo (album_band): due tinte che si alternano da un album all'altro, ognuna chiara e
+scura a righe alterne dentro l'album; le tinte sono semitrasparenti, per il tema chiaro e quello scuro."""
 
 from __future__ import annotations
 
+from PySide6.QtGui import QColor, QPalette
+
 BLUE = "#2f6fb3"
+SELECTION = "#1f6fd6"          # lo sfondo della selezione, con il testo bianco
+# (chiara, scura) per album: azzurro, poi ambra, poi di nuovo azzurro…
+ALBUM_BANDS = ((QColor(47, 111, 179, 34), QColor(47, 111, 179, 70)),
+               (QColor(225, 150, 30, 30), QColor(225, 150, 30, 66)))
 BLUE_LIGHT = "#3d82cc"
 BLUE_DARK = "#245a93"
 GREEN = "#2e8b57"
@@ -70,13 +81,77 @@ QToolButton {{ border-radius: 4px; padding: 3px; }}
 QToolButton:hover {{ background-color: rgba(47, 111, 179, 0.25); }}
 QToolButton:pressed {{ background-color: rgba(47, 111, 179, 0.40); }}
 QToolButton:disabled {{ color: {GRAY_TEXT}; }}
+
+QAbstractItemView {{ selection-background-color: {SELECTION}; selection-color: white; }}
 """
 
 
 def apply_theme(app) -> None:
     """Da chiamare una volta, subito dopo aver creato la QApplication."""
     app.setStyle("Fusion")
+    palette = app.palette()
+    for group in (QPalette.Active, QPalette.Inactive):     # anche senza fuoco: non grigio su grigio
+        palette.setColor(group, QPalette.Highlight, QColor(SELECTION))
+        palette.setColor(group, QPalette.HighlightedText, QColor(255, 255, 255))
+    app.setPalette(palette)
     app.setStyleSheet(STYLE_SHEET)
+
+
+def album_bands(keys: list) -> list:
+    """Per ogni riga (la chiave del suo album, nell'ordine mostrato) l'indice in ALBUM_BANDS e 0/1 (chiara/scura):
+    la tinta cambia quando cambia l'album rispetto alla riga prima, la chiara e la scura si alternano dentro l'album."""
+    result = []
+    band = 0
+    shade = 0
+    previous = None
+    for position, key in enumerate(keys):
+        if position > 0 and key != previous:
+            band = 1 - band
+            shade = 0
+        elif position > 0:
+            shade = 1 - shade
+        result.append((band, shade))
+        previous = key
+    return result
+
+
+def album_band(band: int, shade: int) -> QColor:
+    result = ALBUM_BANDS[band][shade]
+    return result
+
+
+GEAR = "icona_rotella"             # al posto di un'icona standard di Qt: Qt non ha la rotella delle impostazioni
+GEAR_TEETH = 8
+GEAR_COLOR = QColor(150, 162, 176)
+
+
+def gear_icon(size: int = 64):
+    """La rotella dell'ingranaggio (Impostazioni), disegnata: un anello con GEAR_TEETH denti e il foro in mezzo."""
+    from PySide6.QtCore import QPointF, QRectF, Qt
+    from PySide6.QtGui import QIcon, QPainter, QPainterPath, QPixmap, QTransform
+    pixmap = QPixmap(size, size)
+    pixmap.fill(Qt.transparent)
+    center = size / 2
+    outer = size * 0.34          # il bordo dell'anello
+    tooth_width = size * 0.16
+    tooth_length = size * 0.13
+    shape = QPainterPath()
+    shape.addEllipse(QPointF(center, center), outer, outer)
+    for index in range(GEAR_TEETH):
+        tooth = QPainterPath()
+        tooth.addRoundedRect(QRectF(center - tooth_width / 2, center - outer - tooth_length, tooth_width,
+                                    tooth_length + size * 0.06), size * 0.03, size * 0.03)
+        turn = QTransform().translate(center, center).rotate(index * 360 / GEAR_TEETH).translate(-center, -center)
+        shape = shape.united(turn.map(tooth))
+    hole = QPainterPath()
+    hole.addEllipse(QPointF(center, center), size * 0.14, size * 0.14)
+    shape = shape.subtracted(hole)
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.Antialiasing)
+    painter.fillPath(shape, GEAR_COLOR)
+    painter.end()
+    result = QIcon(pixmap)
+    return result
 
 
 def install_italian(app) -> bool:

@@ -9,7 +9,8 @@ sull'intestazione, che filtrano i brani mostrati in tabella.
     Album:   un album (o più) -> la tabella mostra solo quei brani
     "(Tutti …)", sempre in cima, toglie il filtro di quell'elenco.
 
-"Raggruppa" sceglie tra i due elenchi (Artista e album) e il solo elenco degli album, tutti (Solo album).
+Tasto destro su una riga: la sceglie (se non lo era già) e chiede alla finestra il menu (menu_requested) per tutti
+i brani della scelta (menu_tracks), interi: artisti o album completi, anche se Cerca ne nasconde una parte.
 
 Con la musica dell'iPhone nota, ogni artista e album ha la spunta "sull'iPhone" a tre stati (tutti i brani, alcuni,
 nessuno), in corsivo blu se dentro c'è una modifica in attesa; cliccarla mette o toglie tutti i suoi brani
@@ -20,10 +21,10 @@ from __future__ import annotations
 
 from typing import Optional
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QPoint, Qt, Signal
 from PySide6.QtGui import QBrush, QColor
 from PySide6.QtWidgets import (
-    QAbstractItemView, QComboBox, QHBoxLayout, QHeaderView, QLabel, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget,
+    QAbstractItemView, QHBoxLayout, QHeaderView, QLabel, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget,
 )
 
 from .album_check_dialog import status_icon
@@ -31,9 +32,6 @@ from ..i18n import tr
 
 SORT_ROLE = Qt.UserRole + 1    # il valore con cui si ordina una colonna (testo minuscolo o numero)
 KEY_ROLE = Qt.UserRole         # l'artista, o la coppia (artista, album)
-GROUP_ARTIST_ALBUM = "artista"   # i valori di "Raggruppa" (anche in settings.json)
-GROUP_ALBUM = "album"
-GROUPINGS = ((GROUP_ARTIST_ALBUM, "Artista e album"), (GROUP_ALBUM, "Solo album"))
 
 
 class SortableItem(QTreeWidgetItem):
@@ -91,75 +89,32 @@ def _make_list(headers: list, widths: list) -> QTreeWidget:
 class LibraryBrowser(QWidget):
     filter_changed = Signal()
     phone_toggled = Signal(list, bool)     # (brani, spunta messa): l'artista o l'album intero sull'iPhone o no
-    grouping_changed = Signal(str)         # GROUP_*: scelto a mano in "Raggruppa"
+    menu_requested = Signal(QPoint)        # tasto destro su una riga: il punto dello schermo dove aprire il menu
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self._groups = {}
         self._check_results = {}
         self.phone_state = None            # brani -> (Qt.CheckState, in attesa) o None; lo imposta la finestra
+        self.menu_tracks = []              # i brani della scelta su cui si è aperto l'ultimo menu (tasto destro)
         self.artists = _make_list(["Artista", "Album", "Brani"], [260, 55, 60])
         self.albums = _make_list(["Album", "Artista", "Anno", "Brani"], [300, 220, 70, 55])
         self.artists.itemSelectionChanged.connect(self._artists_changed)
         self.albums.itemSelectionChanged.connect(self.filter_changed.emit)
         self.artists.itemChanged.connect(self._item_changed)
         self.albums.itemChanged.connect(self._item_changed)
-        self.grouping = QComboBox()
-        for _value, text in GROUPINGS:
-            self.grouping.addItem(tr(text))
-        self.grouping.setToolTip("Artista e album: scegli un artista, poi i suoi album. Solo album: l'elenco di tutti "
-                                 "gli album, senza quello degli artisti.")
-        self.grouping.currentIndexChanged.connect(self._grouping_chosen)
+        for widget in (self.artists, self.albums):
+            widget.setContextMenuPolicy(Qt.CustomContextMenu)
+            widget.customContextMenuRequested.connect(
+                lambda position, widget=widget: self._menu_at(widget, position))
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        self._artist_column = QWidget()
-        album_column = QWidget()
-        for title, widget, holder in (("Artisti", self.artists, self._artist_column),
-                                      ("Album", self.albums, album_column)):
-            column = QVBoxLayout(holder)
-            column.setContentsMargins(0, 0, 0, 0)
-            heading = QHBoxLayout()
-            heading.addWidget(QLabel(f"<b>{title}</b>"))
-            heading.addStretch(1)
-            if widget is self.albums:
-                heading.addWidget(QLabel("Raggruppa:"))
-                heading.addWidget(self.grouping)
-            column.addLayout(heading)
+        for title, widget in (("Artisti", self.artists), ("Album", self.albums)):
+            column = QVBoxLayout()
+            label = QLabel(f"<b>{title}</b>")
+            column.addWidget(label)
             column.addWidget(widget)
-            layout.addWidget(holder, 1)
-
-    # ------------------------------------------------------------------ raggruppamento
-
-    def grouping_value(self) -> str:
-        result = GROUPINGS[max(0, self.grouping.currentIndex())][0]
-        return result
-
-    def set_grouping(self, value: str) -> None:
-        """Il raggruppamento salvato, senza grouping_changed; un valore sconosciuto vale Artista e album."""
-        index = 0
-        for position, (known, _text) in enumerate(GROUPINGS):
-            if known == value:
-                index = position
-        self.grouping.blockSignals(True)
-        self.grouping.setCurrentIndex(index)
-        self.grouping.blockSignals(False)
-        self._show_grouping()
-
-    def _grouping_chosen(self, _index: int) -> None:
-        self._show_grouping()
-        self.grouping_changed.emit(self.grouping_value())
-
-    def _show_grouping(self) -> None:
-        """Solo album: l'elenco degli artisti sparisce e la sua scelta si toglie (si vedono tutti gli album)."""
-        only_albums = self.grouping_value() == GROUP_ALBUM
-        had_artists = bool(self.selected_artists())
-        self._artist_column.setVisible(not only_albums)
-        if only_albums and had_artists:
-            self.artists.blockSignals(True)
-            self.artists.clearSelection()
-            self.artists.blockSignals(False)
-            self._fill_albums(self.selected_albums())
-            self.filter_changed.emit()
+            layout.addLayout(column, 1)
 
     # ------------------------------------------------------------------ dati
 
@@ -280,6 +235,40 @@ class LibraryBrowser(QWidget):
             tracks = self.tracks_of(item)
             if tracks:
                 self.phone_toggled.emit(tracks, item.checkState(0) == Qt.Checked)
+
+    # ------------------------------------------------------------------ tasto destro
+
+    def _menu_at(self, widget: QTreeWidget, position) -> None:
+        """La riga sotto il mouse diventa la scelta (se non è già tra quelle scelte), poi il menu sui suoi brani
+        (menu_tracks)."""
+        item = widget.itemAt(position)
+        if item is not None:
+            if not item.isSelected():
+                widget.clearSelection()
+                item.setSelected(True)
+            self.menu_tracks = self._tracks_of_selection(widget)
+            self.menu_requested.emit(widget.viewport().mapToGlobal(position))
+
+    def _tracks_of_selection(self, widget: QTreeWidget) -> list:
+        """Tutti i brani delle righe scelte di un elenco, interi (Cerca non conta); con "(Tutti …)" tutte le righe
+        dell'elenco."""
+        pinned = False
+        for item in widget.selectedItems():
+            if getattr(item, "pinned", False):
+                pinned = True
+        rows = []
+        for index in range(widget.topLevelItemCount()):
+            item = widget.topLevelItem(index)
+            if not getattr(item, "pinned", False) and (pinned or item.isSelected()):
+                rows.append(item)
+        result = []
+        seen = set()
+        for item in rows:
+            for track in self.tracks_of(item):
+                if id(track) not in seen:
+                    seen.add(id(track))
+                    result.append(track)
+        return result
 
     # ------------------------------------------------------------------ selezione
 

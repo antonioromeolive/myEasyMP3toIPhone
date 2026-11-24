@@ -26,11 +26,30 @@ Fatto e provato senza telefono (test e finestre di prova); da confermare sul tel
   con playlist di 1-42 brani): prima **Prova** ("♪ PROVA", una playlist vera di decine o centinaia di brani, in
   ordine?), poi il piano completo. Controllare che le playlist di CopyTrans abbiano un `sync_id` (se risultano tutte
   "fatte sull'iPhone", il computer non le può cancellare) e il messaggio finale se Sincronizza libreria è attiva.
-- **Album e artisti che l'iPhone tiene con il nome vecchio**: dopo *Rimpiazza* i brani nuovi finiscono nell'album
-  che c'era ("Raccolta 1" invece di "Raccolta 01", "Artisti Vari" invece di "AA.VV.", e anche un album con un altro
-  artista dell'album). Ipotesi: l'iPhone attacca il brano al gruppo con il nome "uguale" che c'è già, e Rimpiazza
-  toglie il vecchio solo dopo. Prova con un album PROVA: togliere prima tutti i brani dell'album e poi inviarli; se
-  l'album prende il nome nuovo, offrirlo come *Rimpiazza l'album intero* per le differenze vere (artista dell'album).
+- **Album e artisti che l'iPhone tiene con il nome vecchio** (prove del 24/11/2026 con l'album "PROVA Raccolta 01"
+  di "PROVA ARTISTA", script nella cartella temporanea della sessione):
+  - l'iPhone riconosce album e artisti per nome (maiuscole e "01"/"1" non contano) e tiene la grafia che ha già;
+  - togliere tutti i brani non basta: album e artista restano nel database, vuoti (nell'app non si vedono). Non
+    li toglie né il riavvio, né una sessione che toglie 3 o 19 brani. `delete_album` e `delete_artist` l'iPhone
+    li ignora (rustunes, docs/05);
+  - reinviare con un nome scritto diversamente e un identificativo nuovo riusa la riga vuota con il nome vecchio;
+    lo stesso con *Cambia tag* (`update_track` con album e `album_pid` nuovi): la riga prende il nuovo
+    identificativo, il nome resta.
+  - un brano scritto "PROVA Raccolta 1" di "PROVA Artista", inviato nello stesso album mentre ha ancora i suoi
+    brani: il nome resta. Per album e artisti dell'album vince la prima grafia (per gli artisti dei brani rustunes
+    ha visto vincere l'ultima). Un album non si rinomina sul posto: nessun comando lo fa (`update_album` è ignorato
+    come `delete_album`).
+  - **La pulizia si provoca**: una sessione che toglie 100 brani ha cancellato tutti gli album e gli artisti vuoti
+    (anche quelli rimasti dalle sessioni prima), come in rustunes (docs/05, "Group collection in a 100-target
+    session"; la regola esatta non è nota: rustunes ha visto pulire anche con 16 brani e non pulire con 90). Dopo,
+    l'album reinviato come "PROVA Raccolta 1" di "PROVA Artista" ha preso il nome nuovo.
+  - ***Allinea la grafia (PC → iPhone)*** è fatto (`phone_actions.align_spelling`, scheda iPhone: tasto destro
+    sui brani o su artisti e album, filtro *Mostra → Album o artista scritti diversamente dal PC*), provato solo con
+    i test. **Da provare sul telefono** (l'iPhone si era staccato): inviare "PROVA Raccolta 01" di "PROVA ARTISTA"
+    con lo script della prova (si attacca alla riga vuota "PROVA Raccolta 1" di "PROVA Artista" rimasta), poi
+    `align_spelling` con la grafia del PC; il nome deve tornare "PROVA Raccolta 01" di "PROVA ARTISTA" e i brani
+    "myEasyMP3toIPhone servizio" non devono restare. Sull'iPhone restano vuoti (invisibili) "PROVA Raccolta 1",
+    "PROVA Artista" e "PROVA Misura".
 - **App Musica che non si aggiorna da sola**: dopo ogni scrittura il programma manda l'avviso di fine
   sincronizzazione di iTunes (`com.apple.itunes-mobdev.syncDidFinish`, `iphone.post_sync_finished`). Con l'app
   Musica aperta: se si aggiorna da sola, togliere dal messaggio finale l'invito a chiuderla e riaprirla; se no,
@@ -59,3 +78,44 @@ musica vera:
 - **Verifica album online**: Deezer e Apple Music sulla Libreria vera (album italiani: il negozio Apple è quello di
   Windows), l'ordine dei servizi, *Ferma*, la finestra dei risultati non modale. Discogs con `DISCOGS_TOKEN`
   impostata. L'AI per le edizioni dubbie con Ollama acceso.
+
+## Versione per macOS (da valutare)
+
+Analisi del 24/11/2026, solo leggendo il codice: su un Mac non è ancora stato provato niente.
+
+**Cosa va già bene.** PySide6, pymobiledevice3, mutagen, keyring (sul Mac usa il Portachiavi) e la cartella dati
+`~/.myEasyMP3toIPhone` funzionano anche su macOS. Il protocollo verso l'iPhone (ATC, AFC) è lo stesso. Sul Mac il
+servizio che parla con l'iPhone (usbmuxd) fa parte del sistema: non c'è da installare il driver di Apple come su
+Windows. Le parti scritte solo per Windows sono poche:
+- `albumcheck.store_country`: legge il paese da Windows con `ctypes.windll`, e sul Mac oggi risponde sempre `US`.
+  Serve `QLocale` o `locale`.
+- `gui/file_actions.open_in_explorer`: Esplora risorse. Sul Mac va `open -R`.
+- I testi che nominano Windows: Gestione credenziali, `%USERPROFILE%`, variabili di Windows, Esplora risorse,
+  "Dispositivi Apple". Vanno resi neutri o scelti secondo il sistema.
+- Le variabili d'ambiente: un programma aperto dal Finder non vede quelle di `.zshrc`, quindi sul Mac vale soprattutto
+  il file `myEasyMP3toIPhone.env` della cartella dati. Da spiegare nel README.
+- Percorsi: i limiti di Windows (230 caratteri, nomi riservati) sul Mac non servono ma non fanno danni. I percorsi del
+  registro della provenienza scritti da un PC Windows sono già "di un altro computer".
+
+**Cosa costa.**
+1. **Un Mac.** PyInstaller non costruisce per macOS da Windows: build e prove si fanno su un Mac (Apple Silicon;
+   per i Mac Intel serve una seconda build o una build universale). In alternativa una macchina macOS di GitHub
+   Actions per la sola build, ma le prove con l'iPhone vogliono un Mac vero.
+2. **La build e la distribuzione.** Un `.app` (PyInstaller `--windowed`, icona `.icns`) in un `.dmg`.
+   `vscode_deploy.py` è condiviso e pensato per Windows (zip, cartella di installazione): per il Mac serve uno script
+   a parte (non si cambia qui).
+3. **La firma di Apple (facoltativa).** Senza l'Apple Developer Program (99 $ all'anno) il programma non è firmato né
+   notarizzato. Per uso personale basta aprirlo la prima volta con tasto destro → Apri (o `xattr -dr
+   com.apple.quarantine`). Per distribuirlo ad altri la firma serve.
+4. **Il rischio più grosso: il Finder.** Sul Mac, quando colleghi l'iPhone, il Finder (AMPDevicesAgent) apre da solo
+   una sessione di sincronizzazione. Va provato se occupa il canale ATC e blocca gli invii del programma, e se
+   "Gestisci manualmente musica" va attivato anche dal Finder. Se il Finder può sincronizzare da solo, l'avviso "non
+   premere Sincronizza" vale anche lì.
+5. **Le prove.** Tutte quelle con l'iPhone attaccato (sezione sopra), di nuovo sul Mac.
+
+**Stima.**
+- Codice: 1-2 giorni.
+- Build e pacchetto `.app`/`.dmg`: 1-2 giorni.
+- Prove con l'iPhone su Mac: 1 giorno, di più se il Finder dà problemi.
+- Spese: nessuna se c'è già un Mac e il programma serve solo a te; altrimenti il Mac e i 99 $ all'anno per la firma.
+- Da decidere prima: per chi è la versione Mac (solo tu o anche altri) e se c'è un Mac per le prove.

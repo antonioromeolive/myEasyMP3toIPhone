@@ -534,8 +534,7 @@ class AppSettings:
     album_ai: bool = False          # Verifica album online: l'AI sceglie tra edizioni dubbie
     hidden_folders: list = field(default_factory=list)   # cartelle nascoste nella scheda PC (con le sottocartelle)
     preferred_folders: list = field(default_factory=list)  # con più copie di un brano, in ordine (library.preference)
-    pc_grouping: str = "artista"       # "Raggruppa" della scheda PC: "artista" (Artista e album) o "album" (Solo album)
-    iphone_grouping: str = "artista"   # "Raggruppa" della scheda iPhone, gli stessi valori
+    various_artists: list = field(default_factory=list)    # altri nomi che valgono come "AA.VV." (oltre a quelli fissi)
     extra: dict = field(default_factory=dict)
 
     def library_path(self) -> Path:

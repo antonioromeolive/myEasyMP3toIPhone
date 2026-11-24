@@ -2225,12 +2225,98 @@ CATALOG = {
         '{0} tracks with different tags matched only by tags: they are not updated, link the source first (iPhone tab)',
     'Sorgente proposta, non ancora associata ({0}):\n{1}\n{2}. Tasto destro → Associa questa sorgente.':
         'Proposed source, not linked yet ({0}):\n{1}\n{2}. Right-click → Link this source.',
-    "Raggruppa:":
-        "Group by:",
-    "Artista e album":
-        "Artist and album",
-    "Solo album":
-        "Album only",
-    "Artista e album: scegli un artista, poi i suoi album. Solo album: l'elenco di tutti gli album, senza quello degli artisti.":
-        "Artist and album: choose an artist, then their albums. Album only: the list of all albums, without the artists list.",
+    "es. Compilation; Artisti diversi":
+        "e.g. Compilation; Different artists",
+    '"AA.VV.", "Artisti vari", "Various Artists", "VA" e simili sono già un artista solo negli elenchi Artisti. Qui altri nomi che valgono come loro, separati da punto e virgola: valgono anche per le playlist delle compilation.':
+        '"AA.VV.", "Artisti vari", "Various Artists", "VA" and similar are already a single artist in the Artists lists. Here, other names that count as them, separated by semicolons: they also count for the compilation playlists.',
+    'Altri nomi per "Artisti vari"':
+        'Other names for "Various Artists"',
+    'meno di un minuto':
+        'less than a minute',
+    'circa un minuto':
+        'about a minute',
+    'circa {0} minuti':
+        'about {0} minutes',
+    '1 ora':
+        '1 hour',
+    '{0} ore':
+        '{0} hours',
+    'circa {0}':
+        'about {0}',
+    'circa {0} e {1} minuti':
+        'about {0} and {1} minutes',
+    'Brani: {0}. Tempo stimato: {1}.':
+        'Tracks: {0}. Estimated time: {1}.',
+    'Aggiorna dal PC':
+        'Update from the PC',
+    "I tag di {0} brani dell'iPhone diventano quelli del PC (PC → iPhone). Continuare?\n\n":
+        'The tags of {0} iPhone tracks become those of the PC (PC → iPhone). Continue?\n\n',
+    'Aggiorna dal PC (PC → iPhone): non si può, {0} brani su {1} non hanno la sorgente associata':
+        'Update from the PC (PC → iPhone): not possible, {0} of {1} tracks have no linked source',
+    "Rimuovi dall'iPhone: {0} brani":
+        'Remove from the iPhone: {0} tracks',
+    '{0} brani acquistati o scaricati sul telefono: un computer non li può togliere':
+        '{0} tracks bought or downloaded on the phone: a computer cannot remove them',
+    'Conferma':
+        'Confirm',
+    "Inviare {0} brani all'app Musica dell'iPhone (PC → iPhone) ({1})?\n\n":
+        "Send {0} tracks to the iPhone's Music app (PC → iPhone) ({1})?\n\n",
+    '\n\nVanno copie con i tag e la copertina modificati: i file del PC non cambiano.':
+        '\n\nCopies go with the edited tags and cover: the files on the PC do not change.',
+    "Rimpiazzare {0} brani dell'iPhone con la versione del PC (PC → iPhone)?\n\n":
+        'Replace {0} iPhone tracks with the PC version (PC → iPhone)?\n\n',
+    "\n\nPrima si invia la versione del PC, poi si toglie quella vecchia. I brani rimpiazzati perdono il conteggio degli ascolti e spariscono dalle playlist fatte sull'iPhone.":
+        '\n\nFirst the PC version is sent, then the old one is removed. Replaced tracks lose their play count and disappear from the playlists made on the iPhone.',
+    "Applicare all'iPhone le modifiche in attesa (PC → iPhone)?\n\n":
+        'Apply the pending changes to the iPhone (PC → iPhone)?\n\n',
+    "{0} brani sull'iPhone abbinati solo per i tag: per toglierli o aggiornarli prima associa la sorgente (scheda iPhone)":
+        '{0} tracks on the iPhone matched only by tags: to remove or update them, first link the source (iPhone tab)',
+    "Collega l'iPhone: la sua musica non è ancora stata letta":
+        'Connect the iPhone: its music has not been read yet',
+    "Ci sono modifiche in attesa per l'iPhone (PC → iPhone) non ancora applicate: {0} da inviare, {1} da togliere, {2} da aggiornare.\n\n":
+        'There are pending changes for the iPhone (PC → iPhone) not applied yet: {0} to send, {1} to remove, {2} to update.\n\n',
+    '\n\nApplicarle prima di uscire? Il programma si chiude alla fine.':
+        '\n\nApply them before exiting? The program closes at the end.',
+    'Applica ed esci':
+        'Apply and exit',
+    "\n\nL'iPhone non è collegato, quindi ora non si possono applicare. Se esci restano in attesa per la prossima volta; per applicarle ora collega l'iPhone e premi Applica.":
+        '\n\nThe iPhone is not connected, so they cannot be applied now. If you exit they stay pending for next time; to apply them now, connect the iPhone and press Apply.',
+    'Esci senza applicare':
+        'Exit without applying',
+    'Aggiorna dal PC (PC → iPhone): rimpiazza {0} brani con i file del PC':
+        'Update from the PC (PC → iPhone): replace {0} tracks with the PC files',
+    'Aggiorna TAG dal PC (PC → iPhone): {0} brani con tag diversi ⟳':
+        'Update TAGS from the PC (PC → iPhone): {0} tracks with different tags ⟳',
+    'Aggiorna TAG dal PC (PC → iPhone): nessun brano associato con tag diversi':
+        'Update TAGS from the PC (PC → iPhone): no linked track with different tags',
+    'Aggiorna TAG dal PC':
+        'Update tags from the PC',
+    "Aggiorna sull'iPhone (PC → iPhone): rimpiazza {0} brani con i file del PC":
+        'Update on the iPhone (PC → iPhone): replace {0} tracks with the PC files',
+    "Aggiorna TAG sull'iPhone (PC → iPhone): {0} brani con tag diversi ⟳":
+        'Update TAGS on the iPhone (PC → iPhone): {0} tracks with different tags ⟳',
+    'Album o artista scritti diversamente dal PC (Aa)':
+        'Album or artist spelled differently from the PC (Aa)',
+    'Allinea la grafia (PC → iPhone): {0} album scritti diversamente (Aa)':
+        'Align the spelling (PC → iPhone): {0} albums spelled differently (Aa)',
+    '; {0} non si possono, hanno brani senza sorgente associata':
+        '; {0} cannot be aligned, they have tracks without a linked source',
+    'Allineare la grafia di {0} album (PC → iPhone)?\n\nL\'iPhone tiene il nome che ha già per un album o un artista finché esiste, anche vuoto. Per dargli il nome del PC il programma toglie i loro {1} brani e li reinvia dal PC; per far cancellare all\'iPhone i nomi vecchi toglie insieme {2} brani di servizio di 3 secondi ("{3}"), inviati poco prima.\n\n':
+        'Align the spelling of {0} albums (PC → iPhone)?\n\nThe iPhone keeps the name it already has for an album or an artist as long as it exists, even empty. To give it the PC name the program removes their {1} tracks and sends them again from the PC; to make the iPhone delete the old names it removes together {2} 3-second service tracks ("{3}"), sent just before.\n\n',
+    "\n\nI brani reinviati perdono il conteggio degli ascolti e spariscono dalle playlist (Playlist per artista le rifà). Se l'iPhone non cancellasse i nomi vecchi, i brani tornano comunque, con il nome di prima.":
+        '\n\nThe tracks sent again lose their play count and disappear from the playlists (Playlists by artist rebuilds them). If the iPhone did not delete the old names, the tracks come back anyway, with the previous name.',
+    '\n\nSono nelle playlist:\n':
+        '\n\nThey are in the playlists:\n',
+    'Allinea la grafia':
+        'Align the spelling',
+    'reinviati con la grafia del PC':
+        'sent again with the PC spelling',
+    'eliminazione: ':
+        'removal: ',
+    "controllo dei nomi sull'iPhone":
+        'checking the names on the iPhone',
+    '{0} album e {1} artisti':
+        '{0} albums and {1} artists',
+    "l'iPhone non ha cancellato i nomi vecchi: i brani sono tornati con la grafia dell'iPhone (si può riprovare più tardi)":
+        'the iPhone did not delete the old names: the tracks came back with the iPhone spelling (you can try again later)',
 }

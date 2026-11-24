@@ -23,8 +23,10 @@ from ..albumcheck import (
 )
 from ..config import PRODUCT, AppSettings, config_dir
 from ..i18n import tr
-from ..library import assign_groups, copy_organized, group_by_album, load_track, scan_folder, track_sort_key
-from .. import provenance
+from ..library import (
+    assign_groups, copy_organized, group_by_album, load_track, scan_folder, set_various_artist_names, track_sort_key,
+)
+from .. import estimate, provenance
 from ..phone_library import (
     DEVICE_ABSENT, DEVICE_SAME, DEVICE_STALE, PhoneIndex, comparison, device_status, load_listing,
     save_listing,
@@ -39,10 +41,11 @@ from .album_check_dialog import AlbumCheckDialog, AlbumCheckOptionsDialog
 from .browser import LibraryBrowser
 from .compare_tip import comparison_html, show_on_tooltip
 from .file_actions import add_file_entries
-from .iphone_panel import IPhonePanel
+from .iphone_panel import IPhonePanel, show_entries_menu
 from .scan_dialog import ScanLauncher
 from .settings_dialog import SettingsDialog
 from .tag_editor import TagEditor
+from .theme import GEAR, gear_icon
 from .track_model import COL_DEVICE, COL_TITLE, COLUMNS, TrackTableModel
 from .worker import BackgroundJob, TaskRunner
 
@@ -55,6 +58,7 @@ DEVICE_TIP = {DEVICE_SAME: "Nell'app Musica dell'iPhone c'è questo brano, con g
               DEVICE_STALE: "Nell'app Musica dell'iPhone c'è questo brano, ma con tag diversi:",
               DEVICE_ABSENT: "Non è nell'app Musica dell'iPhone"}
 # le modifiche in attesa (passo 5): segno, colore del segno, tinta della riga; diversi da quelli "fatti"
+EXIT_NOW, EXIT_AFTER_APPLY, EXIT_CANCEL = "esci_ora", "esci_dopo_applica", "resta_aperto"   # all'uscita
 PENDING_LOOK = {SEND: ("＋", QColor(40, 110, 230), QColor(40, 110, 230, 40)),
                 REMOVE: ("－", QColor(210, 50, 50), QColor(230, 60, 90, 40)),
                 UPDATE: ("⟳", QColor(40, 110, 230), QColor(40, 110, 230, 40))}
@@ -79,6 +83,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(f"{APP_NAME} {app_version()}")
         self.resize(1400, 820)
         self.app_settings = AppSettings.load()
+        set_various_artist_names(self.app_settings.various_artists)
         self._phone_index: Optional[PhoneIndex] = None   # la musica dell'app Musica, per la colonna "iPhone"
         self.phone_tracks = []     # la musica dell'app Musica (phone_library.PhoneTrack), letta o ricordata
         self.phone_label = ""      # di quale iPhone e quando
@@ -101,6 +106,7 @@ class MainWindow(QMainWindow):
         self._visible = []
         self.root_folder: Optional[Path] = None
         self.check_results = {}
+        self._exit_checked = False     # le modifiche in attesa sono già state applicate (o lasciate) per uscire
 
         self._album_label = QLabel()
         self._album_stop = QPushButton("Ferma")
@@ -150,14 +156,14 @@ class MainWindow(QMainWindow):
              "Cerca i problemi confrontando i tuoi brani tra loro (cartella aperta o iPhone), senza cataloghi "
              "online: file non aggiornati, album con pochi brani, collezioni divise, artisti scritti in modi "
              "diversi, brani duplicati (con l'AI, se configurata)", "F6"),
-            ("Impostazioni", QStyle.SP_FileDialogDetailedView, self._open_settings,
+            ("Impostazioni", GEAR, self._open_settings,
              "Cartella della Libreria, profili AI e chiavi", "Ctrl+,"),
             ("Informazioni", QStyle.SP_MessageBoxInformation, self._open_about,
              "Versione, cartella dati, variabili d'ambiente e dove sono salvate le chiavi", None),
         ]
         self._task_actions = []
         for text, icon, slot, tip, shortcut in definitions:
-            action = QAction(style.standardIcon(icon), text, self)
+            action = QAction(gear_icon() if icon == GEAR else style.standardIcon(icon), text, self)
             action.setToolTip(tip)
             action.setStatusTip(tip)
             if shortcut is not None:
@@ -199,8 +205,7 @@ class MainWindow(QMainWindow):
         self.browser.filter_changed.connect(self._fill_table)
         self.browser.phone_state = self._browser_phone_state
         self.browser.phone_toggled.connect(self.set_wanted)
-        self.browser.set_grouping(self.app_settings.pc_grouping)
-        self.browser.grouping_changed.connect(self._pc_grouping_chosen)
+        self.browser.menu_requested.connect(self._browser_menu)
 
         self._table = QTableView()
         self._model = TrackTableModel(self, PENDING_LOOK, PENDING_TIP)
@@ -210,7 +215,7 @@ class MainWindow(QMainWindow):
         self._table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self._table.verticalHeader().setVisible(False)
         self._table.verticalHeader().setDefaultSectionSize(self._table.fontMetrics().height() + 6)
-        self._table.setAlternatingRowColors(True)
+        self._table.setAlternatingRowColors(False)    # le righe hanno la tinta del loro album (theme.album_bands)
         self._table.setWordWrap(False)
         header = self._table.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.Interactive)
@@ -370,16 +375,17 @@ class MainWindow(QMainWindow):
     def save_settings(self) -> None:
         self.app_settings.save()
 
-    def _pc_grouping_chosen(self, value: str) -> None:
-        self.app_settings.pc_grouping = value
-        self.save_settings()
-
     def _open_settings(self) -> None:
         before = self.library_dir()
+        various = list(self.app_settings.various_artists)
         dialog = SettingsDialog(self.app_settings, self)
         if dialog.exec():
             self._model.refresh()                  # il percorso completo delle cartelle, se è cambiato
             self.iphone_panel.pc_changed()
+            if self.app_settings.various_artists != various:     # gli elenchi Artisti si rifanno
+                set_various_artist_names(self.app_settings.various_artists)
+                self._rebuild_views()
+                self.iphone_panel.regroup()
             if self.library_dir() != before:
                 self.open_library()
 
@@ -831,6 +837,56 @@ class MainWindow(QMainWindow):
         return result
 
     def _table_menu(self, position) -> None:
+        self._tracks_menu(self._table.viewport().mapToGlobal(position))
+
+    def browser_menu_entries(self, tracks: list) -> list:
+        """Le voci del tasto destro su un artista o un album (tutti i suoi brani): [(testo, attiva, funzione)].
+        Invia quelli che non sono sull'iPhone; Rimuovi, Aggiorna (rimpiazza il file con quello del PC) e Aggiorna TAG
+        (solo i tag, dove sono diversi: ⟳) quelli che ci sono con la sorgente certa (registro). Ognuna chiede
+        conferma con il tempo stimato."""
+        absent = []
+        removable = []
+        linked_pairs = []
+        stale = []
+        seen = set()
+        unlinked = 0
+        for track in tracks:
+            if not track.error and self._phone_index is not None:
+                status, phone_track, linked = self._device_state(track)
+                if status == DEVICE_ABSENT:
+                    absent.append(track)
+                elif linked and phone_track.from_computer and phone_track.pid not in seen:
+                    seen.add(phone_track.pid)
+                    removable.append(phone_track)
+                    linked_pairs.append((phone_track, track))
+                    if status == DEVICE_STALE:
+                        stale.append((phone_track, track))
+                elif not linked:
+                    unlinked += 1
+        ready = self.iphone_panel.connected and not self.runner.is_busy
+        result = [
+            (f"Invia all'iPhone (PC → iPhone): {len(absent)} brani che non ci sono", ready and bool(absent),
+             lambda: self.iphone_panel.send_tracks(absent)),
+            (f"Rimuovi dall'iPhone: {len(removable)} brani", ready and bool(removable),
+             lambda: self.iphone_panel.delete_items(removable)),
+            (f"Aggiorna sull'iPhone (PC → iPhone): rimpiazza {len(linked_pairs)} brani con i file del PC",
+             ready and bool(linked_pairs), lambda: self.iphone_panel.replace_pairs(linked_pairs)),
+            (f"Aggiorna TAG sull'iPhone (PC → iPhone): {len(stale)} brani con tag diversi ⟳", ready and bool(stale),
+             lambda: self.iphone_panel.update_pairs(stale, "Aggiorna TAG dal PC")),
+        ]
+        if unlinked:
+            result.append((f"{unlinked} brani sull'iPhone abbinati solo per i tag: per toglierli o aggiornarli "
+                           "prima associa la sorgente (scheda iPhone)", False, None))
+        if self._phone_index is None:
+            result.append(("Collega l'iPhone: la sua musica non è ancora stata letta", False, None))
+        return result
+
+    def _browser_menu(self, where) -> None:
+        """Tasto destro su un artista o un album: invia, rimuovi, aggiorna per tutti i suoi brani."""
+        show_entries_menu(self, self.browser_menu_entries(self.browser.menu_tracks), where,
+                          self.iphone_panel.connected)
+
+    def _tracks_menu(self, where) -> None:
         """Tasto destro sui brani: invia all'iPhone quelli che non ci sono, rimpiazza o aggiorna quelli associati con
         tag diversi (PC → iPhone). Quelli abbinati solo per i tag si contano a parte: prima si associano."""
         tracks = self._selected_table_tracks()
@@ -889,7 +945,7 @@ class MainWindow(QMainWindow):
                             "i file non cambiano; Cartelle nascoste… in alto le mostra di nuovo")
             hide.triggered.connect(lambda: self.hide_folders(distinct))
             menu.setToolTipsVisible(True)
-            menu.exec(self._table.viewport().mapToGlobal(position))
+            menu.exec(where)
 
     def selected_tracks(self) -> list:
         """Brani selezionati in tabella; altrimenti quelli dell'artista o dell'album scelti negli elenchi."""
@@ -1199,5 +1255,50 @@ class MainWindow(QMainWindow):
                 event.accept()
             else:
                 event.ignore()
-        else:
+        elif self._exit_checked:
             event.accept()
+        else:
+            choice = self._ask_pending_on_exit()
+            if choice == EXIT_NOW:
+                event.accept()
+            elif choice == EXIT_AFTER_APPLY:
+                event.ignore()
+                self._exit_checked = True        # alla fine di Applica si esce, senza chiedere di nuovo
+                sends, removes, updates = self.pending_work()
+                self.iphone_panel.apply_pending(sends, removes, updates, closing=True, then=self.close)
+            else:
+                event.ignore()
+
+    def _ask_pending_on_exit(self) -> str:
+        """Con modifiche in attesa per l'iPhone (tra i brani aperti) chiede se applicarle prima di uscire, con il
+        tempo stimato. EXIT_NOW, EXIT_AFTER_APPLY o EXIT_CANCEL."""
+        sends, removes, updates = self.pending_work()
+        count = len(sends) + len(removes) + len(updates)
+        if not count:
+            result = EXIT_NOW
+        else:
+            seconds = self.iphone_panel.pending_seconds(sends, removes, updates)
+            text = (f"Ci sono modifiche in attesa per l'iPhone (PC → iPhone) non ancora applicate: {len(sends)} da "
+                    f"inviare, {len(removes)} da togliere, {len(updates)} da aggiornare.\n\n"
+                    + estimate.summary(count, seconds))
+            box = QMessageBox(QMessageBox.Warning, APP_NAME, "", QMessageBox.NoButton, self)
+            apply_button = None
+            if self.iphone_panel.connected:
+                text += "\n\nApplicarle prima di uscire? Il programma si chiude alla fine."
+                apply_button = box.addButton("Applica ed esci", QMessageBox.AcceptRole)
+            else:
+                text += ("\n\nL'iPhone non è collegato, quindi ora non si possono applicare. Se esci restano in attesa "
+                         "per la prossima volta; per applicarle ora collega l'iPhone e premi Applica.")
+            exit_button = box.addButton("Esci senza applicare", QMessageBox.DestructiveRole)
+            cancel_button = box.addButton("Annulla", QMessageBox.RejectRole)
+            box.setText(text)
+            box.setDefaultButton(apply_button if apply_button is not None else cancel_button)
+            box.exec()
+            clicked = box.clickedButton()
+            if apply_button is not None and clicked is apply_button:
+                result = EXIT_AFTER_APPLY
+            elif clicked is exit_button:
+                result = EXIT_NOW
+            else:
+                result = EXIT_CANCEL
+        return result

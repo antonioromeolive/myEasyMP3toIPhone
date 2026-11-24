@@ -118,20 +118,49 @@ def album_folder(path) -> str:
 VARIOUS_ARTIST_KEYS = {"aavv", "artistivari", "variousartists", "various", "va", "autorivari", "vari",
                        "variartisti"}
 LEADING_ZEROS = re.compile(r"(?<!\d)0+(?=\d)")
+VARIOUS_KEY = "\x00"          # la chiave di tutti gli "artisti vari"
+_extra_various_keys = set()   # i nomi aggiunti in Impostazioni (set_various_artist_names)
+
+
+def _various_key(name: str) -> str:
+    result = re.sub(r"[^a-z0-9]", "", group_name(name or ""))
+    return result
+
+
+def set_various_artist_names(names) -> None:
+    """Gli altri nomi che valgono come "AA.VV." (Impostazioni → Altri nomi per "Artisti vari"): da richiamare
+    all'avvio e dopo ogni cambio."""
+    keys = set()
+    for name in names:
+        key = _various_key(name)
+        if key:
+            keys.add(key)
+    _extra_various_keys.clear()
+    _extra_various_keys.update(keys)
 
 
 def is_various_artists(name: str) -> bool:
-    """"AA.VV.", "Artisti vari", "Various Artists"…: l'artista di una compilation."""
-    result = re.sub(r"[^a-z0-9]", "", group_name(name or "")) in VARIOUS_ARTIST_KEYS
+    """"AA.VV.", "Artisti vari", "Various Artists"… e i nomi aggiunti in Impostazioni: l'artista di una
+    compilation."""
+    key = _various_key(name)
+    result = key in VARIOUS_ARTIST_KEYS or key in _extra_various_keys
+    return result
+
+
+def artist_group_key(name: str) -> str:
+    """Il gruppo di un artista negli elenchi: senza maiuscole, accenti e spazi; tutti gli "artisti vari" (anche i
+    nomi aggiunti in Impostazioni) sono un artista solo."""
+    result = VARIOUS_KEY if is_various_artists(name) else group_name(name)
     return result
 
 
 def phone_group_key(text: str) -> str:
     """Il nome di un artista o di un album come lo confronta l'iPhone, che con un nome "uguale" attacca il brano
     all'album o all'artista che ha già e ne tiene la grafia: senza maiuscole, accenti e spazi, gli zeri davanti ai
-    numeri non contano ("Raccolta 01" = "Raccolta 1"), e "AA.VV." = "Artisti vari" = "Various Artists"."""
+    numeri non contano ("Raccolta 01" = "Raccolta 1"), e "AA.VV." = "Artisti vari" = "Various Artists" (solo i nomi
+    fissi: quelli aggiunti in Impostazioni l'iPhone non li conosce)."""
     key = LEADING_ZEROS.sub("", group_name(text or ""))
-    result = "\x00" if is_various_artists(key) else key      # tutti gli "artisti vari" hanno la stessa chiave
+    result = VARIOUS_KEY if _various_key(key) in VARIOUS_ARTIST_KEYS else key
     return result
 
 
@@ -316,25 +345,37 @@ def best_spelling(values: list) -> str:
     return result
 
 
-def assign_groups(tracks: list) -> None:
-    """Imposta Track.group_key: artisti e album che differiscono solo per maiuscole, accenti o spazi sono un gruppo
-    solo, mostrato con la grafia più usata. Da richiamare dopo ogni modifica dei tag."""
+def _group_keys(pairs: list) -> list:
+    """[(artista, album)] -> le stesse coppie come si mostrano negli elenchi: artisti e album che differiscono solo per
+    maiuscole, accenti o spazi sono un gruppo solo, con la grafia più usata; tutti gli "artisti vari" ("AA.VV.",
+    "Various Artists"…, artist_group_key) sono un artista solo, e i loro album con lo stesso nome un album solo."""
     artist_spellings = {}
     album_spellings = {}
-    for track in tracks:
-        artist, album = track.raw_album_key
-        artist_spellings.setdefault(group_name(artist), []).append(artist)
-        album_spellings.setdefault((group_name(artist), group_name(album)), []).append(album)
+    keys = []
+    for artist, album in pairs:
+        key = (artist_group_key(artist), group_name(album))
+        keys.append(key)
+        artist_spellings.setdefault(key[0], []).append(artist)
+        album_spellings.setdefault(key, []).append(album)
     artists = {}
     for name, spellings in artist_spellings.items():
         artists[name] = best_spelling(spellings)
     albums = {}
-    for name, spellings in album_spellings.items():
-        albums[name] = best_spelling(spellings)
+    for key, spellings in album_spellings.items():
+        albums[key] = best_spelling(spellings)
+    result = []
+    for key in keys:
+        result.append((artists[key[0]], albums[key]))
+    return result
+
+
+def assign_groups(tracks: list) -> None:
+    """Imposta Track.group_key (_group_keys). Da richiamare dopo ogni modifica dei tag."""
+    pairs = []
     for track in tracks:
-        artist, album = track.raw_album_key
-        artist_name = group_name(artist)
-        track.group_key = (artists[artist_name], albums[(artist_name, group_name(album))])
+        pairs.append(track.raw_album_key)
+    for track, key in zip(tracks, _group_keys(pairs)):
+        track.group_key = key
 
 
 def track_sort_key(track: Track) -> tuple:
@@ -361,26 +402,13 @@ def _tags_sort_key(item) -> tuple:
 def album_groups(items: list) -> dict:
     """{(artista, album): [elementi ordinati per disco e numero]} per elementi che hanno solo i tag (i brani
     dell'iPhone): come assign_groups e group_by_album (l'artista dell'album, o quello del brano; le grafie che
-    differiscono per maiuscole, accenti o spazi insieme, con la più usata), senza cambiare gli elementi."""
-    artist_spellings = {}
-    album_spellings = {}
-    named = []
+    differiscono per maiuscole, accenti o spazi insieme, con la più usata; gli "artisti vari" insieme), senza
+    cambiare gli elementi."""
+    pairs = []
     for item in items:
-        artist = item.tags.album_artist or item.tags.artist or UNKNOWN_ARTIST
-        album = item.tags.album or UNKNOWN_ALBUM
-        named.append((item, artist, album))
-        artist_spellings.setdefault(group_name(artist), []).append(artist)
-        album_spellings.setdefault((group_name(artist), group_name(album)), []).append(album)
-    artists = {}
-    for name, spellings in artist_spellings.items():
-        artists[name] = best_spelling(spellings)
-    albums = {}
-    for name, spellings in album_spellings.items():
-        albums[name] = best_spelling(spellings)
+        pairs.append((item.tags.album_artist or item.tags.artist or UNKNOWN_ARTIST, item.tags.album or UNKNOWN_ALBUM))
     groups = {}
-    for item, artist, album in named:
-        artist_name = group_name(artist)
-        key = (artists[artist_name], albums[(artist_name, group_name(album))])
+    for item, key in zip(items, _group_keys(pairs)):
         groups.setdefault(key, []).append(item)
     for members in groups.values():
         members.sort(key=_tags_sort_key)

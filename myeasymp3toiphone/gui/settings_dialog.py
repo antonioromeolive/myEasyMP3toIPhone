@@ -85,6 +85,11 @@ class SettingsDialog(QDialog):
                                     "Associa sorgente, Associa sorgenti) scelgono la copia nella prima di queste "
                                     "cartelle, poi nella seconda… Nomi di cartella (valgono in qualsiasi punto del "
                                     "percorso) o percorsi interi, separati da punto e virgola.")
+        self.g_various = QLineEdit("; ".join(self.settings.various_artists))
+        self.g_various.setPlaceholderText("es. Compilation; Artisti diversi")
+        self.g_various.setToolTip("\"AA.VV.\", \"Artisti vari\", \"Various Artists\", \"VA\" e simili sono già un "
+                                  "artista solo negli elenchi Artisti. Qui altri nomi che valgono come loro, separati da "
+                                  "punto e virgola: valgono anche per le playlist delle compilation.")
         note = QLabel("La scansione usa sempre le regole locali (gratuite). Con un profilo AI, l'AI riceve una tabella "
                       "degli album (artisti, titoli, numeri di traccia, nomi delle cartelle) e propone altri problemi e "
                       "le correzioni. Con un'AI nel cloud questi dati escono dal computer; con Ollama restano qui.")
@@ -96,6 +101,7 @@ class SettingsDialog(QDialog):
         form.addRow("Lingua dell'interfaccia", self.g_language)
         form.addRow("Colonne delle cartelle", self.g_full_path)
         form.addRow("Cartelle preferite", self.g_preferred)
+        form.addRow("Altri nomi per \"Artisti vari\"", self.g_various)
         form.addRow(note)
         widget = QWidget()
         widget.setLayout(form)
@@ -457,6 +463,11 @@ class SettingsDialog(QDialog):
             if entry.strip():
                 preferred.append(entry.strip())
         self.settings.preferred_folders = preferred
+        various = []
+        for entry in self.g_various.text().split(";"):
+            if entry.strip():
+                various.append(entry.strip())
+        self.settings.various_artists = various
         chosen =self.g_scan_profile.currentText()
         if chosen == tr(NO_AI):
             self.settings.scan_profile = ""

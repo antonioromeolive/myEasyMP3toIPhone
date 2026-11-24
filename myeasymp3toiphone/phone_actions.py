@@ -27,6 +27,7 @@ from typing import Callable, Optional
 
 from . import iphone, phone_sync, provenance
 from .library import UNKNOWN_ALBUM, UNKNOWN_ARTIST, is_cancelled, phone_group_key
+from .phone_library import spelling_differences
 from .phone_sync import PhoneSyncError
 from .scan import VARIOUS_ARTISTS
 from .tags import TagError, prepare_copy, read_cover
@@ -407,6 +408,131 @@ def replace_tracks(pairs: list, overlay, progress: Optional[ProgressFn] = None,
 
     if pending:
         iphone._run(work())
+    return report
+
+
+# --------------------------------------------------------------------------- allinea la grafia degli album
+
+SERVICE_NAME = "myEasyMP3toIPhone servizio"   # album, artista e titolo dei brani di servizio
+SERVICE_MINIMUM = 100     # brani tolti nell'ultima sessione: con 100 l'iPhone ha cancellato album e artisti vuoti
+SERVICE_FRAME = b"\xff\xfb\x90\x64" + b"\x00" * 413   # MPEG1 Layer III 128 kbit/s 44,1 kHz, silenzio
+SERVICE_FRAMES = 120      # circa 3 secondi, 50 kB
+SERVICE_SIZE = len(SERVICE_FRAME) * SERVICE_FRAMES
+
+
+def is_service_track(tags) -> bool:
+    """Un brano di servizio rimasto sull'iPhone (un'operazione interrotta): si toglie alla prossima."""
+    result = (tags.album or "") == SERVICE_NAME
+    return result
+
+
+def service_padding(removed: int) -> int:
+    """Quanti brani di servizio servono perché l'ultima sessione di eliminazione (BATCH_CHANGES per sessione) ne tolga
+    almeno SERVICE_MINIMUM. La regola dell'iPhone non è nota (rustunes, docs/05: 16, 32, 100, 200 e 499 brani hanno
+    pulito, 4, 8 e 90 no; qui 3 e 19 no, 100 sì)."""
+    rest = removed % BATCH_CHANGES
+    result = SERVICE_MINIMUM - rest if 0 < rest < SERVICE_MINIMUM else 0
+    if removed == 0:
+        result = SERVICE_MINIMUM
+    return result
+
+
+def _service_pending(count: int, folder: Path) -> list:
+    from .library import Track
+    from .tags import TrackTags
+    result = []
+    for number in range(1, count + 1):
+        path = folder / f"servizio{number}.mp3"
+        path.write_bytes(SERVICE_FRAME * SERVICE_FRAMES)
+        tags = TrackTags(title=f"{SERVICE_NAME} {number}", artist=SERVICE_NAME, album_artist=SERVICE_NAME,
+                         album=SERVICE_NAME, track_number=number, genre=SERVICE_NAME)
+        result.append(_Pending(Track(path=path, tags=tags, length=3.0), None))
+    return result
+
+
+async def _groups_left(album_keys: set, artist_keys: set) -> tuple:
+    """(album rimasti, artisti rimasti, sync_id dei brani) secondo una copia fresca del database dell'iPhone."""
+    folder = Path(tempfile.mkdtemp(prefix="myEasyMP3toIPhone_controllo_"))
+    lockdown = await iphone._open_lockdown()
+    try:
+        snapshot = await _snapshot(lockdown, folder)
+    finally:
+        await lockdown.close()
+        shutil.rmtree(folder, ignore_errors=True)
+    albums = set()
+    for key in album_keys:
+        if key in snapshot.albums:
+            albums.add(key)
+    artists = set()
+    for key in artist_keys:
+        if key in snapshot.artists:
+            artists.add(key)
+    result = (albums, artists, snapshot.track_ids)
+    return result
+
+
+def align_spelling(pairs: list, overlay, progress: Optional[ProgressFn] = None,
+                   cancel: Optional[threading.Event] = None, home: Optional[Path] = None,
+                   leftovers: tuple = ()) -> ActionReport:
+    """Gli album (interi) che il PC scrive in modo diverso prendono la grafia del PC: pairs (PhoneTrack, Track del PC).
+    L'iPhone tiene la grafia di un album o di un artista finché la sua riga esiste, anche vuota, e la cancella solo
+    in certe sessioni di eliminazione (con 100 brani sì). Quindi: brani di servizio (service_padding), una sessione
+    che toglie i brani degli album e quelli di servizio, il controllo che album e artisti vecchi siano spariti, il
+    reinvio dal PC. Il reinvio si fa sempre (non si annulla: i brani sono già stati tolti), anche se i nomi vecchi
+    sono rimasti: allora tornano con quelli, e l'errore lo dice. leftovers: brani di servizio rimasti, da togliere."""
+    report = ActionReport()
+    registry = provenance.Registry.load(home) if home is not None else None
+    album_keys = set()
+    artist_keys = set()
+    for phone_track, track in pairs:
+        artist = phone_track.tags.album_artist or phone_track.tags.artist or ""
+        album_keys.add((phone_group_key(phone_track.tags.album or ""), phone_group_key(artist)))
+        if "album_artist" in spelling_differences(track.tags, phone_track.tags):
+            artist_keys.add(phone_group_key(artist))     # solo gli artisti da riscrivere: gli altri restano
+
+    async def work():
+        folder = Path(tempfile.mkdtemp(prefix="myEasyMP3toIPhone_servizio_"))
+        try:
+            service = _service_pending(service_padding(len(pairs) + len(leftovers)), folder)
+            service_report = ActionReport()
+            sent_service = await _send_batches(service, progress, cancel, service_report)
+            report.errors += service_report.errors
+            if is_cancelled(cancel) or len(sent_service) < len(service):
+                report.cancelled = is_cancelled(cancel)
+                if sent_service:
+                    service_ids = []
+                    for item in sent_service:
+                        service_ids.append(item.sent_as)
+                    await _delete_batches(service_ids, progress, ActionReport())
+            else:
+                ids = []
+                for phone_track, _track in pairs:
+                    ids.append(phone_track.sync_id)
+                for item in leftovers:
+                    ids.append(item.sync_id)
+                for item in sent_service:
+                    ids.append(item.sent_as)
+                removal = ActionReport()
+                await _delete_batches(ids, progress, removal, registry, home)
+                for name, message in removal.errors:
+                    report.errors.append((name, "eliminazione: " + message))
+                if progress is not None:
+                    progress(0, 0, "controllo dei nomi sull'iPhone")
+                albums_left, artists_left, present = await _groups_left(album_keys, artist_keys)
+                pending = []
+                for phone_track, track in pairs:
+                    if phone_track.sync_id not in present:      # tolto davvero: si reinvia
+                        cover = overlay.cover_for(track.path) if overlay is not None else None
+                        pending.append(_Pending(track, cover))
+                await _send_batches(pending, progress, None, report, registry, overlay, home)
+                if albums_left or artists_left:
+                    report.errors.append((f"{len(albums_left)} album e {len(artists_left)} artisti",
+                                          "l'iPhone non ha cancellato i nomi vecchi: i brani sono tornati con la "
+                                          "grafia dell'iPhone (si può riprovare più tardi)"))
+        finally:
+            shutil.rmtree(folder, ignore_errors=True)
+
+    iphone._run(work())
     return report
 
 

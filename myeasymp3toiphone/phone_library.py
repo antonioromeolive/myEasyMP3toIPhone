@@ -391,6 +391,23 @@ def comparison(pc_tags: TrackTags, phone_tags: TrackTags) -> list:
     return result
 
 
+def spelling_differences(pc_tags: TrackTags, phone_tags: TrackTags) -> list:
+    """"album" e/o "album_artist" quando il PC e l'iPhone li scrivono in modo diverso ma l'iPhone li considera
+    uguali (phone_group_key: maiuscole, zeri, "AA.VV." = "Artisti vari"). L'artista dell'album è quello effettivo:
+    l'artista dell'album o, senza, quello del brano. comparison non li segnala: un invio non li corregge, perché
+    l'iPhone tiene la grafia che ha già finché l'album o l'artista esiste, anche vuoto (prove del 24/11/2026)."""
+    result = []
+    pc_album = pc_tags.album or ""
+    phone_album = phone_tags.album or ""
+    if pc_album != phone_album and phone_group_key(pc_album) == phone_group_key(phone_album):
+        result.append("album")
+    pc_artist = pc_tags.album_artist or pc_tags.artist or ""
+    phone_artist = phone_tags.album_artist or phone_tags.artist or ""
+    if pc_artist != phone_artist and phone_group_key(pc_artist) == phone_group_key(phone_artist):
+        result.append("album_artist")
+    return result
+
+
 def changed_fields(pc_tags: TrackTags, phone_tags: TrackTags) -> list:
     """I nomi dei campi (COMPARED_FIELDS) diversi tra il PC e l'iPhone, con le regole di comparison."""
     labels = {}
