@@ -596,3 +596,64 @@ def test_comparison_like_the_iphone_groups_albums_and_artists():
     assert differences(pc, phone) == []
     phone.album_artist = "Michael Rossi"
     assert [label for label, _a, _b in differences(pc, phone)] == ["Artista album"]
+
+
+def test_album_groups_of_phone_tracks():
+    from myeasymp3toiphone.library import album_groups
+    phone = [_phone(1, "Due", "Gruppo Finto", "Disco Uno", track_number=2),
+             _phone(2, "Uno", "gruppo finto", "disco uno", track_number=1),
+             _phone(3, "Ospite", "Cantante Finto", "Raccolta Finta", album_artist="AA.VV."),
+             _phone(4, "Altro", "Gruppo Finto", "Disco Due")]
+    groups = album_groups(phone)
+    assert len(groups) == 3
+    orders = []
+    for members in groups.values():
+        pids = []
+        for item in members:
+            pids.append(item.pid)
+        orders.append(pids)
+    assert [2, 1] in orders                                       # le grafie insieme, per numero di traccia
+    assert ("AA.VV.", "Raccolta Finta") in groups                 # l'artista dell'album vince su quello del brano
+
+
+def test_artist_and_album_lists_and_grouping_in_both_tabs(tmp_path):
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtWidgets import QApplication
+    from myeasymp3toiphone.config import AppSettings
+    from myeasymp3toiphone.gui.browser import GROUP_ALBUM, GROUP_ARTIST_ALBUM
+    from myeasymp3toiphone.gui.main_window import MainWindow
+    app = QApplication.instance() or QApplication([])
+    window = MainWindow()
+    try:
+        phone = [_phone(1, "Uno", "Gruppo Finto", "Disco Uno"), _phone(2, "Due", "Gruppo Finto", "Disco Due"),
+                 _phone(3, "Tre", "Altro Finto", "Disco Tre")]
+        window.set_phone_tracks(phone, "iPhone di prova")
+        panel = window.iphone_panel
+        browser = panel._browser
+        assert browser.artists.topLevelItemCount() == 3               # "(Tutti…)" e due artisti
+        assert browser.albums.topLevelItemCount() == 4                # "(Tutti…)" e tre album
+        for index in range(browser.artists.topLevelItemCount()):
+            item = browser.artists.topLevelItem(index)
+            if item.text(0) == "Gruppo Finto":
+                item.setSelected(True)
+        assert panel._count.text() == "2 di 3 brani"
+        assert browser.albums.topLevelItemCount() == 3                # solo i suoi album
+        browser.grouping.setCurrentIndex(1)                           # Solo album
+        assert browser.grouping_value() == GROUP_ALBUM
+        assert browser._artist_column.isHidden()
+        assert browser.albums.topLevelItemCount() == 4                # di nuovo tutti gli album
+        assert panel._count.text() == "3 brani"
+        for index in range(browser.albums.topLevelItemCount()):
+            item = browser.albums.topLevelItem(index)
+            if item.text(0) == "Disco Tre":
+                item.setSelected(True)
+        assert panel._count.text() == "1 di 3 brani"
+        assert AppSettings.load().iphone_grouping == GROUP_ALBUM      # si ricorda
+        window.browser.grouping.setCurrentIndex(1)
+        assert AppSettings.load().pc_grouping == GROUP_ALBUM
+        window.browser.set_grouping(GROUP_ARTIST_ALBUM)
+        assert not window.browser._artist_column.isHidden()
+        assert AppSettings.load().pc_grouping == GROUP_ALBUM          # set_grouping non salva: solo la scelta a mano
+    finally:
+        window.close()
+        app.processEvents()

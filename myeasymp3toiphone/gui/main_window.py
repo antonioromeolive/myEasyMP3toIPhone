@@ -199,6 +199,8 @@ class MainWindow(QMainWindow):
         self.browser.filter_changed.connect(self._fill_table)
         self.browser.phone_state = self._browser_phone_state
         self.browser.phone_toggled.connect(self.set_wanted)
+        self.browser.set_grouping(self.app_settings.pc_grouping)
+        self.browser.grouping_changed.connect(self._pc_grouping_chosen)
 
         self._table = QTableView()
         self._model = TrackTableModel(self, PENDING_LOOK, PENDING_TIP)
@@ -367,6 +369,10 @@ class MainWindow(QMainWindow):
 
     def save_settings(self) -> None:
         self.app_settings.save()
+
+    def _pc_grouping_chosen(self, value: str) -> None:
+        self.app_settings.pc_grouping = value
+        self.save_settings()
 
     def _open_settings(self) -> None:
         before = self.library_dir()

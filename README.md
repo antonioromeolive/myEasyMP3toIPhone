@@ -64,6 +64,9 @@ sull'intestazione:
   solo quei brani;
 - la riga **(Tutti …)**, sempre in cima, toglie il filtro; scegliere un artista (o "(Tutti)") azzera l'album scelto
   prima; la casella *Cerca* filtra ancora dentro la scelta;
+- **Raggruppa** (sopra l'elenco Album): *Artista e album* mostra i due elenchi; *Solo album* nasconde quello degli
+  artisti e mostra tutti gli album (l'artista scelto prima non conta più). Ci sono gli stessi due elenchi, con la
+  loro scelta, anche nella scheda iPhone, sopra i brani;
 - **Formato** (accanto a *Cerca*): solo MP3, FLAC, M4A, OGG/Opus o WMA/WAV/AIFF, con il numero di brani di
   ciascuno. Vale per gli elenchi, la tabella, *Esporta*, *Verifica album online*, *Controlla la musica* e l'invio
   all'app Musica.
@@ -387,6 +390,10 @@ Nella scheda iPhone la colonna **Sorgente** dice da quale file viene ogni brano:
 | *file non trovato* | un file di questo computer che non c'è più (spostato o cancellato): il brano **non** viene tolto dall'iPhone |
 | *telefono* | acquistato o scaricato sull'iPhone: non si gestisce da un computer |
 | *senza file* | un brano "fantasma": è nell'elenco dell'app Musica ma il suo file sull'iPhone non c'è (non si può ascoltare); toglilo con *Elimina dall'iPhone* |
+
+Sopra l'elenco dei brani ci sono gli elenchi **Artisti** e **Album**, come nella scheda PC (senza le spunte), con
+**Raggruppa** (*Artista e album* o *Solo album*): un artista o un album scelto mostra solo i suoi brani, insieme a
+*Cerca* e *Mostra*.
 
 Il menu **Mostra** filtra l'elenco per sorgente (per esempio solo i brani *senza sorgente*), e per la colonna *Sul PC*:
 *Da rivedere: abbinati solo per i tag (≈)*, *Sorgente con tag diversi (⟳)* e *Con una sorgente proposta (in
@@ -721,6 +728,13 @@ In inglese sono in inglese finestre, pulsanti, menu, messaggi, la barra di stato
 la colonna *Cartella* della scheda PC e *Cartella della sorgente* della scheda iPhone, subito. Senza: spento (il solo
 nome della cartella). Le colonne dei file mostrano sempre il solo nome; il suggerimento delle celle mostra sempre il
 percorso completo.
+
+### Raggruppa (Artista e album, Solo album)
+
+1. La scelta di **Raggruppa** sopra l'elenco Album, una per scheda: `pc_grouping` e `iphone_grouping` in
+   `settings.json` (`artista` = *Artista e album*, `album` = *Solo album*), salvata appena la cambi e ripresa al
+   prossimo avvio.
+2. Senza, o con un valore sconosciuto: *Artista e album*.
 
 ### Le cartelle nascoste
 

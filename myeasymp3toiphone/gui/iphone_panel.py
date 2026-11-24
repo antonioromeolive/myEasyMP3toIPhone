@@ -9,18 +9,18 @@ from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QBrush, QColor
 from PySide6.QtWidgets import (
     QAbstractItemView, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFileDialog, QFormLayout, QGroupBox, QHBoxLayout, QHeaderView,
-    QLabel, QLineEdit, QMenu, QMessageBox, QPushButton, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget,
+    QLabel, QLineEdit, QMenu, QMessageBox, QPushButton, QSplitter, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget,
 )
 
 from .. import adoption, iphone, phone_actions, provenance
 from ..config import config_dir
 from ..i18n import tr
-from ..library import Track, copy_organized, scan_folder
+from ..library import Track, album_groups, copy_organized, scan_folder
 from ..phone_library import DEVICE_SAME, comparison, differences, pc_matches, playlist_reminder
 from .compare_tip import comparison_html, show_on_tooltip
 from .file_actions import add_file_entries
 from .theme import set_role
-from .browser import SORT_ROLE, SortableItem
+from .browser import SORT_ROLE, LibraryBrowser, SortableItem
 
 DEVICE_POLL_MS = 3000   # ogni quanto si guarda se è stato collegato (o scollegato) un iPhone
 DOWNLOAD_TEMP_FOLDER = ".salvataggio_iphone"
@@ -289,6 +289,7 @@ class IPhonePanel(QWidget):
         self._source_queue = []       # brani da associare uno alla volta (Associa sorgente da una cartella)
         self._warned_missing = set()  # sync_id già segnalati come sorgente sparita in questa sessione
         self._by_pid = {}
+        self._album_of = {}           # pid -> (artista, album) degli elenchi Artisti e Album
         self._matches = {}
         self._pc_states = {}          # pid -> (PC_*, Track del PC o None): la colonna Sul PC
         self._proposed = {}           # pid -> adoption.Proposal: la sorgente proposta, in rosso
@@ -386,12 +387,26 @@ class IPhonePanel(QWidget):
         buttons.addStretch(1)
         buttons.addWidget(self._listing_note)
 
+        self._browser = LibraryBrowser()       # Artisti e Album, come nella scheda PC (senza spunte)
+        self._browser.set_grouping(self._window.app_settings.iphone_grouping)
+        self._browser.filter_changed.connect(self._apply_search)
+        self._browser.grouping_changed.connect(self._grouping_chosen)
+        lists = QSplitter(Qt.Vertical)
+        lists.addWidget(self._browser)
+        lists.addWidget(self._music_view)
+        lists.setSizes([200, 420])
+        lists.setStretchFactor(1, 1)
+
         box = QGroupBox("Musica nell'app Musica dell'iPhone")
         box_layout = QVBoxLayout(box)
         box_layout.addLayout(search_row)
-        box_layout.addWidget(self._music_view, 1)
+        box_layout.addWidget(lists, 1)
         box_layout.addLayout(buttons)
         return box
+
+    def _grouping_chosen(self, value: str) -> None:
+        self._window.app_settings.iphone_grouping = value
+        self._window.save_settings()
 
     def set_phone_tracks(self, tracks: list, note: str) -> None:
         """L'elenco da mostrare (letto ora dall'iPhone o salvato l'ultima volta); note dice da dove viene."""
@@ -399,6 +414,12 @@ class IPhonePanel(QWidget):
         self._by_pid = {}
         for item in self._phone_tracks:
             self._by_pid[item.pid] = item
+        groups = album_groups(self._phone_tracks)
+        self._album_of = {}
+        for key, members in groups.items():
+            for item in members:
+                self._album_of[item.pid] = key
+        self._browser.set_data(groups, {})
         self._listing_note.setText(note)
         self._fill_music()
 
@@ -680,6 +701,7 @@ class IPhonePanel(QWidget):
     def _apply_search(self) -> None:
         words = self._search.text().casefold().split()
         rule = SHOW_FILTERS[max(0, self._show.currentIndex())][1]
+        chosen = self._browser.track_filter()     # None, o (artisti, album) scelti negli elenchi
         shown = 0
         view = self._music_view
         for index in range(view.topLevelItemCount()):
@@ -690,14 +712,28 @@ class IPhonePanel(QWidget):
             for word in words:
                 if word not in text:
                     visible = False
+            if visible and chosen is not None:
+                visible = self._in_chosen(row.data(COL_TITLE, PID_ROLE), chosen)
             row.setHidden(not visible)
             if visible:
                 shown += 1
         total = view.topLevelItemCount()
-        if words or self._show.currentIndex() > 0:
+        if words or self._show.currentIndex() > 0 or chosen is not None:
             self._count.setText(f"{shown} di {total} brani")
         else:
             self._count.setText(f"{total} brani")
+
+    def _in_chosen(self, pid, chosen: tuple) -> bool:
+        """Il brano è tra gli album scelti negli elenchi o, senza album scelti, tra gli artisti scelti."""
+        artists, albums = chosen
+        key = self._album_of.get(pid)
+        if key is None:
+            result = False
+        elif albums:
+            result = key in albums
+        else:
+            result = key[0] in artists
+        return result
 
     def _selected_phone_tracks(self) -> list:
         result = []

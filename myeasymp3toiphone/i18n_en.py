@@ -2225,4 +2225,12 @@ CATALOG = {
         '{0} tracks with different tags matched only by tags: they are not updated, link the source first (iPhone tab)',
     'Sorgente proposta, non ancora associata ({0}):\n{1}\n{2}. Tasto destro → Associa questa sorgente.':
         'Proposed source, not linked yet ({0}):\n{1}\n{2}. Right-click → Link this source.',
+    "Raggruppa:":
+        "Group by:",
+    "Artista e album":
+        "Artist and album",
+    "Solo album":
+        "Album only",
+    "Artista e album: scegli un artista, poi i suoi album. Solo album: l'elenco di tutti gli album, senza quello degli artisti.":
+        "Artist and album: choose an artist, then their albums. Album only: the list of all albums, without the artists list.",
 }

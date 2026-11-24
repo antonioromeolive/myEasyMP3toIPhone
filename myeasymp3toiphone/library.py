@@ -352,6 +352,42 @@ def group_by_album(tracks: list) -> dict:
     return groups
 
 
+def _tags_sort_key(item) -> tuple:
+    tags = item.tags
+    result = (tags.disc_number or 1, tags.track_number or 9999, (tags.title or "").lower())
+    return result
+
+
+def album_groups(items: list) -> dict:
+    """{(artista, album): [elementi ordinati per disco e numero]} per elementi che hanno solo i tag (i brani
+    dell'iPhone): come assign_groups e group_by_album (l'artista dell'album, o quello del brano; le grafie che
+    differiscono per maiuscole, accenti o spazi insieme, con la più usata), senza cambiare gli elementi."""
+    artist_spellings = {}
+    album_spellings = {}
+    named = []
+    for item in items:
+        artist = item.tags.album_artist or item.tags.artist or UNKNOWN_ARTIST
+        album = item.tags.album or UNKNOWN_ALBUM
+        named.append((item, artist, album))
+        artist_spellings.setdefault(group_name(artist), []).append(artist)
+        album_spellings.setdefault((group_name(artist), group_name(album)), []).append(album)
+    artists = {}
+    for name, spellings in artist_spellings.items():
+        artists[name] = best_spelling(spellings)
+    albums = {}
+    for name, spellings in album_spellings.items():
+        albums[name] = best_spelling(spellings)
+    groups = {}
+    for item, artist, album in named:
+        artist_name = group_name(artist)
+        key = (artists[artist_name], albums[(artist_name, group_name(album))])
+        groups.setdefault(key, []).append(item)
+    for members in groups.values():
+        members.sort(key=_tags_sort_key)
+    result = groups
+    return result
+
+
 def safe_name(text: str, fallback: str) -> str:
     """Rende un testo utilizzabile come nome di file o cartella su Windows."""
     cleaned = ""
