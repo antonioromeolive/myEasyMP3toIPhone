@@ -35,13 +35,22 @@ class _Task(QRunnable):
     def run(self) -> None:
         try:
             value = self.fn(self._progress, self.cancel)
-            self.signals.finished.emit(value)
+            self._emit(self.signals.finished, value)
         except IPhoneError as exc:
-            self.signals.failed.emit(str(exc))
+            self._emit(self.signals.failed, str(exc))
         except Exception as exc:  # noqa: BLE001 - qualsiasi errore va mostrato all'utente
             # nel log, non su una console: l'eseguibile a finestra non ne ha (sys.stderr è None)
             log.exception("Operazione non riuscita")
-            self.signals.failed.emit(f"{type(exc).__name__}: {exc}")
+            self._emit(self.signals.failed, f"{type(exc).__name__}: {exc}")
+
+    @staticmethod
+    def _emit(signal, value) -> None:
+        """Il risultato alla finestra. Se la finestra è già stata chiusa (si esce durante un'operazione) i segnali non
+        ci sono più: non è un errore, il risultato non serve a nessuno."""
+        try:
+            signal.emit(value)
+        except RuntimeError as exc:
+            log.info("Risultato di un'operazione arrivato a programma chiuso: %s", exc)
 
 
 class TaskRunner(QObject):

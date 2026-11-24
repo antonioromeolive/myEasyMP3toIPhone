@@ -1082,3 +1082,152 @@ def test_key_e_goes_to_the_tag_editor(monkeypatch):
         window._exit_checked = True
         window.close()
         app.processEvents()
+
+
+def test_moved_sources_are_found_again(tmp_path, monkeypatch):
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtWidgets import QApplication
+    from myeasymp3toiphone import adoption, provenance
+    from myeasymp3toiphone.gui import iphone_panel
+    from myeasymp3toiphone.gui.main_window import MainWindow
+    from myeasymp3toiphone.overlay import path_key
+    from myeasymp3toiphone.relocate import REASON_SAME_AUDIO, REASON_SAME_FILE_AUDIO, relocate
+
+    def mp3(folder, name, frames):
+        path = tmp_path / folder / name
+        write_mp3(path, frames)
+        return Track(path=path, tags=TrackTags(title=name, artist="Gruppo Finto", album="Disco Finto"))
+
+    moved_print = mp3("nuova", "01 Uno.mp3", 40)          # spostato e rinominato: lo ritrova l'impronta
+    moved_name = mp3("nuova", "02 Due.mp3", 50)           # spostato: stesso nome e dimensione
+    other_audio = mp3("altra", "03 Tre.mp3", 60)          # stesso nome e dimensione, ma un altro audio
+    taken = mp3("presa", "04 Quattro.mp3", 70)            # già la sorgente di un altro brano
+
+    class Cache:
+        def fingerprint_index(self):
+            return {"impronta-uno": [path_key(moved_print.path)]}
+
+        def fingerprint(self, path):
+            return "impronta-uno" if path == moved_print.path else ""
+
+    prints = {moved_name.path: "impronta-due", other_audio.path: "impronta-diversa"}
+    phone = [_phone(index, title, "Gruppo Finto", "Disco Finto") for index, title in enumerate("abcd", start=1)]
+    for item in phone:
+        item.sync_id = item.pid
+
+    def link(item, old, size, printed):
+        return provenance.Link(sync_id=item.pid, pc=provenance.computer_name(), path=str(tmp_path / "vecchia" / old),
+                               size=size, fingerprint=printed)
+
+    missing = [(phone[0], link(phone[0], "Uno.mp3", 1, "impronta-uno")),
+               (phone[1], link(phone[1], "02 Due.mp3", moved_name.path.stat().st_size, "impronta-due")),
+               (phone[2], link(phone[2], "03 Tre.mp3", other_audio.path.stat().st_size, "impronta-tre")),
+               (phone[3], link(phone[3], "04 Quattro.mp3", taken.path.stat().st_size, ""))]
+    found = relocate(missing, [moved_print, moved_name, other_audio, taken], Cache(), taken={path_key(taken.path)},
+                     printer=lambda path: prints.get(path, ""))
+    assert found[1].pc is moved_print and found[1].reason == REASON_SAME_AUDIO
+    assert found[1].how == provenance.HOW_FINGERPRINT and found[1].level == adoption.LEVEL_CERTAIN
+    assert found[2].pc is moved_name and found[2].reason == REASON_SAME_FILE_AUDIO
+    assert 3 not in found or found[3].pc is not other_audio   # un altro audio: non è lui
+    assert 4 not in found or found[4].pc is not taken         # un file già associato non si ruba
+
+    app = QApplication.instance() or QApplication([])
+    from myeasymp3toiphone.gui.missing_dialog import ACTION_RELINK, MissingSourcesDialog
+    dialog = MissingSourcesDialog(None, missing, False, {1: found[1], 2: found[2]})
+    assert dialog.tree.topLevelItem(0).text(3) == r"nuova\01 Uno.mp3" and dialog.tree.topLevelItem(2).text(3) == ""
+    dialog._choose(ACTION_RELINK)
+    assert dialog.action == ACTION_RELINK and len(dialog.chosen()) == 4
+    window = MainWindow()
+    try:
+        registry = provenance.Registry()
+        for item, old in missing:
+            registry.record(old)
+        window.registry = registry
+        saved = []
+        monkeypatch.setattr(window.iphone_panel, "_store_registry", lambda reg, message, then=None: saved.append(message))
+        window.iphone_panel._relink(missing, {1: found[1], 2: found[2]}, [phone[0], phone[1], phone[2]])
+        assert registry.get(1).path == str(moved_print.path) and registry.get(1).fingerprint == "impronta-uno"
+        assert registry.get(2).path == str(moved_name.path)
+        assert registry.get(3).path == str(tmp_path / "vecchia" / "03 Tre.mp3")      # non ritrovato: com'era
+        assert saved == ["Ritrovati e associati 2 file spostati"]
+    finally:
+        window._exit_checked = True
+        window.close()
+        dialog.close()
+        app.processEvents()
+
+
+def test_fingerprints_in_the_background_only_once(tmp_path):
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    import time
+    from PySide6.QtWidgets import QApplication
+    from myeasymp3toiphone.gui import main_window
+    from myeasymp3toiphone.gui.main_window import MainWindow
+    from myeasymp3toiphone.library import load_track
+    app = QApplication.instance() or QApplication([])
+    window = MainWindow()
+    try:
+        tracks = []
+        for number in range(3):
+            path = tmp_path / f"brano{number}.mp3"
+            write_mp3(path, 40 + number)
+            track = load_track(path)
+            window.tag_cache.store(track)
+            tracks.append(track)
+        window.tracks = tracks
+        news = []
+
+        def run():
+            window._start_fingerprints()
+            window._fingerprint_job.item.connect(news.append)
+            start = time.time()
+            while window._fingerprint_job.running and time.time() - start < 20:
+                app.processEvents()
+                time.sleep(0.01)
+            app.processEvents()
+
+        run()
+        for track in tracks:
+            assert window.tag_cache.fingerprint(track.path).startswith("mp3:")
+        assert (main_window.FINGERPRINTS_DONE, 3) in news
+        news.clear()
+        run()                                                    # la seconda volta: niente da ricalcolare
+        assert (main_window.FINGERPRINTS_TO_DO, 0) in news and (main_window.FINGERPRINTS_DONE, 0) in news
+    finally:
+        window._exit_checked = True
+        window.close()
+        app.processEvents()
+
+
+def test_link_source_to_a_file_that_is_gone_does_not_crash(tmp_path, monkeypatch):
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtWidgets import QApplication
+    from myeasymp3toiphone import provenance
+    from myeasymp3toiphone.gui import source_dialog
+    from myeasymp3toiphone.gui.main_window import MainWindow
+    app = QApplication.instance() or QApplication([])
+
+    class Chosen:
+        def __init__(self, *args):
+            self.chosen = tmp_path / "spostato" / "01.mp3"         # nell'elenco di prima, ora non c'è più
+            self.how = provenance.HOW_MANUAL
+            self.skipped = False
+
+        def exec(self):
+            return True
+
+    monkeypatch.setattr(source_dialog, "SourceDialog", Chosen)
+    window = MainWindow()
+    try:
+        item = _phone(1, "Uno", "Gruppo Finto", "Disco")
+        item.sync_id = 11
+        window.registry = provenance.Registry()
+        panel = window.iphone_panel
+        moved_on = []
+        monkeypatch.setattr(panel, "_next_source", lambda: moved_on.append(True))
+        panel._show_sources(item, [])
+        assert moved_on == [True] and window.registry.get(11) is None   # niente nel registro, si va avanti
+    finally:
+        window._exit_checked = True
+        window.close()
+        app.processEvents()

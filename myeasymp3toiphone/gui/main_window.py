@@ -59,7 +59,11 @@ DEVICE_TIP = {DEVICE_SAME: "Nell'app Musica dell'iPhone c'è questo brano, con g
               DEVICE_STALE: "Nell'app Musica dell'iPhone c'è questo brano, ma con tag diversi:",
               DEVICE_ABSENT: "Non è nell'app Musica dell'iPhone"}
 # le modifiche in attesa (passo 5): segno, colore del segno, tinta della riga; diversi da quelli "fatti"
-EXIT_NOW, EXIT_AFTER_APPLY, EXIT_CANCEL = "esci_ora", "esci_dopo_applica", "resta_aperto"   # all'uscita
+FINGERPRINT_SUFFIXES = {".mp3", ".flac", ".m4a", ".m4b", ".mp4"}   # provenance.fingerprint li sa leggere
+FINGERPRINT_BATCH = 200       # impronte per giro: annullare (nuova cartella, uscita) aspetta al massimo un giro
+FINGERPRINT_NOTICE = 100      # da quanti file in su lo si dice nella barra di stato
+FINGERPRINTS_TO_DO, FINGERPRINTS_DONE = "impronte_da_fare", "impronte_fatte"   # i messaggi del lavoro in sottofondo
+EXIT_NOW, EXIT_AFTER_APPLY, EXIT_CANCEL ="esci_ora", "esci_dopo_applica", "resta_aperto"   # all'uscita
 PENDING_LOOK = {SEND: ("＋", QColor(40, 110, 230), QColor(40, 110, 230, 40)),
                 REMOVE: ("－", QColor(210, 50, 50), QColor(230, 60, 90, 40)),
                 UPDATE: ("⟳", QColor(40, 110, 230), QColor(40, 110, 230, 40))}
@@ -108,6 +112,7 @@ class MainWindow(QMainWindow):
         self.root_folder: Optional[Path] = None
         self.check_results = {}
         self._exit_checked = False     # le modifiche in attesa sono già state applicate (o lasciate) per uscire
+        self._fingerprint_job = None   # le impronte in sottofondo (_start_fingerprints)
 
         self._album_label = QLabel()
         self._album_stop = QPushButton("Ferma")
@@ -539,8 +544,58 @@ class MainWindow(QMainWindow):
                 text += f" ({hidden} nelle cartelle nascoste)"
             self.statusBar().showMessage(text, 8000)
             self.iphone_panel.check_missing_sources()
+            self._start_fingerprints()
 
+        self._stop_fingerprints()                # erano per la cartella di prima
         self.runner.run("Lettura brani", work, done)
+
+    # ================================================================== impronte in sottofondo
+
+    def _start_fingerprints(self) -> None:
+        """In sottofondo, dopo l'apertura di una cartella: l'impronta dell'audio dei file che non ce l'hanno ancora
+        nella cache dei tag (nuovi, spostati, cambiati), così un file spostato e rinominato si ritrova sempre
+        (relocate). La prima volta tutta la cartella, poi solo i file nuovi o cambiati. Non blocca niente; la cache
+        si salva alla fine."""
+        paths = []
+        for track in self.tracks:
+            if not track.error and track.path.suffix.lower() in FINGERPRINT_SUFFIXES:
+                paths.append(track.path)
+        cache = self.tag_cache
+
+        def work(progress, cancel, emit):
+            missing = []
+            for path in paths:
+                if not cancel.is_set() and not cache.fingerprint(path):
+                    missing.append(path)
+            emit((FINGERPRINTS_TO_DO, len(missing)))
+            done = 0
+            start = 0
+            while start < len(missing) and not cancel.is_set():
+                batch = missing[start:start + FINGERPRINT_BATCH]
+                for path, value in provenance.file_fingerprints(batch, None, cancel).items():
+                    if value:
+                        cache.store_fingerprint(path, value)
+                        done += 1
+                start += FINGERPRINT_BATCH
+            emit((FINGERPRINTS_DONE, done))
+
+        job = BackgroundJob(work)
+        job.item.connect(self._fingerprints_news)
+        job.finished.connect(self.tag_cache.save)
+        self._fingerprint_job = job
+        job.start()
+
+    def _fingerprints_news(self, value) -> None:
+        kind, count = value
+        if kind == FINGERPRINTS_TO_DO and count >= FINGERPRINT_NOTICE:
+            self.statusBar().showMessage(f"Impronte dell'audio in sottofondo: {count} file (servono per ritrovare i "
+                                         "file spostati o rinominati)", 10000)
+        elif kind == FINGERPRINTS_DONE and count >= FINGERPRINT_NOTICE:
+            self.statusBar().showMessage(f"Impronte dell'audio calcolate: {count} file", 8000)
+
+    def _stop_fingerprints(self) -> None:
+        if self._fingerprint_job is not None and self._fingerprint_job.running:
+            self._fingerprint_job.cancel()
 
     # ================================================================== navigatore e tabella
 
@@ -1270,6 +1325,7 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event) -> None:
         if self._album_job is not None and self._album_job.running:
             self._album_job.cancel()
+        self._stop_fingerprints()
         self.app_settings.window_geometry = bytes(self.saveGeometry().toBase64()).decode("ascii")
         self.save_settings()
         if self.runner.is_busy:

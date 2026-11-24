@@ -96,6 +96,16 @@ class TagCache:
                 result = ""
         return result
 
+    def fingerprint_index(self) -> dict:
+        """{impronta: [chiavi dei file (overlay.path_key)]} di tutte le impronte nella cache, senza guardare i file:
+        una voce trovata qui si verifica con fingerprint(), che controlla che valga ancora."""
+        result = {}
+        with self._lock:
+            for key, entry in self._entries.items():
+                if isinstance(entry, dict) and entry.get("f"):
+                    result.setdefault(str(entry["f"]), []).append(key)
+        return result
+
     def store_fingerprint(self, path: Path, value: str) -> None:
         """Si aggiunge alla voce dei tag del file (che deve esserci e valere): cambia il file, si perde con lei."""
         with self._lock:

@@ -1363,12 +1363,23 @@ class IPhonePanel(QWidget):
             if rows:
                 QTimer.singleShot(0, lambda: self._show_missing(rows))
 
+    def relocated(self, rows: list) -> dict:
+        """{pid: adoption.Proposal}: i file spostati ritrovati nella cartella aperta (relocate.relocate)."""
+        from ..relocate import relocate
+        window = self._window
+        result = relocate(rows, window.tracks, window.tag_cache, tuple(window.app_settings.preferred_folders),
+                          set(window.registry.links_here()))
+        return result
+
     def _show_missing(self, rows: list) -> None:
-        from .missing_dialog import ACTION_DELETE, ACTION_ORPHAN, ACTION_SEARCH, MissingSourcesDialog
-        dialog = MissingSourcesDialog(self, rows, self._connected)
+        from .missing_dialog import ACTION_DELETE, ACTION_ORPHAN, ACTION_RELINK, ACTION_SEARCH, MissingSourcesDialog
+        found = self.relocated(rows)
+        dialog = MissingSourcesDialog(self, rows, self._connected, found)
         if dialog.exec() and not self._window.runner.is_busy:
             chosen = dialog.chosen()
-            if dialog.action == ACTION_SEARCH:
+            if dialog.action == ACTION_RELINK:
+                self._relink(rows, found, chosen)
+            elif dialog.action == ACTION_SEARCH:
                 self._source_queue = chosen[1:]
                 self._link_one(chosen[0])
             elif dialog.action == ACTION_ORPHAN:
@@ -1378,6 +1389,26 @@ class IPhonePanel(QWidget):
                 self._store_registry(registry, f"{len(chosen)} brani ora sono senza sorgente")
             elif dialog.action == ACTION_DELETE:
                 self.delete_items(chosen)
+
+    def _relink(self, rows: list, found: dict, chosen: list) -> None:
+        """Associa i file ritrovati: per i brani spuntati che ne hanno uno, il file ritrovato diventa la sorgente
+        (registro). Con lo stesso audio l'impronta è quella che il registro aveva già."""
+        window = self._window
+        registry = window.registry
+        old_prints = {}
+        for item, link in rows:
+            old_prints[item.pid] = link.fingerprint
+        count = 0
+        for item in chosen:
+            proposal = found.get(item.pid)
+            if proposal is not None:
+                if proposal.how == provenance.HOW_FINGERPRINT:
+                    printed = old_prints.get(item.pid, "")
+                else:
+                    printed = window.tag_cache.fingerprint(proposal.pc.path)
+                registry.record(adoption.link_for(proposal, window.overlay, printed))
+                count += 1
+        self._store_registry(registry, f"Ritrovati e associati {count} file spostati")
 
     # ------------------------------------------------------------------ scrittura sull'iPhone
 
@@ -1842,7 +1873,13 @@ class IPhonePanel(QWidget):
                                               f"Il brano ha già una sorgente:\n{current.path}{where}\n\n"
                                               f"Sostituirla con:\n{path}?")
                 accepted = answer == QMessageBox.Yes
-            if accepted:
+            if accepted and not Path(path).is_file():
+                # l'elenco dei brani del PC è di prima che il file fosse spostato o rinominato
+                QMessageBox.warning(self, "Associa sorgente", f"Questo file non c'è più:\n{path}\n\nForse è stato "
+                                    "spostato o rinominato dopo l'apertura della cartella: premi Aggiorna nella scheda "
+                                    "PC e riprova.")
+                self._next_source()
+            elif accepted:
                 registry = window.registry
                 registry.record(self._link_to(item, path, dialog.how))
                 self._store_registry(registry, f"Sorgente associata: {path}", self._next_source)

@@ -2337,6 +2337,26 @@ CATALOG = {
         "\n\n{0} albums with a different spelling have tracks without a linked source: they cannot be sent again whole and keep the iPhone's spelling.",
     '• {0} brani da reinviare con il loro album intero, per la grafia (perdono ascolti e playlist)':
         '• {0} tracks to send again with their whole album, for the spelling (they lose plays and playlists)',
+    'Ritrovati e associati {0} file spostati':
+        'Found and linked {0} moved files',
+    "Impronte dell'audio in sottofondo: {0} file (servono per ritrovare i file spostati o rinominati)":
+        'Audio fingerprints in the background: {0} files (they help find moved or renamed files)',
+    "Impronte dell'audio calcolate: {0} file":
+        'Audio fingerprints computed: {0} files',
+    "<b>{0}</b> brani dell'iPhone vengono da file di questo PC che non ci sono più (spostati o cancellati). <b>{1}</b> li ho ritrovati nella cartella aperta: colonna <i>Ritrovato sul PC</i>. Il programma non li toglie dall'iPhone da solo: scegli tu cosa fare con quelli spuntati.<br>Se il file è su un disco che ora non è collegato, collegalo e premi <i>Più tardi</i>.":
+        "<b>{0}</b> iPhone tracks come from files of this PC that are no longer there (moved or deleted). <b>{1}</b> were found again in the open folder: column <i>Found on the PC</i>. The program does not remove them from the iPhone by itself: you choose what to do with the checked ones.<br>If the file is on a drive that is not connected now, connect it and press <i>Later</i>.",
+    'Ritrovato sul PC':
+        'Found on the PC',
+    'Associa i file ritrovati ({0})':
+        'Link the found files ({0})',
+    'I brani spuntati con un file nella colonna Ritrovato sul PC: quel file diventa la loro sorgente (si scrive solo il registro della provenienza)':
+        'The checked tracks with a file in the Found on the PC column: that file becomes their source (only the source register is written)',
+    'stesso audio (impronta), spostato':
+        'same audio (fingerprint), moved',
+    'stesso nome, dimensione e audio (impronta), spostato':
+        'same name, size and audio (fingerprint), moved',
+    'stesso nome e stessa dimensione del file, spostato':
+        'same file name and size, moved',
     'Campi da scrivere:':
         'Fields to write:',
     "Cambia tag: connetti l'iPhone (e attendi la fine dell'operazione in corso)":
