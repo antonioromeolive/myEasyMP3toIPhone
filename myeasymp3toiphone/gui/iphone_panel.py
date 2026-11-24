@@ -56,19 +56,18 @@ ORIGIN_ROLE = Qt.UserRole + 7     # l'origine com'è nel codice (il testo della 
 ORIGIN_NO_FILE = "senza file"     # brano "fantasma": il suo file sull'iPhone non c'è
 # il filtro "Mostra": (testo, funzione (origine, stato di Sul PC) -> visibile)
 SHOW_FILTERS = [
-    ("Tutti i brani", lambda origin, pc, proposed, spelling, coverless: True),
-    ("Senza sorgente (solo sull'iPhone)", lambda origin, pc, proposed, spelling, coverless: origin == ORIGIN_UNKNOWN),
-    ("Con la sorgente su questo PC", lambda origin, pc, proposed, spelling, coverless: origin == ORIGIN_HERE),
-    ("Da altri computer", lambda origin, pc, proposed, spelling, coverless: origin not in (ORIGIN_HERE, ORIGIN_UNKNOWN, ORIGIN_PHONE, ORIGIN_MISSING,
+    ("Tutti i brani", lambda origin, pc, proposed, coverless: True),
+    ("Senza sorgente (solo sull'iPhone)", lambda origin, pc, proposed, coverless: origin == ORIGIN_UNKNOWN),
+    ("Con la sorgente su questo PC", lambda origin, pc, proposed, coverless: origin == ORIGIN_HERE),
+    ("Da altri computer", lambda origin, pc, proposed, coverless: origin not in (ORIGIN_HERE, ORIGIN_UNKNOWN, ORIGIN_PHONE, ORIGIN_MISSING,
                                                             ORIGIN_NO_FILE)),
-    ("File del PC non trovato", lambda origin, pc, proposed, spelling, coverless: origin == ORIGIN_MISSING),
-    ("Acquistati o scaricati sul telefono", lambda origin, pc, proposed, spelling, coverless: origin == ORIGIN_PHONE),
-    ("Senza file sull'iPhone (fantasmi)", lambda origin, pc, proposed, spelling, coverless: origin == ORIGIN_NO_FILE),
-    ("Da rivedere: abbinati solo per i tag (≈)", lambda origin, pc, proposed, spelling, coverless: pc == PC_PROBABLE),
-    ("Sorgente con tag diversi (⟳)", lambda origin, pc, proposed, spelling, coverless: pc == PC_STALE),
-    ("Con una sorgente proposta (in rosso)", lambda origin, pc, proposed, spelling, coverless: bool(proposed)),
-    ("Album o artista scritti diversamente dal PC (Aa)", lambda origin, pc, proposed, spelling, coverless: spelling),
-    ("Album senza immagine sull'iPhone", lambda origin, pc, proposed, spelling, coverless: coverless),
+    ("File del PC non trovato", lambda origin, pc, proposed, coverless: origin == ORIGIN_MISSING),
+    ("Acquistati o scaricati sul telefono", lambda origin, pc, proposed, coverless: origin == ORIGIN_PHONE),
+    ("Senza file sull'iPhone (fantasmi)", lambda origin, pc, proposed, coverless: origin == ORIGIN_NO_FILE),
+    ("Da rivedere: abbinati solo per i tag (≈)", lambda origin, pc, proposed, coverless: pc == PC_PROBABLE),
+    ("Sorgente con tag diversi (⟳)", lambda origin, pc, proposed, coverless: pc == PC_STALE),
+    ("Con una sorgente proposta (in rosso)", lambda origin, pc, proposed, coverless: bool(proposed)),
+    ("Album senza immagine sull'iPhone", lambda origin, pc, proposed, coverless: coverless),
 ]
 PC_TIP = {PC_SAME: "Sul PC c'è la sorgente di questo brano, con gli stessi tag",
           PC_STALE: "Sul PC c'è la sorgente di questo brano, ma con tag diversi",
@@ -242,45 +241,89 @@ class PhoneTagDialog(QDialog):
 
 
 class AlignToPcDialog(QDialog):
-    """Allinea i tag verso il PC: l'elenco dei file che verranno modificati, con ogni campo (ora → diventa). Si
-    scrive solo con Modifica i file."""
+    """Allinea i tag verso il PC: l'elenco dei file che verranno modificati, con ogni campo (ora → diventa). Una
+    casella per campo, con quanti file cambia: si scrivono solo i campi scelti (chosen_plan), così una correzione fatta
+    sul PC in un altro campo non torna indietro. Si scrive solo con Modifica i file."""
 
     def __init__(self, parent, plan: list) -> None:
         super().__init__(parent)
-        from ..phone_library import COMPARED_FIELDS, _shown
+        from ..phone_library import COMPARED_FIELDS
         self.setWindowTitle("Allinea i tag: modifica dei file del PC")
-        self.resize(1000, 460)
-        labels = {}
+        self.resize(1000, 520)
+        self._plan = plan
+        self._labels = {}
         for name, label in COMPARED_FIELDS:
-            labels[name] = label
-        header = QLabel(f"<b>Questi {len(plan)} file del PC verranno modificati</b>: si scrivono nel file i tag "
-                        "dell'iPhone. Non si può annullare.")
-        header.setWordWrap(True)
-        tree = QTreeWidget()
-        tree.setHeaderLabels(["File", "Campo", "Ora sul PC", "Diventa"])
-        tree.setRootIsDecorated(False)
-        tree.setAlternatingRowColors(True)
+            self._labels[name] = label
+        counts = {}
+        for _track, _new_tags, fields in plan:
+            for name in fields:
+                counts[name] = counts.get(name, 0) + 1
+        self._header = QLabel()
+        self._header.setWordWrap(True)
+        self._boxes = {}
+        choices = QHBoxLayout()
+        choices.addWidget(QLabel("Campi da scrivere:"))
+        for name, _label in COMPARED_FIELDS:
+            if name in counts:
+                box = QCheckBox(f"{tr(self._labels[name])} ({counts[name]} file)")
+                box.setChecked(True)
+                box.toggled.connect(lambda _checked: self._refresh())
+                self._boxes[name] = box
+                choices.addWidget(box)
+        choices.addStretch(1)
+        self._tree = QTreeWidget()
+        self._tree.setHeaderLabels(["File", "Campo", "Ora sul PC", "Diventa"])
+        self._tree.setRootIsDecorated(False)
+        self._tree.setAlternatingRowColors(True)
         for column, width in enumerate((420, 110, 200)):
-            tree.setColumnWidth(column, width)
+            self._tree.setColumnWidth(column, width)
+        self._buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        self._buttons.button(QDialogButtonBox.Ok).setProperty("role", "danger")
+        self._buttons.button(QDialogButtonBox.Cancel).setText("Annulla")
+        self._buttons.button(QDialogButtonBox.Cancel).setDefault(True)
+        self._buttons.accepted.connect(self.accept)
+        self._buttons.rejected.connect(self.reject)
+        layout = QVBoxLayout(self)
+        layout.addWidget(self._header)
+        layout.addLayout(choices)
+        layout.addWidget(self._tree, 1)
+        layout.addWidget(self._buttons)
+        self._refresh()
+
+    def chosen_plan(self) -> list:
+        """Il piano con i soli campi scelti: (brano, tag nuovi, campi); i file senza campi scelti non ci sono."""
+        result = []
+        for track, new_tags, fields in self._plan:
+            kept = []
+            for name in fields:
+                if self._boxes[name].isChecked():
+                    kept.append(name)
+            if kept:
+                tags = track.tags.copy()
+                for name in kept:
+                    setattr(tags, name, getattr(new_tags, name))
+                result.append((track, tags, kept))
+        return result
+
+    def _refresh(self) -> None:
+        from ..phone_library import _shown
+        plan = self.chosen_plan()
+        self._header.setText(f"<b>Questi {len(plan)} file del PC verranno modificati</b>: si scrivono nel file i tag "
+                             "dell'iPhone dei campi scelti. Non si può annullare.")
+        self._tree.clear()
+        rows = []
         for track, new_tags, fields in plan:
             first = True
             for name in fields:
-                row = QTreeWidgetItem([str(track.path) if first else "", tr(labels.get(name, name)),
+                row = QTreeWidgetItem([str(track.path) if first else "", tr(self._labels.get(name, name)),
                                        _shown(name, getattr(track.tags, name)), _shown(name, getattr(new_tags, name))])
                 row.setToolTip(0, str(track.path))
-                tree.addTopLevelItem(row)
+                rows.append(row)
                 first = False
-        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        buttons.button(QDialogButtonBox.Ok).setText(f"Modifica {len(plan)} file")
-        buttons.button(QDialogButtonBox.Ok).setProperty("role", "danger")
-        buttons.button(QDialogButtonBox.Cancel).setText("Annulla")
-        buttons.button(QDialogButtonBox.Cancel).setDefault(True)
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
-        layout = QVBoxLayout(self)
-        layout.addWidget(header)
-        layout.addWidget(tree, 1)
-        layout.addWidget(buttons)
+        self._tree.addTopLevelItems(rows)
+        accept = self._buttons.button(QDialogButtonBox.Ok)
+        accept.setText(f"Modifica {len(plan)} file")
+        accept.setEnabled(bool(plan))
 
 
 def show_entries_menu(parent, entries: list, where, connected: bool) -> None:
@@ -756,7 +799,7 @@ class IPhonePanel(QWidget):
             pid = row.data(COL_TITLE, PID_ROLE)
             item = self._by_pid.get(pid)
             visible = rule(row.data(COL_ORIGIN, ORIGIN_ROLE), row.data(COL_PC, PC_STATE_ROLE),
-                           row.data(COL_SOURCE_FILE, PROPOSED_ROLE), pid in self._spelling,
+                           row.data(COL_SOURCE_FILE, PROPOSED_ROLE),
                            item is not None and item.album_without_cover)
             for word in words:
                 if word not in text:
@@ -867,55 +910,83 @@ class IPhonePanel(QWidget):
         result = (text, ready and bool(pairs), lambda: self.replace_pairs(pairs, reason, "Sistema le copertine"))
         return result
 
-    def _spelling_entry(self, items: list) -> tuple:
-        """La voce di menu Allinea la grafia per i brani scelti: (testo, attiva, funzione)."""
-        pairs, blocked = self.spelling_plan(items)
-        albums = set()
-        for item, _track in pairs:
-            albums.add(item.album_sync_id)
-        text = f"Allinea la grafia (PC → iPhone): {len(albums)} album scritti diversamente (Aa)"
-        if blocked:
-            text += f"; {blocked} non si possono, hanno brani senza sorgente associata"
-        ready = self._connected and not self._window.runner.is_busy
-        result = (text, ready and bool(pairs), lambda: self.align_spelling(pairs))
-        return result
-
-    def align_spelling(self, pairs: list) -> None:
-        """Toglie gli album scelti e li reinvia dal PC con la sua grafia (phone_actions.align_spelling), dopo la
-        conferma con il tempo stimato."""
-        leftovers = []
+    def _service_leftovers(self) -> list:
+        """I brani di servizio rimasti sull'iPhone da un'operazione interrotta: si tolgono con i prossimi."""
+        result = []
         for item in self._phone_tracks:
             if phone_actions.is_service_track(item.tags) and item.from_computer:
-                leftovers.append(item)
-        padding = phone_actions.service_padding(len(pairs) + len(leftovers))
-        sizes = [phone_actions.SERVICE_SIZE] * padding
+                result.append(item)
+        return result
+
+    def split_for_spelling(self, pairs: list) -> tuple:
+        """Prima di ogni aggiornamento dal PC: (coppie da aggiornare come sempre, coppie degli album interi da togliere e
+        reinviare perché l'iPhone prenda la grafia del PC, album con la grafia diversa che non si possono reinviare
+        interi). Un brano associato con l'album o l'artista dell'album scritto in modo diverso dal PC (_spelling) porta
+        con sé il suo album intero, o tutti gli album dell'artista (spelling_plan): l'iPhone tiene la grafia del suo
+        gruppo finché esiste, e solo togliendolo tutto la cambia (phone_actions.align_spelling)."""
+        items = []
+        for phone_track, _track in pairs:
+            if self._spelling.get(phone_track.pid):
+                items.append(phone_track)
+        whole = []
+        blocked = 0
+        if items:
+            whole, blocked = self.spelling_plan(items)
+        taken = set()
+        for phone_track, _track in whole:
+            taken.add(phone_track.pid)
+        rest = []
+        for phone_track, track in pairs:
+            if phone_track.pid not in taken:
+                rest.append((phone_track, track))
+        result = (rest, whole, blocked)
+        return result
+
+    def _spelling_cost(self, whole: list) -> tuple:
+        """(byte di ogni brano da inviare, brani da togliere) per reinviare gli album interi, con i brani di servizio."""
+        sizes = []
+        removes = 0
+        if whole:
+            leftovers = self._service_leftovers()
+            padding = phone_actions.service_padding(len(whole) + len(leftovers))
+            sizes = [phone_actions.SERVICE_SIZE] * padding
+            for _phone_track, track in whole:
+                sizes.append(estimate.file_size(track.path))
+            removes = len(whole) + padding + len(leftovers)
+        result = (sizes, removes)
+        return result
+
+    @staticmethod
+    def _spelling_text(whole: list, blocked: int) -> str:
+        """Le righe della conferma per gli album da reinviare interi per la grafia."""
         albums = set()
-        phone_tracks = []
-        for item, track in pairs:
-            sizes.append(estimate.file_size(track.path))
-            albums.add(item.album_sync_id)
-            phone_tracks.append(item)
-        seconds = estimate.seconds(sizes, removes=len(pairs) + padding + len(leftovers))
-        text = (f"Allineare la grafia di {len(albums)} album (PC → iPhone)?\n\n"
-                "L'iPhone tiene il nome che ha già per un album o un artista finché esiste, anche vuoto. Per dargli "
-                f"il nome del PC il programma toglie i loro {len(pairs)} brani e li reinvia dal PC; per far "
-                f"cancellare all'iPhone i nomi vecchi toglie insieme {padding} brani di servizio di 3 secondi "
-                f"(\"{phone_actions.SERVICE_NAME}\"), inviati poco prima.\n\n"
-                + estimate.summary(len(pairs), seconds) + "\n\n"
-                "I brani reinviati perdono il conteggio degli ascolti e spariscono dalle playlist (Playlist per "
-                "artista le rifà). Se l'iPhone non cancellasse i nomi vecchi, i brani tornano comunque, con il nome "
-                "di prima.")
-        reminder = playlist_reminder(phone_tracks)
-        if reminder:
-            text += "\n\nSono nelle playlist:\n" + reminder
-        if self._confirm("Allinea la grafia", text):
-            overlay = self._window.overlay
+        for phone_track, _track in whole:
+            albums.add(phone_track.album_sync_id)
+        text = ""
+        if whole:
+            text = (f"\n\nGrafia: {len(albums)} album hanno il nome dell'album o dell'artista scritto in modo diverso "
+                    "dal PC (maiuscole, zeri, accenti). L'iPhone tiene il nome che ha già, quindi questi album si "
+                    f"tolgono interi e si reinviano dal PC: {len(whole)} brani, anche quelli dello stesso album non "
+                    "scelti, con qualche brano di servizio di 3 secondi che si toglie subito.")
+        if blocked:
+            text += (f"\n\n{blocked} album con la grafia diversa hanno brani senza sorgente associata: non si possono "
+                     "reinviare interi e restano con la grafia dell'iPhone.")
+        return text
 
-            def action(progress, cancel):
-                value = phone_actions.align_spelling(pairs, overlay, progress, cancel, config_dir(), tuple(leftovers))
-                return value
+    def _with_spelling(self, whole: list, action):
+        """action(progress, cancel) preceduta dal reinvio degli album interi per la grafia."""
+        overlay = self._window.overlay
+        leftovers = tuple(self._service_leftovers())
 
-            self._write("Allinea la grafia", "reinviati con la grafia del PC", action, _playlist_note(phone_tracks))
+        def combined(progress, cancel):
+            report = phone_actions.ActionReport()
+            if whole:
+                report.add(phone_actions.align_spelling(whole, overlay, progress, cancel, config_dir(), leftovers))
+            if not cancel.is_set():
+                report.add(action(progress, cancel))
+            return report
+
+        return combined
 
     def _in_chosen(self, pid, chosen: tuple) -> bool:
         """Il brano è tra gli album scelti negli elenchi o, senza album scelti, tra gli artisti scelti."""
@@ -1015,8 +1086,10 @@ class IPhonePanel(QWidget):
                 plan.append((track, new_tags, fields))
         if not plan:
             QMessageBox.information(self, "Allinea i tag", "Sul PC non c'è niente da cambiare.")
-        elif AlignToPcDialog(self, plan).exec():
-            self._write_pc_tags(plan)
+        else:
+            dialog = AlignToPcDialog(self, plan)
+            if dialog.exec():
+                self._write_pc_tags(dialog.chosen_plan())
 
     def _write_pc_tags(self, plan: list) -> None:
         """Scrive i tag approvati nei file del PC (tags.write_tags_approved) e li rilegge."""
@@ -1063,31 +1136,35 @@ class IPhonePanel(QWidget):
 
     def update_pairs(self, pairs: list, title: str = "Aggiorna dal PC") -> None:
         """Vale il PC: i brani dell'iPhone ((PhoneTrack, Track) associati) prendono i tag del PC (Cambia tag dove basta,
-        Rimpiazza per artisti e copertina), dopo la conferma con il tempo stimato."""
-        edits, replacements = phone_actions.plan_updates(pairs, frozenset())
-        if not edits and not replacements:
+        Rimpiazza per artisti e copertina; gli album con la grafia diversa interi, split_for_spelling), dopo la
+        conferma con il tempo stimato."""
+        rest, whole, blocked = self.split_for_spelling(pairs)
+        edits, replacements = phone_actions.plan_updates(rest, frozenset())
+        if not edits and not replacements and not whole:
             QMessageBox.information(self, title, "Sull'iPhone non c'è niente da cambiare.")
         else:
-            sizes = []
+            sizes, removes = self._spelling_cost(whole)
             for _phone_track, track in replacements:
                 sizes.append(estimate.file_size(track.path))
-            count = len(edits) + len(replacements)
+            count = len(edits) + len(replacements) + len(whole)
             text = (f"I tag di {count} brani dell'iPhone diventano quelli del PC (PC → iPhone). Continuare?\n\n"
-                    + estimate.summary(count, estimate.seconds(sizes, removes=len(replacements), edits=len(edits))))
+                    + estimate.summary(count, estimate.seconds(sizes, removes=removes + len(replacements),
+                                                               edits=len(edits))))
             if replacements:
                 text += (f"\n\nAttenzione: {len(replacements)} hanno un artista diverso e vanno rimpiazzati: perdono "
                          "ascolti e playlist.")
+            text += self._spelling_text(whole, blocked)
             if self._confirm(title, text):
                 overlay = self._window.overlay
                 replaced = []
-                for phone_track, _track in replacements:
+                for phone_track, _track in replacements + whole:
                     replaced.append(phone_track)
 
                 def action(progress, cancel):
                     value = phone_actions.update_from_pc(edits, replacements, overlay, progress, cancel, config_dir())
                     return value
 
-                self._write(title, "aggiornati", action, _playlist_note(replaced))
+                self._write(title, "aggiornati", self._with_spelling(whole, action), _playlist_note(replaced))
 
     def _source_paths(self, items: list) -> list:
         """I file delle sorgenti dei brani scelti (quelli che ne hanno una)."""
@@ -1131,7 +1208,6 @@ class IPhonePanel(QWidget):
         result = [
             (update_text, ready and not missing and bool(pairs), lambda: self.replace_pairs(pairs)),
             (tags_text, ready and bool(stale), lambda: self.update_pairs(stale, "Aggiorna TAG dal PC")),
-            self._spelling_entry(items),
             self._cover_entry(items),
             (f"Rimuovi dall'iPhone: {len(writable)} brani", ready and bool(writable),
              lambda: self.delete_items(writable)),
@@ -1171,8 +1247,6 @@ class IPhonePanel(QWidget):
                 source_text = "Associa sorgente…"
             else:
                 source_text = f"Associa sorgenti… ({len(writable)} brani)"
-            text, enabled, slot = self._spelling_entry(items)
-            spelling_entry = (text, slot, enabled)
             text, enabled, slot = self._cover_entry(items)
             cover_entry = (text, slot, enabled)
             menu = QMenu(self)
@@ -1184,7 +1258,6 @@ class IPhonePanel(QWidget):
                 (f"Rimpiazza con la versione del PC (PC → iPhone): {len(stale)} brani associati ⟳", self._replace_selected,
                  ready and bool(stale)),
                 (f"Cambia tag… ({len(writable)} brani)", self._edit_selected, ready and bool(writable)),
-                spelling_entry,
                 cover_entry,
                 None,
                 (source_text, lambda: self._link_sources(writable),
@@ -1377,17 +1450,22 @@ class IPhonePanel(QWidget):
 
     def replace_pairs(self, pairs: list, reason: str = "", title: str = "Rimpiazza") -> None:
         """(brano dell'iPhone, brano del PC): la versione del PC prende il posto di quella dell'iPhone. reason, se
-        c'è, va in testa alla domanda (perché si rimpiazza)."""
+        c'è, va in testa alla domanda (perché si rimpiazza). Gli album con la grafia diversa si reinviano interi
+        (split_for_spelling)."""
+        rest, whole, blocked = self.split_for_spelling(pairs)
         phone_tracks = []
-        sizes = []
-        for phone_track, track in pairs:
-            phone_tracks.append(phone_track)
+        sizes, removes = self._spelling_cost(whole)
+        for phone_track, track in rest:
             sizes.append(estimate.file_size(track.path))
+        for phone_track, _track in rest + whole:
+            phone_tracks.append(phone_track)
+        count = len(rest) + len(whole)
         text = ((reason + "\n\n" if reason else "") +
-                f"Rimpiazzare {len(pairs)} brani dell'iPhone con la versione del PC (PC → iPhone)?\n\n"
-                + estimate.summary(len(pairs), estimate.seconds(sizes, removes=len(pairs))) + "\n\n"
+                f"Rimpiazzare {count} brani dell'iPhone con la versione del PC (PC → iPhone)?\n\n"
+                + estimate.summary(count, estimate.seconds(sizes, removes=removes + len(rest))) + "\n\n"
                 "Prima si invia la versione del PC, poi si toglie quella vecchia. I brani rimpiazzati perdono "
-                "il conteggio degli ascolti e spariscono dalle playlist fatte sull'iPhone.")
+                "il conteggio degli ascolti e spariscono dalle playlist fatte sull'iPhone."
+                + self._spelling_text(whole, blocked))
         reminder = playlist_reminder(phone_tracks)
         if reminder:
             text += "\n\nSono nelle playlist (alla fine te le ricordo, per rimetterli a mano):\n" + reminder
@@ -1395,30 +1473,32 @@ class IPhonePanel(QWidget):
             overlay = self._window.overlay
 
             def action(progress, cancel):
-                value = phone_actions.replace_tracks(pairs, overlay, progress, cancel, config_dir())
+                value = phone_actions.replace_tracks(rest, overlay, progress, cancel, config_dir())
                 return value
 
-            self._write(title if reason else "Rimpiazzo sull'iPhone", "rimpiazzati", action,
+            self._write(title if reason else "Rimpiazzo sull'iPhone", "rimpiazzati", self._with_spelling(whole, action),
                         _playlist_note(phone_tracks))
 
-    @staticmethod
-    def pending_seconds(sends: list, removes: list, updates: list) -> float:
-        """Il tempo stimato di Applica (estimate.seconds)."""
-        edits, replacements = phone_actions.plan_updates(updates)
-        sizes = []
+    def pending_seconds(self, sends: list, removes: list, updates: list) -> float:
+        """Il tempo stimato di Applica (estimate.seconds), con gli album da reinviare interi per la grafia."""
+        rest, whole, _blocked = self.split_for_spelling(updates)
+        edits, replacements = phone_actions.plan_updates(rest)
+        sizes, spelling_removes = self._spelling_cost(whole)
         for track in sends:
             sizes.append(estimate.file_size(track.path))
         for _phone_track, track in replacements:
             sizes.append(estimate.file_size(track.path))
-        result = estimate.seconds(sizes, removes=len(removes) + len(replacements), edits=len(edits))
+        result = estimate.seconds(sizes, removes=len(removes) + len(replacements) + spelling_removes,
+                                  edits=len(edits))
         return result
 
     def apply_pending(self, sends: list, removes: list, updates: list, closing: bool = False, then=None) -> None:
         """Le modifiche in attesa della scheda PC (passo 5) tutte insieme: invia (Track), togli (PhoneTrack), aggiorna
         ((PhoneTrack, Track): Cambia tag o Rimpiazza, come per una modifica dei tag). closing: all'uscita dal
         programma, già confermato (nessuna domanda e, se tutto riesce, nessun messaggio alla fine); then(), se c'è,
-        alla fine."""
-        edits, replacements = phone_actions.plan_updates(updates)
+        alla fine. Gli album con la grafia diversa si reinviano interi (split_for_spelling)."""
+        rest, whole, blocked = self.split_for_spelling(updates)
+        edits, replacements = phone_actions.plan_updates(rest)
         lines = []
         if sends:
             lines.append(f"• {len(sends)} brani da inviare")
@@ -1429,17 +1509,29 @@ class IPhonePanel(QWidget):
         if replacements:
             lines.append(f"• {len(replacements)} brani da rimpiazzare (artista, artista dell'album o un campo da "
                          "svuotare: perdono ascolti e playlist)")
+        if whole:
+            lines.append(f"• {len(whole)} brani da reinviare con il loro album intero, per la grafia (perdono ascolti e "
+                         "playlist)")
         replaced = []
-        for phone_track, _track in replacements:
+        for phone_track, _track in replacements + whole:
             replaced.append(phone_track)
-        count = len(sends) + len(removes) + len(edits) + len(replacements)
+        count = len(sends) + len(removes) + len(edits) + len(replacements) + len(whole)
         text = ("Applicare all'iPhone le modifiche in attesa (PC → iPhone)?\n\n" + "\n".join(lines) + "\n\n"
-                + estimate.summary(count, self.pending_seconds(sends, removes, updates)))
+                + estimate.summary(count, self.pending_seconds(sends, removes, updates))
+                + self._spelling_text(whole, blocked))
         reminder = playlist_reminder(replaced)
         if reminder:
             text += "\n\nI brani da rimpiazzare sono nelle playlist (alla fine te le ricordo):\n" + reminder
         if lines and (closing or self._confirm("Applica", text)):
             overlay = self._window.overlay
+
+            def updates_action(progress, cancel):
+                value = phone_actions.ActionReport()
+                if edits or replacements:
+                    value = phone_actions.update_from_pc(edits, replacements, overlay, progress, cancel, config_dir())
+                return value
+
+            spelling_and_updates = self._with_spelling(whole, updates_action)
 
             def action(progress, cancel):
                 report = phone_actions.ActionReport()
@@ -1447,9 +1539,8 @@ class IPhonePanel(QWidget):
                     report.add(phone_actions.send_tracks(sends, overlay, progress, cancel, config_dir()))
                 if removes and not cancel.is_set():
                     report.add(phone_actions.delete_tracks(removes, progress, config_dir()))
-                if (edits or replacements) and not cancel.is_set():
-                    report.add(phone_actions.update_from_pc(edits, replacements, overlay, progress, cancel,
-                                                            config_dir()))
+                if (edits or replacements or whole) and not cancel.is_set():
+                    report.add(spelling_and_updates(progress, cancel))
                 return report
 
             self._write("Applica all'iPhone", "sistemati sull'iPhone", action, _playlist_note(replaced),

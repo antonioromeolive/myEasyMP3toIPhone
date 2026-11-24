@@ -2329,4 +2329,18 @@ CATALOG = {
         '{0} albums on the iPhone have no album artwork, even though the tracks have a cover (it happens to albums put there by other programs). Replacing their tracks with the PC files makes the iPhone choose one.',
     'Sistema le copertine':
         'Fix the artwork',
+    '{0} — {1}\n{2} brani: selezionali in tabella per modificarli':
+        '{0} — {1}\n{2} tracks: select them in the table to edit them',
+    "\n\nGrafia: {0} album hanno il nome dell'album o dell'artista scritto in modo diverso dal PC (maiuscole, zeri, accenti). L'iPhone tiene il nome che ha già, quindi questi album si tolgono interi e si reinviano dal PC: {1} brani, anche quelli dello stesso album non scelti, con qualche brano di servizio di 3 secondi che si toglie subito.":
+        '\n\nSpelling: {0} albums have the album or artist name written differently from the PC (capitals, zeros, accents). The iPhone keeps the name it already has, so these albums are removed whole and sent again from the PC: {1} tracks, also the ones of the same album not chosen, with a few 3-second service tracks that are removed right away.',
+    "\n\n{0} album con la grafia diversa hanno brani senza sorgente associata: non si possono reinviare interi e restano con la grafia dell'iPhone.":
+        "\n\n{0} albums with a different spelling have tracks without a linked source: they cannot be sent again whole and keep the iPhone's spelling.",
+    '• {0} brani da reinviare con il loro album intero, per la grafia (perdono ascolti e playlist)':
+        '• {0} tracks to send again with their whole album, for the spelling (they lose plays and playlists)',
+    'Campi da scrivere:':
+        'Fields to write:',
+    '{0} ({1} file)':
+        '{0} ({1} files)',
+    "<b>Questi {0} file del PC verranno modificati</b>: si scrivono nel file i tag dell'iPhone dei campi scelti. Non si può annullare.":
+        "<b>These {0} PC files will be modified</b>: the iPhone's tags of the chosen fields are written into the file. It cannot be undone.",
 }

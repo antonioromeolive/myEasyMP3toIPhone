@@ -160,7 +160,7 @@ def test_device_status_by_artist_album_and_title():
     same = _pc("canzone  a", "ARTISTA UNO", "Album Primo", year="1991-05-01", track_number=1)
     status, item, found = device_status(same, index)
     assert item.pid == 1 and status == DEVICE_STALE and [label for label, _pc_value, _value in found] == \
-        ["Titolo"]       # ritrovato senza badare a maiuscole e spazi; il titolo differisce, l'artista (un gruppo) no
+        ["Titolo", "Artista"]   # ritrovato senza badare a maiuscole e spazi; la grafia diversa è una differenza
     exact = _pc("Canzone A", "Artista Uno", "Album Primo", year="1991", track_number=1, disc_number=1)
     assert device_status(exact, index)[0] == DEVICE_SAME   # anno e disco 1 / nessun disco sono uguali
     other_artist = _pc("Intro", "Artista Due", "Album Primo")
@@ -300,7 +300,7 @@ def test_comparison_table_tooltips(tmp_path):
     from myeasymp3toiphone.gui.main_window import MainWindow
     rows = phone_library.comparison(TrackTags(title="T", artist="A", album="B", year="1991", compilation=True),
                                     TrackTags(title="T", artist="a", album="B", year="1990"))
-    assert ("Anno", "1991", "1990", True) in rows and ("Artista", "A", "a", False) in rows
+    assert ("Anno", "1991", "1990", True) in rows and ("Artista", "A", "a", True) in rows   # anche la grafia
     assert ("Compilation", "sì", "no", True) in rows
     app = QApplication.instance() or QApplication([])
     window = MainWindow()
@@ -583,19 +583,22 @@ def test_red_proposal_from_folder_name_without_whole_album(tmp_path):
 
 
 def test_comparison_like_the_iphone_groups_albums_and_artists():
-    """L'iPhone tiene la grafia del suo album o artista "uguale": "01" = "1", "AA.VV." = "Artisti Vari". Quelle
-    differenze non si possono correggere con un invio e non fanno giallo; le altre sì."""
+    """L'iPhone tiene la grafia del suo album o artista "uguale": "01" = "1", maiuscole (phone_group_key, per
+    l'invio). Il confronto invece conta anche la grafia: fa giallo, e l'aggiornamento la corregge reinviando l'album
+    intero. "AA.VV." e "Artisti Vari" per l'iPhone sono nomi diversi."""
     from myeasymp3toiphone.library import phone_group_key
+    from myeasymp3toiphone.phone_library import spelling_differences
     assert phone_group_key("Raccolta 01 - Estate") == phone_group_key("Raccolta 1 - Estate")
-    assert phone_group_key("AA.VV.") == phone_group_key("Artisti Vari") == phone_group_key("Various Artists")
+    assert phone_group_key("AA.VV.") != phone_group_key("Artisti Vari") != phone_group_key("Various Artists")
     assert phone_group_key("Festival 1990") != phone_group_key("Festival 199")
     assert phone_group_key("Disco 10") != phone_group_key("Disco 1")
     pc = TrackTags(title="Uno", artist="Anna", album="Raccolta 01 - Estate", album_artist="AA.VV.", compilation=True)
-    phone = TrackTags(title="Uno", artist="Anna", album="Raccolta 1 - Estate", album_artist="Artisti Vari",
+    phone = TrackTags(title="Uno", artist="Anna", album="Raccolta 1 - Estate", album_artist="aa.vv.",
                       compilation=True)
-    assert differences(pc, phone) == []
-    phone.album_artist = "Michael Rossi"
-    assert [label for label, _a, _b in differences(pc, phone)] == ["Artista album"]
+    assert [label for label, _a, _b in differences(pc, phone)] == ["Artista album", "Album"]
+    assert spelling_differences(pc, phone) == ["album", "album_artist"]       # solo grafia: album intero da reinviare
+    phone.album_artist = "Artisti Vari"                   # un altro artista per l'iPhone: si rimpiazza e basta
+    assert spelling_differences(pc, phone) == ["album"]
 
 
 def test_album_groups_of_phone_tracks():
@@ -751,9 +754,8 @@ def test_right_click_menus_on_artists_and_albums(monkeypatch):
         entries = panel.browser_menu_entries(phone_browser.menu_tracks)
         assert "rimpiazza 2 brani con i file del PC" in entries[0][0]
         assert "TAG" in entries[1][0] and "1 brani con tag diversi" in entries[1][0]
-        assert "Allinea la grafia" in entries[2][0] and not entries[2][1]     # niente scritto diversamente
-        assert "Sistema le copertine" in entries[3][0] and not entries[3][1]  # nessun album senza immagine
-        assert "Rimuovi dall'iPhone: 2 brani" in entries[4][0]
+        assert "Sistema le copertine" in entries[2][0] and not entries[2][1]  # nessun album senza immagine
+        assert "Rimuovi dall'iPhone: 2 brani" in entries[3][0]
         phone.append(_phone(3, "Senza sorgente", "Gruppo Finto", "Disco Uno"))
         phone[2].sync_id = 13
         window.set_phone_tracks(phone, "iPhone di prova")
@@ -850,12 +852,18 @@ def test_spelling_differences_and_alignment_plan(tmp_path):
         pairs, blocked = panel.spelling_plan([phone[0]])
         assert sorted(item.pid for item, _track in pairs) == [1, 2]     # l'album intero, non l'altro dell'artista
         assert blocked == 0
-        panel._show.setCurrentIndex(panel._show.count() - 2)         # Mostra: scritti diversamente
-        assert panel._count.text() == "2 di 3 brani"
+        panel._show.setCurrentIndex(panel._show.findText("Sorgente con tag diversi (⟳)"))
+        assert panel._count.text() == "2 di 3 brani"                  # la grafia diversa è una differenza
+        # un aggiornamento di "Uno" e "Tre": "Uno" porta con sé il suo album intero, "Tre" si aggiorna come sempre
+        rest, whole, blocked = panel.split_for_spelling([(phone[0], here[0]), (phone[2], here[2])])
+        assert [item.pid for item, _track in rest] == [3]
+        assert sorted(item.pid for item, _track in whole) == [1, 2] and blocked == 0
         registry.forget(12)                                          # un brano dell'album senza sorgente
         window.set_phone_tracks(phone, "iPhone di prova")
         pairs, blocked = panel.spelling_plan([phone[0]])
         assert pairs == [] and blocked == 1
+        rest, whole, blocked = panel.split_for_spelling([(phone[0], here[0])])
+        assert [item.pid for item, _track in rest] == [1] and whole == [] and blocked == 1   # come sempre, e avvisa
     finally:
         window.close()
         app.processEvents()
@@ -975,3 +983,68 @@ def test_albums_without_cover_read_saved_and_planned(tmp_path):
         window._exit_checked = True
         window.close()
         app.processEvents()
+
+
+def test_choosing_an_album_shows_its_cover_without_selected_tracks():
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtCore import QBuffer, QByteArray, QIODevice
+    from PySide6.QtGui import QColor, QImage
+    from PySide6.QtWidgets import QApplication
+    from myeasymp3toiphone.gui.main_window import MainWindow
+    app = QApplication.instance() or QApplication([])
+    image = QImage(20, 20, QImage.Format_RGB32)
+    image.fill(QColor(200, 30, 30))
+    data = QByteArray()
+    buffer = QBuffer(data)
+    buffer.open(QIODevice.WriteOnly)
+    image.save(buffer, "PNG")
+    png = bytes(data)
+    window = MainWindow()
+    try:
+        tracks = [_pc("Uno", "Gruppo Finto", "Disco Uno", track_number=1),
+                  _pc("Due", "Gruppo Finto", "Disco Uno", track_number=2),
+                  _pc("Tre", "Altro Finto", "Disco Tre")]
+        window.tracks = tracks
+        window.editor.cover_provider = lambda track: png if track.title == "Due" else None   # il primo non ce l'ha
+        window._rebuild_views()
+        browser = window.browser
+        for index in range(browser.albums.topLevelItemCount()):
+            item = browser.albums.topLevelItem(index)
+            if item.text(0) == "Disco Uno":
+                item.setSelected(True)
+        app.processEvents()
+        editor = window.editor
+        assert not editor._cover_label.pixmap().isNull()             # la copertina dell'album
+        assert "Disco Uno" in editor._header.text() and "2 brani" in editor._header.text()
+        assert not editor._cover_button.isEnabled()                  # niente da modificare senza brani
+        window._table.selectRow(0)
+        app.processEvents()
+        assert editor._header.text() == "Uno.mp3"                    # un brano selezionato: l'editor normale
+    finally:
+        window._exit_checked = True
+        window.close()
+        app.processEvents()
+
+
+def test_align_to_pc_writes_only_the_chosen_fields():
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtWidgets import QApplication, QDialogButtonBox
+    from myeasymp3toiphone.gui.iphone_panel import AlignToPcDialog
+    app = QApplication.instance() or QApplication([])
+    one = _pc("Uno", "Anna", "Raccolta", album_artist="AA.VV.", year="2001")
+    two = _pc("Due", "Anna", "Raccolta", album_artist="AA.VV.")
+    new_one = one.tags.copy()
+    new_one.album_artist, new_one.year = "Artisti Vari", "1999"
+    new_two = two.tags.copy()
+    new_two.album_artist = "Artisti Vari"
+    dialog = AlignToPcDialog(None, [(one, new_one, ["album_artist", "year"]), (two, new_two, ["album_artist"])])
+    assert dialog._boxes["album_artist"].text().endswith("(2 file)") and dialog._boxes["year"].text().endswith("(1 file)")
+    dialog._boxes["year"].setChecked(False)                 # l'anno corretto sul PC non torna indietro
+    plan = dialog.chosen_plan()
+    assert [(track.tags.title, tags.album_artist, tags.year, fields) for track, tags, fields in plan] == [
+        ("Uno", "Artisti Vari", "2001", ["album_artist"]), ("Due", "Artisti Vari", "", ["album_artist"])]
+    assert dialog._buttons.button(QDialogButtonBox.Ok).text() == "Modifica 2 file"
+    dialog._boxes["album_artist"].setChecked(False)
+    assert dialog.chosen_plan() == [] and not dialog._buttons.button(QDialogButtonBox.Ok).isEnabled()
+    dialog.close()
+    app.processEvents()

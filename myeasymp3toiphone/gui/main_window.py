@@ -982,7 +982,14 @@ class MainWindow(QMainWindow):
         self.activateWindow()
 
     def _selection_changed(self) -> None:
-        self.editor.set_tracks(self._selected_table_tracks())
+        """L'editor dei brani selezionati; senza brani selezionati ma con un album scelto negli elenchi, la copertina
+        e il nome dell'album."""
+        tracks = self._selected_table_tracks()
+        albums = self.browser.selected_albums()
+        if not tracks and len(albums) == 1:
+            self.editor.show_album(self.browser.album_tracks(next(iter(albums))))
+        else:
+            self.editor.set_tracks(tracks)
 
     def _busy_changed(self, busy: bool) -> None:
         for action in self._task_actions:

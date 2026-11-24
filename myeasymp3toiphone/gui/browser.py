@@ -192,6 +192,11 @@ class LibraryBrowser(QWidget):
 
     # ------------------------------------------------------------------ spunte "sull'iPhone"
 
+    def album_tracks(self, key) -> list:
+        """I brani di un album (la chiave (artista, album) di selected_albums), per disco e numero."""
+        result = list(self._groups.get(key, []))
+        return result
+
     def tracks_of(self, item) -> list:
         """I brani di una riga: un artista (tutti i suoi album) o un album."""
         key = item.data(0, KEY_ROLE)

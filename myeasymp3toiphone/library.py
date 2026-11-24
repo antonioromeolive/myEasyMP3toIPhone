@@ -171,10 +171,10 @@ def artist_group_key(name: str) -> str:
 def phone_group_key(text: str) -> str:
     """Il nome di un artista o di un album come lo confronta l'iPhone, che con un nome "uguale" attacca il brano
     all'album o all'artista che ha già e ne tiene la grafia: senza maiuscole, accenti e spazi, gli zeri davanti ai
-    numeri non contano ("Raccolta 01" = "Raccolta 1"), e "AA.VV." = "Artisti vari" = "Various Artists" (solo i nomi
-    fissi: quelli aggiunti in Impostazioni l'iPhone non li conosce)."""
-    key = LEADING_ZEROS.sub("", group_name(text or ""))
-    result = VARIOUS_KEY if _various_key(key) in VARIOUS_ARTIST_KEYS else key
+    numeri non contano ("Raccolta 01" = "Raccolta 1", provato il 24/11/2026). "AA.VV.", "Artisti vari" e "Various
+    Artists" invece per l'iPhone sono nomi diversi (sul telefono dell'utente erano tre artisti distinti): qui non si
+    uniscono, altrimenti un invio con "AA.VV." prenderebbe il nome "Artisti vari" che l'iPhone ha già."""
+    result = LEADING_ZEROS.sub("", group_name(text or ""))
     return result
 
 

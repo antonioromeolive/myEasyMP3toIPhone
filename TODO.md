@@ -43,9 +43,9 @@ Fatto e provato senza telefono (test e finestre di prova); da confermare sul tel
     (anche quelli rimasti dalle sessioni prima), come in rustunes (docs/05, "Group collection in a 100-target
     session"; la regola esatta non è nota: rustunes ha visto pulire anche con 16 brani e non pulire con 90). Dopo,
     l'album reinviato come "PROVA Raccolta 1" di "PROVA Artista" ha preso il nome nuovo.
-  - ***Allinea la grafia (PC → iPhone)*** è fatto (`phone_actions.align_spelling`, scheda iPhone: tasto destro
-    sui brani o su artisti e album, filtro *Mostra → Album o artista scritti diversamente dal PC*) e **provato sul
-    telefono** il 24/11/2026: "PROVA Raccolta 1" di "PROVA Artista" è diventato "PROVA Raccolta 01" di "PROVA
+  - La correzione della grafia (`phone_actions.align_spelling`) è fatta e ora è dentro ogni aggiornamento dal PC
+    (`IPhonePanel.split_for_spelling`: niente comando a parte, su richiesta dell'utente); **provata sul
+    telefono** il 24/11/2026 come comando a parte: "PROVA Raccolta 1" di "PROVA Artista" è diventato "PROVA Raccolta 01" di "PROVA
     ARTISTA" (album e artista dell'album insieme), 97 brani di servizio inviati e tolti, nessuno rimasto, 17 s in
     tutto; la sessione ha cancellato anche le altre righe vuote. L'utente ha visto il nome nuovo nell'app. Restano
     da provare dalla finestra (build nuova) e su un album vero. Sull'iPhone restano vuoti (invisibili) "PROVA

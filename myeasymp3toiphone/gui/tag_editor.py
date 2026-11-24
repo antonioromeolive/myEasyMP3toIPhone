@@ -15,6 +15,7 @@ from ..tags import BOOL_FIELDS, COVER_EXTENSIONS, INT_FIELDS, READ_ONLY_EXTENSIO
 
 MIXED = "(valori diversi)"
 COVER_SIZE = 180
+ALBUM_COVER_TRIES = 5     # un album scelto senza brani selezionati: la copertina del primo brano che ne ha una
 
 
 def _as_text(value) -> str:
@@ -116,6 +117,22 @@ class TagEditor(QWidget):
     def set_tracks(self, tracks: list) -> None:
         self._tracks = list(tracks)
         self._reload()
+
+    def show_album(self, tracks: list) -> None:
+        """Nessun brano selezionato, ma un album scelto negli elenchi: la sua copertina e il suo nome, senza niente da
+        modificare (la copertina del primo dei suoi brani che ne ha una, tra i primi ALBUM_COVER_TRIES)."""
+        self.set_tracks([])
+        cover = None
+        index = 0
+        while cover is None and index < len(tracks) and index < ALBUM_COVER_TRIES:
+            cover = self._cover_of(tracks[index])
+            index += 1
+        self._show_cover(cover)
+        if tracks:
+            tags = tracks[0].tags
+            artist = tags.album_artist or tags.artist
+            self._header.setText(f"{artist} — {tags.album}\n{len(tracks)} brani: selezionali in tabella per "
+                                 "modificarli")
 
     def has_unsaved_changes(self) -> bool:
         result = bool(self._dirty) or self._new_cover is not None

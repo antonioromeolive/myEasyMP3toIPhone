@@ -35,7 +35,6 @@ DEVICE_ABSENT = ""        # non c'è
 COMPARED_FIELDS = (("title", "Titolo"), ("artist", "Artista"), ("album_artist", "Artista album"), ("album", "Album"),
                    ("year", "Anno"), ("genre", "Genere"), ("track_number", "N. traccia"), ("disc_number", "N. disco"),
                    ("compilation", "Compilation"))
-GROUPED_FIELDS = {"artist", "album_artist", "album"}
 
 _QUERY = """
 SELECT i.item_pid, e.title, ia.item_artist, aa.album_artist, a.album, g.genre, e.year, i.track_number,
@@ -400,19 +399,16 @@ def _shown(name: str, value) -> str:
 
 def comparison(pc_tags: TrackTags, phone_tags: TrackTags) -> list:
     """(nome del campo, valore sul PC, valore sull'iPhone, diverso) per ogni campo confrontato. "Artista album" si
-    confronta solo se almeno uno dei due ce l'ha (altrimenti ripete la differenza dell'artista). Artisti e album si
-    confrontano come li confronta l'iPhone (library.phone_group_key: senza maiuscole, accenti, spazi e zeri davanti ai
-    numeri; "AA.VV." = "Artisti Vari"): sull'iPhone sono gruppi, e l'invio si unisce al gruppo che c'è già con la sua
-    grafia, quindi quella differenza non si può correggere con un invio."""
+    confronta solo se almeno uno dei due ce l'ha (altrimenti ripete la differenza dell'artista). Tutto si confronta
+    com'è scritto, anche artisti e album: una grafia diversa (maiuscole, zeri, accenti: spelling_differences) è una
+    differenza, che l'aggiornamento dal PC corregge reinviando l'album intero (phone_actions.align_spelling),
+    perché l'iPhone tiene la grafia del suo gruppo finché esiste."""
     result = []
     for name, label in COMPARED_FIELDS:
         pc_value = _comparable(name, pc_tags)
         phone_value = _comparable(name, phone_tags)
         relevant = name != "album_artist" or bool(pc_tags.album_artist or phone_tags.album_artist)
-        if name in GROUPED_FIELDS:
-            same = phone_group_key(str(pc_value)) == phone_group_key(str(phone_value))
-        else:
-            same = pc_value == phone_value
+        same = pc_value == phone_value
         if relevant:
             result.append((label, _shown(name, pc_value), _shown(name, phone_value), not same))
     return result
@@ -420,7 +416,7 @@ def comparison(pc_tags: TrackTags, phone_tags: TrackTags) -> list:
 
 def spelling_differences(pc_tags: TrackTags, phone_tags: TrackTags) -> list:
     """"album" e/o "album_artist" quando il PC e l'iPhone li scrivono in modo diverso ma l'iPhone li considera
-    uguali (phone_group_key: maiuscole, zeri, "AA.VV." = "Artisti vari"). L'artista dell'album è quello effettivo:
+    uguali (phone_group_key: maiuscole, accenti, spazi, zeri). L'artista dell'album è quello effettivo:
     l'artista dell'album o, senza, quello del brano. comparison non li segnala: un invio non li corregge, perché
     l'iPhone tiene la grafia che ha già finché l'album o l'artista esiste, anche vuoto (prove del 24/11/2026)."""
     result = []

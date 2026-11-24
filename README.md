@@ -35,7 +35,9 @@ Per l'iPhone serve l'app gratuita **Dispositivi Apple** dal Microsoft Store (opp
 > apri (compresa la Libreria). Le modifiche dei tag, fatte a mano, dalla scansione o da *Verifica album online*, restano
 > **in sospeso** nella cartella dati e valgono per le **copie**: quelle inviate all'iPhone, esportate o importate.
 > L'unica scrittura in un file del PC è **Allinea i tag → Usa i tag dell'iPhone** (scheda iPhone), dopo una finestra
-> che elenca ogni file e ogni campo che cambia (*Modifica N file*; non si può annullare).
+> che elenca ogni file e ogni campo che cambia (*Modifica N file*; non si può annullare). In cima, una casella per
+> campo con quanti file cambia: si scrivono solo i campi lasciati accesi (per esempio solo *Artista album*, perché
+> una correzione fatta sul PC in un altro campo non torni al valore vecchio dell'iPhone).
 >
 > **PC e iPhone non si allineano da soli.** Cancellare o cambiare un brano sull'iPhone non cambia niente sul PC, e
 > cambiare i tag sul PC non cambia niente sull'iPhone: la differenza si vede (⟳, il nome del file in giallo) e il
@@ -61,7 +63,8 @@ sull'intestazione:
 - **Artisti** (artista, numero di album, numero di brani): sceglierne uno (o più, con Ctrl/Maiusc) filtra l'elenco
   Album sui suoi album e la tabella sui suoi brani;
 - **Album** (album, artista, anno, brani; l'icona dice l'esito di *Verifica album online*): sceglierne uno (o più) mostra
-  solo quei brani;
+  solo quei brani; con un album solo scelto e nessun brano selezionato in tabella, a destra compaiono la sua
+  copertina e il suo nome (quella del primo dei suoi brani che ne ha una);
 - la riga **(Tutti …)**, sempre in cima, toglie il filtro; scegliere un artista (o "(Tutti)") azzera l'album scelto
   prima; la casella *Cerca* filtra ancora dentro la scelta;
 - **tasto destro** su un artista o un album (anche più righe scelte, o "(Tutti …)"): la riga diventa la scelta e il
@@ -355,13 +358,11 @@ CopyTrans Manager (*AirTrafficControl*), senza iTunes e senza sincronizzare tutt
 - **Formati:** MP3, FLAC (l'iPhone li suona così come sono) e M4A in AAC. Gli M4A in Apple Lossless non ancora.
 - **Copertine:** quella modificata, o altrimenti quella del file, se è JPEG o PNG.
 - **Album e artisti:** sull'iPhone album e artisti dell'album sono gruppi: un brano va nel gruppo che c'è già con un
-  nome "uguale", e il gruppo tiene la sua grafia, anche dopo un *Rimpiazza* (il brano nuovo arriva prima che il
-  vecchio se ne vada, quindi il gruppo non resta mai vuoto). Per l'iPhone sono uguali i nomi che differiscono per
-  maiuscole, accenti, spazi o zeri davanti ai numeri ("Raccolta 01" = "Raccolta 1"), e "AA.VV." = "Artisti vari" =
-  "Various Artists". Il programma invia con la grafia dell'iPhone (niente doppioni) e la colonna *iPhone* e il
-  giallo della scheda iPhone confrontano allo stesso modo: queste differenze non contano, perché un invio non le
-  cambierebbe. Una differenza vera (un altro artista dell'album) resta ⟳ anche quando l'iPhone tiene il gruppo
-  vecchio: per ora si corregge solo togliendo dall'iPhone tutto l'album e inviandolo di nuovo.
+  nome "uguale" e il gruppo tiene la sua grafia, finché esiste (anche vuoto). Per l'iPhone sono uguali i nomi che
+  differiscono per maiuscole, accenti, spazi o zeri davanti ai numeri ("Raccolta 01" = "Raccolta 1"); "AA.VV.",
+  "Artisti vari" e "Various Artists" invece sono tre artisti diversi. Il confronto (colonna *iPhone*, giallo della
+  scheda iPhone) guarda i nomi come sono scritti: anche una grafia diversa è una differenza (⟳), e ogni
+  aggiornamento dal PC la corregge da solo (vedi *La grafia* sotto).
 - **Compilation:** si invia la spunta, con l'artista dell'album ("Artisti vari" se manca): l'album resta intero
   nell'app Musica.
 - **Rimpiazza** prima invia la versione del PC, poi toglie quella vecchia, solo se l'invio è riuscito. Il brano
@@ -424,27 +425,30 @@ Sopra l'elenco dei brani ci sono gli elenchi **Artisti** e **Album**, come nella
 artista o un album scelto mostra solo i suoi brani, insieme a *Cerca* e *Mostra*.
 
 Il menu **Mostra** filtra l'elenco per sorgente (per esempio solo i brani *senza sorgente*), e per la colonna *Sul PC*:
-*Da rivedere: abbinati solo per i tag (≈)*, *Sorgente con tag diversi (⟳)*, *Con una sorgente proposta (in
-rosso)* e *Album o artista scritti diversamente dal PC (Aa)*.
+*Da rivedere: abbinati solo per i tag (≈)*, *Sorgente con tag diversi (⟳)* (anche solo la grafia), *Con una
+sorgente proposta (in rosso)* e *Album senza immagine sull'iPhone*.
 
-**Allinea la grafia (PC → iPhone)** (tasto destro sui brani, o su un artista o un album, anche "(Tutti gli
-artisti)" per tutti insieme): per gli album che il PC scrive in modo diverso ma che l'iPhone considera uguali
-(maiuscole, zeri davanti ai numeri, "AA.VV." / "Artisti vari"). L'iPhone tiene il nome che ha già per un album o un
-artista finché la sua riga esiste, anche vuota (provato il 24/11/2026: né un nuovo invio, né *Cambia tag*, né il
-riavvio lo cambiano), e cancella le righe vuote solo in certe sessioni di eliminazione (con 100 brani tolti insieme
-sì). Quindi il programma, in un'operazione sola per tutti gli album scelti:
+**La grafia.** Quando un aggiornamento dal PC (*Rimpiazza*, *Aggiorna*, *Aggiorna TAG*, *Allinea i tag → Usa i tag
+del PC*, *Applica*, *Sistema le copertine*) tocca un brano associato che sull'iPhone ha l'album o l'artista
+dell'album scritto in modo diverso dal PC ("Raccolta 1" invece di "Raccolta 01", "ARTISTA" invece di "Artista"),
+il programma ne prende l'album intero e lo reinvia, nella stessa operazione. L'iPhone infatti tiene il nome che
+ha già per un album o un artista finché la sua riga esiste, anche vuota (provato il 24/11/2026: né un nuovo invio,
+né *Cambia tag*, né il riavvio lo cambiano), e cancella le righe vuote solo in certe sessioni di eliminazione (con
+100 brani tolti insieme sì). Quindi, prima del resto dell'aggiornamento:
 1. invia i brani di servizio che servono (3 secondi di silenzio, album "myEasyMP3toIPhone servizio");
-2. toglie in una sessione i brani degli album insieme a quelli di servizio (almeno 100 nell'ultima sessione);
+2. toglie in una sessione i brani di quegli album insieme a quelli di servizio (almeno 100 nell'ultima sessione);
 3. controlla nel database dell'iPhone che i nomi vecchi siano spariti;
 4. reinvia gli album dal PC, con la sua grafia, e aggiorna il registro della provenienza.
 
-Si prende sempre l'album intero; se è scritto diversamente l'artista dell'album, tutti gli album di quell'artista
-(sull'iPhone la sua riga è una sola). Si può solo se tutti quei brani hanno la sorgente associata su questo PC; il
-menu conta gli album che non si possono. Il reinvio si fa sempre, anche se l'iPhone tenesse i nomi vecchi (allora
-lo dice). Come *Rimpiazza*, i brani reinviati perdono ascolti e playlist. Un brano di servizio rimasto da
-un'operazione interrotta si toglie alla successiva.
+Si prende sempre l'album intero, anche i brani non scelti; se è scritto diversamente l'artista dell'album, tutti gli
+album di quell'artista (sull'iPhone la sua riga è una sola). La conferma lo dice, con quanti brani in più. Un album
+con brani senza sorgente associata non si può reinviare intero: i suoi brani si aggiornano come gli altri e
+restano con la grafia dell'iPhone (la conferma lo dice). Il reinvio si fa sempre, anche se l'iPhone tenesse i nomi
+vecchi (allora lo dice). Come *Rimpiazza*, i brani reinviati perdono ascolti e playlist. Un brano di servizio
+rimasto da un'operazione interrotta si toglie alla successiva.
 
-**Sistema le copertine (PC → iPhone)** (tasto destro, come sopra; *Mostra → Album senza immagine sull'iPhone*): gli
+**Sistema le copertine (PC → iPhone)** (tasto destro sui brani, o su un artista o un album, anche "(Tutti gli
+artisti)"; *Mostra → Album senza immagine sull'iPhone*): gli
 album messi sull'iPhone da altri programmi (CopyTrans, iTunes) possono non avere l'immagine dell'album anche se i
 loro brani hanno la copertina: l'iPhone non ne ha scelta una. Gli album inviati da questo programma ce l'hanno
 sempre. Il comando rimpiazza i brani di quegli album con i file del PC (quelli con la sorgente associata) e l'iPhone
