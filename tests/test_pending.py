@@ -39,6 +39,25 @@ def test_toggle_rules():
     assert not still_needed(DEVICE_SAME, UPDATE) and still_needed(DEVICE_STALE, UPDATE)
 
 
+def test_one_entry_per_file_with_the_phone_index(tmp_path):
+    """L'indice delle voci dell'iPhone (per non scorrere tutta la coda a ogni brano) resta giusto: una voce nuova per
+    lo stesso file toglie quella vecchia, nei due versi."""
+    first, second = Path("C:/musica/a.mp3"), Path("C:/musica/b.mp3")
+    pending = Pending(tmp_path)
+    pending.set_phone(1, REPLACE, first)
+    assert pending.get(first) == REPLACE
+    pending.set(first, SEND)                                             # la voce del brano dell'iPhone esce
+    assert pending.get(first) == SEND and pending.get_phone(1) == "" and pending.total() == 1
+    pending.set_phone(2, UPDATE, first)                                  # e la voce del file esce
+    assert pending.get(first) == UPDATE and pending.total() == 1
+    pending.set_phone(3, DELETE, second)
+    pending.set_phone(2, REPLACE, second)                                # stesso file: la 3 esce
+    assert pending.get_phone(3) == "" and pending.get(second) == REPLACE and pending.get(first) == ""
+    for index in range(2000):
+        pending.set(Path(f"C:/musica/{index}.mp3"), SEND)
+    assert pending.total() == 2001 and pending.get(second) == REPLACE
+
+
 def test_saved_and_reconciled(tmp_path):
     tracks = [Track(path=Path(f"C:/musica/{name}.mp3"), tags=TrackTags(title=name)) for name in ("a", "b", "c")]
     pending = Pending(tmp_path)

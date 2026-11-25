@@ -1338,12 +1338,19 @@ def test_warning_for_songs_already_on_the_iphone_in_another_format(monkeypatch):
     try:
         window.set_phone_tracks(phone, "iPhone di prova")
         panel = window.iphone_panel
-        from myeasymp3toiphone.pending import SEND, Job
+        from myeasymp3toiphone.overlay import path_key
+        from myeasymp3toiphone.pending import FILE_PREFIX, SEND, Job
         sent = []
         monkeypatch.setattr(panel, "_run_jobs", lambda jobs, sends, *args: sent.append(sends))
         monkeypatch.setattr(panel, "_connected", True)
-        panel.apply_jobs([Job("a", SEND, track=flac_one), Job("b", SEND, track=other_album)])  # "Invia senza questi"
+        window.pending.set(flac_one.path, SEND)
+        window.pending.set(other_album.path, SEND)
+        panel.apply_jobs([Job(FILE_PREFIX + path_key(flac_one.path), SEND, track=flac_one),
+                          Job(FILE_PREFIX + path_key(other_album.path), SEND, track=other_album)])  # "Invia senza questi"
         assert sent == [[other_album]]
+        assert window.pending.get(flac_one.path) == "" and window.pending.get(other_album.path) == SEND  # fuori coda
+        assert "Tolto dalla coda 1 brano" in window.statusBar().currentMessage() or \
+            "Tolto dalla coda 1 brano" in window._pending_last.text()
         panel.apply_jobs([Job("a", SEND, track=flac_one)])        # erano tutti doppioni: niente da copiare
         assert sent == [[other_album]] and "Niente da applicare" in window.statusBar().currentMessage()
     finally:
@@ -1399,6 +1406,27 @@ def test_everything_for_the_iphone_waits_for_apply(tmp_path, monkeypatch):
         assert len(dialog.jobs) == 3 and window.pending.total() == 3
         dialog.close()
         assert "iPhone · 3 in attesa" == window._tabs.tabText(tab)
+
+        # la ✕ si clicca nella terza colonna; "Togli le selezionate" e Canc tolgono le righe scelte
+        from PySide6.QtCore import QEvent, Qt
+        from PySide6.QtGui import QKeyEvent
+        dialog = ApplyDialog(window, window.pending_jobs(), window._remove_pending, panel.jobs_seconds,
+                             panel.jobs_notes, False, "iPhone di prova")
+        tree = dialog._tree
+        assert tree.topLevelItemCount() == 3 and not dialog._remove_selected.isEnabled()
+        first_group = tree.topLevelItem(0)
+        dialog._clicked(first_group.child(0), 0)                     # clic sul nome: niente
+        assert len(dialog.jobs) == 3
+        dialog._clicked(first_group.child(0), 2)                     # clic sulla ✕
+        assert len(dialog.jobs) == 2 and window.pending.total() == 2
+        tree.topLevelItem(0).child(0).setSelected(True)
+        assert dialog._remove_selected.isEnabled()
+        dialog._drop_selected()
+        assert len(dialog.jobs) == 1 and tree.topLevelItemCount() == 1
+        tree.topLevelItem(0).setSelected(True)                       # il gruppo intero, con Canc
+        dialog.keyPressEvent(QKeyEvent(QEvent.KeyPress, Qt.Key_Delete, Qt.NoModifier))
+        assert dialog.jobs == [] and window.pending.total() == 0 and not dialog._apply.isEnabled()
+        dialog.close()
 
         # Cambia i tag con "Anche sul PC": gli stessi tag sul file del PC, in sospeso
         monkeypatch.setattr(iphone_panel.PhoneTagDialog, "exec", lambda dialog: True)
@@ -1512,7 +1540,7 @@ def test_apply_removes_done_actions_and_tells_what_it_did(tmp_path):
     from myeasymp3toiphone import phone_actions
     from myeasymp3toiphone.gui import iphone_panel
     from myeasymp3toiphone.gui.main_window import MainWindow
-    from myeasymp3toiphone.pending import DELETE, SEND, Job
+    from myeasymp3toiphone.pending import DELETE, SEND
     app = QApplication.instance() or QApplication([])
     window = MainWindow()
     try:

@@ -2435,8 +2435,16 @@ CATALOG = {
         'Remove the group',
     'Togli tutte le azioni di questo gruppo':
         'Remove all the actions of this group',
-    "<b>Azioni in attesa per {0}: {1}</b>. La ✕ toglie un'azione: non parte, il brano resta com'è e la rimetti dalle schede.":
-        "<b>Pending actions for {0}: {1}</b>. The ✕ removes an action: it won't run, the track stays as it is and you can add it again from the tabs.",
+    "<b>Azioni in attesa per {0}: {1}</b>. La ✕ (o Canc sulle righe selezionate) toglie un'azione: non parte, il brano resta com'è e la rimetti dalle schede.":
+        "<b>Pending actions for {0}: {1}</b>. The ✕ (or Delete on the selected rows) removes an action: it won't run, the track stays as it is and you can add it again from the tabs.",
+    'Togli le selezionate':
+        'Remove the selected',
+    'Toglie dalla coda le azioni delle righe selezionate (anche il tasto Canc)':
+        'Removes the actions of the selected rows from the queue (the Delete key too)',
+    "Tolto dalla coda 1 brano già sull'iPhone in un altro formato.":
+        'Removed from the queue 1 track already on the iPhone in another format.',
+    "Tolti dalla coda {0} brani già sull'iPhone in un altro formato.":
+        'Removed from the queue {0} tracks already on the iPhone in another format.',
     '<b>Nessuna azione</b>: le hai tolte tutte.':
         '<b>No actions</b>: you removed them all.',
     "\n\nPer applicarle connetti l'iPhone (e aspetta la fine dell'operazione in corso).":

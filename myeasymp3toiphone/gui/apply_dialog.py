@@ -8,9 +8,10 @@ com'è e si possono rimettere dalle schede. "Applica N azioni" fa partire quelle
 
 from __future__ import annotations
 
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QBrush, QColor
 from PySide6.QtWidgets import (
-    QDialog, QDialogButtonBox, QHBoxLayout, QLabel, QPushButton, QToolButton, QTreeWidget, QTreeWidgetItem,
-    QVBoxLayout, QWidget,
+    QAbstractItemView, QDialog, QDialogButtonBox, QLabel, QPushButton, QTreeWidget, QTreeWidgetItem, QVBoxLayout,
 )
 
 from .. import estimate
@@ -28,6 +29,8 @@ GROUPS = (
      "con i tag da cambiare sull'iPhone"),
     (DELETE, "Elimina dall'iPhone", "i file del PC non cambiano", "da eliminare dall'iPhone"),
 )
+REMOVE_COLOR = QColor(192, 57, 43)     # la ✕ e "Togli il gruppo"
+MAX_EXPANDED = 300                     # un gruppo più grande si apre chiuso (si apre con la freccia)
 EDIT_LABELS = {"title": "Titolo", "album": "Album", "genre": "Genere", "year": "Anno", "track_number": "N. traccia",
                "disc_number": "N. disco", "compilation": "Compilation"}
 
@@ -100,8 +103,13 @@ class ApplyDialog(QDialog):
         self._tree = QTreeWidget()
         self._tree.setHeaderLabels([tr("Brano"), tr("Dettaglio"), ""])
         self._tree.setRootIsDecorated(True)
+        self._tree.setUniformRowHeights(True)
+        self._tree.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self._tree.setColumnWidth(0, 420)
         self._tree.setColumnWidth(1, 330)
+        self._tree.itemClicked.connect(self._clicked)
+        self._tree.itemSelectionChanged.connect(
+            lambda: self._remove_selected.setEnabled(bool(self._selected_keys())))
         self._footer = QLabel()
         self._footer.setWordWrap(True)
         self._footer.setStyleSheet("color: gray")
@@ -110,6 +118,10 @@ class ApplyDialog(QDialog):
         self._apply.setProperty("role", "go")
         cancel = self._buttons.addButton(tr("Annulla"), QDialogButtonBox.RejectRole)
         cancel.setDefault(True)
+        self._remove_selected = QPushButton("Togli le selezionate")
+        self._remove_selected.setToolTip("Toglie dalla coda le azioni delle righe selezionate (anche il tasto Canc)")
+        self._remove_selected.clicked.connect(self._drop_selected)
+        self._buttons.addButton(self._remove_selected, QDialogButtonBox.ResetRole)
         self._buttons.accepted.connect(self.accept)
         self._buttons.rejected.connect(self.reject)
         layout = QVBoxLayout(self)
@@ -120,37 +132,49 @@ class ApplyDialog(QDialog):
         self._fill()
 
     def _fill(self) -> None:
+        """Le azioni per gruppo. La terza colonna ha la ✕ (una riga) o "Togli il gruppo": un clic le toglie. Niente
+        widget per riga: con migliaia di azioni (una Copia di tutta la libreria) la finestra si apre subito."""
         from .iphone_panel import SYNC_WARNING
+        self._tree.setUpdatesEnabled(False)
         self._tree.clear()
+        bold = None
         for action, label, sub, _phrase in GROUPS:
             members = []
             for job in self.jobs:
                 if job.action == action:
                     members.append(job)
             if members:
-                group = QTreeWidgetItem([f"{tr(label)} ({len(members)})", tr(sub), ""])
-                font = group.font(0)
-                font.setBold(True)
-                group.setFont(0, font)
-                self._tree.addTopLevelItem(group)
                 keys = []
                 for job in members:
                     keys.append(job.key)
+                group = QTreeWidgetItem([f"{tr(label)} ({len(members)})", tr(sub), tr("Togli il gruppo")])
+                if bold is None:
+                    bold = group.font(0)
+                    bold.setBold(True)
+                group.setFont(0, bold)
+                group.setData(2, Qt.UserRole, keys)
+                group.setToolTip(2, tr("Togli tutte le azioni di questo gruppo"))
+                group.setForeground(2, QBrush(REMOVE_COLOR))
+                rows = []
+                for job in members:
                     name, detail = describe(job)
-                    row = QTreeWidgetItem([name, detail, ""])
+                    row = QTreeWidgetItem([name, detail, "✕"])
                     row.setToolTip(0, name)
                     row.setToolTip(1, detail)
-                    group.addChild(row)
-                    self._tree.setItemWidget(row, 2, self._remove_button("✕", tr("Togli questa azione: non parte"),
-                                                                         [job.key]))
-                self._tree.setItemWidget(group, 2, self._remove_button(tr("Togli il gruppo"),
-                                                                       tr("Togli tutte le azioni di questo gruppo"),
-                                                                       keys))
-                group.setExpanded(True)
+                    row.setToolTip(2, tr("Togli questa azione: non parte"))
+                    row.setData(2, Qt.UserRole, [job.key])
+                    row.setForeground(2, QBrush(REMOVE_COLOR))
+                    row.setTextAlignment(2, Qt.AlignCenter)
+                    rows.append(row)
+                group.addChildren(rows)
+                self._tree.addTopLevelItem(group)
+                group.setExpanded(len(members) <= MAX_EXPANDED)
+        self._tree.setUpdatesEnabled(True)
         count = len(self.jobs)
         if count:
-            self._header.setText(f"<b>Azioni in attesa per {self._device}: {count}</b>. La ✕ toglie un'azione: non "
-                                 "parte, il brano resta com'è e la rimetti dalle schede.")
+            self._header.setText(f"<b>Azioni in attesa per {self._device}: {count}</b>. La ✕ (o Canc sulle righe "
+                                 "selezionate) toglie un'azione: non parte, il brano resta com'è e la rimetti dalle "
+                                 "schede.")
         else:
             self._header.setText("<b>Nessuna azione</b>: le hai tolte tutte.")
         footer = estimate.summary(count, self._seconds(self.jobs)) if count else ""
@@ -161,21 +185,31 @@ class ApplyDialog(QDialog):
         self._footer.setText(footer.strip())
         self._apply.setText(f"Applica {count} azioni" if count != 1 else "Applica 1 azione")
         self._apply.setEnabled(bool(count) and self._ready)
+        self._remove_selected.setEnabled(False)
 
-    def _remove_button(self, text: str, tip: str, keys: list) -> QWidget:
-        if text == "✕":
-            button = QToolButton()
-            button.setText(text)
+    def _clicked(self, item, column: int) -> None:
+        keys = item.data(2, Qt.UserRole)
+        if column == 2 and keys:
+            self._drop(list(keys))
+
+    def _selected_keys(self) -> list:
+        result = []
+        for item in self._tree.selectedItems():
+            for key in item.data(2, Qt.UserRole) or []:
+                if key not in result:
+                    result.append(key)
+        return result
+
+    def _drop_selected(self) -> None:
+        keys = self._selected_keys()
+        if keys:
+            self._drop(keys)
+
+    def keyPressEvent(self, event) -> None:
+        if event.key() == Qt.Key_Delete and self._selected_keys():
+            self._drop_selected()
         else:
-            button = QPushButton(text)
-        button.setToolTip(tip)
-        button.clicked.connect(lambda: self._drop(keys))
-        holder = QWidget()
-        row = QHBoxLayout(holder)
-        row.setContentsMargins(0, 0, 0, 0)
-        row.addWidget(button)
-        row.addStretch(1)
-        return holder
+            super().keyPressEvent(event)
 
     def _drop(self, keys: list) -> None:
         self.jobs = self._remove(keys)

@@ -1305,6 +1305,13 @@ class MainWindow(QMainWindow):
             message = f"{done} sull'iPhone."
         self.pending_changed(message)
 
+    def pending_skipped(self, keys: list) -> None:
+        """Brani lasciati fuori all'avviso dei formati doppi (Invia senza questi): escono dalla coda."""
+        self.pending.remove(keys)
+        count = len(keys)
+        self.pending_changed("Tolto dalla coda 1 brano già sull'iPhone in un altro formato." if count == 1 else
+                             f"Tolti dalla coda {count} brani già sull'iPhone in un altro formato.")
+
     def _remove_pending(self, keys: list) -> list:
         """Dalla finestra di Applica: toglie le azioni dalla coda e restituisce quelle rimaste."""
         removed = self.pending.remove(keys)
@@ -1332,9 +1339,11 @@ class MainWindow(QMainWindow):
         return result
 
     def _selected_rows(self) -> list:
+        """Le righe selezionate, dagli intervalli della selezione: selectedRows() di Qt interroga il modello per ogni
+        cella (con 14.000 brani selezionati, secondi a ogni cambio della selezione)."""
         rows = set()
-        for index in self._table.selectionModel().selectedRows():
-            rows.add(index.row())
+        for selected in self._table.selectionModel().selection():
+            rows.update(range(selected.top(), selected.bottom() + 1))
         result = sorted(rows)
         return result
 

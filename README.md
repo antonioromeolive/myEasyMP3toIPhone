@@ -188,8 +188,9 @@ per artista*.
 - **Applica N azioni…** apre la finestra con **tutte le azioni**, divise per gruppo (*Copia da PC a iPhone*,
   *Ricopia da PC a iPhone*, *Usa i tag da PC a iPhone*, *Cambia i tag sull'iPhone*, *Elimina dall'iPhone*), ognuna
   con il brano e cosa cambia (il formato, i campi diversi, i valori nuovi). La **✕** di una riga, o **Togli il
-  gruppo**, toglie le azioni dalla coda subito: non partono, il brano resta com'è e le rimetti dalle schede. In
-  fondo il tempo stimato, gli album da ricopiare interi per la grafia, le playlist da sistemare dopo un rimpiazzo.
+  gruppo**, toglie le azioni dalla coda subito: non partono, il brano resta com'è e le rimetti dalle schede; per
+  molte righe insieme selezionale e premi **Togli le selezionate** (o Canc). Un gruppo di più di 300 azioni si apre
+  chiuso (si apre con la freccia). In fondo il tempo stimato, gli album da ricopiare interi per la grafia, le playlist da sistemare dopo un rimpiazzo.
   La finestra si apre anche a iPhone scollegato, per guardare e togliere; **Applica N azioni** si preme a iPhone
   connesso e fa tutto insieme (copia, elimina, cambia i tag, poi *Usa i tag* e *Ricopia*). Alla fine un messaggio
   dice cosa è stato fatto, per specie (*12 brani copiati da PC a iPhone*, *3 brani eliminati dall'iPhone*…), e quali
@@ -546,7 +547,7 @@ i brani mancanti degli album*, le spunte) il programma controlla se qualcuno c'�
 stesso titolo, durata uguale entro 2 secondi, estensione diversa: per esempio il FLAC di un brano che sull'iPhone è
 MP3), o se nello stesso invio ci sono due copie in formati diversi. Se sì, un avviso li elenca: **Invia senza
 questi** (scelta predefinita; tra due copie nello stesso invio resta quella della prima cartella preferita; quelli
-lasciati fuori restano in attesa), **Invia anche questi** o **Annulla** (non parte niente). La stessa canzone nello stesso formato in un'altra raccolta non conta. All'uscita
+lasciati fuori escono dalla coda e il messaggio lo dice), **Invia anche questi** o **Annulla** (non parte niente). La stessa canzone nello stesso formato in un'altra raccolta non conta. All'uscita
 (*Applica ed esci*) l'avviso non compare: si è già confermato.
 
 **Copia i brani mancanti degli album da PC a iPhone** (scheda iPhone, tasto destro sui brani, o su un artista o un

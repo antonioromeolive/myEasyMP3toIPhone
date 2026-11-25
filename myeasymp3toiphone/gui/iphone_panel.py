@@ -1784,12 +1784,27 @@ class IPhonePanel(QWidget):
     def apply_jobs(self, jobs: list, closing: bool = False, then=None) -> None:
         """Applica le azioni scelte nella finestra di Applica (già confermate lì): prima l'avviso per i brani da
         copiare che sull'iPhone ci sono già in un altro formato (check_duplicates; non all'uscita, dove si è già
-        confermato). Un brano lasciato fuori resta in attesa. closing: all'uscita dal programma (nessun messaggio se
+        confermato). Con "Invia senza questi" i brani lasciati fuori escono dalla coda: l'hai deciso tu, non sono un
+        errore (altrimenti ogni Applica li riproporrebbe). closing: all'uscita dal programma (nessun messaggio se
         tutto riesce); then(), se c'è, alla fine."""
         sends, removes, updates, replaces, edits = self._split_jobs(jobs)
         proceed = True
         if sends and not closing:
-            proceed, sends = self.check_duplicates(sends)     # Annulla ferma tutto Applica
+            proceed, kept = self.check_duplicates(sends)      # Annulla ferma tutto Applica
+            kept_ids = set()
+            for track in kept:
+                kept_ids.add(id(track))
+            dropped = []
+            remaining = []
+            for job in jobs:
+                if job.action == SEND and id(job.track) not in kept_ids:
+                    dropped.append(job)
+                else:
+                    remaining.append(job)
+            if proceed and dropped:
+                self._window.pending_skipped([job.key for job in dropped])
+                jobs = remaining
+            sends = kept
         anything = bool(sends or removes or updates or replaces or edits)
         if proceed and anything and (self._connected or closing):
             self._run_jobs(jobs, sends, removes, updates, replaces, edits, closing, then)

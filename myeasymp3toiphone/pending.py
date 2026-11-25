@@ -195,32 +195,40 @@ class Pending:
         return result
 
     def _phone_paths(self) -> dict:
-        """{path_key del file del PC: azione} delle voci per brano dell'iPhone (Cambia i tag no), rifatto solo quando
-        le voci cambiano: get() si chiama per ogni brano mostrato."""
+        """{path_key del file del PC: azione} delle voci per brano dell'iPhone (Cambia i tag no)."""
+        result = self._phone_index()[0]
+        return result
+
+    def _phone_index(self) -> tuple:
+        """({path_key: azione}, {path_key: [chiavi delle voci]}) delle voci per brano dell'iPhone con un file del PC
+        (Cambia i tag no), rifatto solo quando cambiano le voci dell'iPhone: get() si chiama per ogni brano mostrato e
+        set() per ogni brano messo in coda (una Copia di migliaia di brani)."""
         if self._paths_cache is None or self._paths_cache[0] != self._version:
             paths = {}
+            keys = {}
             for item_key, item in self.items.items():
                 if item["action"] != EDIT and item_key.startswith(PHONE_PREFIX) and item.get("path"):
-                    paths[path_key(item["path"])] = item["action"]
-            self._paths_cache = (self._version, paths)
+                    file_key = path_key(item["path"])
+                    paths[file_key] = item["action"]
+                    keys.setdefault(file_key, []).append(item_key)
+            self._paths_cache = (self._version, (paths, keys))
         result = self._paths_cache[1]
         return result
 
     def set(self, path, action: str) -> None:
-        """La voce di un file del PC ("" la toglie); toglie le altre azioni sullo stesso file (Cambia i tag a parte)."""
+        """La voce di un file del PC ("" la toglie); toglie le altre azioni sullo stesso file (Cambia i tag a parte).
+        Le voci dei file non entrano nell'indice dell'iPhone: _version cresce solo se se ne toglie una dell'iPhone."""
         key = path_key(path)
-        self._version += 1
         self._drop_path(key)
         if action:
             self.items[FILE_PREFIX + key] = {"action": action, "at": _now()}
 
     def _drop_path(self, key: str) -> None:
-        for item_key in list(self.items):
-            item = self.items[item_key]
-            same_file = item_key == FILE_PREFIX + key or \
-                (bool(item.get("path")) and item["action"] != EDIT and path_key(item["path"]) == key)
-            if same_file:
-                del self.items[item_key]
+        self.items.pop(FILE_PREFIX + key, None)
+        phone_keys = list(self._phone_index()[1].get(key, []))
+        for item_key in phone_keys:
+            if self.items.pop(item_key, None) is not None:
+                self._version += 1
 
     # ------------------------------------------------------------------ per brano dell'iPhone
 
@@ -235,6 +243,8 @@ class Pending:
         """La voce di un brano dell'iPhone; path: il suo file del PC (Ricopia, Usa i tag), le cui altre voci si
         tolgono. Cambia i tag (EDIT) unisce i valori nuovi a quelli già in attesa."""
         key = phone_key(pid)
+        if path and action != EDIT:
+            self._drop_path(path_key(path))   # con l'indice prima che cambi (_version qui sotto)
         self._version += 1
         if action == EDIT:
             entry = self.items.get(key)
@@ -242,8 +252,6 @@ class Pending:
             merged.update(values or {})
             self.items[key] = {"action": EDIT, "values": merged, "at": _now()}
         else:
-            if path:
-                self._drop_path(path_key(path))
             self.items.pop(key, None)
             entry = {"action": action, "at": _now()}
             if path:
