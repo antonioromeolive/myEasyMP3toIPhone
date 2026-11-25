@@ -119,6 +119,55 @@ INSERT INTO container_item VALUES (1, 1, 101, 0), (2, 2, 101, 0), (3, 3, 101, 0)
     assert reminder.splitlines() == ["• Corsa: Canzone A, Canzone B", "• In auto: Canzone A"]
 
 
+def test_playlists_of_a_computer_are_told_apart(tmp_path):
+    """Le playlist messe da un computer (sync_id) si rifanno da sole dopo un rimpiazzo: il promemoria nomina solo
+    quelle fatte sul telefono; i brani di ogni playlist si leggono nel loro ordine."""
+    connection = _database(tmp_path / "MediaLibrary.sqlitedb")
+    connection.executescript("""
+CREATE TABLE container (container_pid INTEGER PRIMARY KEY, distinguished_kind INTEGER, is_hidden INTEGER,
+                        smart_criteria BLOB, smart_is_folder INTEGER, name TEXT, sync_id INTEGER);
+CREATE TABLE container_item (container_item_pid INTEGER PRIMARY KEY, container_pid INTEGER, item_pid INTEGER,
+                             position INTEGER);
+CREATE TABLE db_info (primary_container_pid INTEGER);
+INSERT INTO db_info VALUES (1);
+INSERT INTO container VALUES (1, 0, 1, NULL, 0, 'Libreria', 0), (2, 0, 0, NULL, 0, 'In auto', 0),
+                             (5, 0, 0, NULL, 0, '♪ Gruppo Finto', -9001);
+INSERT INTO container_item VALUES (1, 1, 101, 0), (2, 2, 101, 0), (5, 5, 101, 1), (6, 5, 102, 0);
+""")
+    connection.commit()
+    connection.close()
+    tracks = {t.pid: t for t in read_music_database(tmp_path / "MediaLibrary.sqlitedb")}
+    assert tracks[101].playlists == ("In auto", "♪ Gruppo Finto")
+    assert tracks[101].computer_playlists == ("♪ Gruppo Finto",) and tracks[102].computer_playlists == ("♪ Gruppo Finto",)
+    items = [tracks[101], tracks[102]]
+    assert phone_library.playlist_reminder(items).splitlines() == ["• In auto: Canzone A"]
+    assert phone_library.playlist_reminder(items, from_computer=True).splitlines() == [
+        "• ♪ Gruppo Finto: Canzone A, Canzone B"]
+    phone_library.save_listing(tmp_path, "iPhone", list(tracks.values()))
+    again = {t.pid: t for t in phone_library.load_listing(tmp_path)["tracks"]}
+    assert again[101].computer_playlists == ("♪ Gruppo Finto",)
+    members = {}
+    for playlist, sync_ids in phone_library.playlist_members(tmp_path / "MediaLibrary.sqlitedb"):
+        members[playlist.name] = (playlist.from_computer, sync_ids)
+    big = 1 << 64
+    assert members == {"In auto": (False, [big - 101]), "♪ Gruppo Finto": (True, [big - 102, big - 101])}
+
+
+def test_playlist_after_a_replacement_keeps_its_order():
+    """Dopo un rimpiazzo la playlist ha il brano nuovo al posto di quello vecchio; un brano sparito esce; se un brano
+    nuovo non c'è ancora, la playlist non si rifà (per non perderlo)."""
+    from myeasymp3toiphone.phone_actions import _replaced_ids, _Pending, restored_members
+    assert restored_members([1, 2, 3, 4], {2: 20}, {1, 20, 3}) == ([1, 20, 3], True)    # il 4 non c'è più
+    assert restored_members([1, 2], {2: 20}, {1}) == ([1], False)
+    sent = [_Pending(None, None, 2), _Pending(None, None, 5), _Pending(None, None, 0)]
+    sent[0].sent_as, sent[1].sent_as, sent[2].sent_as = 20, 50, 70
+    assert _replaced_ids(sent, [2]) == {2: 20}           # il 5 vecchio non è stato tolto: due copie, niente scambio
+    from myeasymp3toiphone.gui.iphone_panel import apply_report_text
+    from myeasymp3toiphone.phone_actions import ActionReport
+    report = ActionReport(playlists_restored=["♪ Gruppo Finto", "Corsa"])
+    assert "• 2 playlist rifatte con i brani ricopiati: ♪ Gruppo Finto, Corsa" in apply_report_text(report, [], 0)
+
+
 def test_read_music_database_with_pending_wal_and_no_shm(tmp_path):
     """Il programma scarica il database e il file -wal, non il -shm: le ultime modifiche devono esserci."""
     source = tmp_path / "iphone"

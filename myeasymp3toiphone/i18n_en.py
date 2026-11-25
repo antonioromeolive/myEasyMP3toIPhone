@@ -2861,4 +2861,26 @@ CATALOG = {
         'Folder ({0})',
     "versione vecchia non tolta dall'iPhone (ora ci sono due copie: elimina quella vecchia): ":
         'old version not removed from the iPhone (now there are two copies: delete the old one): ',
+    ' e altre {0}':
+        ' and {0} more',
+    '• {0} playlist rifatte con i brani ricopiati: {1}':
+        '• {0} playlists rebuilt with the copied-again tracks: {1}',
+    '\n\nI brani ricopiati non sono più nelle playlist fatte sul telefono, che il computer non può cambiare: rimettili a mano (app Musica, playlist, Modifica, Aggiungi musica). Quelle messe da un computer (anche le ♪ di Playlist per artista) si rifanno da sole:\n':
+        "\n\nThe copied-again tracks are no longer in the playlists made on the phone, which the computer can't change: put them back by hand (Music app, playlist, Edit, Add Music). Those added by a computer (the ♪ ones of Playlists by artist too) are rebuilt automatically:\n",
+    '\n\nI brani da ricopiare sono in playlist messe da un computer: si rifanno da sole, con i brani nuovi al loro posto:\n':
+        '\n\nThe tracks to copy again are in playlists added by a computer: they are rebuilt automatically, with the new tracks in their place:\n',
+    '\n\nI brani da ricopiare sono in playlist fatte sul telefono: il computer non le può cambiare, andranno sistemate a mano (alla fine te le ricordo):\n':
+        "\n\nThe tracks to copy again are in playlists made on the phone: the computer can't change them, they will need fixing by hand (I'll remind you at the end):\n",
+    'playlist con i brani nuovi: {0}':
+        'playlists with the new tracks: {0}',
+    "playlist non rifatta: i brani nuovi non risultano ancora sull'iPhone e mancano dalla playlist":
+        "playlist not rebuilt: the new tracks aren't on the iPhone yet and are missing from the playlist",
+    'non rifatte con i brani nuovi: ':
+        'not rebuilt with the new tracks: ',
+    'playlist':
+        'playlist',
+    'non rifatte con i brani nuovi (mancano dalle playlist): {0}':
+        'not rebuilt with the new tracks (they are missing from the playlists): {0}',
+    'non lette prima di ricopiare: non si rifanno da sole ({0})':
+        "not read before copying again: they won't be rebuilt automatically ({0})",
 }

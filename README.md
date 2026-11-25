@@ -459,9 +459,13 @@ Tutte vanno **in attesa** e partono con **Applica** (vedi [Le azioni in attesa](
 - **Compilation:** si invia la spunta, con l'artista dell'album ("Artisti vari" se manca): l'album resta intero
   nell'app Musica.
 - **Ricopia** prima copia la versione del PC, poi toglie quella vecchia, solo se la copia è riuscita. Il brano
-  ricopiato perde il conteggio degli ascolti e la presenza nelle playlist fatte sull'iPhone: la finestra di *Applica*
-  e il messaggio alla fine dicono in quali playlist era ciascun brano, così lo rimetti a mano (le playlist smart si
-  aggiornano da sole).
+  ricopiato perde il conteggio degli ascolti. Le **playlist messe da un computer** (le ♪ di *Playlist per artista*,
+  quelle di CopyTrans o iTunes) che lo contenevano **si rifanno da sole**, nello stesso *Applica*: stesso nome, stesso
+  ordine, il brano nuovo al posto di quello vecchio (il messaggio alla fine le elenca). Se il brano nuovo non risulta
+  ancora sull'iPhone la playlist resta com'è, senza di lui, e il messaggio lo dice. Le **playlist fatte sul
+  telefono** il computer non le può cambiare: la finestra di *Applica* e il messaggio alla fine dicono in quali era
+  ciascun brano, così lo rimetti a mano (le playlist smart si aggiornano da sole). Lo stesso vale per gli album
+  ricopiati interi per la grafia.
 - **Una modifica da una parte non cambia l'altra.** Cambiando i tag nella scheda **PC** (editor, scansione,
   *Verifica album online*, *Torna ai tag del file*) l'iPhone resta com'è; con **Cambia i tag** nella scheda **iPhone**
   i file del PC restano come sono. I brani con la sorgente su questo PC diventano ⟳, con il nome del file **in
@@ -491,7 +495,7 @@ Tutte vanno **in attesa** e partono con **Applica** (vedi [Le azioni in attesa](
     i brani messi da un computer (non quelli acquistati sul telefono);
   - **Prova** crea solo "♪ PROVA", una copia della prima playlist spuntata, e non cancella niente: per vedere sul
     telefono che va, prima di farlo davvero. La volta dopo si cancella con le altre.
-  Va fatto dopo aver aggiornato i brani: un brano rimpiazzato è un brano nuovo e non è più nelle playlist vecchie.
+  Dopo un *Ricopia* non serve rifarle: le playlist messe da un computer si rifanno da sole con i brani nuovi.
 - Si possono aggiornare ed eliminare solo i brani messi sull'iPhone da un computer (iTunes, CopyTrans, questo
   programma), non quelli acquistati o scaricati sul telefono.
 - Serve l'iPhone connesso e sbloccato, con la gestione manuale della musica attiva (in *Dispositivi Apple* o in
@@ -539,7 +543,7 @@ Si prende sempre l'album intero, anche i brani non scelti; se è scritto diversa
 album di quell'artista (sull'iPhone la sua riga è una sola). La finestra di *Applica* lo dice, con quanti brani in
 più. Un album con brani senza sorgente associata non si può reinviare intero: i suoi brani si aggiornano come gli
 altri e restano con la grafia dell'iPhone (la finestra lo dice). Il reinvio si fa sempre, anche se l'iPhone tenesse
-i nomi vecchi (allora lo dice). Come *Ricopia*, i brani reinviati perdono ascolti e playlist. Un brano di servizio
+i nomi vecchi (allora lo dice). Come *Ricopia*, i brani reinviati perdono gli ascolti e le playlist fatte sul telefono (quelle di un computer si rifanno da sole). Un brano di servizio
 rimasto da un'operazione interrotta si toglie alla successiva.
 
 **Lo stesso brano in un altro formato.** Ad *Applica*, prima di copiare brani nuovi (*Copia da PC a iPhone*, *Copia
@@ -563,7 +567,7 @@ mostra): gli
 album messi sull'iPhone da altri programmi (CopyTrans, iTunes) possono non avere l'immagine dell'album anche se i
 loro brani hanno la copertina: l'iPhone non ne ha scelta una. Gli album inviati da questo programma ce l'hanno
 sempre. Il comando mette in attesa *Ricopia* per i brani di quegli album con la sorgente associata e l'iPhone
-sceglie l'immagine (provato il 24/11/2026). Come *Ricopia*: perdono ascolti e playlist. Il programma copia sempre
+sceglie l'immagine (provato il 24/11/2026). Come *Ricopia*: perdono gli ascolti e le playlist fatte sul telefono. Il programma copia sempre
 la copertina che sta *dentro* il file (JPEG o PNG); un'immagine a parte nella cartella (`folder.jpg`) non si usa.
 
 Quando un brano ha la

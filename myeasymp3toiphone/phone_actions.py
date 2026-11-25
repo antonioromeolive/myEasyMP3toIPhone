@@ -53,6 +53,7 @@ class ActionReport:
     sessions: int = 0
     sent_tracks: list = field(default_factory=list)    # i brani del PC copiati davvero (library.Track)
     done_sync_ids: list = field(default_factory=list)  # i brani dell'iPhone eliminati o cambiati davvero
+    playlists_restored: list = field(default_factory=list)   # playlist rifatte con i brani rimpiazzati (nomi)
 
     def add(self, other: "ActionReport") -> None:
         """Somma l'esito di un'altra azione (più azioni in un'operazione sola)."""
@@ -61,6 +62,7 @@ class ActionReport:
         self.errors += other.errors
         self.sent_tracks += other.sent_tracks
         self.done_sync_ids += other.done_sync_ids
+        self.playlists_restored += other.playlists_restored
         self.cancelled = self.cancelled or other.cancelled
         self.sessions += other.sessions
 
@@ -399,10 +401,131 @@ def send_tracks(tracks: list, overlay, progress: Optional[ProgressFn] = None,
     return report
 
 
+async def _playlists_with(sync_ids: set) -> list:
+    """Le playlist messe da un computer che contengono questi brani: [(PhonePlaylist, [sync_id in ordine])]. Si
+    leggono prima di un rimpiazzo, che toglie il brano vecchio da tutte le playlist."""
+    from .phone_library import DATABASE_NAME, playlist_members
+    work = Path(tempfile.mkdtemp(prefix="myEasyMP3toIPhone_playlist_"))
+    lockdown = await iphone._open_lockdown()
+    try:
+        await _snapshot(lockdown, work)
+        found = []
+        for playlist, members in playlist_members(work / DATABASE_NAME):
+            touched = False
+            for sync_id in members:
+                if sync_id in sync_ids:
+                    touched = True
+            if playlist.from_computer and touched:
+                found.append((playlist, members))
+    finally:
+        await lockdown.close()
+        shutil.rmtree(work, ignore_errors=True)
+    return found
+
+
+def restored_members(members: list, replaced: dict, present: set) -> tuple:
+    """I brani di una playlist dopo un rimpiazzo: ogni brano vecchio al suo posto con quello nuovo (replaced {vecchio:
+    nuovo}), senza quelli che sull'iPhone non ci sono più. (brani, True se tutti i brani nuovi ci sono già: se no la
+    playlist resta com'è, per non perderli)."""
+    result = []
+    complete = True
+    for sync_id in members:
+        new_id = replaced.get(sync_id, sync_id)
+        if new_id in present:
+            result.append(new_id)
+        elif sync_id in replaced:
+            complete = False
+    outcome = (result, complete)
+    return outcome
+
+
+async def _restore_playlists(before: list, replaced: dict, progress: Optional[ProgressFn],
+                             report: ActionReport) -> None:
+    """Rifà le playlist (messe da un computer) che contenevano i brani rimpiazzati: stesso nome, stesso ordine, il
+    brano nuovo al posto di quello vecchio; poi cancella quella vecchia. Le playlist fatte sul telefono il computer
+    non le può cambiare."""
+    from .phone_library import DATABASE_NAME, container_ids
+    changed = []
+    for playlist, members in before:
+        touched = False
+        for sync_id in members:
+            if sync_id in replaced:
+                touched = True
+        if touched:
+            changed.append((playlist, members))
+    if changed:
+        work = Path(tempfile.mkdtemp(prefix="myEasyMP3toIPhone_playlist_"))
+        lockdown = await iphone._open_lockdown()
+        try:
+            if progress is not None:
+                progress(0, 0, f"playlist con i brani nuovi: {len(changed)}")
+            snapshot = await _snapshot(lockdown, work)
+            expected = set(replaced.values())
+            if not expected <= snapshot.track_ids:
+                await asyncio.sleep(RECHECK_DELETE_SECONDS)   # l'iPhone può mostrare i brani nuovi un po' dopo
+                snapshot = await _snapshot(lockdown, work)
+            used = container_ids(work / DATABASE_NAME)
+            start = 0
+            while start < len(changed):
+                operations = []
+                names = []
+                for playlist, members in changed[start:start + BATCH_PLAYLISTS // 2]:
+                    new_members, complete = restored_members(members, replaced, snapshot.track_ids)
+                    if complete and new_members:
+                        operations.append(phone_sync.insert_playlist(_Snapshot._fresh(used), playlist.name,
+                                                                     new_members, _now()))
+                        operations.append(phone_sync.delete_playlist(playlist.sync_id))
+                        names.append(playlist.name)
+                    else:
+                        report.errors.append((playlist.name, "playlist non rifatta: i brani nuovi non risultano "
+                                                             "ancora sull'iPhone e mancano dalla playlist"))
+                if operations:
+                    try:
+                        await _run(lockdown, snapshot, operations, [], report)
+                        report.playlists_restored += names
+                    except PhoneSyncError as exc:
+                        report.errors.append((f"{len(names)} playlist", "non rifatte con i brani nuovi: " + str(exc)))
+                    if start + BATCH_PLAYLISTS // 2 < len(changed):
+                        snapshot = await _snapshot(lockdown, work)
+                start += BATCH_PLAYLISTS // 2
+        finally:
+            await lockdown.close()
+            shutil.rmtree(work, ignore_errors=True)
+
+
+async def _restore_safely(before: list, replaced: dict, progress: Optional[ProgressFn], report: ActionReport) -> None:
+    """_restore_playlists dopo un rimpiazzo già fatto: un errore lo dice, non annulla il rimpiazzo."""
+    try:
+        await _restore_playlists(before, replaced, progress, report)
+    except Exception as exc:  # noqa: BLE001 - i brani sono già rimpiazzati
+        log.warning("Playlist non rifatte dopo il rimpiazzo: %s", exc)
+        report.errors.append(("playlist", f"non rifatte con i brani nuovi (mancano dalle playlist): {exc}"))
+
+
+def _in_playlists(phone_tracks: list) -> set:
+    """I sync_id dei brani che stanno in almeno una playlist (senza: niente da leggere né da rifare)."""
+    result = set()
+    for phone_track in phone_tracks:
+        if phone_track.playlists:
+            result.add(phone_track.sync_id)
+    return result
+
+
+def _replaced_ids(sent: list, removed: list) -> dict:
+    """{sync_id vecchio: sync_id nuovo} dei brani rimpiazzati davvero (inviato il nuovo e tolto il vecchio)."""
+    gone = set(removed)
+    result = {}
+    for item in sent:
+        if item.replaces and item.replaces in gone:
+            result[item.replaces] = item.sent_as
+    return result
+
+
 def replace_tracks(pairs: list, overlay, progress: Optional[ProgressFn] = None,
                    cancel: Optional[threading.Event] = None, home: Optional[Path] = None) -> ActionReport:
     """pairs: (PhoneTrack, Track del PC). Prima si invia la versione del PC; solo per i brani inviati davvero si toglie
-    la versione vecchia. Si perdono i conteggi degli ascolti e la presenza nelle playlist del brano vecchio."""
+    la versione vecchia. Si perdono i conteggi degli ascolti; le playlist messe da un computer che contenevano il
+    brano vecchio si rifanno con quello nuovo (_restore_playlists), quelle fatte sul telefono no."""
     report = ActionReport()
     pending = []
     for phone_track, track in pairs:
@@ -415,8 +538,19 @@ def replace_tracks(pairs: list, overlay, progress: Optional[ProgressFn] = None,
             pending.append(_Pending(track, cover, phone_track.sync_id))
 
     registry = provenance.Registry.load(home) if home is not None else None
+    phone_tracks = []
+    for phone_track, _track in pairs:
+        phone_tracks.append(phone_track)
+    listed = _in_playlists(phone_tracks)
 
     async def work():
+        before = []
+        if listed:
+            try:
+                before = await _playlists_with(listed)
+            except Exception as exc:  # noqa: BLE001 - senza le playlist il rimpiazzo si fa lo stesso
+                log.warning("Playlist non lette prima del rimpiazzo: %s", exc)
+                report.errors.append(("playlist", f"non lette prima di ricopiare: non si rifanno da sole ({exc})"))
         sent = await _send_batches(pending, progress, cancel, report, registry, overlay, home)
         old = []
         for item in sent:
@@ -428,6 +562,8 @@ def replace_tracks(pairs: list, overlay, progress: Optional[ProgressFn] = None,
             for name, message in removal.errors + removal.skipped:
                 report.errors.append((name, "versione vecchia non tolta dall'iPhone (ora ci sono due copie: "
                                             "elimina quella vecchia): " + message))
+            if before:
+                await _restore_safely(before, _replaced_ids(sent, removal.done_sync_ids), progress, report)
 
     if pending:
         iphone._run(work())
@@ -513,9 +649,21 @@ def align_spelling(pairs: list, overlay, progress: Optional[ProgressFn] = None,
         if "album_artist" in spelling_differences(track.tags, phone_track.tags):
             artist_keys.add(phone_group_key(artist))     # solo gli artisti da riscrivere: gli altri restano
 
+    phone_tracks = []
+    for phone_track, _track in pairs:
+        phone_tracks.append(phone_track)
+    listed = _in_playlists(phone_tracks)
+
     async def work():
         folder = Path(tempfile.mkdtemp(prefix="myEasyMP3toIPhone_servizio_"))
         try:
+            before = []
+            if listed:
+                try:
+                    before = await _playlists_with(listed)
+                except Exception as exc:  # noqa: BLE001 - senza le playlist si va avanti lo stesso
+                    log.warning("Playlist non lette prima di allineare la grafia: %s", exc)
+                    report.errors.append(("playlist", f"non lette prima di ricopiare: non si rifanno da sole ({exc})"))
             service = _service_pending(service_padding(len(pairs) + len(leftovers)), folder)
             service_report = ActionReport()
             sent_service = await _send_batches(service, progress, cancel, service_report)
@@ -546,8 +694,10 @@ def align_spelling(pairs: list, overlay, progress: Optional[ProgressFn] = None,
                 for phone_track, track in pairs:
                     if phone_track.sync_id not in present:      # tolto davvero: si reinvia
                         cover = overlay.cover_for(track.path) if overlay is not None else None
-                        pending.append(_Pending(track, cover))
-                await _send_batches(pending, progress, None, report, registry, overlay, home)
+                        pending.append(_Pending(track, cover, phone_track.sync_id))
+                resent = await _send_batches(pending, progress, None, report, registry, overlay, home)
+                if before:
+                    await _restore_safely(before, _replaced_ids(resent, removal.done_sync_ids), progress, report)
                 if albums_left or artists_left:
                     report.errors.append((f"{len(albums_left)} album e {len(artists_left)} artisti",
                                           "l'iPhone non ha cancellato i nomi vecchi: i brani sono tornati con la "

@@ -215,6 +215,10 @@ def apply_report_text(report, done: list, total: int) -> str:
             lines.append(f"• 1 {tr(one)}")
         elif count:
             lines.append(f"• {count} {tr(many)}")
+    restored = report.playlists_restored
+    if restored:
+        shown = ", ".join(restored[:6]) + (f" e altre {len(restored) - 6}" if len(restored) > 6 else "")
+        lines.append(tr(f"• {len(restored)} playlist rifatte con i brani ricopiati: {shown}"))
     if lines:
         message = tr("Fatto sull'iPhone:") + "\n" + "\n".join(lines)
     else:
@@ -270,12 +274,14 @@ def _playlist_report_text(report, phone_playlists: list) -> str:
 
 
 def _playlist_note(phone_tracks: list) -> str:
-    """Il promemoria delle playlist da sistemare a mano dopo un rimpiazzo ("" se non ce ne sono)."""
+    """Il promemoria delle playlist fatte sul telefono da sistemare a mano dopo un rimpiazzo ("" se non ce ne sono):
+    quelle messe da un computer si rifanno da sole (phone_actions._restore_playlists) e le dice l'esito."""
     reminder = playlist_reminder(phone_tracks)
     result = ""
     if reminder:
-        result = ("\n\nI brani rimpiazzati non sono più nelle playlist fatte sull'iPhone: rimettili a mano (app "
-                  "Musica, playlist, Modifica, Aggiungi musica):\n" + reminder)
+        result = ("\n\nI brani ricopiati non sono più nelle playlist fatte sul telefono, che il computer non può "
+                  "cambiare: rimettili a mano (app Musica, playlist, Modifica, Aggiungi musica). Quelle messe da un "
+                  "computer (anche le ♪ di Playlist per artista) si rifanno da sole:\n" + reminder)
     return result
 
 
@@ -1770,10 +1776,14 @@ class IPhonePanel(QWidget):
         replaced = []
         for phone_track, _track in replaces + whole:
             replaced.append(phone_track)
+        automatic = playlist_reminder(replaced, from_computer=True)
+        if automatic:
+            text += ("\n\nI brani da ricopiare sono in playlist messe da un computer: si rifanno da sole, con i "
+                     "brani nuovi al loro posto:\n" + automatic)
         reminder = playlist_reminder(replaced)
         if reminder:
-            text += "\n\nI brani da ricopiare sono nelle playlist fatte sull'iPhone (alla fine te le ricordo):\n" + \
-                reminder
+            text += ("\n\nI brani da ricopiare sono in playlist fatte sul telefono: il computer non le può cambiare, "
+                     "andranno sistemate a mano (alla fine te le ricordo):\n" + reminder)
         return text
 
     @staticmethod

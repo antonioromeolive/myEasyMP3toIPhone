@@ -63,7 +63,7 @@ WHERE NOT EXISTS (SELECT 1 FROM best_artwork_token b
 
 # le playlist normali: non la libreria (nascosta), non le smart (si aggiornano da sole), non le cartelle
 _PLAYLIST_QUERY = """
-SELECT ci.item_pid, c.name
+SELECT ci.item_pid, c.name, c.sync_id
 FROM container_item ci
 JOIN container c ON c.container_pid = ci.container_pid
 WHERE c.distinguished_kind = 0 AND c.is_hidden = 0 AND c.smart_criteria IS NULL AND c.smart_is_folder = 0
@@ -81,6 +81,16 @@ LEFT JOIN container_item ci ON ci.container_pid = c.container_pid
 WHERE c.distinguished_kind = 0 AND c.is_hidden = 0 AND c.smart_criteria IS NULL AND c.smart_is_folder = 0
 GROUP BY c.container_pid
 ORDER BY c.name
+"""
+
+# i brani (sync_id) delle playlist normali, nell'ordine della playlist
+_MEMBERS_QUERY = """
+SELECT ci.container_pid, s.sync_id
+FROM container_item ci
+JOIN container c ON c.container_pid = ci.container_pid
+JOIN item_store s ON s.item_pid = ci.item_pid
+WHERE c.distinguished_kind = 0 AND c.is_hidden = 0 AND c.smart_criteria IS NULL AND c.smart_is_folder = 0
+ORDER BY ci.container_pid, ci.position
 """
 
 
@@ -112,6 +122,7 @@ class PhoneTrack:
     album_sync_id: int = 0
     artist_sync_id: int = 0   # dell'artista dell'album
     playlists: tuple = ()     # le playlist fatte a mano che lo contengono (non le smart)
+    computer_playlists: tuple = ()   # quelle tra loro messe da un computer: dopo un rimpiazzo si rifanno da sole
     missing_file: bool = False   # "fantasma": nel database dell'app Musica, ma il suo file sull'iPhone non c'è
     album_without_cover: bool = False   # il suo album sull'iPhone non ha l'immagine (_COVERLESS_ALBUM_QUERY)
 
@@ -153,6 +164,16 @@ def _unsigned(value) -> int:
     return result
 
 
+def _of_computer(names, from_computer: set) -> tuple:
+    """Le playlist tra names messe da un computer."""
+    found = []
+    for name in names:
+        if name in from_computer:
+            found.append(name)
+    result = tuple(found)
+    return result
+
+
 def read_music_database(path: Path) -> list:
     """I brani con un file sull'iPhone (non quelli solo in streaming), dalla copia del database in path. Se accanto
     c'è il file -wal, SQLite ne legge anche le ultime modifiche."""
@@ -164,7 +185,10 @@ def read_music_database(path: Path) -> list:
             try:
                 playlist_rows = connection.execute(_PLAYLIST_QUERY).fetchall()
             except sqlite3.Error:
-                playlist_rows = []      # senza le playlist si va avanti: servono solo come promemoria
+                try:                    # senza sync_id delle playlist: tutte come fatte sul telefono
+                    playlist_rows = connection.execute(_PLAYLIST_QUERY.replace(", c.sync_id", ", 0")).fetchall()
+                except sqlite3.Error:
+                    playlist_rows = []  # senza le playlist si va avanti: servono solo come promemoria
             coverless = set()
             try:
                 for (album_sync_id,) in connection.execute(_COVERLESS_ALBUM_QUERY):
@@ -177,10 +201,13 @@ def read_music_database(path: Path) -> list:
     except sqlite3.Error as exc:
         raise PhoneLibraryError(f"il database dell'app Musica non si legge ({exc})") from exc
     playlists = {}
-    for item_pid, name in playlist_rows:
+    from_computer = set()
+    for item_pid, name, container_sync_id in playlist_rows:
         names = playlists.setdefault(int(item_pid), [])
-        if name not in names:
+        if _text(name) not in names:
             names.append(_text(name))
+        if _unsigned(container_sync_id):
+            from_computer.add(_text(name))
     for (pid, title, artist, album_artist, album, genre, year, track_number, track_count, disc_number, disc_count,
          total_ms, location, file_size, base, sync_id, album_sync_id, artist_sync_id, compilation) in rows:
         year_number = _number(year)
@@ -194,6 +221,7 @@ def read_music_database(path: Path) -> list:
                                  length=(_number(total_ms) or 0) / 1000.0, tags=tags, sync_id=_unsigned(sync_id),
                                  album_sync_id=_unsigned(album_sync_id), artist_sync_id=_unsigned(artist_sync_id),
                                  playlists=tuple(playlists.get(int(pid), ())),
+                                 computer_playlists=_of_computer(playlists.get(int(pid), ()), from_computer),
                                  album_without_cover=_unsigned(album_sync_id) in coverless))
     tracks.sort(key=lambda item: (group_name(item.display_artist), group_name(item.tags.album),
                                   item.tags.disc_number or 1, item.tags.track_number or 9999,
@@ -223,6 +251,26 @@ def read_playlists(path: Path) -> list:
     return result
 
 
+def playlist_members(path: Path) -> list:
+    """[(PhonePlaylist, [sync_id dei brani, nell'ordine])] delle playlist normali, dalla copia del database in path."""
+    playlists = read_playlists(path)
+    members = {}
+    try:
+        connection = sqlite3.connect(str(path))
+        try:
+            for container_pid, sync_id in connection.execute(_MEMBERS_QUERY):
+                if _unsigned(sync_id):
+                    members.setdefault(_unsigned(container_pid), []).append(_unsigned(sync_id))
+        finally:
+            connection.close()
+    except sqlite3.Error as exc:
+        raise PhoneLibraryError(f"le playlist dell'app Musica non si leggono ({exc})") from exc
+    result = []
+    for playlist in playlists:
+        result.append((playlist, members.get(playlist.pid, [])))
+    return result
+
+
 def container_ids(path: Path) -> set:
     """Tutti gli identificativi delle playlist dell'iPhone (container_pid e sync_id): uno nuovo non deve essere tra
     questi."""
@@ -245,6 +293,7 @@ def container_ids(path: Path) -> set:
 def save_listing(home: Path, device: str, tracks: list) -> None:
     rows = []
     playlists = {}
+    from_computer = set()
     missing = []
     coverless = []
     for item in tracks:
@@ -252,6 +301,7 @@ def save_listing(home: Path, device: str, tracks: list) -> None:
                      item.album_sync_id, item.artist_sync_id])
         if item.playlists:
             playlists[str(item.pid)] = list(item.playlists)
+        from_computer.update(item.computer_playlists)
         if item.missing_file:
             missing.append(item.pid)
         if item.album_without_cover:
@@ -259,7 +309,8 @@ def save_listing(home: Path, device: str, tracks: list) -> None:
     # playlist, fantasmi e album senza immagine a parte: le righe restano quelle che le versioni precedenti sanno
     # leggere
     data = {"version": LISTING_VERSION, "device": device, "saved_at": time.strftime("%Y-%m-%d %H:%M"),
-            "tracks": rows, "playlists": playlists, "missing_files": missing, "albums_without_cover": coverless}
+            "tracks": rows, "playlists": playlists, "computer_playlists": sorted(from_computer),
+            "missing_files": missing, "albums_without_cover": coverless}
     home.mkdir(parents=True, exist_ok=True)
     path = home / LISTING_FILE
     temporary = path.with_name(path.name + ".tmp")
@@ -275,6 +326,9 @@ def load_listing(home: Path) -> dict:
         if data.get("version") == LISTING_VERSION:
             tracks = []
             playlists = data.get("playlists") or {}
+            from_computer = set()
+            for name in data.get("computer_playlists") or []:
+                from_computer.add(str(name))
             missing = set()
             for pid in data.get("missing_files") or []:
                 missing.add(int(pid))
@@ -292,7 +346,9 @@ def load_listing(home: Path) -> dict:
                 tracks.append(PhoneTrack(pid=int(pid), remote_path=str(remote), size=int(size),
                                          length=float(length), tags=TrackTags(**known), sync_id=int(sync_id),
                                          album_sync_id=int(album_sync_id), artist_sync_id=int(artist_sync_id),
-                                         playlists=tuple(names), missing_file=int(pid) in missing,
+                                         playlists=tuple(names),
+                                         computer_playlists=_of_computer(names, from_computer),
+                                         missing_file=int(pid) in missing,
                                          album_without_cover=int(pid) in coverless))
             result = {"device": str(data.get("device", "")), "saved_at": str(data.get("saved_at", "")),
                       "tracks": tracks}
@@ -497,12 +553,15 @@ def changed_fields(pc_tags: TrackTags, phone_tags: TrackTags) -> list:
     return result
 
 
-def playlist_reminder(phone_tracks: list) -> str:
-    """Le playlist dell'iPhone in cui rimettere a mano i brani (dopo un rimpiazzo): una riga per playlist."""
+def playlist_reminder(phone_tracks: list, from_computer: bool = False) -> str:
+    """Le playlist dell'iPhone che contengono i brani da rimpiazzare, una riga per playlist: quelle fatte sul telefono
+    (da sistemare a mano: il computer non le può cambiare) o, con from_computer, quelle messe da un computer (si
+    rifanno da sole con i brani nuovi, phone_actions)."""
     by_playlist = {}
     for item in phone_tracks:
         for name in item.playlists:
-            by_playlist.setdefault(name, []).append(item.tags.title or "?")
+            if (name in item.computer_playlists) == from_computer:
+                by_playlist.setdefault(name, []).append(item.tags.title or "?")
     lines = []
     for name in sorted(by_playlist, key=str.lower):
         titles = by_playlist[name]
