@@ -2439,6 +2439,10 @@ CATALOG = {
         "<b>Pending actions for {0}: {1}</b>. The ✕ (or Delete on the selected rows) removes an action: it won't run, the track stays as it is and you can add it again from the tabs.",
     'Togli le selezionate':
         'Remove the selected',
+    'Associa sorgenti: cartelle che non ci sono, saltate: {0}':
+        "Link sources: folders that don't exist, skipped: {0}",
+    'Scrivi la cartella dove cercare.':
+        'Write the folder to search in.',
     'Toglie dalla coda le azioni delle righe selezionate (anche il tasto Canc)':
         'Removes the actions of the selected rows from the queue (the Delete key too)',
     "Tolto dalla coda 1 brano già sull'iPhone in un altro formato.":

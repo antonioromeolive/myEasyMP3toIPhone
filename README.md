@@ -898,6 +898,10 @@ La casella *…e i nomi dubbi anche su MusicBrainz* (sotto *Artisti scritti in m
    la Libreria scelta, così una versione precedente del programma la trova ancora), altrimenti
    `%USERPROFILE%\Music\myEasyMP3toIPhone`.
 
+Una cartella dell'elenco dentro un'altra (per esempio la Libreria dentro la cartella principale) si legge una volta
+sola, con quella che la contiene; la stessa cartella non si aggiunge due volte, comunque scritta. Una cartella che non
+c'è (disco scollegato) si salta: *La mia musica* e *Associa sorgenti* usano le altre e lo dicono.
+
 Le impostazioni della prima versione nel registro di Windows si copiano una volta, solo se `settings.json` non
 esiste.
 

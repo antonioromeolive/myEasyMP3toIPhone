@@ -105,6 +105,24 @@ def _format_length(seconds: float) -> str:
     return result
 
 
+def outermost_folders(folders: list) -> list:
+    """Le cartelle da leggere: senza quelle uguali o dentro un'altra dell'elenco (la Libreria dentro la cartella
+    principale), che si leggerebbero due volte. L'ordine resta."""
+    result = []
+    for folder in folders:
+        inside = False
+        for other in folders:
+            if path_key(other) != path_key(folder) and Path(folder).is_relative_to(other):
+                inside = True
+        already = False
+        for kept in result:
+            if path_key(kept) == path_key(folder):
+                already = True
+        if not inside and not already:
+            result.append(folder)
+    return result
+
+
 
 
 class MainWindow(QMainWindow):
@@ -600,7 +618,10 @@ class MainWindow(QMainWindow):
         """La mia musica: tutte le cartelle della musica di questo computer insieme (la Libreria si crea se manca)."""
         library = self.library_dir()
         if library in self.music_dirs():
-            library.mkdir(parents=True, exist_ok=True)
+            try:
+                library.mkdir(parents=True, exist_ok=True)
+            except OSError as exc:             # disco scollegato, permessi: si aprono le altre cartelle
+                QMessageBox.warning(self, "Libreria", f"La Libreria {library} non c'è e non si può creare: {exc}")
         folders = self._existing_music_dirs()
         if folders:
             self.load_folders(folders)
@@ -761,11 +782,12 @@ class MainWindow(QMainWindow):
         if self._album_job is not None and self._album_job.running:
             self._stop_album_check()           # i risultati varrebbero per i brani di prima
         folders = list(folders)
+        to_scan = outermost_folders(folders)
 
         def work(progress, cancel):
             value = []
             seen = set()
-            for folder in folders:
+            for folder in to_scan:
                 if not cancel.is_set():
                     for track in scan_folder(folder, progress, cancel, self.tag_cache, force):
                         key = path_key(track.path)

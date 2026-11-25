@@ -157,6 +157,52 @@ def test_music_folders_of_this_computer(tmp_path):
     window.close()
 
 
+def test_nested_music_folders_read_once(tmp_path, monkeypatch):
+    """Una cartella della musica dentro un'altra (la Libreria dentro la cartella principale) si legge una volta sola;
+    in Impostazioni la stessa cartella scritta con "/" non si aggiunge due volte."""
+    from pathlib import Path
+    from conftest import write_mp3
+    from myeasymp3toiphone.config import AppSettings
+    from myeasymp3toiphone.gui import main_window as mw
+    from myeasymp3toiphone.gui.settings_dialog import SettingsDialog
+    app = QApplication.instance() or QApplication([])
+    main = tmp_path / "Musica"
+    library = main / "Libreria"
+    write_mp3(main / "Gruppo" / "a.mp3")
+    write_mp3(library / "Gruppo" / "b.mp3")
+    assert mw.outermost_folders([library, main, Path(str(main).upper())]) == [main]
+    assert mw.outermost_folders([main, tmp_path / "Musica2"]) == [main, tmp_path / "Musica2"]
+    scanned = []
+    original = mw.scan_folder
+
+    def counting(folder, *args):
+        scanned.append(folder)
+        result = original(folder, *args)
+        return result
+
+    monkeypatch.setattr(mw, "scan_folder", counting)
+    settings = AppSettings(last_opened=mw.MUSIC_MARK)
+    settings.set_music_dirs([str(main), str(library)], str(library))
+    settings.save()
+    window = mw.MainWindow()
+    _wait(window, app)
+    assert scanned == [main] and len(window.tracks) == 2 and window.showing_music()
+    window._exit_checked = True
+    window.close()
+    dialog = SettingsDialog(AppSettings.load())
+    count = dialog.f_list.count()
+    assert not dialog.add_music_folder(str(main).replace("\\", "/"))
+    assert dialog.add_music_folder(str(tmp_path / "Altro").replace("\\", "/"))
+    assert dialog.f_list.count() == count + 1 and dialog.music_folders()[-1] == str(tmp_path / "Altro")
+    dialog.reject()
+
+    # Associa sorgenti: le cartelle che ci sono (una volta sola), quelle scollegate a parte, il campo vuoto non vale
+    from myeasymp3toiphone.gui.iphone_panel import adopt_folders
+    gone = tmp_path / "Disco scollegato"
+    assert adopt_folders([main, library, gone]) == ([main], [str(gone)])
+    assert adopt_folders([Path("")]) == ([], [])
+
+
 def test_hide_folder_in_pc_tab(tmp_path):
     """Nascondi la cartella: i suoi brani (e quelli delle sottocartelle) spariscono dalla scheda PC, si ricorda, si
     mostrano di nuovo. I file non cambiano."""

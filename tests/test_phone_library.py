@@ -1447,6 +1447,32 @@ def test_everything_for_the_iphone_waits_for_apply(tmp_path, monkeypatch):
         app.processEvents()
 
 
+def test_change_tags_on_the_iphone_checks_and_converts_the_values(monkeypatch):
+    """Cambia i tag (scheda iPhone): i numeri si controllano ("²" no), un campo uguale o vuoto non cambia, 0 svuota; con
+    "Anche sul PC" i valori diventano quelli di un TrackTags del PC."""
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtWidgets import QApplication, QMessageBox
+    from myeasymp3toiphone.gui.iphone_panel import PhoneTagDialog, _pc_value
+    app = QApplication.instance() or QApplication([])
+    warnings = []
+    monkeypatch.setattr(QMessageBox, "warning", lambda *args: warnings.append(args[2]))
+    monkeypatch.setattr(QMessageBox, "information", lambda *args: warnings.append(args[2]))
+    dialog = PhoneTagDialog(None, [_phone(1, "Uno", "Gruppo Finto", "Disco", year="2000")], 1)
+    dialog.fields["year"].setText("²")
+    dialog._check()
+    assert warnings == ["year: serve un numero"] and dialog.values == {}
+    dialog.fields["year"].setText("0")                                  # 0 svuota
+    dialog.fields["track_number"].setText(" 7 ")
+    dialog.fields["album"].setText("Disco")                             # uguale: non cambia
+    dialog._check()
+    assert dialog.values == {"year": 0, "track_number": 7} and not dialog.also_pc
+    assert (_pc_value("year", 0), _pc_value("year", 1999), _pc_value("track_number", 0),
+            _pc_value("disc_number", 2), _pc_value("compilation", 1), _pc_value("genre", "Jazz")) == \
+        ("", "1999", None, 2, True, "Jazz")
+    dialog.close()
+    app.processEvents()
+
+
 def test_filter_chips_and_action_bars(tmp_path):
     """I filtri a pulsanti contano i brani e filtrano la tabella; la barra delle azioni ha le voci del tasto destro
     per i brani scelti; il menu Strumenti della scheda iPhone si riempie all'apertura."""

@@ -8,6 +8,7 @@ chiave o indirizzo accetta $NOME; scritti in chiaro vanno nella Gestione credenz
 from __future__ import annotations
 
 import copy
+import os
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -26,6 +27,7 @@ from ..config import (
     get_secret, import_calibre_tools_key, literal_text, load_profiles, new_profile, save_profiles, set_secret,
     variable_in,
 )
+from ..overlay import path_key
 from .theme import mark_danger
 
 NO_AI = "(nessuna: solo le regole)"
@@ -146,9 +148,21 @@ class SettingsDialog(QDialog):
 
     def _add_folder(self) -> None:
         folder = QFileDialog.getExistingDirectory(self, "Una cartella della musica", self._library)
-        if folder and folder not in self.music_folders():
+        if folder:
+            self.add_music_folder(folder)
+
+    def add_music_folder(self, folder: str) -> bool:
+        """Aggiunge una cartella all'elenco (scritta alla Windows: la finestra di scelta la dà con "/"); False se c'è
+        già, comunque scritta."""
+        folder = os.path.normpath(folder)
+        known = set()
+        for existing in self.music_folders():
+            known.add(path_key(existing))
+        result = path_key(folder) not in known
+        if result:
             self._add_folder_item(folder)
             self.f_list.setCurrentRow(self.f_list.count() - 1)
+        return result
 
     def _remove_folder(self) -> None:
         row = self.f_list.currentRow()

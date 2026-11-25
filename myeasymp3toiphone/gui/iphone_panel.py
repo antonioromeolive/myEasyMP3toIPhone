@@ -98,6 +98,24 @@ PENDING_NAMES = {SEND: "Copia da PC a iPhone", REMOVE: "Elimina dall'iPhone", DE
                  EDIT: "Cambia i tag sull'iPhone"}
 
 
+def adopt_folders(folders: list) -> tuple:
+    """Dove cerca Associa sorgenti: (cartelle che ci sono, senza quelle dentro un'altra; [cartelle che non ci sono]).
+    Un percorso vuoto (campo non scritto) non vale: Path("") sarebbe la cartella corrente del programma."""
+    from .main_window import outermost_folders
+    existing = []
+    missing = []
+    for folder in folders:
+        text = str(folder).strip()
+        if text in ("", "."):
+            pass
+        elif Path(text).is_dir():
+            existing.append(Path(text))
+        else:
+            missing.append(text)
+    result = (outermost_folders(existing), missing)
+    return result
+
+
 def _pc_value(name: str, value):
     """Un valore di Cambia i tag (scheda iPhone) come lo vuole un TrackTags del PC: anno come testo, numeri interi
     (0 = vuoto), compilation booleana."""
@@ -335,7 +353,7 @@ class PhoneTagDialog(QDialog):
             text = edit.text().strip()
             if edit.isEnabled() and text and text != self._original[name]:
                 if name in ("year", "track_number", "disc_number"):
-                    if text.isdigit() and int(text) <= 9999:
+                    if text.isascii() and text.isdigit() and int(text) <= 9999:   # "²" è isdigit ma non un int
                         values[name] = int(text)
                     else:
                         problem = f"{name.replace('_', ' ')}: serve un numero"
@@ -2000,18 +2018,20 @@ class IPhonePanel(QWidget):
                                     window.music_dirs(), to_read, self._connected,
                                     provider.profile.name if provider is not None else "")
         if dialog.exec():
-            folders = dialog.folders()
             items = list(selected) if dialog.selected_only else unknown
-            missing = []
-            for folder in folders:
-                if not folder.is_dir():
-                    missing.append(str(folder))
-            if missing or not folders:
-                QMessageBox.warning(self, "Associa sorgenti", f"La cartella non c'è: {', '.join(missing)}")
+            found, missing = adopt_folders(dialog.folders())
+            if not found:
+                if missing:
+                    QMessageBox.warning(self, "Associa sorgenti", f"La cartella non c'è: {', '.join(missing)}")
+                else:
+                    QMessageBox.warning(self, "Associa sorgenti", "Scrivi la cartella dove cercare.")
             elif not items:
                 QMessageBox.information(self, "Associa sorgenti", "Nessun brano da associare.")
             else:
-                self._run_adopt(items, folders, dialog.use_fingerprint, provider if dialog.use_ai else None,
+                if missing:                    # una cartella della musica su un disco scollegato: le altre sì
+                    window.statusBar().showMessage(f"Associa sorgenti: cartelle che non ci sono, saltate: "
+                                                   f"{', '.join(missing)}", 15000)
+                self._run_adopt(items, found, dialog.use_fingerprint, provider if dialog.use_ai else None,
                                 dialog.selected_only)
 
     def _run_adopt(self, items: list, folders: list, use_fingerprint: bool, provider, replace_known: bool) -> None:
