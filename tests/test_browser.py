@@ -235,3 +235,27 @@ def test_hide_folder_in_pc_tab(tmp_path):
     finally:
         window.close()
         app.processEvents()
+
+
+def test_clipboard_menu_copies_folder_names_and_paths():
+    """Copia negli appunti: nome e percorso della cartella, ogni cartella una volta sola."""
+    from pathlib import Path
+    from PySide6.QtWidgets import QMenu
+    from myeasymp3toiphone.gui.file_actions import add_file_entries
+    app = QApplication.instance() or QApplication([])
+    paths = [Path("C:/m/Gruppo Finto/Disco Uno/1.mp3"), Path("C:/m/Gruppo Finto/Disco Uno/2.mp3"),
+             Path("C:/m/Gruppo Finto/Disco Due/1.mp3")]
+    said = []
+    menu = QMenu()
+    add_file_entries(menu, paths, said.append)
+    clipboard = menu.actions()[0].menu()
+    actions = {}
+    for action in clipboard.actions():
+        actions[action.text()] = action
+    assert list(actions) == ["Nome del file (3)", "Percorso completo (3)", "Nome della cartella (2)",
+                             "Percorso della cartella (2)"]
+    actions["Nome della cartella (2)"].trigger()
+    assert app.clipboard().text() == "Disco Uno\nDisco Due"
+    actions["Percorso della cartella (2)"].trigger()
+    assert app.clipboard().text().splitlines() == [str(paths[0].parent), str(paths[2].parent)]
+    assert said[-1] == "Copiati negli appunti i percorsi di 2 cartelle"

@@ -2907,4 +2907,12 @@ CATALOG = {
         "Not put on the iPhone by a computer (bought, downloaded or from another program): the tags are shown but can't be changed",
     '{0} dei brani scelti non sono stati messi da un computer: i loro tag non cambiano':
         "{0} of the chosen tracks were not put there by a computer: their tags don't change",
+    'Copiati negli appunti i nomi di {0} cartelle':
+        'Copied the names of {0} folders to the clipboard',
+    'Copiati negli appunti i percorsi di {0} cartelle':
+        'Copied the paths of {0} folders to the clipboard',
+    'Nome della cartella ({0})':
+        'Folder name ({0})',
+    'Percorso della cartella ({0})':
+        'Folder path ({0})',
 }

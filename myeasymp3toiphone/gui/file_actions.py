@@ -68,7 +68,7 @@ def open_in_explorer(paths: list) -> int:
 
 
 def add_file_entries(menu: QMenu, paths: list, status=None) -> None:
-    """Le voci Copia negli appunti (sottomenu: Nome del file / Percorso completo / Cartella) e Apri la cartella, per i
+    """Le voci Copia negli appunti (sottomenu: Nome del file / Percorso completo / Nome e Percorso della cartella) e Apri la cartella, per i
     file dati.
     status(testo): dove dire cosa è successo (la barra di stato)."""
     count = len(paths)
@@ -86,9 +86,13 @@ def add_file_entries(menu: QMenu, paths: list, status=None) -> None:
         copy_text(paths_text(paths))
         say(f"Copiati negli appunti i percorsi di {count} file")
 
+    def copy_folder_names() -> None:
+        copy_text(names_text(distinct))
+        say(f"Copiati negli appunti i nomi di {len(distinct)} cartelle")
+
     def copy_folders() -> None:
         copy_text("\n".join(distinct))
-        say(f"Copiate negli appunti {len(distinct)} cartelle")
+        say(f"Copiati negli appunti i percorsi di {len(distinct)} cartelle")
 
     def open_folders() -> None:
         opened = open_in_explorer(paths)
@@ -97,12 +101,13 @@ def add_file_entries(menu: QMenu, paths: list, status=None) -> None:
         elif len(distinct) > opened:
             say(f"Aperte le prime {opened} cartelle di {len(distinct)}")
 
-    # le tre copie negli appunti stanno in un sottomenu: non si confondono con "Copia da PC a iPhone"
+    # le copie negli appunti stanno in un sottomenu: non si confondono con "Copia da PC a iPhone"
     clipboard = QMenu("Copia negli appunti", menu)
     entries = [
         (f"Nome del file ({count})", copy_names),
         (f"Percorso completo ({count})", copy_paths),
-        (f"Cartella ({len(distinct)})", copy_folders),
+        (f"Nome della cartella ({len(distinct)})", copy_folder_names),
+        (f"Percorso della cartella ({len(distinct)})", copy_folders),
     ]
     for text, slot in entries:
         action = clipboard.addAction(text)
