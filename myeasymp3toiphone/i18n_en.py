@@ -2833,4 +2833,10 @@ CATALOG = {
         '{0} on the iPhone; {1} that did not succeed stay pending.',
     "{0} sull'iPhone.":
         '{0} on the iPhone.',
+    "L'iPhone non mostra ancora {0}: lo rileggo tra {1} secondi":
+        'The iPhone does not show {0} yet: reading it again in {1} seconds',
+    "rilettura della musica dell'app Musica":
+        "reading the Music app's music again",
+    "Rilettura dell'iPhone":
+        'Reading the iPhone again',
 }

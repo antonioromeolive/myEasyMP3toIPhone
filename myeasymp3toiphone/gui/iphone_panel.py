@@ -90,6 +90,8 @@ CONNECTED, CONNECTING, NOT_CONNECTED_STATE = "connesso", "connessione", "non con
 SYNC_WARNING = ("Non premere mai \"Sincronizza\" in iTunes o in Dispositivi Apple: con la musica messa da un altro "
                 "programma, iTunes la toglierebbe dall'iPhone.")
 
+RECHECK_SECONDS = 5           # dopo Applica: se l'iPhone non mostra ancora le modifiche, si rilegge dopo…
+RECHECK_TRIES = 3             # …al più tante volte
 PENDING_COLOR = QColor(40, 110, 230)       # il titolo di un brano con un'azione in attesa (in corsivo)
 PENDING_NAMES = {SEND: "Copia da PC a iPhone", REMOVE: "Elimina dall'iPhone", DELETE: "Elimina dall'iPhone",
                  UPDATE: "Usa i tag da PC a iPhone", REPLACE: "Ricopia da PC a iPhone",
@@ -1499,6 +1501,44 @@ class IPhonePanel(QWidget):
 
             self._window.runner.run("Lettura dell'iPhone", work, self._music_read)
 
+    def lagging(self, jobs: list) -> list:
+        """Le azioni fatte che l'elenco riletto non mostra ancora: un brano copiato che non c'è, uno eliminato che
+        c'è ancora (l'iPhone aggiorna il suo database poco dopo la sincronizzazione)."""
+        result = []
+        for job in jobs:
+            if job.action in (SEND, REPLACE) and job.track is not None:
+                missing = self._window.device_state(job.track)[0] == DEVICE_ABSENT
+            elif job.action == DELETE and job.phone is not None:
+                missing = job.phone.pid in self._by_pid
+            else:
+                missing = False
+            if missing:
+                result.append(job)
+        return result
+
+    def _recheck_later(self, jobs: list, tries: int) -> None:
+        """Se l'elenco non mostra ancora quello che Applica ha fatto, lo rilegge da solo dopo RECHECK_SECONDS."""
+        waiting = self.lagging(jobs)
+        if waiting and tries > 0 and self._connected:
+            self._window.statusBar().showMessage(
+                f"L'iPhone non mostra ancora {songs(len(waiting))}: lo rileggo tra {RECHECK_SECONDS} secondi", 8000)
+            QTimer.singleShot(RECHECK_SECONDS * 1000, lambda: self._recheck(waiting, tries - 1))
+
+    def _recheck(self, jobs: list, tries: int) -> None:
+        if self._connected and not self._window.runner.is_busy:
+            def work(progress, _cancel):
+                progress(0, 0, "rilettura della musica dell'app Musica")
+                value = iphone.list_music_app()
+                return value
+
+            def done(tracks):
+                self._music_read(tracks)
+                self._recheck_later(jobs, tries)
+
+            self._window.runner.run("Rilettura dell'iPhone", work, done)
+        elif self._connected and tries > 0:
+            self._recheck_later(jobs, tries)          # un'operazione in corso: si riprova più tardi
+
     def _music_read(self, tracks: list) -> None:
         self._window.set_phone_tracks(tracks, self._device_name)
         self.check_missing_sources()
@@ -1814,6 +1854,7 @@ class IPhonePanel(QWidget):
             for job in outcome["done"]:
                 keys.append(job.key)
             self._window.pending_done(keys, len(jobs) - len(keys))
+            self._recheck_later(outcome["done"], RECHECK_TRIES)
 
         self._write("Applica sull'iPhone", "", action, _playlist_note(replaced), after=after, quiet=closing,
                     then=then, describe=lambda report: apply_report_text(report, outcome["done"], len(jobs)))

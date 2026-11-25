@@ -1541,3 +1541,38 @@ def test_apply_removes_done_actions_and_tells_what_it_did(tmp_path):
         window._exit_checked = True
         window.close()
         app.processEvents()
+
+
+def test_after_apply_reread_if_the_iphone_does_not_show_the_changes_yet(monkeypatch):
+    """Dopo Applica: se l'elenco riletto non mostra ancora un brano copiato (o mostra ancora uno eliminato) la
+    musica dell'iPhone si rilegge da sola dopo qualche secondo, al più qualche volta; se mostra tutto, no."""
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtWidgets import QApplication
+    from myeasymp3toiphone.gui import iphone_panel
+    from myeasymp3toiphone.gui.main_window import MainWindow
+    from myeasymp3toiphone.pending import DELETE, SEND, Job
+    app = QApplication.instance() or QApplication([])
+    window = MainWindow()
+    try:
+        sent = _pc("Nuovo", "Gruppo Finto", "Disco")
+        window.tracks = [sent]
+        old = _phone(9, "Vecchio", "Gruppo Finto", "Disco")
+        old.sync_id = 99
+        window.set_phone_tracks([old], "iPhone di prova")
+        window._rebuild_views()
+        panel = window.iphone_panel
+        jobs = [Job("file:nuovo", SEND, track=sent), Job("pid:9", DELETE, phone=old)]
+        assert panel.lagging(jobs) == jobs                    # il nuovo non c'è, il vecchio c'è ancora
+        scheduled = []
+        monkeypatch.setattr(iphone_panel.QTimer, "singleShot", lambda ms, slot: scheduled.append(ms))
+        monkeypatch.setattr(panel, "_connected", True)
+        panel._recheck_later(jobs, iphone_panel.RECHECK_TRIES)
+        assert scheduled == [iphone_panel.RECHECK_SECONDS * 1000]
+        window.set_phone_tracks([_phone(10, "Nuovo", "Gruppo Finto", "Disco")], "iPhone di prova")   # aggiornato
+        assert panel.lagging(jobs) == []
+        panel._recheck_later(jobs, iphone_panel.RECHECK_TRIES)
+        assert len(scheduled) == 1                            # niente da aspettare
+    finally:
+        window._exit_checked = True
+        window.close()
+        app.processEvents()
