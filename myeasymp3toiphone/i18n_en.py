@@ -2847,4 +2847,6 @@ CATALOG = {
         'Full path ({0})',
     'Cartella ({0})':
         'Folder ({0})',
+    "versione vecchia non tolta dall'iPhone (ora ci sono due copie: elimina quella vecchia): ":
+        'old version not removed from the iPhone (now there are two copies: delete the old one): ',
 }

@@ -11,6 +11,8 @@ Tutte le funzioni pubbliche sono bloccanti: vanno chiamate da un thread di lavor
 
 from __future__ import annotations
 
+import asyncio
+
 import logging
 import random
 import secrets
@@ -35,6 +37,7 @@ from .tags import TagError, prepare_copy, read_cover
 log = logging.getLogger(__name__)
 
 BATCH_INSERTS = 25        # brani nuovi per sessione: l'audio di ognuno si carica mentre la sessione è aperta
+RECHECK_DELETE_SECONDS = 3   # un brano da eliminare che il database non mostra: si guarda di nuovo dopo
 BATCH_CHANGES = 400       # modifiche o eliminazioni per sessione (un file ne tiene al massimo 500)
 DELETE_WAIT_NOTE = "L'iPhone toglie i file dei brani eliminati da solo, entro qualche minuto."
 
@@ -342,6 +345,15 @@ async def _delete_batches(sync_ids: list, progress: Optional[ProgressFn], report
             if progress is not None:
                 progress(start, len(sync_ids), f"eliminazione di {len(batch)} brani")
             snapshot = await _snapshot(lockdown, work)
+            missing = []
+            for sync_id in batch:
+                if sync_id not in snapshot.track_ids:
+                    missing.append(sync_id)
+            if missing:
+                # subito dopo un invio il database dell'iPhone può non essere ancora a posto: una seconda occhiata
+                # dopo qualche secondo prima di dire che il brano non c'è
+                await asyncio.sleep(RECHECK_DELETE_SECONDS)
+                snapshot = await _snapshot(lockdown, work)
             present = []
             for sync_id in batch:
                 if sync_id in snapshot.track_ids:
@@ -412,8 +424,10 @@ def replace_tracks(pairs: list, overlay, progress: Optional[ProgressFn] = None,
         if old:
             removal = ActionReport()
             await _delete_batches(old, progress, removal, registry, home)
-            for name, message in removal.errors:
-                report.errors.append((name, "versione vecchia non tolta: " + message))
+            # la versione vecchia rimasta sull'iPhone si dice: altrimenti restano due copie senza saperlo
+            for name, message in removal.errors + removal.skipped:
+                report.errors.append((name, "versione vecchia non tolta dall'iPhone (ora ci sono due copie: "
+                                            "elimina quella vecchia): " + message))
 
     if pending:
         iphone._run(work())

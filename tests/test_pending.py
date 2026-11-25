@@ -9,6 +9,7 @@ import json
 from pathlib import Path
 
 from myeasymp3toiphone.library import Track
+from myeasymp3toiphone.overlay import path_key
 from myeasymp3toiphone.pending import (
     DELETE, EDIT, PENDING_FILE, REMOVE, REPLACE, SEND, UPDATE, Pending, edit_needed, phone_key, still_needed, toggled,
     wanted,
@@ -94,3 +95,22 @@ def test_phone_entries_reconciled(tmp_path):
     assert edit_needed(phone[2], {"genre": "Jazz"}) and not edit_needed(phone[1], {"year": 2001})
     assert pending.reconcile_phone(phone, lambda item, path: False) == 3
     assert sorted(pending.items) == [phone_key(1), phone_key(4)]
+
+
+def test_replace_leaves_the_queue_once_the_file_was_sent(tmp_path):
+    """Una Ricopia esce dalla coda quando il registro mostra il file mandato all'iPhone dopo che è entrata in coda;
+    una voce senza ora (versioni precedenti) vale da sempre. Prima restava e un altro Applica mandava un'altra copia."""
+    pending = Pending(tmp_path)
+    song = Path("C:/musica/a.mp3")
+    pending.set(song, REPLACE)
+    queued_at = pending.items[next(iter(pending.items))]["at"]
+    pending.items["file:vecchia"] = {"action": REPLACE}                  # senza ora: una versione precedente
+    sent = {}
+    assert pending.reconcile_sent(lambda key, since: sent.get(key, "") >= since and key in sent) == 0
+    sent["vecchia"] = "2026-01-01 10:00:00"                             # mandata: anche prima, vale
+    sent[path_key(song)] = "2000-01-01 00:00:00"                         # mandata PRIMA di entrare in coda: no
+    assert pending.reconcile_sent(lambda key, since: key in sent and sent[key] >= since) == 1
+    assert pending.get(song) == REPLACE
+    sent[path_key(song)] = queued_at                                     # mandata dopo: fatta
+    assert pending.reconcile_sent(lambda key, since: key in sent and sent[key] >= since) == 1
+    assert pending.total() == 0

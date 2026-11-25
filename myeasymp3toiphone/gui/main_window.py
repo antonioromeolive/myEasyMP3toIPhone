@@ -456,6 +456,7 @@ class MainWindow(QMainWindow):
         self._states = {}
         removed = self.pending.reconcile(self.tracks, lambda track: self._device_state(track)[0])
         removed += self.pending.reconcile_phone(tracks, self._update_still_needed)
+        removed += self.pending.reconcile_sent(self._sent_since)
         if removed:
             self._save_pending()
         self._model.device_header_tip = (f"Nell'app Musica dell'iPhone ({label}): ✔ stesso brano, ⟳ stesso brano "
@@ -1156,6 +1157,15 @@ class MainWindow(QMainWindow):
             self._fill_table()
         self._update_pending_bar()
         self.iphone_panel.pending_changed()
+
+    def _sent_since(self, key: str, since: str) -> bool:
+        """Il file (overlay.path_key) è stato mandato all'iPhone da questo PC dall'ora since in poi: una Ricopia
+        in coda è fatta (registro della provenienza, "inviato")."""
+        result = False
+        for link in self.registry.links.values():
+            if link.here and link.how == provenance.HOW_SENT and link.date >= since and path_key(link.path) == key:
+                result = True
+        return result
 
     def _update_still_needed(self, phone_track, path: str) -> bool:
         """Usa i tag da PC a iPhone è ancora da fare: il file del PC ha tag diversi da quelli dell'iPhone."""

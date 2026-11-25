@@ -21,6 +21,7 @@ reconcile_phone). La versione 1 del file (solo voci per file) si legge ancora.""
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -43,6 +44,12 @@ ACTIONS = (SEND, REMOVE, UPDATE, REPLACE, DELETE, EDIT)
 FILE_PREFIX = "file:"
 PHONE_PREFIX = "pid:"
 EDIT_FIELDS = ("title", "album", "genre", "year", "track_number", "disc_number", "compilation")
+TIME_FORMAT = "%Y-%m-%d %H:%M:%S"     # "at": quando la voce è entrata in coda (come le date del registro)
+
+
+def _now() -> str:
+    result = time.strftime(TIME_FORMAT)
+    return result
 
 
 def wanted(status: str, action: str) -> bool:
@@ -164,6 +171,8 @@ class Pending:
                 kept = {"action": action}
                 if isinstance(entry.get("path"), str) and entry["path"]:
                     kept["path"] = entry["path"]
+                if isinstance(entry.get("at"), str):
+                    kept["at"] = entry["at"]
                 if action == EDIT and isinstance(entry.get("values"), dict):
                     values = {}
                     for name, value in entry["values"].items():
@@ -203,7 +212,7 @@ class Pending:
         self._version += 1
         self._drop_path(key)
         if action:
-            self.items[FILE_PREFIX + key] = {"action": action}
+            self.items[FILE_PREFIX + key] = {"action": action, "at": _now()}
 
     def _drop_path(self, key: str) -> None:
         for item_key in list(self.items):
@@ -231,12 +240,12 @@ class Pending:
             entry = self.items.get(key)
             merged = dict(entry.get("values", {})) if entry is not None and entry["action"] == EDIT else {}
             merged.update(values or {})
-            self.items[key] = {"action": EDIT, "values": merged}
+            self.items[key] = {"action": EDIT, "values": merged, "at": _now()}
         else:
             if path:
                 self._drop_path(path_key(path))
             self.items.pop(key, None)
-            entry = {"action": action}
+            entry = {"action": action, "at": _now()}
             if path:
                 entry["path"] = str(path)
             self.items[key] = entry
@@ -307,6 +316,24 @@ class Pending:
                 else:
                     keep = True
                 if not keep:
+                    del self.items[key]
+                    removed += 1
+        return removed
+
+    def reconcile_sent(self, sent_since) -> int:
+        """Toglie le Ricopia già fatte: sent_since(chiave del file, ora) dice se quel file è stato mandato
+        all'iPhone da quell'ora in poi (registro della provenienza). Una voce senza ora (versioni precedenti) vale da
+        sempre. Restituisce quante ne ha tolte."""
+        removed = 0
+        self._version += 1
+        for key in list(self.items):
+            entry = self.items[key]
+            if entry["action"] == REPLACE:
+                if key.startswith(FILE_PREFIX):
+                    target = key[len(FILE_PREFIX):]
+                else:
+                    target = path_key(entry["path"]) if entry.get("path") else ""
+                if target and sent_since(target, entry.get("at", "")):
                     del self.items[key]
                     removed += 1
         return removed
