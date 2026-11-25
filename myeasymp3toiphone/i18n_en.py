@@ -2839,4 +2839,12 @@ CATALOG = {
         "reading the Music app's music again",
     "Rilettura dell'iPhone":
         'Reading the iPhone again',
+    'Copia negli appunti':
+        'Copy to the clipboard',
+    'Nome del file ({0})':
+        'File name ({0})',
+    'Percorso completo ({0})':
+        'Full path ({0})',
+    'Cartella ({0})':
+        'Folder ({0})',
 }

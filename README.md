@@ -150,8 +150,9 @@ restano un album solo).
 è il nome del file; *Cartella* è il nome della cartella che lo contiene, o il suo percorso completo con *Impostazioni →
 Generale → Mostra il percorso completo delle cartelle*. Il suggerimento di tutte e due mostra il percorso completo.
 
-**Tasto destro sui brani**, oltre ai comandi per l'iPhone: **Copia nome file**, **Copia percorso completo**, **Copia
-cartella** (negli appunti, una riga per brano; le cartelle una volta sola) e **Apri la cartella in Esplora risorse**
+**Tasto destro sui brani**, oltre ai comandi per l'iPhone: **Copia negli appunti** → *Nome del file*, *Percorso
+completo*, *Cartella* (una riga per brano; le cartelle una volta sola; in un sottomenu, per non confonderle con *Copia
+da PC a iPhone*) e **Apri la cartella in Esplora risorse**
 (un file solo: selezionato; più cartelle: le prime 5).
 
 **Nascondi la cartella** (tasto destro sui brani): i brani delle cartelle che li contengono, sottocartelle comprese,
@@ -420,8 +421,8 @@ accenti non sono evidenziati: sull'iPhone sono lo stesso gruppo.
   - **Associa al file sul PC…**, **Associa le probabili ≈** (rende certi i brani ≈ scelti, dopo una conferma),
     **Associa la sorgente proposta in rosso** (come *cartella*), **Togli la sorgente**: subito, solo il registro;
   - **Elimina N brani dall'iPhone** (tasto **Canc**): in attesa;
-  - **File della sorgente** → *Copia nome file*, *Copia percorso completo*, *Copia cartella*, *Apri la cartella in
-    Esplora risorse*, come nella scheda PC.
+  - **File della sorgente** → *Copia negli appunti* (nome del file, percorso completo, cartella) e *Apri la cartella
+    in Esplora risorse*, come nella scheda PC.
 - L'elenco letto resta in `iphone_musica.json` nella cartella dati: scheda iPhone, colonna *iPhone* e scansione
   funzionano anche a telefono disconnesso. **Rileggi** lo rilegge dall'iPhone connesso; senza iPhone rifà il
   confronto con il PC.

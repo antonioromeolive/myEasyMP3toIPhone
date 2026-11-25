@@ -68,7 +68,8 @@ def open_in_explorer(paths: list) -> int:
 
 
 def add_file_entries(menu: QMenu, paths: list, status=None) -> None:
-    """Le voci Copia nome file / Copia percorso completo / Copia cartella / Apri la cartella, per i file dati.
+    """Le voci Copia negli appunti (sottomenu: Nome del file / Percorso completo / Cartella) e Apri la cartella, per i
+    file dati.
     status(testo): dove dire cosa è successo (la barra di stato)."""
     count = len(paths)
     distinct = folders(paths)
@@ -96,13 +97,17 @@ def add_file_entries(menu: QMenu, paths: list, status=None) -> None:
         elif len(distinct) > opened:
             say(f"Aperte le prime {opened} cartelle di {len(distinct)}")
 
+    # le tre copie negli appunti stanno in un sottomenu: non si confondono con "Copia da PC a iPhone"
+    clipboard = QMenu("Copia negli appunti", menu)
     entries = [
-        (f"Copia nome file ({count})", copy_names),
-        (f"Copia percorso completo ({count})", copy_paths),
-        (f"Copia cartella ({len(distinct)})", copy_folders),
-        (f"Apri la cartella in Esplora risorse ({min(len(distinct), MAX_OPENED)})", open_folders),
+        (f"Nome del file ({count})", copy_names),
+        (f"Percorso completo ({count})", copy_paths),
+        (f"Cartella ({len(distinct)})", copy_folders),
     ]
     for text, slot in entries:
-        action = menu.addAction(text)
-        action.setEnabled(count > 0)
+        action = clipboard.addAction(text)
         action.triggered.connect(slot)
+    menu.addMenu(clipboard).setEnabled(count > 0)
+    explorer = menu.addAction(f"Apri la cartella in Esplora risorse ({min(len(distinct), MAX_OPENED)})")
+    explorer.setEnabled(count > 0)
+    explorer.triggered.connect(open_folders)
