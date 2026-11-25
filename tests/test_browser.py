@@ -115,12 +115,46 @@ def test_last_opened_folder_is_reopened(tmp_path):
     window = mw.MainWindow()   # _startup parte da solo, con il primo giro di eventi
     _wait(window, app)
     assert window.root_folder == music and len(window.tracks) == 1
-    # cartella non più disponibile: la Libreria, con un avviso
+    # cartella non più disponibile: le cartelle della musica (qui la Libreria sola), con un avviso
     AppSettings(library_dir=str(library), last_opened=str(tmp_path / "sparita")).save()
     window = mw.MainWindow()
     _wait(window, app)
-    assert window.root_folder == library
-    assert AppSettings.load().last_opened == str(library)   # ora l'ultima usata è la Libreria
+    assert window.root_folder == library and window.showing_music()
+    assert AppSettings.load().last_opened == mw.MUSIC_MARK      # ora sono aperte le cartelle della musica
+
+
+def test_music_folders_of_this_computer(tmp_path):
+    """Più cartelle della musica per questo computer: si aprono insieme, la Libreria è una di loro, l'ordine vale tra
+    copie uguali; le cartelle di un altro computer non si usano."""
+    from conftest import write_mp3
+    from myeasymp3toiphone.config import AppSettings, computer_name
+    from myeasymp3toiphone.gui import main_window as mw
+    app = QApplication.instance() or QApplication([])
+    first = tmp_path / "Musica"
+    second = tmp_path / "Archivio FLAC"
+    write_mp3(first / "Gruppo" / "a.mp3")
+    write_mp3(second / "Gruppo" / "b.mp3")
+    write_mp3(second / "Gruppo" / "c.mp3")
+    settings = AppSettings(last_opened=mw.MUSIC_MARK)
+    settings.set_music_dirs([str(first), str(second)], str(second))
+    settings.music_folders["ALTRO-PC"] = {"folders": ["Z:\\Altrove"], "library": "Z:\\Altrove"}
+    settings.save()
+    loaded = AppSettings.load()
+    assert loaded.music_dirs() == [first, second] and loaded.library_path() == second
+    assert loaded.library_dir == str(second)                    # una versione precedente trova la Libreria
+    assert loaded.other_computers() == {"ALTRO-PC": ["Z:\\Altrove"]} and computer_name() in loaded.music_folders
+    window = mw.MainWindow()
+    _wait(window, app)
+    assert window.root_folders == [first, second] and len(window.tracks) == 3 and window.showing_music()
+    assert window.root_folder is None and window.is_open(second / "Gruppo" / "b.mp3")
+    assert window.preferred_order()[-2:] == (str(first), str(second))
+    assert window._folders_combo.currentIndex() == 0 and window._folders_combo.count() == 4   # tutte, 2, altra…
+    assert "(Libreria)" in window._folders_combo.itemText(2)
+    window.load_folder(first)                                   # una sola dall'elenco
+    _wait(window, app)
+    assert window.root_folder == first and not window.showing_music() and window._folders_combo.currentIndex() == 1
+    window._exit_checked = True
+    window.close()
 
 
 def test_hide_folder_in_pc_tab(tmp_path):

@@ -38,12 +38,12 @@ class ScanTargetDialog(QDialog):
     def __init__(self, window, phone_count: int, profile_name: str) -> None:
         super().__init__(window)
         self.setWindowTitle(TITLE)
-        folder = window.root_folder
-        self.local = QRadioButton(f"I brani della cartella aperta ({folder})" if folder else "Nessuna cartella aperta")
-        self.local.setEnabled(folder is not None and bool(window.tracks))
+        opened = window.open_description()
+        self.local = QRadioButton(f"I brani aperti nella scheda PC ({opened})" if opened else "Nessuna cartella aperta")
+        self.local.setEnabled(bool(opened) and bool(window.tracks))
         if phone_count:
             self.device = QRadioButton(f"La musica dell'app Musica dell'iPhone ({phone_count} brani, "
-                                       f"{window.phone_label}), confrontata con la Libreria")
+                                       f"{window.phone_label}), confrontata con le cartelle della musica del PC")
         else:
             self.device = QRadioButton("L'iPhone (connettilo una volta: la sua musica resta ricordata)")
         self.device.setEnabled(phone_count > 0)
@@ -170,7 +170,7 @@ class ScanLauncher:
         from ..adoption import pc_fingerprints
         window = self.window
         tracks = window.format_tracks()
-        target = str(window.root_folder)
+        target = window.open_description()
         self.library_tracks = tracks
         tag_cache = window.tag_cache
         musicbrainz = self.musicbrainz
@@ -191,8 +191,8 @@ class ScanLauncher:
 
         from ..provenance import PhoneFingerprints
         window = self.window
-        library = window.library_dir()
-        loaded = list(window.tracks) if window.root_folder == library else None
+        music = [folder for folder in window.music_dirs() if folder.is_dir()]
+        loaded = list(window.tracks) if window.showing_music() else None
         phone_tracks = list(window.phone_tracks)
         target = f"iPhone, app Musica ({window.phone_label})"
         musicbrainz = self.musicbrainz
@@ -201,7 +201,9 @@ class ScanLauncher:
             tracks = tracks_for_scan(phone_tracks)
             library_tracks = loaded
             if library_tracks is None:
-                library_tracks = scan_folder(library, progress, cancel, window.tag_cache) if library.is_dir() else []
+                library_tracks = []
+                for folder in music:
+                    library_tracks.extend(scan_folder(folder, progress, cancel, window.tag_cache))
             window.overlay.apply(library_tracks)
             known = PhoneFingerprints(config_dir())
             prints = {}

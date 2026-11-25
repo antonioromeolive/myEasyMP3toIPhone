@@ -673,7 +673,7 @@ class IPhonePanel(QWidget):
         # album intero, nome della cartella, regole: senza leggere l'audio (circa un secondo e mezzo per 500 brani
         # non associati e 15.000 file sul PC)
         self._proposed = adoption.automatic_proposals(unlinked, self._window.tracks,
-                                                      tuple(self._window.app_settings.preferred_folders),
+                                                      self._window.preferred_order(),
                                                       set(self._window.registry.links_here()))
         self._pc_dirty = False
 
@@ -883,8 +883,7 @@ class IPhonePanel(QWidget):
         return result
 
     def _in_open_folder(self, track) -> bool:
-        root = self._window.root_folder
-        result = track is not None and root is not None and track.path.is_relative_to(root)
+        result = track is not None and self._window.is_open(track.path)
         return result
 
     def pc_changed(self) -> None:
@@ -1469,7 +1468,7 @@ class IPhonePanel(QWidget):
         """{pid: adoption.Proposal}: i file spostati ritrovati nella cartella aperta (relocate.relocate)."""
         from ..relocate import relocate
         window = self._window
-        result = relocate(rows, window.tracks, window.tag_cache, tuple(window.app_settings.preferred_folders),
+        result = relocate(rows, window.tracks, window.tag_cache, window.preferred_order(),
                           set(window.registry.links_here()))
         return result
 
@@ -1568,7 +1567,7 @@ class IPhonePanel(QWidget):
         predefinita), Invia anche questi o Annulla. (si va avanti: False solo con Annulla, brani da inviare: anche
         nessuno, se erano tutti doppioni)."""
         duplicates, remaining = format_duplicates(sends, self._phone_tracks,
-                                                  tuple(self._window.app_settings.preferred_folders))
+                                                  self._window.preferred_order())
         result = (True, sends)
         if duplicates:
             lines = []
@@ -1849,40 +1848,51 @@ class IPhonePanel(QWidget):
             if not known_prints.get(item.remote_path, item.size):
                 to_read += 1
         provider = self._ai_provider()
-        library = window.library_dir()
-        dialog = AdoptOptionsDialog(self, len(unknown), len(selected), self._folder_for(selected or unknown), library,
-                                    to_read, self._connected, provider.profile.name if provider is not None else "")
+        dialog = AdoptOptionsDialog(self, len(unknown), len(selected), self._folder_for(selected or unknown),
+                                    window.music_dirs(), to_read, self._connected,
+                                    provider.profile.name if provider is not None else "")
         if dialog.exec():
-            folder = dialog.folder()
+            folders = dialog.folders()
             items = list(selected) if dialog.selected_only else unknown
-            if not folder.is_dir():
-                QMessageBox.warning(self, "Associa sorgenti", f"La cartella non c'è: {folder}")
+            missing = []
+            for folder in folders:
+                if not folder.is_dir():
+                    missing.append(str(folder))
+            if missing or not folders:
+                QMessageBox.warning(self, "Associa sorgenti", f"La cartella non c'è: {', '.join(missing)}")
             elif not items:
                 QMessageBox.information(self, "Associa sorgenti", "Nessun brano da associare.")
             else:
-                self._run_adopt(items, folder, dialog.use_fingerprint, provider if dialog.use_ai else None,
+                self._run_adopt(items, folders, dialog.use_fingerprint, provider if dialog.use_ai else None,
                                 dialog.selected_only)
 
-    def _run_adopt(self, items: list, folder: Path, use_fingerprint: bool, provider, replace_known: bool) -> None:
+    def _run_adopt(self, items: list, folders: list, use_fingerprint: bool, provider, replace_known: bool) -> None:
+        """Cerca le sorgenti nelle cartelle (con le sottocartelle): se sono tutte dentro le cartelle aperte si usano i
+        brani già letti, altrimenti si leggono."""
         window = self._window
-        root = window.root_folder
-        opened = None
-        if root is not None and folder.is_relative_to(root):
-            opened = list(window.tracks)
+        opened = list(window.tracks)
+        for folder in folders:
+            if not window.is_open(folder):
+                opened = None
         registry = window.registry
         tag_cache = window.tag_cache
         read_phone = self._connected
-        preferred = tuple(window.app_settings.preferred_folders)
+        preferred = window.preferred_order()
 
         def work(progress, cancel):
+            pc_tracks = []
             if opened is None:
-                progress(0, 0, f"lettura di {folder}")
-                pc_tracks = scan_folder(folder, progress, cancel, tag_cache)
+                for folder in folders:
+                    progress(0, 0, f"lettura di {folder}")
+                    pc_tracks.extend(scan_folder(folder, progress, cancel, tag_cache))
                 window.overlay.apply(pc_tracks)
             else:
-                pc_tracks = []
                 for track in opened:
-                    if track.path.is_relative_to(folder):
+                    inside = False
+                    for folder in folders:
+                        if track.path.is_relative_to(folder):
+                            inside = True
+                    if inside:
                         pc_tracks.append(track)
             value = adoption.adopt(items, pc_tracks, registry, config_dir(), tag_cache, provider, progress, cancel,
                                    use_fingerprint, read_phone, replace_known, preferred)
@@ -2015,7 +2025,7 @@ class IPhonePanel(QWidget):
         provider = self._ai_provider()
         read_phone = self._connected
         tag_cache = window.tag_cache
-        preferred = tuple(window.app_settings.preferred_folders)
+        preferred = window.preferred_order()
 
         def work(progress, cancel):
             progress(0, 0, "ricerca dei file possibili")
@@ -2181,8 +2191,8 @@ class IPhonePanel(QWidget):
         if transfer.cancelled or copy_report.cancelled:
             message += "\n\nOperazione annullata."
         QMessageBox.information(self, "Copia da iPhone a PC", message)
-        if self._window.root_folder == target:
-            self._window.load_folder(target)
+        if self._window.is_open(target):
+            self._window.reload_folder()
 
     # ------------------------------------------------------------------ stato e collegamento
 

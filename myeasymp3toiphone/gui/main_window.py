@@ -67,6 +67,7 @@ FINGERPRINT_SUFFIXES = {".mp3", ".flac", ".m4a", ".m4b", ".mp4"}   # provenance.
 FINGERPRINT_BATCH = 200       # impronte per giro: annullare (nuova cartella, uscita) aspetta al massimo un giro
 FINGERPRINT_NOTICE = 100      # da quanti file in su lo si dice nella barra di stato
 FINGERPRINTS_TO_DO, FINGERPRINTS_DONE = "impronte_da_fare", "impronte_fatte"   # i messaggi del lavoro in sottofondo
+MUSIC_MARK = "*"              # last_opened: erano aperte le cartelle della musica
 EXIT_NOW, EXIT_AFTER_APPLY, EXIT_CANCEL ="esci_ora", "esci_dopo_applica", "resta_aperto"   # all'uscita
 PENDING_LOOK = {SEND: ("＋", QColor(40, 110, 230), QColor(40, 110, 230, 40)),
                 REMOVE: ("－", QColor(210, 50, 50), QColor(230, 60, 90, 40)),
@@ -120,7 +121,7 @@ class MainWindow(QMainWindow):
         self.tag_cache = TagCache(config_dir())
         self.pending = Pending(config_dir())   # le spunte della colonna iPhone non ancora applicate
         self._states = {}                      # id(brano) -> (stato, PhoneTrack, collegato): rifatto quando serve
-        self.open_on_start: Optional[Path] = None   # --open CARTELLA: aperta all'avvio al posto della Libreria
+        self.open_on_start: Optional[Path] = None   # --open CARTELLA: aperta all'avvio al posto delle cartelle della musica
         if self.app_settings.window_geometry:
             self.restoreGeometry(QByteArray.fromBase64(self.app_settings.window_geometry.encode("ascii")))
         self.album_clients = make_clients()      # i cataloghi di Verifica album online
@@ -132,7 +133,7 @@ class MainWindow(QMainWindow):
         self.tracks = []           # i brani della cartella aperta, senza quelli delle cartelle nascoste
         self._all_tracks = []      # tutti i brani letti, anche quelli nascosti
         self._visible = []
-        self.root_folder: Optional[Path] = None
+        self.root_folders = []     # le cartelle aperte: le cartelle della musica, o una con Apri cartella
         self.check_results = {}
         self._exit_checked = False     # le modifiche in attesa sono già state applicate (o lasciate) per uscire
         self._fingerprint_job = None   # le impronte in sottofondo (_start_fingerprints)
@@ -177,8 +178,8 @@ class MainWindow(QMainWindow):
         self.addToolBar(toolbar)
         style = self.style()
         definitions = [
-            ("Libreria", QStyle.SP_DirHomeIcon, self.open_library,
-             "Mostra la tua Libreria musicale", "Ctrl+L"),
+            ("La mia musica", QStyle.SP_DirHomeIcon, self.open_music,
+             "Mostra tutte le cartelle della musica di questo PC (Impostazioni → Cartelle della musica)", "Ctrl+L"),
             ("Apri cartella", QStyle.SP_DirOpenIcon, self._open_folder,
              "Mostra i brani di una cartella qualsiasi, in sola lettura: i file non vengono mai modificati",
              "Ctrl+O"),
@@ -226,8 +227,14 @@ class MainWindow(QMainWindow):
         self._reload_button.setToolTip("F5. Rilegge la cartella aperta: i file nuovi, tolti o cambiati (gli altri "
                                        "dalla cache dei tag). Con Maiusc premuto rilegge tutti i file da zero.")
         self._reload_button.clicked.connect(self.reload_folder)
+        self._folders_combo = QComboBox()
+        self._folders_combo.setToolTip("Quali cartelle mostrare: tutte le cartelle della musica di questo PC "
+                                       "(Impostazioni), una sola, o un'altra cartella qualsiasi")
+        self._folders_combo.activated.connect(self._folder_chosen)
         top = QHBoxLayout()
         top.addWidget(self._search, 1)
+        top.addWidget(QLabel("Cartelle:"))
+        top.addWidget(self._folders_combo)
         top.addWidget(QLabel("Formato:"))
         top.addWidget(self._format)
         top.addWidget(self._folder_label, 1)
@@ -237,6 +244,7 @@ class MainWindow(QMainWindow):
         self._hidden_button.clicked.connect(self._show_hidden_folders)
         top.addWidget(self._hidden_button)
         self._update_hidden_button()
+        self._fill_folder_combo()
         # i filtri a pulsanti, con quanti brani ha ognuno: fanno anche da legenda dei segni della colonna iPhone
         self._chips = ChipBar([text for _key, text, _tip in PC_CHIPS])
         self._chips.set_tips([tip for _key, _text, tip in PC_CHIPS])
@@ -437,23 +445,25 @@ class MainWindow(QMainWindow):
         self._update_pending_bar()
 
     def _startup(self) -> None:
-        """All'avvio: --open, altrimenti l'ultima cartella usata (se c'è ancora), altrimenti la Libreria."""
+        """All'avvio: --open; altrimenti quello che era aperto l'ultima volta: le cartelle della musica di questo
+        computer (anche la prima volta) o una cartella aperta con Apri cartella, se c'è ancora; altrimenti le cartelle
+        della musica."""
         self._load_device_listing()
-        library = self.library_dir()
-        last = Path(self.app_settings.last_opened) if self.app_settings.last_opened else None
+        last = self.app_settings.last_opened
+        music = self._existing_music_dirs()
         if self.open_on_start is not None:
             self.load_folder(self.open_on_start)
-        elif last is not None and last.is_dir():
-            self.load_folder(last)
-        elif library.is_dir():
-            self.load_folder(library)
-            if last is not None:
-                self.statusBar().showMessage(f"L'ultima cartella usata non è disponibile ({last}): apro la "
-                                             "Libreria", 15000)
+        elif last and last != MUSIC_MARK and Path(last).is_dir():
+            self.load_folder(Path(last))
+        elif music:
+            self.open_music()
+            if last and last != MUSIC_MARK:
+                self.statusBar().showMessage(f"L'ultima cartella usata non è disponibile ({last}): apro le "
+                                             "cartelle della musica", 15000)
         else:
             self.statusBar().showMessage(
                 "Benvenuto! Premi \"Apri cartella\" per vedere la tua musica, o \"Importa cartella\" per copiarla "
-                "nella Libreria.")
+                "nella Libreria. Le cartelle della musica di questo PC si scelgono in Impostazioni.")
 
     def library_dir(self) -> Path:
         result = self.app_settings.library_path()
@@ -474,11 +484,68 @@ class MainWindow(QMainWindow):
             result = track
         return result
 
+    def music_dirs(self) -> list:
+        """Le cartelle della musica di questo computer (Impostazioni), in ordine."""
+        result = self.app_settings.music_dirs()
+        return result
+
+    def _existing_music_dirs(self) -> list:
+        result = []
+        for folder in self.music_dirs():
+            if folder.is_dir():
+                result.append(folder)
+        return result
+
+    def preferred_order(self) -> tuple:
+        """Tra più copie dello stesso brano: prima le Cartelle preferite (nomi), poi l'ordine delle cartelle della
+        musica (library.preference)."""
+        order = list(self.app_settings.preferred_folders)
+        for folder in self.music_dirs():
+            order.append(str(folder))
+        result = tuple(order)
+        return result
+
+    @property
+    def root_folder(self) -> Optional[Path]:
+        """La cartella aperta, se è una sola (None con più cartelle o nessuna)."""
+        result = self.root_folders[0] if len(self.root_folders) == 1 else None
+        return result
+
+    def showing_music(self) -> bool:
+        """Sono aperte le cartelle della musica di questo computer (tutte quelle che ci sono)."""
+        opened = set()
+        for folder in self.root_folders:
+            opened.add(path_key(folder))
+        music = set()
+        for folder in self._existing_music_dirs():
+            music.add(path_key(folder))
+        result = bool(opened) and opened == music
+        return result
+
+    def is_open(self, path: Path) -> bool:
+        """Il file è in una delle cartelle aperte."""
+        result = False
+        for folder in self.root_folders:
+            if Path(path).is_relative_to(folder):
+                result = True
+        return result
+
+    def open_description(self) -> str:
+        """Cosa è aperto, per i messaggi: le cartelle della musica, o la cartella."""
+        if self.showing_music() and len(self.root_folders) > 1:
+            result = f"le cartelle della musica ({len(self.root_folders)})"
+        elif self.root_folders:
+            result = str(self.root_folders[0])
+        else:
+            result = ""
+        return result
+
     def save_settings(self) -> None:
         self.app_settings.save()
 
     def _open_settings(self) -> None:
-        before = self.library_dir()
+        before = (self.library_dir(), self.music_dirs())
+        showing = self.showing_music()
         various = list(self.app_settings.various_artists)
         dialog = SettingsDialog(self.app_settings, self)
         if dialog.exec():
@@ -488,8 +555,9 @@ class MainWindow(QMainWindow):
                 set_various_artist_names(self.app_settings.various_artists)
                 self._rebuild_views()
                 self.iphone_panel.regroup()
-            if self.library_dir() != before:
-                self.open_library()
+            self._fill_folder_combo()
+            if (self.library_dir(), self.music_dirs()) != before and (showing or not self.root_folders):
+                self.open_music()
 
     def _open_about(self) -> None:
         AboutDialog(self).exec()
@@ -497,10 +565,21 @@ class MainWindow(QMainWindow):
     def _scan(self) -> None:
         self.scan_launcher.start()
 
-    def open_library(self) -> None:
+    def open_music(self) -> None:
+        """La mia musica: tutte le cartelle della musica di questo computer insieme (la Libreria si crea se manca)."""
         library = self.library_dir()
-        library.mkdir(parents=True, exist_ok=True)
-        self.load_folder(library)
+        if library in self.music_dirs():
+            library.mkdir(parents=True, exist_ok=True)
+        folders = self._existing_music_dirs()
+        if folders:
+            self.load_folders(folders)
+        else:
+            self.statusBar().showMessage("Le cartelle della musica di questo PC non ci sono (dischi scollegati?): "
+                                         "sceglile in Impostazioni → Cartelle della musica", 15000)
+
+    def open_library(self) -> None:
+        """Per compatibilità: apre le cartelle della musica."""
+        self.open_music()
 
     def _open_folder(self) -> None:
         folder = QFileDialog.getExistingDirectory(self, "Cartella da aprire",
@@ -509,6 +588,43 @@ class MainWindow(QMainWindow):
             self.app_settings.last_folder = folder
             self.save_settings()
             self.load_folder(Path(folder))
+
+    def _fill_folder_combo(self) -> None:
+        """La scelta "Cartelle" della scheda PC: tutte le cartelle della musica, ognuna da sola (la Libreria segnata),
+        la cartella aperta con Apri cartella se è un'altra, e Apri un'altra cartella…"""
+        combo = self._folders_combo
+        combo.blockSignals(True)
+        combo.clear()
+        music = self.music_dirs()
+        library = path_key(self.library_dir())
+        combo.addItem(f"Tutte le cartelle della musica ({len(music)})", "*")
+        combo.setItemData(0, "\n".join(str(folder) for folder in music), Qt.ToolTipRole)
+        current = 0 if self.showing_music() else -1
+        for folder in music:
+            text = folder.name or str(folder)
+            if path_key(folder) == library:
+                text += tr(" (Libreria)")
+            combo.addItem(text, str(folder))
+            combo.setItemData(combo.count() - 1, str(folder), Qt.ToolTipRole)
+            if current < 0 and self.root_folder is not None and path_key(self.root_folder) == path_key(folder):
+                current = combo.count() - 1
+        if current < 0 and self.root_folder is not None:
+            combo.addItem(f"Altra: {self.root_folder.name or self.root_folder}", str(self.root_folder))
+            combo.setItemData(combo.count() - 1, str(self.root_folder), Qt.ToolTipRole)
+            current = combo.count() - 1
+        combo.addItem("Apri un'altra cartella…", "")
+        combo.setCurrentIndex(max(0, current))
+        combo.blockSignals(False)
+
+    def _folder_chosen(self, index: int) -> None:
+        value = self._folders_combo.itemData(index)
+        if value == "*":
+            self.open_music()
+        elif value:
+            self.load_folder(Path(value))
+        else:
+            self._fill_folder_combo()           # torna a quello aperto, poi la finestra per scegliere
+            self._open_folder()
 
     # ------------------------------------------------------------------ cartelle nascoste
 
@@ -598,35 +714,55 @@ class MainWindow(QMainWindow):
             self._apply_hidden()
 
     def reload_folder(self) -> None:
-        """Aggiorna: rilegge la cartella aperta; con Maiusc premuto tutti i file, senza la cache dei tag."""
-        if self.root_folder is None:
-            QMessageBox.information(self, "Aggiorna", "Nessuna cartella aperta")
+        """Rileggi: rilegge le cartelle aperte; con Maiusc premuto tutti i file, senza la cache dei tag."""
+        if not self.root_folders:
+            QMessageBox.information(self, "Rileggi", "Nessuna cartella aperta")
         else:
             force = bool(QApplication.keyboardModifiers() & Qt.ShiftModifier)
-            self.load_folder(self.root_folder, force)
+            self.load_folders(list(self.root_folders), force)
 
     def load_folder(self, folder: Path, force: bool = False) -> None:
+        self.load_folders([folder], force)
+
+    def load_folders(self, folders: list, force: bool = False) -> None:
+        """Legge le cartelle (una, o le cartelle della musica insieme) e le mostra nella scheda PC; un file in due
+        cartelle annidate conta una volta."""
         if self._album_job is not None and self._album_job.running:
-            self._stop_album_check()           # i risultati varrebbero per i brani della cartella di prima
+            self._stop_album_check()           # i risultati varrebbero per i brani di prima
+        folders = list(folders)
 
         def work(progress, cancel):
-            value = scan_folder(folder, progress, cancel, self.tag_cache, force)
+            value = []
+            seen = set()
+            for folder in folders:
+                if not cancel.is_set():
+                    for track in scan_folder(folder, progress, cancel, self.tag_cache, force):
+                        key = path_key(track.path)
+                        if key not in seen:
+                            seen.add(key)
+                            value.append(track)
             return value
 
         def done(tracks):
-            protect_folder(folder)
+            for folder in folders:
+                protect_folder(folder)
             self.overlay.apply(tracks)
             self._all_tracks = tracks
             self.tracks = self._without_hidden(tracks)
-            self.root_folder = folder
-            self.app_settings.last_opened = str(folder)   # riaperta al prossimo avvio
+            self.root_folders = folders
+            showing_music = self.showing_music()
+            self.app_settings.last_opened = MUSIC_MARK if showing_music else str(folders[0])   # al prossimo avvio
             self.save_settings()
             self.check_results = {}
-            if folder == self.library_dir():
-                label = f"Libreria: {folder}"
+            if showing_music and len(folders) > 1:
+                label = f"Le cartelle della musica di questo PC: {', '.join(str(folder) for folder in folders)}"
+            elif path_key(folders[0]) == path_key(self.library_dir()):
+                label = f"Libreria: {folders[0]}"
             else:
-                label = f"Cartella: {folder}"
+                label = f"Cartella: {folders[0]}"
             self._folder_label.setText(label)
+            self._folder_label.setToolTip("\n".join(str(folder) for folder in folders))
+            self._fill_folder_combo()
             self._rebuild_views()
             self._tabs.setCurrentIndex(0)
             hidden = len(tracks) - len(self.tracks)
@@ -637,7 +773,7 @@ class MainWindow(QMainWindow):
             self.iphone_panel.check_missing_sources()
             self._start_fingerprints()
 
-        self._stop_fingerprints()                # erano per la cartella di prima
+        self._stop_fingerprints()                # erano per le cartelle di prima
         self.runner.run("Lettura brani", work, done)
 
     # ================================================================== impronte in sottofondo
@@ -1480,7 +1616,7 @@ class MainWindow(QMainWindow):
 
                 def done(report):
                     self._show_copy_report("Importa cartella", report)
-                    self.open_library()
+                    self.open_music()
 
                 self.runner.run("Importazione", work, done)
 

@@ -5,7 +5,7 @@
 """L'avvio del programma: la finestra (main) e la console (cli_main).
 
 Finestra (myEasyMP3toIPhone.exe, o python main.py):
-    --open CARTELLA         apre quella cartella all'avvio, al posto della Libreria (non si salva)
+    --open CARTELLA         apre quella cartella all'avvio, al posto delle cartelle della musica (non si salva)
 
 Console (myEasyMP3toIPhone-cli.exe, o python main.py --cli):
     --version               la versione

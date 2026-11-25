@@ -2,7 +2,7 @@
 # Author: Antonio Romeo (with Claude Code et al.)
 # SPDX-License-Identifier: MIT (see the LICENSE file for the full terms)
 
-"""Le Impostazioni: la cartella della Libreria, l'AI della scansione e i profili AI (come in myCalibreTools: ogni
+"""Le Impostazioni: le cartelle della musica di questo PC (una è la Libreria), l'AI della scansione e i profili AI (come in myCalibreTools: ogni
 chiave o indirizzo accetta $NOME; scritti in chiaro vanno nella Gestione credenziali di Windows)."""
 
 from __future__ import annotations
@@ -12,7 +12,8 @@ import copy
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QDoubleSpinBox, QFileDialog, QFormLayout,
-    QHBoxLayout, QLabel, QLineEdit, QListWidget, QMessageBox, QPushButton, QSpinBox, QTabWidget, QVBoxLayout, QWidget,
+    QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem, QMessageBox, QPushButton, QSpinBox, QTabWidget,
+    QVBoxLayout, QWidget,
 )
 
 from .. import environment
@@ -20,7 +21,8 @@ from ..i18n import DEFAULT_LANGUAGE, LANGUAGES, tr
 from ..ai import AIError, connection_test, make_provider
 from ..config import (
     ANTHROPIC, ANTHROPIC_SERVER, AZURE, DEFAULT_MODELS, KINDS, OLLAMA, OLLAMA_LOCAL_SERVER, OPENAI, OPENAI_SERVER,
-    PROFILE_VARIABLES, AppSettings, as_written, calibre_tools_folder, calibre_tools_profiles, default_variables,
+    PROFILE_VARIABLES, AppSettings, as_written, calibre_tools_folder, calibre_tools_profiles, computer_name,
+    default_variables,
     get_secret, import_calibre_tools_key, literal_text, load_profiles, new_profile, save_profiles, set_secret,
     variable_in,
 )
@@ -48,6 +50,7 @@ class SettingsDialog(QDialog):
 
         tabs = QTabWidget()
         tabs.addTab(self._build_general_tab(), "Generale")
+        tabs.addTab(self._build_folders_tab(), "Cartelle della musica")
         tabs.addTab(self._build_profiles_tab(), "Profili AI")
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         buttons.accepted.connect(self.accept)
@@ -62,13 +65,113 @@ class SettingsDialog(QDialog):
 
     # ------------------------------------------------------------------ generale
 
+    def _build_folders_tab(self) -> QWidget:
+        """Le cartelle della musica di questo computer, in ordine (la prima vince tra copie uguali), con la Libreria
+        segnata; quelle degli altri computer si vedono soltanto."""
+        self.f_list = QListWidget()
+        self.f_list.setToolTip("La scheda PC le mostra insieme (La mia musica). Togliere una cartella dall'elenco non "
+                               "cancella niente.")
+        self._library = str(self.settings.library_path())
+        for folder in self.settings.music_dirs():
+            self._add_folder_item(str(folder))
+        self.f_list.currentRowChanged.connect(lambda _row: self._update_folder_buttons())
+        self.f_add = QPushButton("Aggiungi una cartella…")
+        self.f_add.clicked.connect(self._add_folder)
+        self.f_remove = QPushButton("Togli")
+        self.f_remove.clicked.connect(self._remove_folder)
+        self.f_up = QPushButton("Su")
+        self.f_up.clicked.connect(lambda: self._move_folder(-1))
+        self.f_down = QPushButton("Giù")
+        self.f_down.clicked.connect(lambda: self._move_folder(1))
+        self.f_library = QPushButton("Segna come Libreria")
+        self.f_library.setToolTip("La Libreria è dove vanno Importa cartella e Copia da iPhone a PC")
+        self.f_library.clicked.connect(self._mark_library)
+        buttons = QVBoxLayout()
+        for button in (self.f_add, self.f_remove, self.f_up, self.f_down, self.f_library):
+            buttons.addWidget(button)
+        buttons.addStretch(1)
+        row = QHBoxLayout()
+        row.addWidget(self.f_list, 1)
+        row.addLayout(buttons)
+        title = QLabel(f"<b>Cartelle della musica su {computer_name()}</b>")
+        intro = QLabel("La scheda PC le mostra insieme (<i>La mia musica</i>, Ctrl+L) e <i>Associa sorgenti</i> cerca in "
+                       "tutte. L'ordine conta: tra due copie dello stesso brano vince quella più in alto (le "
+                       "<i>Cartelle preferite</i> di Generale, se ci sono, contano prima). Valgono solo su questo "
+                       "computer: con la cartella dati condivisa, ogni PC ha le sue.")
+        intro.setWordWrap(True)
+        others = []
+        for name, folders in self.settings.other_computers().items():
+            others.append(f"{name}: {', '.join(folders)}")
+        other_label = QLabel(("Altri computer (si vedono, non si usano qui):\n" + "\n".join(others)) if others else
+                             "Altri computer: nessuno.")
+        other_label.setWordWrap(True)
+        other_label.setStyleSheet("color: gray")
+        layout = QVBoxLayout()
+        layout.addWidget(title)
+        layout.addWidget(intro)
+        layout.addLayout(row, 1)
+        layout.addWidget(other_label)
+        widget = QWidget()
+        widget.setLayout(layout)
+        self._update_folder_buttons()
+        return widget
+
+    def _add_folder_item(self, folder: str) -> None:
+        item = QListWidgetItem(folder)
+        item.setData(Qt.UserRole, folder)
+        self.f_list.addItem(item)
+        self._mark_items()
+
+    def _mark_items(self) -> None:
+        """La Libreria si riconosce dal testo, "(Libreria)" in fondo."""
+        for index in range(self.f_list.count()):
+            item = self.f_list.item(index)
+            folder = item.data(Qt.UserRole)
+            item.setText(folder + tr("  (Libreria)") if folder == self._library else folder)
+
+    def music_folders(self) -> list:
+        result = []
+        for index in range(self.f_list.count()):
+            result.append(self.f_list.item(index).data(Qt.UserRole))
+        return result
+
+    def _update_folder_buttons(self) -> None:
+        row = self.f_list.currentRow()
+        chosen = row >= 0
+        folder = self.f_list.item(row).data(Qt.UserRole) if chosen else ""
+        self.f_remove.setEnabled(chosen and folder != self._library)
+        self.f_up.setEnabled(chosen and row > 0)
+        self.f_down.setEnabled(chosen and row < self.f_list.count() - 1)
+        self.f_library.setEnabled(chosen and folder != self._library)
+
+    def _add_folder(self) -> None:
+        folder = QFileDialog.getExistingDirectory(self, "Una cartella della musica", self._library)
+        if folder and folder not in self.music_folders():
+            self._add_folder_item(folder)
+            self.f_list.setCurrentRow(self.f_list.count() - 1)
+
+    def _remove_folder(self) -> None:
+        row = self.f_list.currentRow()
+        if row >= 0 and self.f_list.item(row).data(Qt.UserRole) != self._library:
+            self.f_list.takeItem(row)
+            self._update_folder_buttons()
+
+    def _move_folder(self, step: int) -> None:
+        row = self.f_list.currentRow()
+        target = row + step
+        if row >= 0 and 0 <= target < self.f_list.count():
+            item = self.f_list.takeItem(row)
+            self.f_list.insertItem(target, item)
+            self.f_list.setCurrentRow(target)
+
+    def _mark_library(self) -> None:
+        row = self.f_list.currentRow()
+        if row >= 0:
+            self._library = self.f_list.item(row).data(Qt.UserRole)
+            self._mark_items()
+            self._update_folder_buttons()
+
     def _build_general_tab(self) -> QWidget:
-        self.g_library = QLineEdit(str(self.settings.library_path()))
-        browse = QPushButton("Sfoglia…")
-        browse.clicked.connect(self._browse_library)
-        library_row = QHBoxLayout()
-        library_row.addWidget(self.g_library, 1)
-        library_row.addWidget(browse)
         self.g_scan_profile = QComboBox()
         self.g_language = QComboBox()
         for code, label in LANGUAGES.items():
@@ -96,7 +199,6 @@ class SettingsDialog(QDialog):
         note.setWordWrap(True)
         note.setStyleSheet("color: gray")
         form = QFormLayout()
-        form.addRow("Cartella della Libreria", library_row)
         form.addRow("AI della scansione", self.g_scan_profile)
         form.addRow("Lingua dell'interfaccia", self.g_language)
         form.addRow("Colonne delle cartelle", self.g_full_path)
@@ -106,11 +208,6 @@ class SettingsDialog(QDialog):
         widget = QWidget()
         widget.setLayout(form)
         return widget
-
-    def _browse_library(self) -> None:
-        folder = QFileDialog.getExistingDirectory(self, "Cartella della Libreria", self.g_library.text())
-        if folder:
-            self.g_library.setText(folder)
 
     def _fill_scan_profiles(self) -> None:
         chosen = self.g_scan_profile.currentText() or self.settings.scan_profile
@@ -454,8 +551,7 @@ class SettingsDialog(QDialog):
                 set_secret(name, value)
             else:
                 set_secret(name, "")
-        library = self.g_library.text().strip()
-        self.settings.library_dir = library
+        self.settings.set_music_dirs(self.music_folders(), self._library)
         self.settings.language = self.g_language.currentData() or DEFAULT_LANGUAGE
         self.settings.show_full_path = self.g_full_path.isChecked()
         preferred = []

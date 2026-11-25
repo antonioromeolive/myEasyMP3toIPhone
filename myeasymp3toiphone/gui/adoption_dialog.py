@@ -48,15 +48,15 @@ def _phone_text(item) -> str:
 
 
 class AdoptOptionsDialog(QDialog):
-    """Le scelte prima di cercare: scope ("tutti" o "selezionati"), folder() la cartella o None per la Libreria,
-    use_fingerprint, use_ai."""
+    """Le scelte prima di cercare: scope ("tutti" o "selezionati"), folders() le cartelle (una scelta, o tutte le
+    cartelle della musica di questo PC), use_fingerprint, use_ai."""
 
-    def __init__(self, parent, unknown: int, selected: int, start: Path, library: Path, to_read: int,
+    def __init__(self, parent, unknown: int, selected: int, start: Path, music: list, to_read: int,
                  connected: bool, ai_name: str) -> None:
         super().__init__(parent)
         self.setWindowTitle("Associa sorgenti")
         self.resize(720, 380)
-        self._library = library
+        self._music = list(music)
         self.all_button = QRadioButton(f"Tutti i brani senza sorgente ({unknown})")
         self.selected_button = QRadioButton(f"I brani selezionati ({selected}), anche con una sorgente")
         self.selected_button.setEnabled(selected > 0)
@@ -74,7 +74,8 @@ class AdoptOptionsDialog(QDialog):
         self.folder_edit = QLineEdit(str(start))
         browse = QPushButton("Sfoglia…")
         browse.clicked.connect(self._browse)
-        self.library_box = QCheckBox(f"Tutta la Libreria ({library})")
+        self.library_box = QCheckBox(f"Tutte le cartelle della musica di questo PC ({len(self._music)})")
+        self.library_box.setToolTip("\n".join(str(folder) for folder in self._music))
         self.library_box.toggled.connect(self._library_toggled)
         folder_row = QHBoxLayout()
         folder_row.addWidget(self.folder_edit, 1)
@@ -144,8 +145,11 @@ class AdoptOptionsDialog(QDialog):
         result = self.selected_button.isChecked()
         return result
 
-    def folder(self) -> Path:
-        result = self._library if self.library_box.isChecked() else Path(self.folder_edit.text().strip())
+    def folders(self) -> list:
+        if self.library_box.isChecked():
+            result = list(self._music)
+        else:
+            result = [Path(self.folder_edit.text().strip())]
         return result
 
     @property

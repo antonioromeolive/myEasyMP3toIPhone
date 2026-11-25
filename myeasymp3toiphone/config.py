@@ -516,11 +516,19 @@ def import_calibre_tools_key(source_name: str, target_name: str) -> bool:
 
 # --------------------------------------------------------------------------- impostazioni del programma
 
+def computer_name() -> str:
+    """Il nome di questo computer (lo stesso del registro della provenienza): le cartelle della musica sono per
+    computer, così con la cartella dati condivisa tra due PC ognuno ha le sue."""
+    import socket
+    result = socket.gethostname()
+    return result
+
+
 @dataclass
 class AppSettings:
     library_dir: str = ""
     last_folder: str = ""           # dove si apre la finestra "Apri cartella"
-    last_opened: str = ""           # l'ultima cartella mostrata (anche la Libreria): riaperta all'avvio
+    last_opened: str = ""           # l'ultima cartella mostrata, o * per le cartelle della musica: riaperta all'avvio
     last_import: str = ""
     last_export: str = ""
     scan_profile: str = ""          # il profilo AI della scansione; "" = senza AI
@@ -535,13 +543,57 @@ class AppSettings:
     hidden_folders: list = field(default_factory=list)   # cartelle nascoste nella scheda PC (con le sottocartelle)
     preferred_folders: list = field(default_factory=list)  # con più copie di un brano, in ordine (library.preference)
     various_artists: list = field(default_factory=list)    # altri nomi che valgono come "AA.VV." (oltre a quelli fissi)
+    # le cartelle della musica di ogni computer: {nome del computer: {"folders": [cartelle], "library": cartella}}
+    music_folders: dict = field(default_factory=dict)
     extra: dict = field(default_factory=dict)
 
+    def _host_entry(self) -> dict:
+        """Le cartelle della musica di questo computer ({} se non sono ancora state scelte)."""
+        entry = self.music_folders.get(computer_name()) if isinstance(self.music_folders, dict) else None
+        result = entry if isinstance(entry, dict) else {}
+        return result
+
     def library_path(self) -> Path:
-        if self.library_dir:
+        """La Libreria (dove vanno Importa e Copia da iPhone a PC): quella segnata tra le cartelle della musica di
+        questo computer; altrimenti library_dir; altrimenti la predefinita."""
+        library = self._host_entry().get("library")
+        if isinstance(library, str) and library:
+            result = Path(_expanded(library))
+        elif self.library_dir:
             result = Path(_expanded(self.library_dir))
         else:
             result = default_library_dir()
+        return result
+
+    def music_dirs(self) -> list:
+        """Le cartelle della musica di questo computer, in ordine (la prima vince tra copie uguali); senza un elenco,
+        la Libreria sola."""
+        folders = self._host_entry().get("folders")
+        result = []
+        if isinstance(folders, list):
+            for folder in folders:
+                if isinstance(folder, str) and folder.strip():
+                    result.append(Path(_expanded(folder.strip())))
+        if not result:
+            result = [self.library_path()]
+        return result
+
+    def set_music_dirs(self, folders: list, library: str) -> None:
+        """L'elenco delle cartelle della musica di questo computer e quale è la Libreria; library_dir la segue, così
+        una versione precedente del programma trova ancora la Libreria."""
+        if not isinstance(self.music_folders, dict):
+            self.music_folders = {}
+        self.music_folders[computer_name()] = {"folders": [str(folder) for folder in folders], "library": str(library)}
+        self.library_dir = str(library)
+
+    def other_computers(self) -> dict:
+        """{nome del computer: [cartelle]} degli altri computer (si vedono in Impostazioni, non si usano qui)."""
+        result = {}
+        here = computer_name().lower()
+        if isinstance(self.music_folders, dict):
+            for name, entry in sorted(self.music_folders.items()):
+                if name.lower() != here and isinstance(entry, dict) and isinstance(entry.get("folders"), list):
+                    result[name] = list(entry["folders"])
         return result
 
     @classmethod

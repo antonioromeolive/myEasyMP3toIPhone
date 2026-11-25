@@ -263,11 +263,12 @@ def test_adoption_dialogs(tmp_path):
     from PySide6.QtWidgets import QApplication
     from myeasymp3toiphone.gui.adoption_dialog import AdoptionDialog, AdoptOptionsDialog
     app = QApplication.instance() or QApplication([])
-    options = AdoptOptionsDialog(None, 40, 3, tmp_path, tmp_path / "Libreria", 10, False, "")
+    music = [tmp_path / "Libreria", tmp_path / "Archivio"]
+    options = AdoptOptionsDialog(None, 40, 3, tmp_path, music, 10, False, "")
     assert options.selected_only and options.use_fingerprint and not options.use_ai
-    assert options.folder() == tmp_path
-    options.library_box.setChecked(True)
-    assert options.folder() == tmp_path / "Libreria" and not options.folder_edit.isEnabled()
+    assert options.folders() == [tmp_path]
+    options.library_box.setChecked(True)                      # tutte le cartelle della musica
+    assert options.folders() == music and not options.folder_edit.isEnabled()
     outcome = adoption.AdoptionResult()
     sure = adoption.Proposal(_phone(1, "Uno", "A", "B"), _pc("C:/m/1.mp3", "Uno", "A", "B"),
                              provenance.HOW_FINGERPRINT, "stesso audio", level=adoption.LEVEL_CERTAIN)

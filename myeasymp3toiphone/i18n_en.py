@@ -2677,4 +2677,58 @@ CATALOG = {
         'Export to a folder…',
     'Strumenti ▾':
         'Tools ▾',
+    'Tutte le cartelle della musica di questo PC ({0})':
+        'All the music folders of this PC ({0})',
+    'La mia musica':
+        'My music',
+    'Mostra tutte le cartelle della musica di questo PC (Impostazioni → Cartelle della musica)':
+        'Shows all the music folders of this PC (Settings → Music folders)',
+    "Quali cartelle mostrare: tutte le cartelle della musica di questo PC (Impostazioni), una sola, o un'altra cartella qualsiasi":
+        'Which folders to show: all the music folders of this PC (Settings), just one, or any other folder',
+    'Cartelle:':
+        'Folders:',
+    "L'ultima cartella usata non è disponibile ({0}): apro le cartelle della musica":
+        'The last folder used is not available ({0}): opening the music folders',
+    'Benvenuto! Premi "Apri cartella" per vedere la tua musica, o "Importa cartella" per copiarla nella Libreria. Le cartelle della musica di questo PC si scelgono in Impostazioni.':
+        'Welcome! Press "Open folder" to see your music, or "Import folder" to copy it into the Library. The music folders of this PC are chosen in Settings.',
+    'le cartelle della musica ({0})':
+        'the music folders ({0})',
+    'Le cartelle della musica di questo PC non ci sono (dischi scollegati?): sceglile in Impostazioni → Cartelle della musica':
+        'The music folders of this PC are not there (disconnected drives?): choose them in Settings → Music folders',
+    'Tutte le cartelle della musica ({0})':
+        'All the music folders ({0})',
+    'Altra: {0}':
+        'Other: {0}',
+    "Apri un'altra cartella…":
+        'Open another folder…',
+    'Le cartelle della musica di questo PC: {0}':
+        'The music folders of this PC: {0}',
+    'I brani aperti nella scheda PC ({0})':
+        'The tracks open in the PC tab ({0})',
+    "La musica dell'app Musica dell'iPhone ({0} brani, {1}), confrontata con le cartelle della musica del PC":
+        "The music of the iPhone's Music app ({0} tracks, {1}), compared with the PC's music folders",
+    'Cartelle della musica':
+        'Music folders',
+    "La scheda PC le mostra insieme (La mia musica). Togliere una cartella dall'elenco non cancella niente.":
+        'The PC tab shows them together (My music). Removing a folder from the list deletes nothing.',
+    'Aggiungi una cartella…':
+        'Add a folder…',
+    'Togli':
+        'Remove',
+    'Giù':
+        'Down',
+    'Segna come Libreria':
+        'Mark as Library',
+    'La Libreria è dove vanno Importa cartella e Copia da iPhone a PC':
+        'The Library is where Import folder and Copy from iPhone to PC go',
+    '<b>Cartelle della musica su {0}</b>':
+        '<b>Music folders on {0}</b>',
+    "La scheda PC le mostra insieme (<i>La mia musica</i>, Ctrl+L) e <i>Associa sorgenti</i> cerca in tutte. L'ordine conta: tra due copie dello stesso brano vince quella più in alto (le <i>Cartelle preferite</i> di Generale, se ci sono, contano prima). Valgono solo su questo computer: con la cartella dati condivisa, ogni PC ha le sue.":
+        'The PC tab shows them together (<i>My music</i>, Ctrl+L) and <i>Link sources</i> searches all of them. The order matters: between two copies of the same track the higher one wins (the <i>Preferred folders</i> of General, if any, count first). They apply only to this computer: with a shared data folder, each PC has its own.',
+    'Altri computer (si vedono, non si usano qui):\n':
+        'Other computers (shown, not used here):\n',
+    'Altri computer: nessuno.':
+        'Other computers: none.',
+    'Una cartella della musica':
+        'A music folder',
 }

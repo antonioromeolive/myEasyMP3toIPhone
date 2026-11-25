@@ -54,14 +54,23 @@ Due schede: **PC** (i brani della cartella aperta) e **iPhone** (la musica dell'
 
 | Pulsante | Cosa fa |
 |---|---|
-| **Libreria** | mostra la Libreria musicale (la cartella si sceglie in *Impostazioni*; predefinita `Musica\myEasyMP3toIPhone`) |
+| **La mia musica** (Ctrl+L) | mostra insieme tutte le **cartelle della musica** di questo PC (*Impostazioni → Cartelle della musica*; una di loro è la **Libreria**, predefinita `Musica\myEasyMP3toIPhone`) |
 | **Apri cartella** | mostra i brani di una cartella qualsiasi, in sola lettura (da riga di comando: `myEasyMP3toIPhone --open <cartella>`) |
 | **Importa cartella** | copia una cartella nella Libreria in `Artista / Album (Anno) / NN - Titolo.ext`, con le modifiche in sospeso applicate alle copie |
 | **Esporta** | copia i brani selezionati (o quelli dell'artista o dell'album scelti negli elenchi) in una cartella, con la stessa struttura e le modifiche in sospeso |
 | **Verifica album online** | confronta gli album con i cataloghi online (Deezer, Apple Music, Discogs, MusicBrainz): elenca i brani mancanti, propone i tag corretti e la copertina (in sospeso, per le copie); in background (vedi [Verifica album online](#verifica-album-online)) |
 | **Controlla la musica** | cerca i problemi confrontando i tuoi brani tra loro (cartella aperta o musica dell'iPhone), senza cataloghi online, con i controlli che scegli (vedi sotto) |
-| **Impostazioni** | cartella della Libreria, AI della scansione, **lingua dell'interfaccia** (italiano o inglese), profili AI |
+| **Impostazioni** | **cartelle della musica** di questo PC (e quale è la Libreria), AI della scansione, **lingua dell'interfaccia** (italiano o inglese), profili AI |
 | **Informazioni** | versione, cartella dati, variabili d'ambiente e da dove viene ciascuna, dove sono le chiavi |
+
+**Le cartelle della musica.** La musica non deve stare tutta in una cartella: in *Impostazioni → Cartelle della
+musica* si elencano le cartelle di **questo computer** (per esempio `D:\Musica`, `E:\Archivio FLAC`), in ordine, e
+una è segnata **Libreria** (dove vanno *Importa cartella* e *Copia da iPhone a PC*). Valgono per il nome del computer:
+con la cartella dati condivisa tra due PC ognuno ha le sue, e quelle degli altri si vedono in grigio ma non si usano.
+Nella scheda PC la scelta **Cartelle** mostra **tutte le cartelle della musica** insieme (come *La mia musica*), una
+sola, la cartella aperta con *Apri cartella* o **Apri un'altra cartella…**. *Associa sorgenti* può cercare in tutte;
+tra due copie dello stesso brano vince quella nella cartella più in alto. Togliere una cartella dall'elenco non
+cancella niente. La prima volta l'elenco ha solo la Libreria di prima.
 
 **Elenchi Artisti e Album (i filtri).** Sopra la tabella dei brani due elenchi affiancati, ognuno ordinabile cliccando
 sull'intestazione:
@@ -596,8 +605,8 @@ dell'iPhone (messi da CopyTrans, da un altro computer…) e lo scrive nel regist
 
 - **Brani:** tutti quelli senza sorgente, oppure quelli selezionati (anche con una sorgente: la si può sostituire);
 - **Dove cercare:** una cartella con tutte le sue sottocartelle (proposta: quella dove stanno le sorgenti già note
-  degli stessi album, altrimenti la cartella aperta), oppure **Tutta la Libreria**. Una cartella fuori da quella
-  aperta si legge in quel momento (con la cache dei tag);
+  degli stessi album, altrimenti la cartella aperta), oppure **Tutte le cartelle della musica di questo PC**. Una
+  cartella fuori da quelle aperte si legge in quel momento (con la cache dei tag);
 - **Come**, in ordine, dal più veloce; per ogni brano ci si ferma al primo che lo trova:
 
 1. **nome della cartella** (sempre, veloce: non legge l'audio): una cartella il cui nome, o quello della cartella sopra,
@@ -867,10 +876,17 @@ La casella *…e i nomi dubbi anche su MusicBrainz* (sotto *Artisti scritti in m
 
 *File che non si aggiornano* sui file del PC si controlla solo per la cartella aperta, non per l'iPhone.
 
-### La cartella della Libreria
+### Le cartelle della musica e la Libreria
 
-`settings.json` (*Impostazioni → Generale*); senza valore `%USERPROFILE%\Music\myEasyMP3toIPhone`. Le impostazioni della
-prima versione nel registro di Windows si copiano una volta, solo se `settings.json` non esiste.
+1. *Impostazioni → Cartelle della musica* (`music_folders` in `settings.json`: per **nome del computer**, l'elenco
+   `folders` in ordine e la cartella `library`, la Libreria). Vale per questo computer; le voci degli altri computer
+   restano e non si usano.
+2. Senza un elenco per questo computer: la Libreria sola, cioè `library_dir` in `settings.json` (che segue sempre
+   la Libreria scelta, così una versione precedente del programma la trova ancora), altrimenti
+   `%USERPROFILE%\Music\myEasyMP3toIPhone`.
+
+Le impostazioni della prima versione nel registro di Windows si copiano una volta, solo se `settings.json` non
+esiste.
 
 ### La lingua dell'interfaccia
 
@@ -899,7 +915,8 @@ Le colonne dei file mostrano sempre il solo nome; il suggerimento delle celle mo
    più copie di un brano sul PC, le associazioni scelgono la copia nella prima cartella della lista, poi nella
    seconda…; una voce con `\`, `/` o `:` è un percorso (con le sottocartelle), senza è il nome di una cartella in
    qualsiasi punto del percorso; le maiuscole non contano. Vale subito.
-2. Senza, o per le copie fuori da tutte: il percorso più corto (con l'impronta, prima la copia con i tag più simili).
+2. Poi l'ordine delle **cartelle della musica** di questo computer: vince la copia nella cartella più in alto.
+3. Senza, o per le copie fuori da tutte: il percorso più corto (con l'impronta, prima la copia con i tag più simili).
 
 ### Gli altri nomi per "Artisti vari"
 
@@ -925,11 +942,12 @@ Le colonne dei file mostrano sempre il solo nome; il suggerimento delle celle mo
 
 1. `--open <cartella>` sulla riga di comando (vale per quell'avvio, non si salva come scelta: ma quella cartella
    diventa l'ultima usata).
-2. Altrimenti **l'ultima cartella usata** (`last_opened` in `settings.json`): quella aperta con *Apri cartella* o la
-   Libreria, salvata ogni volta che una cartella finisce di caricarsi.
-3. Se l'ultima cartella non è più disponibile (disco scollegato, cartella cancellata): la Libreria, con un avviso
-   nella barra di stato.
-4. Senza Libreria: nessuna cartella, con l'invito ad aprirne una.
+2. Altrimenti **quello che era aperto l'ultima volta** (`last_opened` in `settings.json`, salvato ogni volta che le
+   cartelle finiscono di caricarsi): una cartella aperta da sola, o `*` per le cartelle della musica.
+3. Se l'ultima cartella non è più disponibile (disco scollegato, cartella cancellata), e la prima volta: le
+   **cartelle della musica** di questo computer (quelle che ci sono), con un avviso nella barra di stato se l'ultima
+   cartella manca.
+4. Senza nessuna cartella della musica: niente, con l'invito ad aprirne una.
 
 La finestra *Apri cartella* parte invece da `last_folder`, l'ultima cartella scelta lì.
 
@@ -937,7 +955,7 @@ La finestra *Apri cartella* parte invece da `last_folder`, l'ultima cartella sce
 
 | Opzione | Effetto | Salvata? |
 |---|---|---|
-| `--open <cartella>` | apre quella cartella all'avvio, al posto della Libreria (in sola lettura) | no |
+| `--open <cartella>` | apre quella cartella all'avvio, al posto delle cartelle della musica (in sola lettura) | no |
 | `--debug` | il log a livello DEBUG, se `MYEASYMP3TOIPHONE_LOG_LEVEL` non dice altro | no |
 
 ### Opzioni della console (`myEasyMP3toIPhone-cli`)
