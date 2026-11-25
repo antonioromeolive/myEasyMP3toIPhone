@@ -1340,7 +1340,7 @@ def test_warning_for_songs_already_on_the_iphone_in_another_format(monkeypatch):
         panel = window.iphone_panel
         from myeasymp3toiphone.pending import SEND, Job
         sent = []
-        monkeypatch.setattr(panel, "_run_jobs", lambda sends, *args: sent.append(sends))
+        monkeypatch.setattr(panel, "_run_jobs", lambda jobs, sends, *args: sent.append(sends))
         monkeypatch.setattr(panel, "_connected", True)
         panel.apply_jobs([Job("a", SEND, track=flac_one), Job("b", SEND, track=other_album)])  # "Invia senza questi"
         assert sent == [[other_album]]
@@ -1498,6 +1498,45 @@ def test_empty_filter_goes_back_to_all_and_hidden_tracks_are_told(tmp_path):
         window._undo_pending()                                   # la coda si svuota (QMessageBox: Sì)
         assert chips.currentIndex() == 0 and len(window._visible) == 2
         assert chips._note.isHidden() and chips._reset.isHidden()
+    finally:
+        window._exit_checked = True
+        window.close()
+        app.processEvents()
+
+
+def test_apply_removes_done_actions_and_tells_what_it_did(tmp_path):
+    """Alla fine di Applica le azioni riuscite escono subito dalla coda (anche se l'iPhone aggiorna il suo elenco più
+    tardi), quelle non riuscite restano; il messaggio dice cosa è stato fatto, per specie, e perché il resto no."""
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtWidgets import QApplication
+    from myeasymp3toiphone import phone_actions
+    from myeasymp3toiphone.gui import iphone_panel
+    from myeasymp3toiphone.gui.main_window import MainWindow
+    from myeasymp3toiphone.pending import DELETE, SEND, Job
+    app = QApplication.instance() or QApplication([])
+    window = MainWindow()
+    try:
+        here = [_pc("Uno", "Gruppo Finto", "Disco"), _pc("Due", "Gruppo Finto", "Disco")]
+        window.tracks = here
+        phone = [_phone(9, "Vecchio", "Gruppo Finto", "Disco")]
+        phone[0].sync_id = 99
+        window.set_phone_tracks(phone, "iPhone di prova")
+        window._rebuild_views()
+        window.queue_files(here, SEND)
+        window.queue_deletes(phone)
+        jobs = window.pending_jobs()
+        assert len(jobs) == 3
+        report = phone_actions.ActionReport(done=2, sent_tracks=[here[0]], done_sync_ids=[99],
+                                            errors=[("Gruppo Finto — Due", "Due.mp3: non è un MP3 leggibile")])
+        done = iphone_panel.done_jobs(jobs, report)
+        assert sorted(job.action for job in done) == sorted([SEND, DELETE])
+        text = iphone_panel.apply_report_text(report, done, len(jobs))
+        assert "• 1 brano copiato da PC a iPhone" in text and "• 1 brano eliminato dall'iPhone" in text
+        assert "1 azione non è riuscita: resta in attesa" in text and "Due.mp3: non è un MP3 leggibile" in text
+        window.pending_done([job.key for job in done], len(jobs) - len(done))
+        assert window.pending.total() == 1 and window.pending.get(here[1].path) == SEND
+        assert window._apply_button.text() == "Applica 1 azione…"
+        assert window._pending_last.text() == "Applicate 2 azioni sull'iPhone; 1 non riuscita resta in attesa."
     finally:
         window._exit_checked = True
         window.close()

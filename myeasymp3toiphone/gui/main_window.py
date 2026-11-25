@@ -1282,6 +1282,19 @@ class MainWindow(QMainWindow):
             self.pending_changed()
             self._fill_table()
 
+    def pending_done(self, keys: list, failed: int) -> None:
+        """Alla fine di Applica: le azioni riuscite escono dalla coda subito (senza aspettare che l'iPhone aggiorni il
+        suo elenco); quelle non riuscite restano."""
+        self.pending.remove(keys)
+        done = "Applicata 1 azione" if len(keys) == 1 else f"Applicate {len(keys)} azioni"
+        if failed == 1:
+            message = f"{done} sull'iPhone; 1 non riuscita resta in attesa."
+        elif failed:
+            message = f"{done} sull'iPhone; {failed} non riuscite restano in attesa."
+        else:
+            message = f"{done} sull'iPhone."
+        self.pending_changed(message)
+
     def _remove_pending(self, keys: list) -> list:
         """Dalla finestra di Applica: toglie le azioni dalla coda e restituisce quelle rimaste."""
         removed = self.pending.remove(keys)

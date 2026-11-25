@@ -190,8 +190,10 @@ per artista*.
   gruppo**, toglie le azioni dalla coda subito: non partono, il brano resta com'è e le rimetti dalle schede. In
   fondo il tempo stimato, gli album da ricopiare interi per la grafia, le playlist da sistemare dopo un rimpiazzo.
   La finestra si apre anche a iPhone scollegato, per guardare e togliere; **Applica N azioni** si preme a iPhone
-  connesso e fa tutto insieme (copia, elimina, cambia i tag, poi *Usa i tag* e *Ricopia*); alla fine rilegge la
-  musica dell'iPhone.
+  connesso e fa tutto insieme (copia, elimina, cambia i tag, poi *Usa i tag* e *Ricopia*). Alla fine un messaggio
+  dice cosa è stato fatto, per specie (*12 brani copiati da PC a iPhone*, *3 brani eliminati dall'iPhone*…), e quali
+  azioni non sono riuscite e perché. Le azioni riuscite escono subito dalla coda; quelle non riuscite restano in
+  attesa per riprovarle. Poi il programma rilegge la musica dell'iPhone.
 - Prima di copiare, l'avviso per i brani che sull'iPhone ci sono già in un altro formato (vedi sotto).
 - Un brano ha un'azione sola: una nuova (per esempio *Ricopia* dopo *Usa i tag*) prende il posto della vecchia.
 - Le azioni restano nella cartella dati (`iphone_in_attesa.json`) anche chiudendo il programma; quelle già fatte, o

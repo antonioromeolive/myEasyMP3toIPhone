@@ -151,6 +151,73 @@ def _report_text(report, verb: str) -> str:
     return message
 
 
+def done_jobs(jobs: list, report) -> list:
+    """Le azioni di Applica riuscite davvero, dall'esito (brani del PC copiati, brani dell'iPhone eliminati o
+    cambiati): Copia e Ricopia per il brano del PC, Elimina e Cambia i tag per il brano dell'iPhone, Usa i tag per
+    l'uno o l'altro (dove basta si cambiano i tag, altrimenti si ricopia)."""
+    sent = set()
+    for track in report.sent_tracks:
+        sent.add(id(track))
+    changed = set(report.done_sync_ids)
+    result = []
+    for job in jobs:
+        by_track = job.track is not None and id(job.track) in sent
+        by_phone = job.phone is not None and job.phone.sync_id in changed
+        if job.action in (SEND, REPLACE):
+            done = by_track
+        elif job.action == UPDATE:
+            done = by_track or by_phone
+        else:
+            done = by_phone
+        if done:
+            result.append(job)
+    return result
+
+
+# il resoconto di Applica: cosa è stato fatto, per specie di azione
+DONE_TEXT = ((SEND, "brano copiato da PC a iPhone", "brani copiati da PC a iPhone"),
+             (REPLACE, "brano ricopiato da PC a iPhone", "brani ricopiati da PC a iPhone"),
+             (UPDATE, "brano con i tag presi dal PC", "brani con i tag presi dal PC"),
+             (EDIT, "brano con i tag cambiati sull'iPhone", "brani con i tag cambiati sull'iPhone"),
+             (DELETE, "brano eliminato dall'iPhone", "brani eliminati dall'iPhone"))
+
+
+def apply_report_text(report, done: list, total: int) -> str:
+    """Il messaggio alla fine di Applica: le azioni fatte, per specie ("• 12 brani copiati da PC a iPhone"), poi quelle
+    non riuscite (restano in attesa) con il motivo."""
+    lines = []
+    for action, one, many in DONE_TEXT:
+        count = 0
+        for job in done:
+            if job.action == action:
+                count += 1
+        if count == 1:
+            lines.append(f"• 1 {tr(one)}")
+        elif count:
+            lines.append(f"• {count} {tr(many)}")
+    if lines:
+        message = tr("Fatto sull'iPhone:") + "\n" + "\n".join(lines)
+    else:
+        message = tr("Sull'iPhone non è cambiato niente.")
+    left = total - len(done)
+    if left == 1:
+        message += "\n\n" + tr("1 azione non è riuscita: resta in attesa (barra blu, Applica) per riprovarla.")
+    elif left:
+        message += "\n\n" + tr(f"{left} azioni non sono riuscite: restano in attesa (barra blu, Applica) per "
+                                 "riprovarle.")
+    for title, items in (("Motivi", report.errors), ("Saltati", report.skipped)):
+        if items:
+            reasons = []
+            for name, reason in items[:10]:
+                reasons.append(f"• {name}: {reason}")
+            if len(items) > 10:
+                reasons.append(f"… e altri {len(items) - 10}")
+            message += f"\n\n{tr(title)}:\n" + "\n".join(reasons)
+    if report.cancelled:
+        message += "\n\n" + tr("Operazione interrotta: le azioni non fatte restano in attesa.")
+    return message
+
+
 def _playlist_report_text(report, phone_playlists: list) -> str:
     """L'esito di Playlist per artista; controlla sulla musica riletta che le playlist create ci siano davvero."""
     present = set()
@@ -1528,7 +1595,7 @@ class IPhonePanel(QWidget):
     # ------------------------------------------------------------------ scrittura sull'iPhone
 
     def _write(self, title: str, verb: str, action, note: str = "", after=None, quiet: bool = False,
-               then=None) -> None:
+               then=None, describe=None) -> None:
         """Esegue action(progress, cancel) -> ActionReport, poi rilegge la musica dell'iPhone e mostra l'esito (con
         note in fondo, se qualcosa è riuscito). after(report), se c'è, prima del messaggio. quiet: l'esito solo se
         qualcosa non è riuscito. then(), se c'è, per ultimo (anche se l'azione si interrompe con un errore)."""
@@ -1548,7 +1615,7 @@ class IPhonePanel(QWidget):
             self._window.set_phone_tracks(tracks, self._device_name)
             if after is not None:
                 after(report)
-            message = _report_text(report, verb)
+            message = describe(report) if describe is not None else _report_text(report, verb)
             if report.done:
                 message += note + "\n\n" + MUSIC_APP_REFRESH
             if not quiet:
@@ -1685,7 +1752,7 @@ class IPhonePanel(QWidget):
             proceed, sends = self.check_duplicates(sends)     # Annulla ferma tutto Applica
         anything = bool(sends or removes or updates or replaces or edits)
         if proceed and anything and (self._connected or closing):
-            self._run_jobs(sends, removes, updates, replaces, edits, closing, then)
+            self._run_jobs(jobs, sends, removes, updates, replaces, edits, closing, then)
         elif proceed and anything:
             QMessageBox.information(self, "Applica", "Connetti l'iPhone per applicare le azioni in attesa.")
         elif proceed:
@@ -1694,8 +1761,8 @@ class IPhonePanel(QWidget):
         if closing and not (proceed and anything) and then is not None:
             then()            # niente da fare davvero: si esce lo stesso
 
-    def _run_jobs(self, sends: list, removes: list, updates: list, replaces: list, edits: list, closing: bool,
-                  then) -> None:
+    def _run_jobs(self, jobs: list, sends: list, removes: list, updates: list, replaces: list, edits: list,
+                  closing: bool, then) -> None:
         """Le azioni tutte insieme: copia, elimina, cambia i tag, poi Usa i tag e Ricopia (gli album con la grafia
         diversa si ricopiano interi, split_for_spelling)."""
         rest, whole, _blocked = self.split_for_spelling(updates + replaces)
@@ -1737,8 +1804,19 @@ class IPhonePanel(QWidget):
                 report.add(spelling_and_updates(progress, cancel))
             return report
 
-        self._write("Applica sull'iPhone", "fatti sull'iPhone", action, _playlist_note(replaced), quiet=closing,
-                    then=then)
+        outcome = {"done": []}
+
+        def after(report):
+            # le azioni riuscite escono subito dalla coda (l'iPhone può aggiornare il suo elenco più tardi);
+            # quelle non riuscite restano, per riprovarle
+            outcome["done"] = done_jobs(jobs, report)
+            keys = []
+            for job in outcome["done"]:
+                keys.append(job.key)
+            self._window.pending_done(keys, len(jobs) - len(keys))
+
+        self._write("Applica sull'iPhone", "", action, _playlist_note(replaced), after=after, quiet=closing,
+                    then=then, describe=lambda report: apply_report_text(report, outcome["done"], len(jobs)))
 
     def refresh(self) -> None:
         """Il pulsante Rileggi (e F5): rilegge la musica dell'iPhone, o senza iPhone rifà il confronto con il PC."""

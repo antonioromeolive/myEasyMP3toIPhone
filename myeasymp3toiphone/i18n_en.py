@@ -2791,4 +2791,46 @@ CATALOG = {
         'Back to the All filter',
     'Filtro «{0}»: si vedono {1} di {2} brani':
         'Filter «{0}»: showing {1} of {2} tracks',
+    'brano copiato da PC a iPhone':
+        'track copied from PC to iPhone',
+    'brani copiati da PC a iPhone':
+        'tracks copied from PC to iPhone',
+    'brano ricopiato da PC a iPhone':
+        'track copied again from PC to iPhone',
+    'brani ricopiati da PC a iPhone':
+        'tracks copied again from PC to iPhone',
+    'brano con i tag presi dal PC':
+        'track with the tags taken from the PC',
+    'brani con i tag presi dal PC':
+        'tracks with the tags taken from the PC',
+    "brano con i tag cambiati sull'iPhone":
+        'track with the tags changed on the iPhone',
+    "brani con i tag cambiati sull'iPhone":
+        'tracks with the tags changed on the iPhone',
+    "brano eliminato dall'iPhone":
+        'track deleted from the iPhone',
+    "brani eliminati dall'iPhone":
+        'tracks deleted from the iPhone',
+    "Fatto sull'iPhone:":
+        'Done on the iPhone:',
+    "Sull'iPhone non è cambiato niente.":
+        'Nothing changed on the iPhone.',
+    '1 azione non è riuscita: resta in attesa (barra blu, Applica) per riprovarla.':
+        '1 action did not succeed: it stays pending (blue bar, Apply) to try it again.',
+    '{0} azioni non sono riuscite: restano in attesa (barra blu, Applica) per riprovarle.':
+        '{0} actions did not succeed: they stay pending (blue bar, Apply) to try them again.',
+    'Motivi':
+        'Reasons',
+    'Operazione interrotta: le azioni non fatte restano in attesa.':
+        'Operation interrupted: the actions not done stay pending.',
+    'Applicata 1 azione':
+        '1 action applied',
+    'Applicate {0} azioni':
+        '{0} actions applied',
+    "{0} sull'iPhone; 1 non riuscita resta in attesa.":
+        '{0} on the iPhone; 1 that did not succeed stays pending.',
+    "{0} sull'iPhone; {1} non riuscite restano in attesa.":
+        '{0} on the iPhone; {1} that did not succeed stay pending.',
+    "{0} sull'iPhone.":
+        '{0} on the iPhone.',
 }

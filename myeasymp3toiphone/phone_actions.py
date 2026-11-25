@@ -48,12 +48,16 @@ class ActionReport:
     errors: list = field(default_factory=list)    # (brano, messaggio)
     cancelled: bool = False
     sessions: int = 0
+    sent_tracks: list = field(default_factory=list)    # i brani del PC copiati davvero (library.Track)
+    done_sync_ids: list = field(default_factory=list)  # i brani dell'iPhone eliminati o cambiati davvero
 
     def add(self, other: "ActionReport") -> None:
         """Somma l'esito di un'altra azione (più azioni in un'operazione sola)."""
         self.done += other.done
         self.skipped += other.skipped
         self.errors += other.errors
+        self.sent_tracks += other.sent_tracks
+        self.done_sync_ids += other.done_sync_ids
         self.cancelled = self.cancelled or other.cancelled
         self.sessions += other.sessions
 
@@ -301,6 +305,8 @@ async def _send_batches(pending: list, progress: Optional[ProgressFn], cancel, r
                     await _run(lockdown, snapshot, operations, uploads, report)
                     report.done += len(included)
                     sent += included
+                    for item in included:
+                        report.sent_tracks.append(item.track)
                     if registry is not None:
                         for item in included:
                             try:
@@ -349,6 +355,7 @@ async def _delete_batches(sync_ids: list, progress: Optional[ProgressFn], report
                 try:
                     await _run(lockdown, snapshot, operations, [], report)
                     report.done += len(operations)
+                    report.done_sync_ids += present
                     if registry is not None:
                         for sync_id in present:
                             registry.forget(sync_id)
@@ -639,6 +646,7 @@ def edit_each(entries: list, progress: Optional[ProgressFn] = None) -> ActionRep
             while remaining and not failed:
                 snapshot = await _snapshot(lockdown, folder)
                 operations = []
+                changed = []          # i sync_id delle modifiche di questa sessione
                 deferred = []
                 new_albums = {}
                 for phone_track, values in remaining:
@@ -653,6 +661,9 @@ def edit_each(entries: list, progress: Optional[ProgressFn] = None) -> ActionRep
                                 deferred.append((phone_track, values))
                             elif item:
                                 operations.append(phone_sync.update_track(phone_track.sync_id, item))
+                                changed.append(phone_track.sync_id)
+                            else:
+                                report.done_sync_ids.append(phone_track.sync_id)   # già così: niente da fare
                         except PhoneSyncError as exc:
                             report.errors.append((_label(phone_track.tags, ""), str(exc)))
                 if progress is not None:
@@ -661,6 +672,7 @@ def edit_each(entries: list, progress: Optional[ProgressFn] = None) -> ActionRep
                     try:
                         await _run(lockdown, snapshot, operations, [], report)
                         report.done += len(operations)
+                        report.done_sync_ids += changed
                     except PhoneSyncError as exc:
                         failed = True
                         report.errors.append((f"{len(operations)} brani", str(exc)))
