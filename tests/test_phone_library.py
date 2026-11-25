@@ -437,7 +437,6 @@ def test_pc_column_states_source_outside_open_folder_and_probable(tmp_path, monk
         assert panel._count.text() == "1 di 4 brani"
         panel._show.setCurrentIndex(0)
         assert [item.pid for item in panel._with_proposal(phone)] == [3]
-        assert [item.pid for item, _track in panel._aligned_pairs(phone)] == [1]
         assert "fuori dalla cartella aperta" in panel.pc_tooltip(1) and "non c'è più" in panel.pc_tooltip(2)
         assert [item.pid for item, _track in panel._stale_pairs(phone)] == [1]
         window.app_settings.show_full_path = True
@@ -473,11 +472,11 @@ def test_pc_column_states_source_outside_open_folder_and_probable(tmp_path, monk
         wait_idle()
         shown = []
         monkeypatch.setattr(iphone_panel.AlignToPcDialog, "exec", lambda dialog: shown.append(dialog) or False)
-        panel._align_to_pc(panel._aligned_pairs(phone))          # l'elenco dei file, Annulla: niente cambia
+        panel._align_to_pc(panel._stale_pairs(phone))            # l'elenco dei file, Annulla: niente cambia
         wait_idle()
         assert len(shown) == 1 and read_tags(outside)[0].year == "1991"
         monkeypatch.setattr(iphone_panel.AlignToPcDialog, "exec", lambda dialog: True)
-        panel._align_to_pc(panel._aligned_pairs(phone))          # vale l'iPhone: l'anno 1990 si scrive nel file
+        panel._align_to_pc(panel._stale_pairs(phone))            # vale l'iPhone: l'anno 1990 si scrive nel file
         wait_idle()
         assert read_tags(outside)[0].year == "1990" and not window.overlay.is_edited(outside)
     finally:
@@ -540,10 +539,10 @@ def test_only_linked_tracks_are_updated_from_the_pc(tmp_path):
         registry.record(provenance.Link(sync_id=11, pc=provenance.computer_name(), path=str(linked.path)))
         window.set_registry(registry)
         assert window.device_state(linked)[2] and not window.device_state(by_tags)[2]
-        window.mark_for_update([linked, by_tags])
+        window.queue_files([linked, by_tags], UPDATE)
         assert window.pending.get(linked.path) == UPDATE and not window.pending.get(by_tags.path)
         window.pending.set(by_tags.path, UPDATE)               # rimasto da una versione precedente
-        _sends, _removes, updates = window.pending_work()
+        updates = [(job.phone, job.track) for job in window.pending_jobs() if job.action == UPDATE]
         assert updates == [(phone[0], linked)]
     finally:
         window.close()
@@ -736,11 +735,10 @@ def test_right_click_menus_on_artists_and_albums(monkeypatch):
         texts = []
         for text, enabled, _slot in window.browser_menu_entries(browser.menu_tracks):
             texts.append((text, enabled))
-        assert texts[0][0].endswith("1 brani che non ci sono")      # "Tre" non è sull'iPhone
-        assert "Rimuovi dall'iPhone: 2 brani" in texts[1][0]          # i due con la sorgente certa
-        assert "rimpiazza 2 brani con i file del PC" in texts[2][0]   # Aggiorna: i file, tutti e due
-        assert "TAG" in texts[3][0] and "1 brani con tag diversi" in texts[3][0]     # "Due": anno diverso
-        assert not texts[0][1]                                        # iPhone non connesso: tutto spento
+        assert texts[0] == ("Copia 1 brano da PC a iPhone", True)     # "Tre": in attesa anche senza iPhone
+        assert texts[1] == ("Ricopia da PC a iPhone: 1 brano", True)  # "Due": anno diverso
+        assert texts[2] == ("Usa i tag da PC a iPhone: 1 brano", True)
+        assert texts[3] == ("Elimina 2 brani dall'iPhone", True)      # i due con la sorgente certa
 
         panel = window.iphone_panel
         phone_browser = panel._browser
@@ -751,18 +749,20 @@ def test_right_click_menus_on_artists_and_albums(monkeypatch):
             if item.text(0) == "Disco Uno":
                 target = item
         phone_browser._menu_at(phone_browser.albums, phone_browser.albums.visualItemRect(target).center())
-        entries = panel.browser_menu_entries(phone_browser.menu_tracks)
-        assert "rimpiazza 2 brani con i file del PC" in entries[0][0]
-        assert "TAG" in entries[1][0] and "1 brani con tag diversi" in entries[1][0]
-        assert "Completa l'album" in entries[2][0] and "invia 1 brani" in entries[2][0]   # "Tre" manca
-        assert "Sistema le copertine" in entries[3][0] and not entries[3][1]  # nessun album senza immagine
-        assert "Rimuovi dall'iPhone: 2 brani" in entries[4][0]
+        entries = {}
+        for text, enabled, _slot in panel.browser_menu_entries(phone_browser.menu_tracks):
+            entries[text] = enabled
+        assert entries["Copia 2 brani da iPhone a PC…"] is False     # subito: serve l'iPhone connesso
+        assert entries["Ricopia da PC a iPhone: 1 brano"] and entries["Usa i tag da PC a iPhone: 1 brano"]
+        assert entries["Usa i tag da iPhone a PC: 1 brano…"] and entries["Cambia i tag: 2 brani…"]
+        assert entries["Copia i brani mancanti degli album da PC a iPhone: 1 brano (1 album)"]   # "Tre" manca
+        assert entries["Ricopia le copertine da PC a iPhone: 0 album senza immagine"] is False
+        assert entries["Elimina 2 brani dall'iPhone"]
         phone.append(_phone(3, "Senza sorgente", "Gruppo Finto", "Disco Uno"))
         phone[2].sync_id = 13
         window.set_phone_tracks(phone, "iPhone di prova")
-        entries = panel.browser_menu_entries(phone)
-        assert "non si può, 1 brani su 3" in entries[0][0]           # non tutti associati: Aggiorna spento
-        assert not entries[0][1]
+        texts = [text for text, _enabled, _slot in panel.browser_menu_entries(phone)]
+        assert "Ricopia da PC a iPhone: 1 brano" in texts and "Elimina 3 brani dall'iPhone" in texts
         before = phone_browser.menu_tracks
         phone_browser._menu_at(phone_browser.albums, QPoint(-50, -50))     # fuori dalle righe: niente menu
         assert phone_browser.menu_tracks is before
@@ -792,13 +792,14 @@ def test_exit_with_pending_changes_asks_first(tmp_path, monkeypatch):
     window = MainWindow()
     try:
         assert window._ask_pending_on_exit() == main_window.EXIT_NOW              # niente in attesa
+        from myeasymp3toiphone.pending import SEND, Job
         track = _pc("Nuovo", "Gruppo Finto", "Disco Uno")
-        monkeypatch.setattr(window, "pending_work", lambda: ([track], [], []))
+        monkeypatch.setattr(window, "pending_jobs", lambda: [Job("file:nuovo", SEND, track=track)])
         # iPhone non collegato: solo "Esci senza applicare" e "Annulla" (i test scelgono il primo)
         assert window._ask_pending_on_exit() == main_window.EXIT_NOW
         monkeypatch.setattr(type(window.iphone_panel), "connected", property(lambda self: True))
         applied = []
-        monkeypatch.setattr(window.iphone_panel, "apply_pending",
+        monkeypatch.setattr(window.iphone_panel, "apply_jobs",
                             lambda *args, **kwargs: applied.append(kwargs))
         assert window._ask_pending_on_exit() == main_window.EXIT_AFTER_APPLY       # "Applica ed esci"
         window.close()
@@ -1074,10 +1075,7 @@ def test_key_e_goes_to_the_tag_editor(monkeypatch):
         monkeypatch.setattr(panel, "_edit_selected", lambda: opened.append(len(panel._selected_phone_tracks())))
         panel._music_view.setCurrentItem(panel._music_view.topLevelItem(0))
         panel._music_view.clearSelection()
-        panel._edit_current()                                        # iPhone non connesso: solo un messaggio
-        assert opened == [] and "connetti" in window.statusBar().currentMessage()
-        monkeypatch.setattr(panel, "_connected", True)
-        panel._edit_current()                                        # connesso: Cambia tag sul brano
+        panel._edit_current()                                # Cambia i tag sul brano: va in attesa, anche senza iPhone
         assert opened == [1]
     finally:
         window._exit_checked = True
@@ -1261,21 +1259,17 @@ def test_keys_f5_and_delete(tmp_path, monkeypatch):
         window.registry = registry
         window.set_phone_tracks(phone, "iPhone di prova")
         window._rebuild_views()
-        removed = []
-        monkeypatch.setattr(panel, "delete_items", lambda items: removed.append([item.pid for item in items]))
+        from myeasymp3toiphone.pending import REMOVE
         window._table.selectAll()
-        window._remove_selected_from_phone()                         # iPhone non connesso: solo un messaggio
-        assert removed == [] and "connetti" in window.statusBar().currentMessage()
-        monkeypatch.setattr(type(panel), "connected", property(lambda self: True))
-        window._remove_selected_from_phone()                         # Canc: solo quello sull'iPhone, associato
-        assert removed == [[1]]
+        window._remove_selected_from_phone()        # Canc: in attesa solo quello sull'iPhone, associato (senza iPhone)
+        assert window.pending.get(here[0].path) == REMOVE and not window.pending.get(here[1].path)
+        assert "Elimina" in window._pending_label.text() or "eliminare" in window._pending_label.text()
 
         deleted = []
         monkeypatch.setattr(panel, "_delete_selected", lambda: deleted.append(len(panel._selected_phone_tracks())))
-        monkeypatch.setattr(panel, "_connected", True)
         panel._music_view.setCurrentItem(panel._music_view.topLevelItem(0))
         panel._music_view.clearSelection()
-        panel._delete_current()                                      # Canc nella scheda iPhone: Elimina, con conferma
+        panel._delete_current()                                      # Canc nella scheda iPhone: Elimina, in attesa
         assert deleted == [1]
     finally:
         window._exit_checked = True
@@ -1345,12 +1339,81 @@ def test_warning_for_songs_already_on_the_iphone_in_another_format(monkeypatch):
     try:
         window.set_phone_tracks(phone, "iPhone di prova")
         panel = window.iphone_panel
+        from myeasymp3toiphone.pending import SEND, Job
         sent = []
-        monkeypatch.setattr(panel, "_send_tracks", lambda tracks: sent.append(tracks))
-        panel.send_tracks([flac_one, other_album])           # i test scelgono "Invia senza questi"
+        monkeypatch.setattr(panel, "_run_jobs", lambda sends, *args: sent.append(sends))
+        monkeypatch.setattr(panel, "_connected", True)
+        panel.apply_jobs([Job("a", SEND, track=flac_one), Job("b", SEND, track=other_album)])  # "Invia senza questi"
         assert sent == [[other_album]]
-        panel.send_tracks([flac_one])                         # erano tutti doppioni: niente da inviare
-        assert sent == [[other_album]] and "Niente da inviare" in window.statusBar().currentMessage()
+        panel.apply_jobs([Job("a", SEND, track=flac_one)])        # erano tutti doppioni: niente da copiare
+        assert sent == [[other_album]] and "Niente da applicare" in window.statusBar().currentMessage()
+    finally:
+        window._exit_checked = True
+        window.close()
+        app.processEvents()
+
+
+def test_everything_for_the_iphone_waits_for_apply(tmp_path, monkeypatch):
+    """Copia, Ricopia, Usa i tag, Cambia i tag ed Elimina vanno in attesa dalle due schede, anche senza iPhone; la
+    finestra di Applica le elenca e la ✕ ne toglie una dalla coda."""
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtWidgets import QApplication
+    from myeasymp3toiphone import provenance
+    from myeasymp3toiphone.gui import iphone_panel
+    from myeasymp3toiphone.gui.apply_dialog import ApplyDialog, summary
+    from myeasymp3toiphone.gui.main_window import MainWindow
+    from myeasymp3toiphone.pending import DELETE, EDIT, REPLACE, SEND
+    app = QApplication.instance() or QApplication([])
+    window = MainWindow()
+    try:
+        here = [_pc("Uno", "Gruppo Finto", "Disco"), _pc("Due", "Gruppo Finto", "Disco", year="2001"),
+                _pc("Tre", "Gruppo Finto", "Disco")]
+        window.tracks = here
+        phone = [_phone(1, "Uno", "Gruppo Finto", "Disco"), _phone(2, "Due", "Gruppo Finto", "Disco", year="2000"),
+                 _phone(3, "Solo qui", "Altro Gruppo", "Altro Disco")]
+        phone[0].sync_id, phone[1].sync_id, phone[2].sync_id = 11, 12, 13
+        registry = provenance.Registry()
+        for item, track in zip(phone[:2], here[:2]):
+            registry.record(provenance.Link(sync_id=item.sync_id, pc=provenance.computer_name(), path=str(track.path)))
+        window.registry = registry
+        window.set_phone_tracks(phone, "iPhone di prova")
+        window._rebuild_views()
+        panel = window.iphone_panel
+        assert not panel.connected
+        window.queue_files(here, SEND)                               # solo "Tre" non è sull'iPhone
+        assert window._pending_last.text() == "Appena aggiunti: 1 brano da copiare da PC a iPhone"
+        panel._fill_music()
+        window.queue_pairs(panel._stale_pairs(phone), REPLACE)       # "Due" dalla scheda iPhone
+        window.queue_deletes([phone[2]])
+        window.queue_edits([phone[0]], {"genre": "Rock"})
+        jobs = window.pending_jobs()
+        assert sorted(job.action for job in jobs) == sorted([SEND, REPLACE, DELETE, EDIT])
+        assert summary(jobs).startswith("1 brano da copiare da PC a iPhone · 1 brano da ricopiare")
+        tab = window._tabs.indexOf(panel)
+        assert window._tabs.tabText(tab) == "iPhone · 4 in attesa"
+        assert window._apply_button.isEnabled() and window._apply_button.text() == "Applica 4 azioni…"
+        dialog = ApplyDialog(window, jobs, window._remove_pending, panel.jobs_seconds, panel.jobs_notes, False,
+                             "iPhone di prova")
+        assert not dialog._apply.isEnabled()                         # iPhone non connesso: si guarda soltanto
+        delete_key = [job.key for job in jobs if job.action == DELETE]
+        dialog._drop(delete_key)                                     # la ✕ di "Elimina"
+        assert len(dialog.jobs) == 3 and window.pending.total() == 3
+        dialog.close()
+        assert "iPhone · 3 in attesa" == window._tabs.tabText(tab)
+
+        # Cambia i tag con "Anche sul PC": gli stessi tag sul file del PC, in sospeso
+        monkeypatch.setattr(iphone_panel.PhoneTagDialog, "exec", lambda dialog: True)
+        original_init = iphone_panel.PhoneTagDialog.__init__
+
+        def init(dialog, *args):
+            original_init(dialog, *args)
+            dialog.values = {"genre": "Jazz"}
+            dialog.also_pc = True
+
+        monkeypatch.setattr(iphone_panel.PhoneTagDialog, "__init__", init)
+        panel._edit_items([phone[1]])
+        assert window.overlay.is_edited(here[1].path) and here[1].tags.genre == "Jazz"
+        assert "sul PC gli stessi tag" in window._pending_last.text()
     finally:
         window._exit_checked = True
         window.close()

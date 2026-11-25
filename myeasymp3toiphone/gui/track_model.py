@@ -74,13 +74,9 @@ class TrackTableModel(QAbstractTableModel):
         self._bands = album_bands(keys)
 
     def _background(self, row: int, track):
-        """La tinta di un'azione in attesa, se c'è; altrimenti quella dell'album."""
-        action = self._action(track)
-        if action:
-            result = QBrush(self.pending_look[action][2])
-        else:
-            band, shade = self._bands[row]
-            result = QBrush(album_band(band, shade))
+        """La tinta dell'album, sempre (un'azione in attesa si vede dal segno della colonna iPhone, in blu)."""
+        band, shade = self._bands[row]
+        result = QBrush(album_band(band, shade))
         return result
 
     def track(self, row: int):
@@ -186,8 +182,8 @@ class TrackTableModel(QAbstractTableModel):
         if track.error:
             result = tr(track.error)
         elif column in (COL_FILE, COL_FOLDER) and self._linked_but_different(track):
-            result = tr(f"{track.path}\nSull'iPhone questo brano ha tag diversi: Allinea i tag (scheda iPhone, "
-                        "tasto destro) sceglie quali tenere")
+            result = tr(f"{track.path}\nSull'iPhone questo brano ha tag diversi: Usa i tag da PC a iPhone o da "
+                        "iPhone a PC (tasto destro) sceglie quali tenere")
         elif column in (COL_FILE, COL_FOLDER):
             result = str(track.path)
         elif column == COL_TITLE and self.owner.overlay.is_edited(track.path):

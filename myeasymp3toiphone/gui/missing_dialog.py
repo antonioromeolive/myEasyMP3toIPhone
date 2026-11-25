@@ -82,10 +82,9 @@ class MissingSourcesDialog(QDialog):
         orphan = QPushButton("Lascia senza sorgente")
         orphan.setToolTip("Restano sull'iPhone come brani senza sorgente")
         orphan.clicked.connect(lambda: self._choose(ACTION_ORPHAN))
-        delete = QPushButton("Elimina dall'iPhone…")
-        delete.setToolTip("Toglie i brani dall'iPhone (chiede conferma); sul PC non cambia niente" if connected
-                          else "Connetti l'iPhone")
-        delete.setEnabled(connected)
+        delete = QPushButton("Elimina dall'iPhone")
+        delete.setToolTip("I brani spuntati vanno in attesa per Elimina dall'iPhone (partono con Applica); sul PC "
+                          "non cambia niente")
         mark_danger(delete)
         delete.clicked.connect(lambda: self._choose(ACTION_DELETE))
         later = QPushButton("Più tardi")
@@ -101,7 +100,8 @@ class MissingSourcesDialog(QDialog):
         actions.addWidget(delete)
         actions.addStretch(1)
         actions.addWidget(later)
-        note = QLabel("Li ritrovi quando vuoi con Mostra → \"File del PC non trovato\" e il tasto destro.")
+        note = QLabel("Li ritrovi quando vuoi nella scheda iPhone con il filtro \"File del PC non trovato\" e il tasto "
+                      "destro.")
         note.setStyleSheet("color: gray")
         layout = QVBoxLayout(self)
         layout.addWidget(header)

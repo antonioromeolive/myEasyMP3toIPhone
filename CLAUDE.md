@@ -19,15 +19,27 @@ vanno in `overlay.TagOverlay` (cartella dati) e si applicano solo alle copie: in
 `tags.prepare_copy` / `write_tags(..., new_copy=True)`. `tags.protect_folder` blocca le scritture dentro le cartelle
 aperte: non aggirarlo.
 
-L'unica eccezione: **Allinea i tag → Usa i tag dell'iPhone** (scheda iPhone) scrive i tag nei file originali con
+L'unica eccezione: **Usa i tag da iPhone a PC** (scheda iPhone) scrive i tag nei file originali con
 `tags.write_tags_approved`, solo dopo `AlignToPcDialog`, che elenca ogni file e ogni campo che cambia (ora → diventa) e
 dice che non si può annullare. Ogni nuova scrittura nei file del PC deve passare da una finestra così: chiara e
 approvata, mai automatica.
 
 PC e iPhone non si allineano da soli: cancellare o cambiare sull'iPhone non cambia il PC, cambiare sul PC non cambia
-l'iPhone (niente domande "aggiorna anche l'altra parte"). La differenza si vede (⟳, nome del file in giallo) e il
-brano resta associato; si allinea solo con un'azione esplicita (Allinea i tag, Rimpiazza, Applica). L'importazione
-dall'iPhone crea solo file nuovi (`overwrite=False`).
+l'iPhone (niente domande a finestra "aggiorna anche l'altra parte"). La differenza si vede (⟳, nome del file in giallo)
+e il brano resta associato; si allinea solo con un'azione esplicita: Usa i tag da PC a iPhone / da iPhone a PC,
+Ricopia, oppure le caselle **Anche sull'iPhone** (editor dei tag della scheda PC: va in attesa) e **Anche sul PC**
+(Cambia i tag della scheda iPhone: solo modifiche in sospeso nell'overlay, mai i file). Le caselle sono spente di
+serie e quella dell'editor si rispegne dopo ogni salvataggio. L'importazione dall'iPhone crea solo file nuovi
+(`overwrite=False`).
+
+## Tutto ciò che scrive sull'iPhone va in attesa
+
+Copia, Ricopia, Usa i tag da PC a iPhone, Cambia i tag, Elimina (e le spunte della colonna iPhone) mettono una voce in
+`pending.Pending` (per file del PC o per brano dell'iPhone) e partono solo con **Applica**, che mostra
+`apply_dialog.ApplyDialog` (ogni azione si toglie con la ✕). Una nuova azione verso l'iPhone segue la stessa strada:
+mai una scrittura sull'iPhone direttamente da un menu. Restano immediati, con la loro conferma: Copia da iPhone a PC,
+Usa i tag da iPhone a PC, le associazioni (solo il registro), Playlist per artista (anteprima e prova). I nomi delle
+azioni dicono il verso a parole ("da PC a iPhone", "da iPhone a PC").
 
 ## Regole per ogni commit
 

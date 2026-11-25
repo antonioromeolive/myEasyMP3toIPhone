@@ -587,7 +587,7 @@ def _update_item(phone_track, values: dict, snapshot: _Snapshot, new_albums: dic
         item["sort_name"] = title
     if "album" in item or "title" in item:
         if not album_pid:
-            raise PhoneSyncError("il brano non ha un album con identificativo: usa Rimpiazza con la versione del PC")
+            raise PhoneSyncError("il brano non ha un album con identificativo: usa Ricopia da PC a iPhone")
         item["album_pid"] = album_pid
     genre = values.get("genre")
     if genre is not None:

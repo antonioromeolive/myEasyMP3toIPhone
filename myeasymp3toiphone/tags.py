@@ -542,7 +542,7 @@ def write_tags(path: Path, tags: TrackTags, new_copy: bool = False) -> None:
 
 
 def write_tags_approved(path: Path, tags: TrackTags) -> None:
-    """Scrive i tag nel file ORIGINALE del PC, anche dentro una cartella aperta. Solo per Allinea i tag verso il PC
+    """Scrive i tag nel file ORIGINALE del PC, anche dentro una cartella aperta. Solo per Usa i tag da iPhone a PC
     (vale l'iPhone), dopo che l'utente ha visto e approvato l'elenco dei file e dei campi che cambiano. Ogni altra
     modifica dei tag resta in sospeso e va solo sulle copie."""
     write_tags(path, tags, new_copy=True)

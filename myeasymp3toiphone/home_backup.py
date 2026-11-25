@@ -22,7 +22,8 @@ import zipfile
 from pathlib import Path
 from typing import Callable
 
-DATA_FORMAT = 2  # alzato a mano: vedi sopra. 2: il programma si chiama myEasyMP3toIPhone (file e chiavi rinominati)
+DATA_FORMAT = 3  # alzato a mano: vedi sopra. 2: il programma si chiama myEasyMP3toIPhone (file e chiavi rinominati);
+#                 3: le azioni in attesa per l'iPhone hanno il formato 2 (iphone_in_attesa.json, pending.py)
 RECORD_FILE_NAME = "myEasyMP3toIPhone.home.txt"
 BACKUP_FOLDER = "Backup"
 GUARD_FILE_NAME = "copia_in_corso.lock"

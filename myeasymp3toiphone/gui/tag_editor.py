@@ -96,6 +96,11 @@ class TagEditor(QWidget):
                       "inviate all'iPhone (ed esportate).")
         note.setWordWrap(True)
         note.setStyleSheet("color: gray")
+        # spenta di serie, e di nuovo spenta dopo ogni salvataggio: l'iPhone cambia solo se lo chiedi
+        self.also_phone = QCheckBox("Anche sull'iPhone: usa questi tag da PC a iPhone (va in attesa)")
+        self.also_phone.setToolTip("Per i brani che sull'iPhone hanno la sorgente certa (registro): dopo il "
+                                   "salvataggio i tag nuovi vanno in attesa per l'iPhone e partono con Applica. Spenta, "
+                                   "l'iPhone resta com'è e la differenza si vede (⟳).")
         buttons = QHBoxLayout()
         buttons.addWidget(self._save_button)
         buttons.addWidget(self._revert_button)
@@ -104,6 +109,7 @@ class TagEditor(QWidget):
         layout.addWidget(self._header)
         layout.addWidget(self._kinds)
         layout.addWidget(tags_box)
+        layout.addWidget(self.also_phone)
         layout.addLayout(buttons)
         layout.addWidget(self._renumber_button)
         layout.addWidget(self._restore_button)

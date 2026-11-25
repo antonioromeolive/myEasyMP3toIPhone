@@ -2393,4 +2393,204 @@ CATALOG = {
         '{0} ({1} files)',
     "<b>Questi {0} file del PC verranno modificati</b>: si scrivono nel file i tag dell'iPhone dei campi scelti. Non si può annullare.":
         "<b>These {0} PC files will be modified</b>: the iPhone's tags of the chosen fields are written into the file. It cannot be undone.",
+    'Copia da PC a iPhone':
+        'Copy from PC to iPhone',
+    "brani che sull'iPhone non ci sono":
+        'tracks that are not on the iPhone',
+    'da copiare da PC a iPhone':
+        'to copy from PC to iPhone',
+    'Ricopia da PC a iPhone':
+        'Copy again from PC to iPhone',
+    "il file sull'iPhone è sostituito da quello del PC: perde ascolti e playlist":
+        "the file on the iPhone is replaced by the PC's: it loses plays and playlists",
+    'da ricopiare da PC a iPhone':
+        'to copy again from PC to iPhone',
+    'Usa i tag da PC a iPhone':
+        'Use the tags from PC to iPhone',
+    "solo i tag: sull'iPhone diventano quelli del PC":
+        "only the tags: on the iPhone they become the PC's",
+    'con i tag da portare da PC a iPhone':
+        'with tags to bring from PC to iPhone',
+    "Cambia i tag sull'iPhone":
+        'Change the tags on the iPhone',
+    'i tag scritti con Cambia i tag nella scheda iPhone':
+        'the tags written with Change the tags in the iPhone tab',
+    "con i tag da cambiare sull'iPhone":
+        'with tags to change on the iPhone',
+    'i file del PC non cambiano':
+        "the PC files don't change",
+    "da eliminare dall'iPhone":
+        'to delete from the iPhone',
+    'tag diversi: {0}':
+        'different tags: {0}',
+    "Applica le azioni in attesa sull'iPhone":
+        'Apply the pending actions on the iPhone',
+    'Brano':
+        'Track',
+    'Dettaglio':
+        'Detail',
+    'Togli questa azione: non parte':
+        "Remove this action: it won't run",
+    'Togli il gruppo':
+        'Remove the group',
+    'Togli tutte le azioni di questo gruppo':
+        'Remove all the actions of this group',
+    "<b>Azioni in attesa per {0}: {1}</b>. La ✕ toglie un'azione: non parte, il brano resta com'è e la rimetti dalle schede.":
+        "<b>Pending actions for {0}: {1}</b>. The ✕ removes an action: it won't run, the track stays as it is and you can add it again from the tabs.",
+    '<b>Nessuna azione</b>: le hai tolte tutte.':
+        '<b>No actions</b>: you removed them all.',
+    "\n\nPer applicarle connetti l'iPhone (e aspetta la fine dell'operazione in corso).":
+        '\n\nTo apply them connect the iPhone (and wait for the current operation to finish).',
+    'Applica {0} azioni':
+        'Apply {0} actions',
+    'Applica 1 azione':
+        'Apply 1 action',
+    "<b>Come funziona.</b> Qui vedi la musica dell'app <b>Musica</b> dell'iPhone, con i titoli, gli artisti e gli album che mostra l'app. La colonna <b>Sul PC</b> la confronta con il PC: ✔ la sorgente, stessi tag; ⟳ la sorgente, tag diversi; ≈ da rivedere (un brano con gli stessi tag nella cartella aperta, non certo); ✖ la sorgente non c'è più; vuoto = non trovato. <b>Sorgente</b>: il file da cui viene il brano (questo PC, un altro computer, nessuna, telefono); <b>Associa sorgenti</b> la ritrova, <b>Mostra</b> filtra.<br>Tasto destro su uno o più brani: <b>Copia da iPhone a PC</b>, <b>Ricopia da PC a iPhone</b> e <b>Usa i tag da PC a iPhone</b> (per i ⟳), <b>Usa i tag da iPhone a PC</b>, <b>Cambia i tag</b>, <b>Associa al file sul PC</b>, <b>Elimina dall'iPhone</b>. Quello che cambia l'iPhone va in attesa (la barra blu in alto) e parte con <b>Applica</b>. Per copiare brani nuovi: scheda PC → <b>Copia da PC a iPhone</b>. PC e iPhone non si allineano da soli (i file del PC cambiano solo dopo la tua conferma).<br><b>Attenzione:</b> {0}":
+        "<b>How it works.</b> Here you see the music of the iPhone's <b>Music</b> app, with the titles, artists and albums the app shows. The <b>On the PC</b> column compares it with the PC: ✔ the source, same tags; ⟳ the source, different tags; ≈ to review (a track with the same tags in the open folder, not certain); ✖ the source is gone; empty = not found. <b>Source</b>: the file the track comes from (this PC, another computer, none, phone); <b>Link sources</b> finds it again, <b>Show</b> filters.<br>Right click on one or more tracks: <b>Copy from iPhone to PC</b>, <b>Copy again from PC to iPhone</b> and <b>Use the tags from PC to iPhone</b> (for the ⟳), <b>Use the tags from iPhone to PC</b>, <b>Change the tags</b>, <b>Link to the file on the PC</b>, <b>Delete from the iPhone</b>. What changes the iPhone goes pending (the blue bar at the top) and runs with <b>Apply</b>. To copy new tracks: PC tab → <b>Copy from PC to iPhone</b>. PC and iPhone don't align by themselves (the PC files change only after your confirmation).<br><b>Warning:</b> {0}",
+    '{0} brani. Artista e artista dell\'album non si cambiano qui: sull\'iPhone rinominerebbero l\'artista per tutti i suoi brani. Cambiali nella scheda PC, poi usa <i>Ricopia da PC a iPhone</i>. Anno o numero 0: lo svuota.<br>Una compilation vuole anche l\'artista dell\'album <i>Artisti vari</i>: se nell\'app Musica i brani non si raccolgono in un solo album, metti la spunta e "Artisti vari" nella scheda PC e usa <i>Ricopia da PC a iPhone</i>.':
+        '{0} tracks. Artist and album artist are not changed here: on the iPhone they would rename the artist for all their tracks. Change them in the PC tab, then use <i>Copy again from PC to iPhone</i>. Year or number 0: clears it.<br>A compilation also needs the album artist <i>Various Artists</i>: if in the Music app the tracks don\'t gather in a single album, tick it and "Various Artists" in the PC tab and use <i>Copy again from PC to iPhone</i>.',
+    'Anche sul PC: gli stessi tag per i {0} brani con il file su questo PC, come modifiche in sospeso (i file non cambiano)':
+        "Also on the PC: the same tags for the {0} tracks with the file on this PC, as pending changes (the files don't change)",
+    "Spenta, il PC resta com'è e la differenza si vede (⟳). Per scrivere i tag nei file del PC c'è Usa i tag da iPhone a PC.":
+        'Off, the PC stays as it is and the difference shows (⟳). To write the tags into the PC files there is Use the tags from iPhone to PC.',
+    'Metti in attesa':
+        'Add to pending',
+    "L'iPhone cambia con Applica (la barra blu in alto)":
+        'The iPhone changes with Apply (the blue bar at the top)',
+    'Cambia i tag':
+        'Change the tags',
+    'Usa i tag da iPhone a PC: modifica dei file del PC':
+        'Use the tags from iPhone to PC: changing the PC files',
+    "\nI tag sono diversi da quelli dell'iPhone: il file resta la sorgente. Tasto destro → Usa i tag da PC a iPhone o da iPhone a PC per scegliere quali tenere.":
+        "\nThe tags differ from the iPhone's: the file stays the source. Right click → Use the tags from PC to iPhone or from iPhone to PC to choose which to keep.",
+    'Copia i brani mancanti degli album da PC a iPhone: {0} ({1} album)':
+        "Copy the albums' missing tracks from PC to iPhone: {0} ({1} albums)",
+    'Copia i brani mancanti degli album da PC a iPhone: non manca niente (o i brani non hanno la sorgente)':
+        "Copy the albums' missing tracks from PC to iPhone: nothing is missing (or the tracks have no source)",
+    'Ricopia le copertine da PC a iPhone: {0} album senza immagine':
+        'Copy the covers again from PC to iPhone: {0} albums without artwork',
+    'Usa i tag da iPhone a PC':
+        'Use the tags from iPhone to PC',
+    'nessun brano ⟳ con la sorgente':
+        'no ⟳ track with a source',
+    'Copia {0} da iPhone a PC…':
+        'Copy {0} from iPhone to PC…',
+    'Mostra nella scheda PC ({0})':
+        'Show in the PC tab ({0})',
+    'Ricopia da PC a iPhone: {0}':
+        'Copy again from PC to iPhone: {0}',
+    'Usa i tag da PC a iPhone: {0}':
+        'Use the tags from PC to iPhone: {0}',
+    'Usa i tag da iPhone a PC: {0}…':
+        'Use the tags from iPhone to PC: {0}…',
+    'Cambia i tag: {0}…':
+        'Change the tags: {0}…',
+    'Associa al file sul PC…':
+        'Link to the file on the PC…',
+    'Associa al file sul PC: {0}…':
+        'Link to the file on the PC: {0}…',
+    'Associa le probabili ≈: {0}':
+        'Link the probable ≈: {0}',
+    'Associa la sorgente proposta in rosso: {0}':
+        'Link the source proposed in red: {0}',
+    'Togli la sorgente: {0}':
+        'Remove the source: {0}',
+    "Elimina {0} dall'iPhone":
+        'Delete {0} from the iPhone',
+    "Elimina dall'iPhone: nessun brano":
+        'Delete from the iPhone: no tracks',
+    '{0} acquistati o scaricati sul telefono: un computer non li può cambiare né togliere':
+        '{0} bought or downloaded on the phone: a computer can neither change nor remove them',
+    "\n\nI brani da ricopiare sono nelle playlist fatte sull'iPhone (alla fine te le ricordo):\n":
+        "\n\nThe tracks to copy again are in playlists made on the iPhone (I'll remind you at the end):\n",
+    "Connetti l'iPhone per applicare le azioni in attesa.":
+        'Connect the iPhone to apply the pending actions.',
+    "Niente da applicare: i brani da copiare erano già sull'iPhone in un altro formato":
+        'Nothing to apply: the tracks to copy were already on the iPhone in another format',
+    "fatti sull'iPhone":
+        'done on the iPhone',
+    '; sul PC gli stessi tag per {0}, in sospeso (i file non cambiano)':
+        "; on the PC the same tags for {0}, pending (the files don't change)",
+    'Nessun brano da eliminare: quelli scelti non sono stati messi da un computer':
+        'No tracks to delete: the chosen ones were not put there by a computer',
+    'In attesa: {0} (Applica)':
+        'Pending: {0} (Apply)',
+    'Copia da iPhone a PC':
+        'Copy from iPhone to PC',
+    'In attesa: da copiare da PC a iPhone (Applica)':
+        'Pending: to copy from PC to iPhone (Apply)',
+    "In attesa: da eliminare dall'iPhone (Applica)":
+        'Pending: to delete from the iPhone (Apply)',
+    'In attesa: i tag da portare da PC a iPhone (Applica)':
+        'Pending: tags to bring from PC to iPhone (Apply)',
+    'In attesa: da ricopiare da PC a iPhone (Applica)':
+        'Pending: to copy again from PC to iPhone (Apply)',
+    'Annulla tutto':
+        'Cancel all',
+    "Toglie tutte le azioni in attesa: sull'iPhone non cambia niente":
+        'Removes all the pending actions: nothing changes on the iPhone',
+    ' · {0} in attesa':
+        ' · {0} pending',
+    'Appena aggiunti: {0} brani ({1} album) {2}':
+        'Just added: {0} tracks ({1} albums) {2}',
+    'Appena aggiunti: {0} {1}':
+        'Just added: {0} {1}',
+    'Appena aggiunti: {0} {1}. I file del PC non cambiano.':
+        "Just added: {0} {1}. The PC files don't change.",
+    'Appena aggiunti: {0} {1}{2}':
+        'Just added: {0} {1}{2}',
+    "{0} per brani non aperti ora (o con l'iPhone non ancora letto): partono quando ci sono. ":
+        '{0} for tracks not open now (or with the iPhone not read yet): they run when they are there. ',
+    "<b>Azioni in attesa per l'iPhone: {0}.</b> {1}{2}Partono solo con Applica, a iPhone connesso.":
+        '<b>Pending actions for the iPhone: {0}.</b> {1}{2}They run only with Apply, with the iPhone connected.',
+    "<b>Nessuna azione in attesa.</b> Copia, Ricopia, Usa i tag, Cambia i tag ed Elimina mettono qui le azioni per l'iPhone.":
+        '<b>No pending actions.</b> Copy, Copy again, Use the tags, Change the tags and Delete put the actions for the iPhone here.',
+    'Applica {0} azioni…':
+        'Apply {0} actions…',
+    'Applica 1 azione…':
+        'Apply 1 action…',
+    "L'elenco si vede anche così; per applicarle connetti l'iPhone":
+        'You can see the list anyway; to apply them connect the iPhone',
+    "Togliere tutte le {0} azioni in attesa per l'iPhone? Sull'iPhone non cambia niente; le spunte tornano come sono sull'iPhone.":
+        'Remove all the {0} pending actions for the iPhone? Nothing changes on the iPhone; the ticks go back to how they are on the iPhone.',
+    "Tolte tutte le azioni in attesa: sull'iPhone non è cambiato niente.":
+        'All the pending actions removed: nothing changed on the iPhone.',
+    'Tolte {0} azioni dalla coda: non partono.':
+        "{0} actions removed from the queue: they won't run.",
+    "Nessuna azione da fare ora: quelle in attesa sono per brani non aperti o l'iPhone non è ancora stato letto.":
+        'No actions to do now: the pending ones are for tracks not open or the iPhone has not been read yet.',
+    'Copia 1 brano da PC a iPhone':
+        'Copy 1 track from PC to iPhone',
+    'Copia {0} brani ({1} album) da PC a iPhone':
+        'Copy {0} tracks ({1} albums) from PC to iPhone',
+    "Copia da PC a iPhone: sull'iPhone ci sono già tutti":
+        'Copy from PC to iPhone: they are all on the iPhone already',
+    "Elimina dall'iPhone: nessun brano con la sorgente":
+        'Delete from the iPhone: no tracks with a source',
+    '{0} già in attesa (Applica)':
+        '{0} already pending (Apply)',
+    "{0} sull'iPhone abbinati solo per i tag (≈): per toglierli o aggiornarli prima associa la sorgente (scheda iPhone)":
+        '{0} on the iPhone matched only by tags (≈): to remove or update them first link the source (iPhone tab)',
+    'Cambia i tag…':
+        'Change the tags…',
+    "Ci sono azioni in attesa per l'iPhone non ancora applicate: {0}.\n\n":
+        'There are pending actions for the iPhone not applied yet: {0}.\n\n',
+    "I brani spuntati vanno in attesa per Elimina dall'iPhone (partono con Applica); sul PC non cambia niente":
+        'The ticked tracks go pending for Delete from the iPhone (they run with Apply); nothing changes on the PC',
+    'Li ritrovi quando vuoi nella scheda iPhone con il filtro "File del PC non trovato" e il tasto destro.':
+        'You find them whenever you want in the iPhone tab with the "PC file not found" filter and the right click.',
+    "Anche sull'iPhone: usa questi tag da PC a iPhone (va in attesa)":
+        'Also on the iPhone: use these tags from PC to iPhone (goes pending)',
+    "Per i brani che sull'iPhone hanno la sorgente certa (registro): dopo il salvataggio i tag nuovi vanno in attesa per l'iPhone e partono con Applica. Spenta, l'iPhone resta com'è e la differenza si vede (⟳).":
+        'For the tracks that have a certain source on the iPhone (registry): after saving, the new tags go pending for the iPhone and run with Apply. Off, the iPhone stays as it is and the difference shows (⟳).',
+    "{0}\nSull'iPhone questo brano ha tag diversi: Usa i tag da PC a iPhone o da iPhone a PC (tasto destro) sceglie quali tenere":
+        '{0}\nOn the iPhone this track has different tags: Use the tags from PC to iPhone or from iPhone to PC (right click) chooses which to keep',
+    'ricopia':
+        'ricopia',
+    'elimina':
+        'elimina',
+    'il brano non ha un album con identificativo: usa Ricopia da PC a iPhone':
+        'the track has no album with an identifier: use Copy again from PC to iPhone',
+    "Non c'è un brano con lo stesso artista, album e titolo nella Libreria del PC. Se vuoi conservarli, salvali sul PC dalla scheda iPhone (tasto destro → Copia da iPhone a PC); a volte sono solo scritti in modo diverso.":
+        'There is no track with the same artist, album and title in the PC Library. If you want to keep them, save them on the PC from the iPhone tab (right click → Copy from iPhone to PC); sometimes they are just written differently.',
 }

@@ -1,24 +1,29 @@
-"""Scheda iPhone: connessione, la musica dell'app Musica (com'è nell'app, confrontata con il PC) e, con il tasto
-destro, salva su PC, rimpiazza con la versione del PC, cambia i tag, elimina. L'invio dal PC parte dalla scheda PC.
+"""Scheda iPhone: connessione, la musica dell'app Musica (com'è nell'app, confrontata con il PC) e le azioni sui
+brani: verso l'iPhone (Ricopia, Usa i tag da PC a iPhone, Cambia i tag, Elimina) vanno in attesa fino ad Applica;
+verso il PC (Copia da iPhone a PC, Usa i tag da iPhone a PC) e le associazioni sono subito, con la loro conferma.
 La scrittura sull'iPhone passa per phone_actions (il servizio di sincronizzazione di Apple)."""
 
 import shutil
 from pathlib import Path
 
 from PySide6.QtCore import QRect, Qt, QTimer
-from PySide6.QtGui import QBrush, QColor, QKeySequence, QShortcut
+from PySide6.QtGui import QBrush, QColor, QFont, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
-    QAbstractItemView, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFileDialog, QFormLayout, QGroupBox, QHBoxLayout, QHeaderView,
-    QLabel, QLineEdit, QMenu, QMessageBox, QPushButton, QSplitter, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget,
+    QAbstractItemView, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFileDialog, QFormLayout, QGroupBox, QHBoxLayout,
+    QHeaderView, QLabel, QLineEdit, QMenu, QMessageBox, QPushButton, QSplitter, QTreeWidget, QTreeWidgetItem,
+    QVBoxLayout, QWidget,
 )
 
 from .. import adoption, estimate, iphone, phone_actions, provenance
 from ..config import config_dir
 from ..i18n import tr
 from ..library import Track, album_folder, album_groups, copy_organized, group_name, scan_folder, short_folder
+from ..pending import DELETE, EDIT, REMOVE, REPLACE, SEND, UPDATE
 from ..phone_library import (
-    DEVICE_ABSENT, DEVICE_SAME, comparison, format_duplicates, differences, pc_matches, playlist_reminder, spelling_differences,
+    DEVICE_ABSENT, DEVICE_SAME, comparison, differences, format_duplicates, pc_matches, playlist_reminder,
+    spelling_differences,
 )
+from .apply_dialog import songs
 from .compare_tip import comparison_html, show_on_tooltip
 from .file_actions import add_file_entries
 from .theme import album_band, album_bands, set_role
@@ -83,17 +88,37 @@ CONNECTED, CONNECTING, NOT_CONNECTED_STATE = "connesso", "connessione", "non con
 SYNC_WARNING = ("Non premere mai \"Sincronizza\" in iTunes o in Dispositivi Apple: con la musica messa da un altro "
                 "programma, iTunes la toglierebbe dall'iPhone.")
 
+PENDING_COLOR = QColor(40, 110, 230)       # il titolo di un brano con un'azione in attesa (in corsivo)
+PENDING_NAMES = {SEND: "Copia da PC a iPhone", REMOVE: "Elimina dall'iPhone", DELETE: "Elimina dall'iPhone",
+                 UPDATE: "Usa i tag da PC a iPhone", REPLACE: "Ricopia da PC a iPhone",
+                 EDIT: "Cambia i tag sull'iPhone"}
+
+
+def _pc_value(name: str, value):
+    """Un valore di Cambia i tag (scheda iPhone) come lo vuole un TrackTags del PC: anno come testo, numeri interi
+    (0 = vuoto), compilation booleana."""
+    if name == "year":
+        result = str(value) if value else ""
+    elif name in ("track_number", "disc_number"):
+        result = int(value) if value else None
+    elif name == "compilation":
+        result = bool(value)
+    else:
+        result = str(value)
+    return result
+
+
 INFO_TEXT = (
     "<b>Come funziona.</b> Qui vedi la musica dell'app <b>Musica</b> dell'iPhone, con i titoli, gli artisti e gli "
     "album che mostra l'app. La colonna <b>Sul PC</b> la confronta con il PC: ✔ la sorgente, stessi tag; ⟳ la "
     "sorgente, tag diversi; ≈ da rivedere (un brano con gli stessi tag nella cartella aperta, non certo); ✖ la "
     "sorgente non c'è più; vuoto = non trovato. <b>Sorgente</b>: il file da cui viene il brano (questo PC, un altro "
     "computer, nessuna, telefono); <b>Associa sorgenti</b> la ritrova, <b>Mostra</b> filtra.<br>"
-    "Tasto destro su uno o più brani: <b>Salva su PC</b>, <b>Mostra nella scheda PC</b>, <b>Rimpiazza con la "
-    "versione del PC</b> (per i ⟳), <b>Cambia tag</b>, <b>Associa sorgente</b>, <b>Togli sorgente</b>, "
-    "<b>Elimina dall'iPhone</b>. Per mandare brani nuovi: tasto "
-    "destro nella scheda PC → <b>Invia all'iPhone</b>. PC e iPhone non si allineano da soli: <b>Allinea i tag</b> "
-    "sceglie la direzione (i file del PC cambiano solo dopo la tua conferma).<br>"
+    "Tasto destro su uno o più brani: <b>Copia da iPhone a PC</b>, <b>Ricopia da PC a iPhone</b> e <b>Usa i tag da "
+    "PC a iPhone</b> (per i ⟳), <b>Usa i tag da iPhone a PC</b>, <b>Cambia i tag</b>, <b>Associa al file sul "
+    "PC</b>, <b>Elimina dall'iPhone</b>. Quello che cambia l'iPhone va in attesa (la barra blu in alto) e parte con "
+    "<b>Applica</b>. Per copiare brani nuovi: scheda PC → <b>Copia da PC a iPhone</b>. PC e iPhone non si allineano "
+    "da soli (i file del PC cambiano solo dopo la tua conferma).<br>"
     f"<b>Attenzione:</b> {SYNC_WARNING}"
 )
 
@@ -159,11 +184,14 @@ def _playlist_note(phone_tracks: list) -> str:
 
 
 class PhoneTagDialog(QDialog):
-    """Cambia i tag dei brani dell'iPhone. Un campo vuoto non cambia; per più brani, il titolo non si cambia."""
+    """Cambia i tag dei brani dell'iPhone. Un campo vuoto non cambia; per più brani, il titolo non si cambia.
+    linked: quanti hanno la sorgente certa sul PC; la casella "Anche sul PC" (spenta) mette gli stessi tag sui loro
+    file come modifiche in sospeso (also_pc)."""
 
-    def __init__(self, parent, phone_tracks: list) -> None:
+    def __init__(self, parent, phone_tracks: list, linked: int = 0) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Cambia tag sull'iPhone")
+        self.setWindowTitle("Cambia i tag sull'iPhone")
+        self.also_pc = False
         single = phone_tracks[0].tags if len(phone_tracks) == 1 else None
         self.fields = {}
         form = QFormLayout()
@@ -197,20 +225,27 @@ class PhoneTagDialog(QDialog):
         form.addRow("", self.compilation)
         note = QLabel(f"{len(phone_tracks)} brani. Artista e artista dell'album non si cambiano qui: sull'iPhone "
                       "rinominerebbero l'artista per tutti i suoi brani. Cambiali nella scheda PC, poi usa "
-                      "<i>Rimpiazza con la versione del PC</i>. Anno o numero 0: lo svuota.<br>Una compilation "
+                      "<i>Ricopia da PC a iPhone</i>. Anno o numero 0: lo svuota.<br>Una compilation "
                       "vuole anche l'artista dell'album <i>Artisti vari</i>: se nell'app Musica i brani non si "
                       "raccolgono in un solo album, metti la spunta e \"Artisti vari\" nella scheda PC e usa "
-                      "<i>Rimpiazza con la versione del PC</i>.")
+                      "<i>Ricopia da PC a iPhone</i>.")
         note.setWordWrap(True)
         note.setTextFormat(Qt.RichText)
         note.setStyleSheet("color: gray")
+        self._also_pc = QCheckBox(f"Anche sul PC: gli stessi tag per i {linked} brani con il file su questo PC, come "
+                                  "modifiche in sospeso (i file non cambiano)")
+        self._also_pc.setToolTip("Spenta, il PC resta com'è e la differenza si vede (⟳). Per scrivere i tag nei file "
+                                 "del PC c'è Usa i tag da iPhone a PC.")
+        self._also_pc.setEnabled(linked > 0)
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        buttons.button(QDialogButtonBox.Ok).setText("Applica sull'iPhone")
+        buttons.button(QDialogButtonBox.Ok).setText("Metti in attesa")
+        buttons.button(QDialogButtonBox.Ok).setToolTip("L'iPhone cambia con Applica (la barra blu in alto)")
         buttons.accepted.connect(self._check)
         buttons.rejected.connect(self.reject)
         layout = QVBoxLayout(self)
         layout.addLayout(form)
         layout.addWidget(note)
+        layout.addWidget(self._also_pc)
         layout.addWidget(buttons)
         self.values = {}
         self.resize(480, 300)
@@ -232,23 +267,24 @@ class PhoneTagDialog(QDialog):
         if state != self._original_compilation and state != Qt.PartiallyChecked:
             values["compilation"] = state == Qt.Checked
         if problem:
-            QMessageBox.warning(self, "Cambia tag", problem)
+            QMessageBox.warning(self, "Cambia i tag", problem)
         elif not values:
-            QMessageBox.information(self, "Cambia tag", "Non hai cambiato niente.")
+            QMessageBox.information(self, "Cambia i tag", "Non hai cambiato niente.")
         else:
             self.values = values
+            self.also_pc = self._also_pc.isChecked()
             self.accept()
 
 
 class AlignToPcDialog(QDialog):
-    """Allinea i tag verso il PC: l'elenco dei file che verranno modificati, con ogni campo (ora → diventa). Una
+    """Usa i tag da iPhone a PC: l'elenco dei file che verranno modificati, con ogni campo (ora → diventa). Una
     casella per campo, con quanti file cambia: si scrivono solo i campi scelti (chosen_plan), così una correzione fatta
     sul PC in un altro campo non torna indietro. Si scrive solo con Modifica i file."""
 
     def __init__(self, parent, plan: list) -> None:
         super().__init__(parent)
         from ..phone_library import COMPARED_FIELDS
-        self.setWindowTitle("Allinea i tag: modifica dei file del PC")
+        self.setWindowTitle("Usa i tag da iPhone a PC: modifica dei file del PC")
         self.resize(1000, 520)
         self._plan = plan
         self._labels = {}
@@ -432,7 +468,7 @@ class IPhonePanel(QWidget):
         self._music_view.customContextMenuRequested.connect(self._show_menu)
         self._music_view.viewport().installEventFilter(self)    # il suggerimento di Sul PC, al passaggio del mouse
         edit_shortcut = QShortcut(QKeySequence("E"), self._music_view, context=Qt.WidgetShortcut)
-        edit_shortcut.activated.connect(self._edit_current)       # E: Cambia tag sul brano su cui si è
+        edit_shortcut.activated.connect(self._edit_current)       # E: Cambia i tag sul brano su cui si è
         delete_shortcut = QShortcut(QKeySequence(Qt.Key_Delete), self._music_view, context=Qt.WidgetShortcut)
         delete_shortcut.activated.connect(self._delete_current)   # Canc: Elimina dall'iPhone (con la conferma)
         header = self._music_view.header()
@@ -619,6 +655,7 @@ class IPhonePanel(QWidget):
         view.addTopLevelItems(rows)
         view.setSortingEnabled(True)
         self._apply_search()
+        self.pending_changed()
 
     def _origin_text(self, item) -> str:
         """Da dove viene il brano, secondo il registro della provenienza."""
@@ -656,8 +693,8 @@ class IPhonePanel(QWidget):
                    f"{proposal.reason}. Tasto destro → Associa questa sorgente.")
         different = not is_proposal and self._pc_states.get(item.pid, (PC_NONE, None))[0] == PC_STALE
         if different:
-            tip += ("\nI tag sono diversi da quelli dell'iPhone: il file resta la sorgente. Tasto destro → Allinea i "
-                    "tag per scegliere quali tenere.")
+            tip += ("\nI tag sono diversi da quelli dell'iPhone: il file resta la sorgente. Tasto destro → Usa i "
+                    "tag da PC a iPhone o da iPhone a PC per scegliere quali tenere.")
         if is_proposal:
             brush = QBrush(PROPOSED_COLOR)
         elif different:
@@ -903,14 +940,15 @@ class IPhonePanel(QWidget):
         return result
 
     def _complete_entry(self, items: list) -> tuple:
-        """La voce di menu Completa l'album per i brani scelti: (testo, attiva, funzione)."""
+        """La voce Copia i brani mancanti degli album (ex Completa l'album) per i brani scelti: (testo, attiva,
+        funzione); va in attesa."""
         sends, albums = self.complete_plan(items)
         if sends:
-            text = f"Completa l'album (PC → iPhone): invia {len(sends)} brani che mancano ({albums} album)"
+            text = f"Copia i brani mancanti degli album da PC a iPhone: {songs(len(sends))} ({albums} album)"
         else:
-            text = "Completa l'album (PC → iPhone): sull'iPhone non manca niente (o i brani non hanno la sorgente)"
-        ready = self._connected and not self._window.runner.is_busy
-        result = (text, ready and bool(sends), lambda: self.send_tracks(sends))
+            text = ("Copia i brani mancanti degli album da PC a iPhone: non manca niente (o i brani non hanno la "
+                    "sorgente)")
+        result = (text, bool(sends), lambda: self._window.queue_files(sends, SEND))
         return result
 
     def cover_plan(self, items: list) -> tuple:
@@ -934,19 +972,17 @@ class IPhonePanel(QWidget):
         return result
 
     def _cover_entry(self, items: list) -> tuple:
-        """La voce di menu Sistema le copertine per i brani scelti: (testo, attiva, funzione)."""
+        """La voce Ricopia le copertine (ex Sistema le copertine) per i brani scelti: (testo, attiva, funzione). Gli
+        album sull'iPhone senza immagine, anche se i brani hanno la copertina (album messi da altri programmi):
+        ricopiando i loro brani dal PC l'iPhone la sceglie. Va in attesa come Ricopia."""
         pairs, blocked = self.cover_plan(items)
         albums = set()
         for item, _track in pairs:
             albums.add(item.album_sync_id)
-        text = f"Sistema le copertine (PC → iPhone): {len(albums)} album senza immagine"
+        text = f"Ricopia le copertine da PC a iPhone: {len(albums)} album senza immagine"
         if blocked:
             text += f"; {blocked} non si possono, nessun brano ha la sorgente associata"
-        reason = (f"{len(albums)} album sull'iPhone non hanno l'immagine dell'album, anche se i brani hanno la "
-                  "copertina (succede agli album messi da altri programmi). Rimpiazzando i loro brani con i file del "
-                  "PC, l'iPhone la sceglie.")
-        ready = self._connected and not self._window.runner.is_busy
-        result = (text, ready and bool(pairs), lambda: self.replace_pairs(pairs, reason, "Sistema le copertine"))
+        result = (text, bool(pairs), lambda: self._window.queue_pairs(pairs, REPLACE))
         return result
 
     def _service_leftovers(self) -> list:
@@ -1100,17 +1136,8 @@ class IPhonePanel(QWidget):
                                               window.tag_cache.fingerprint(proposal.pc.path)))
         self._store_registry(registry, f"Sorgente associata a {len(items)} brani")
 
-    def _aligned_pairs(self, items: list) -> list:
-        """(brano dell'iPhone, file del PC) per i brani scelti con una sorgente certa e tag diversi (⟳)."""
-        result = []
-        for item in items:
-            state, track = self._pc_states.get(item.pid, (PC_NONE, None))
-            if state == PC_STALE and track is not None and item.from_computer:
-                result.append((item, track))
-        return result
-
     def _align_to_pc(self, pairs: list) -> None:
-        """Allinea i tag, vale l'iPhone: i tag diversi dell'iPhone si SCRIVONO nei file del PC, dopo che l'utente ha
+        """Usa i tag da iPhone a PC: i tag diversi dell'iPhone si SCRIVONO nei file del PC, dopo che l'utente ha
         visto l'elenco dei file e dei campi e l'ha approvato (AlignToPcDialog). Le modifiche in sospeso di quei file
         entrano nel file insieme; la copertina in sospeso resta in sospeso."""
         from ..phone_library import changed_fields
@@ -1124,7 +1151,7 @@ class IPhonePanel(QWidget):
                     setattr(new_tags, name, getattr(item.tags, name))
                 plan.append((track, new_tags, fields))
         if not plan:
-            QMessageBox.information(self, "Allinea i tag", "Sul PC non c'è niente da cambiare.")
+            QMessageBox.information(self, "Usa i tag da iPhone a PC", "Sul PC non c'è niente da cambiare.")
         else:
             dialog = AlignToPcDialog(self, plan)
             if dialog.exec():
@@ -1164,46 +1191,17 @@ class IPhonePanel(QWidget):
             window.refresh_after_tag_change()
             message = f"Tag scritti in {len(done)} file del PC"
             if errors:
-                QMessageBox.warning(self, "Allinea i tag", message + ". Non riusciti:\n" + "\n".join(errors[:10]))
+                QMessageBox.warning(self, "Usa i tag da iPhone a PC", message + ". Non riusciti:\n" + "\n".join(errors[:10]))
             else:
                 window.statusBar().showMessage(message, 8000)
 
-        window.runner.run("Allinea i tag", work, finished)
+        window.runner.run("Usa i tag da iPhone a PC", work, finished)
 
     def _align_to_phone(self, pairs: list) -> None:
-        self.update_pairs(pairs, "Allinea i tag")
-
-    def update_pairs(self, pairs: list, title: str = "Aggiorna dal PC") -> None:
-        """Vale il PC: i brani dell'iPhone ((PhoneTrack, Track) associati) prendono i tag del PC (Cambia tag dove basta,
-        Rimpiazza per artisti e copertina; gli album con la grafia diversa interi, split_for_spelling), dopo la
-        conferma con il tempo stimato."""
-        rest, whole, blocked = self.split_for_spelling(pairs)
-        edits, replacements = phone_actions.plan_updates(rest, frozenset())
-        if not edits and not replacements and not whole:
-            QMessageBox.information(self, title, "Sull'iPhone non c'è niente da cambiare.")
-        else:
-            sizes, removes = self._spelling_cost(whole)
-            for _phone_track, track in replacements:
-                sizes.append(estimate.file_size(track.path))
-            count = len(edits) + len(replacements) + len(whole)
-            text = (f"I tag di {count} brani dell'iPhone diventano quelli del PC (PC → iPhone). Continuare?\n\n"
-                    + estimate.summary(count, estimate.seconds(sizes, removes=removes + len(replacements),
-                                                               edits=len(edits))))
-            if replacements:
-                text += (f"\n\nAttenzione: {len(replacements)} hanno un artista diverso e vanno rimpiazzati: perdono "
-                         "ascolti e playlist.")
-            text += self._spelling_text(whole, blocked)
-            if self._confirm(title, text):
-                overlay = self._window.overlay
-                replaced = []
-                for phone_track, _track in replacements + whole:
-                    replaced.append(phone_track)
-
-                def action(progress, cancel):
-                    value = phone_actions.update_from_pc(edits, replacements, overlay, progress, cancel, config_dir())
-                    return value
-
-                self._write(title, "aggiornati", self._with_spelling(whole, action), _playlist_note(replaced))
+        """Usa i tag da PC a iPhone: in attesa (Applica). Dove basta si cambiano i tag (restano ascolti e playlist),
+        con artista diverso o un campo da svuotare il brano si ricopia; gli album scritti diversamente si ricopiano
+        interi (split_for_spelling)."""
+        self._window.queue_pairs(pairs, UPDATE)
 
     def _source_paths(self, items: list) -> list:
         """I file delle sorgenti dei brani scelti (quelli che ne hanno una)."""
@@ -1217,127 +1215,86 @@ class IPhonePanel(QWidget):
     def _show_menu(self, position) -> None:
         self._tracks_menu(self._music_view.viewport().mapToGlobal(position))
 
-    def browser_menu_entries(self, items: list) -> list:
-        """Le voci del tasto destro su un artista o un album (tutti i suoi brani): [(testo, attiva, funzione)].
-        Aggiorna dal PC rimpiazza ogni brano con il file del PC, solo se tutti hanno la sorgente su questo PC (registro)
-        e il file c'è. Aggiorna TAG dal PC: i brani associati con tag diversi (⟳) prendono quelli del PC. Rimuovi: i
-        brani messi da un computer."""
+    def phone_entries(self, items: list) -> list:
+        """Le azioni per brani dell'iPhone (tasto destro sui brani o su un artista/album, barra delle azioni):
+        [(testo, attiva, funzione)], None per un separatore, funzione None per una nota grigia. Quelle verso l'iPhone
+        vanno in attesa (Applica) e non chiedono l'iPhone connesso; Copia da iPhone a PC, Usa i tag da iPhone a PC e
+        le associazioni sono subito, con la loro conferma."""
+        busy = self._window.runner.is_busy
         writable = []
-        pairs = []
-        missing = 0
         for item in items:
             if item.from_computer:
                 writable.append(item)
-            state, track = self._pc_states.get(item.pid, (PC_NONE, None))
-            if state in (PC_SAME, PC_STALE) and item.from_computer:
-                pairs.append((item, track))
-            else:
-                missing += 1
+        on_pc = []
+        for item in items:
+            track = self._pc_states.get(item.pid, (PC_NONE, None))[1]
+            if track is not None and self._in_open_folder(track):
+                on_pc.append(track)
         stale = self._stale_pairs(items)
-        ready = self._connected and not self._window.runner.is_busy
-        if missing:
-            update_text = (f"Aggiorna dal PC (PC → iPhone): non si può, {missing} brani su {len(items)} non hanno la "
-                           "sorgente associata")
-        else:
-            update_text = f"Aggiorna dal PC (PC → iPhone): rimpiazza {len(pairs)} brani con i file del PC"
-        if stale:
-            tags_text = f"Aggiorna TAG dal PC (PC → iPhone): {len(stale)} brani con tag diversi ⟳"
-        else:
-            tags_text = "Aggiorna TAG dal PC (PC → iPhone): nessun brano associato con tag diversi"
+        probable = self._probable(items)
+        proposed = self._with_proposal(items)
+        linked_here = []
+        for item in items:
+            link = self._window.registry.get(item.sync_id) if item.sync_id else None
+            if link is not None and link.here:
+                linked_here.append(item)
+        stale_text = songs(len(stale)) if stale else "nessun brano ⟳ con la sorgente"
         result = [
-            (update_text, ready and not missing and bool(pairs), lambda: self.replace_pairs(pairs)),
-            (tags_text, ready and bool(stale), lambda: self.update_pairs(stale, "Aggiorna TAG dal PC")),
+            (f"Copia {songs(len(items))} da iPhone a PC…", self._connected and not busy,
+             lambda: self._save_selected(items)),
+            (f"Mostra nella scheda PC ({songs(len(on_pc))})",
+             bool(on_pc), lambda: self._window.show_tracks({str(track.path) for track in on_pc})),
+            None,
+            (f"Ricopia da PC a iPhone: {stale_text}", bool(stale), lambda: self._window.queue_pairs(stale, REPLACE)),
+            (f"Usa i tag da PC a iPhone: {stale_text}", bool(stale), lambda: self._align_to_phone(stale)),
+            (f"Usa i tag da iPhone a PC: {stale_text}…", bool(stale) and not busy, lambda: self._align_to_pc(stale)),
+            (f"Cambia i tag: {songs(len(writable))}…", bool(writable), lambda: self._edit_items(writable)),
             self._complete_entry(items),
             self._cover_entry(items),
-            (f"Rimuovi dall'iPhone: {len(writable)} brani", ready and bool(writable),
-             lambda: self.delete_items(writable)),
+            None,
+            ("Associa al file sul PC…" if len(writable) == 1 else f"Associa al file sul PC: {songs(len(writable))}…",
+             bool(writable) and not busy, lambda: self._link_sources(writable)),
+            (f"Associa le probabili ≈: {songs(len(probable))}", bool(probable) and not busy,
+             lambda: self._link_probable(probable)),
+            (f"Associa la sorgente proposta in rosso: {songs(len(proposed))}", bool(proposed) and not busy,
+             lambda: self._link_proposed(proposed)),
+            (f"Togli la sorgente: {songs(len(linked_here))}", bool(linked_here) and not busy,
+             lambda: self._unlink(linked_here)),
+            None,
+            (f"Elimina {songs(len(writable))} dall'iPhone" if writable else "Elimina dall'iPhone: nessun brano",
+             bool(writable), lambda: self._window.queue_deletes(writable)),
         ]
         if len(writable) < len(items):
-            result.append((f"{len(items) - len(writable)} brani acquistati o scaricati sul telefono: un computer non "
-                           "li può togliere", False, None))
+            result.append((f"{songs(len(items) - len(writable))} acquistati o scaricati sul telefono: un computer non "
+                           "li può cambiare né togliere", False, None))
+        return result
+
+    def browser_menu_entries(self, items: list) -> list:
+        """Le voci del tasto destro su un artista o un album: le stesse dei brani (phone_entries), senza separatori."""
+        result = []
+        for entry in self.phone_entries(items):
+            if entry is not None:
+                result.append(entry)
         return result
 
     def _browser_menu(self, where) -> None:
-        """Tasto destro su un artista o un album: aggiorna dal PC o rimuovi, per tutti i suoi brani."""
-        show_entries_menu(self, self.browser_menu_entries(self._browser.menu_tracks), where, self._connected)
+        """Tasto destro su un artista o un album: le azioni per tutti i suoi brani."""
+        show_entries_menu(self, self.browser_menu_entries(self._browser.menu_tracks), where, True)
 
     def _tracks_menu(self, where) -> None:
         items = self._selected_phone_tracks()
         if items:
-            ready = self._connected and not self._window.runner.is_busy
-            on_pc = []
-            for item in items:
-                track = self._pc_states.get(item.pid, (PC_NONE, None))[1]
-                if track is not None and self._in_open_folder(track):
-                    on_pc.append(track)
-            probable = self._probable(items)
-            proposed = self._with_proposal(items)
-            aligned = self._aligned_pairs(items)
-            writable = []
-            for item in items:
-                if item.from_computer:
-                    writable.append(item)
-            stale = self._stale_pairs(items)
-            linked_here = []
-            for item in items:
-                link = self._window.registry.get(item.sync_id) if item.sync_id else None
-                if link is not None and link.here:
-                    linked_here.append(item)
-            if len(writable) == 1:
-                source_text = "Associa sorgente…"
-            else:
-                source_text = f"Associa sorgenti… ({len(writable)} brani)"
-            text, enabled, slot = self._cover_entry(items)
-            cover_entry = (text, slot, enabled)
-            text, enabled, slot = self._complete_entry(items)
-            complete_entry = (text, slot, enabled)
             menu = QMenu(self)
-            entries = [
-                (f"Salva su PC (iPhone → PC)… ({len(items)} brani)", self._save_selected, ready),
-                (f"Mostra nella scheda PC ({len(on_pc)} brani)",
-                 lambda: self._window.show_tracks({str(track.path) for track in on_pc}), bool(on_pc)),
-                None,
-                (f"Rimpiazza con la versione del PC (PC → iPhone): {len(stale)} brani associati ⟳", self._replace_selected,
-                 ready and bool(stale)),
-                (f"Cambia tag… ({len(writable)} brani)", self._edit_selected, ready and bool(writable)),
-                complete_entry,
-                cover_entry,
-                None,
-                (source_text, lambda: self._link_sources(writable),
-                 bool(writable) and not self._window.runner.is_busy),
-                (f"Associa le probabili ≈ ({len(probable)} brani)", lambda: self._link_probable(probable),
-                 bool(probable) and not self._window.runner.is_busy),
-                (f"Associa questa sorgente, proposta in rosso ({len(proposed)} brani)",
-                 lambda: self._link_proposed(proposed), bool(proposed) and not self._window.runner.is_busy),
-                (f"Togli sorgente ({len(linked_here)} brani)", lambda: self._unlink(linked_here),
-                 bool(linked_here) and not self._window.runner.is_busy),
-                None,
-                (f"Elimina dall'iPhone… ({len(writable)} brani)", self._delete_selected, ready and bool(writable)),
-            ]
-            for entry in entries:
+            for entry in self.phone_entries(items):
                 if entry is None:
                     menu.addSeparator()
                 else:
-                    text, slot, enabled = entry
+                    text, enabled, slot = entry
                     action = menu.addAction(text)
                     action.setEnabled(enabled)
-                    if not self._connected:
-                        action.setToolTip("Connetti l'iPhone")
-                    action.triggered.connect(slot)
+                    if slot is not None:
+                        action.triggered.connect(slot)
             menu.addSeparator()
-            align = QMenu(f"Allinea i tag ({len(aligned)} brani ⟳)", menu)
-            to_pc = align.addAction("Usa i tag dell'iPhone (iPhone → PC): modifica i file del PC…")
-            to_pc.triggered.connect(lambda: self._align_to_pc(aligned))
-            to_pc.setEnabled(not self._window.runner.is_busy)
-            to_phone = align.addAction("Usa i tag del PC (PC → iPhone): aggiorna l'iPhone")
-            to_phone.triggered.connect(lambda: self._align_to_phone(aligned))
-            to_phone.setEnabled(ready)
-            if not self._connected:
-                to_phone.setToolTip("Connetti l'iPhone")
-            align.setToolTipsVisible(True)
-            align_action = menu.addMenu(align)
-            align_action.setEnabled(bool(aligned))
-            align_action.setToolTip("Solo per i brani con la sorgente certa e tag diversi (⟳): quale parte vale")
             sources = QMenu("File della sorgente", menu)
             add_file_entries(sources, self._source_paths(items),
                              lambda text: self._window.statusBar().showMessage(text, 8000))
@@ -1429,7 +1386,7 @@ class IPhonePanel(QWidget):
                     registry.forget(item.sync_id)
                 self._store_registry(registry, f"{len(chosen)} brani ora sono senza sorgente")
             elif dialog.action == ACTION_DELETE:
-                self.delete_items(chosen)
+                self._window.queue_deletes(chosen)
 
     def _relink(self, rows: list, found: dict, chosen: list) -> None:
         """Associa i file ritrovati: per i brani spuntati che ne hanno uno, il file ritrovato diventa la sorgente
@@ -1535,222 +1492,222 @@ class IPhonePanel(QWidget):
                 result = (False, [])
         return result
 
-    def send_tracks(self, tracks: list) -> None:
-        """Dalla scheda PC: i brani nell'app Musica dell'iPhone (con le modifiche in sospeso). Prima l'avviso per i
-        brani che sull'iPhone ci sono già in un altro formato (check_duplicates)."""
-        proceed, tracks = self.check_duplicates(tracks)
-        if proceed and tracks:
-            self._send_tracks(tracks)
-        elif proceed:
-            self._window.statusBar().showMessage("Niente da inviare: erano tutti già sull'iPhone in un altro formato",
-                                                 8000)
-
-    def _send_tracks(self, tracks: list) -> None:
-        formats = {}
-        sizes = []
-        for track in tracks:
-            suffix = track.path.suffix.lower()
-            formats[suffix] = formats.get(suffix, 0) + 1
-            sizes.append(estimate.file_size(track.path))
-        described = ", ".join(f"{count} {suffix[1:].upper()}" for suffix, count in sorted(formats.items()))
-        text = (f"Inviare {len(tracks)} brani all'app Musica dell'iPhone (PC → iPhone) ({described})?\n\n"
-                + estimate.summary(len(tracks), estimate.seconds(sizes)) + "\n\n"
-                "Vanno copie con i tag e la copertina modificati: i file del PC non cambiano.")
-        if self._confirm("Invia all'iPhone", text):
-            overlay = self._window.overlay
-
-            def action(progress, cancel):
-                value = phone_actions.send_tracks(tracks, overlay, progress, cancel, config_dir())
-                return value
-
-            self._write("Invio all'iPhone", "inviati", action)
-
-    def replace_pairs(self, pairs: list, reason: str = "", title: str = "Rimpiazza") -> None:
-        """(brano dell'iPhone, brano del PC): la versione del PC prende il posto di quella dell'iPhone. reason, se
-        c'è, va in testa alla domanda (perché si rimpiazza). Gli album con la grafia diversa si reinviano interi
-        (split_for_spelling)."""
-        rest, whole, blocked = self.split_for_spelling(pairs)
-        phone_tracks = []
-        sizes, removes = self._spelling_cost(whole)
-        for phone_track, track in rest:
-            sizes.append(estimate.file_size(track.path))
-        for phone_track, _track in rest + whole:
-            phone_tracks.append(phone_track)
-        count = len(rest) + len(whole)
-        text = ((reason + "\n\n" if reason else "") +
-                f"Rimpiazzare {count} brani dell'iPhone con la versione del PC (PC → iPhone)?\n\n"
-                + estimate.summary(count, estimate.seconds(sizes, removes=removes + len(rest))) + "\n\n"
-                "Prima si invia la versione del PC, poi si toglie quella vecchia. I brani rimpiazzati perdono "
-                "il conteggio degli ascolti e spariscono dalle playlist fatte sull'iPhone."
-                + self._spelling_text(whole, blocked))
-        reminder = playlist_reminder(phone_tracks)
-        if reminder:
-            text += "\n\nSono nelle playlist (alla fine te le ricordo, per rimetterli a mano):\n" + reminder
-        if self._confirm(title, text):
-            overlay = self._window.overlay
-
-            def action(progress, cancel):
-                value = phone_actions.replace_tracks(rest, overlay, progress, cancel, config_dir())
-                return value
-
-            self._write(title if reason else "Rimpiazzo sull'iPhone", "rimpiazzati", self._with_spelling(whole, action),
-                        _playlist_note(phone_tracks))
-
-    def pending_seconds(self, sends: list, removes: list, updates: list) -> float:
-        """Il tempo stimato di Applica (estimate.seconds), con gli album da reinviare interi per la grafia."""
-        rest, whole, _blocked = self.split_for_spelling(updates)
-        edits, replacements = phone_actions.plan_updates(rest)
+    def jobs_seconds(self, jobs: list) -> float:
+        """Il tempo stimato di Applica (estimate.seconds), con gli album da ricopiare interi per la grafia."""
+        sends, removes, updates, replaces, edits = self._split_jobs(jobs)
+        rest, whole, _blocked = self.split_for_spelling(updates + replaces)
+        taken = set()
+        for phone_track, _track in whole:
+            taken.add(phone_track.pid)
+        update_rest = []
+        for phone_track, track in updates:
+            if phone_track.pid not in taken:
+                update_rest.append((phone_track, track))
+        tag_edits, replacements = phone_actions.plan_updates(update_rest)
         sizes, spelling_removes = self._spelling_cost(whole)
         for track in sends:
             sizes.append(estimate.file_size(track.path))
+        replaced = 0
         for _phone_track, track in replacements:
             sizes.append(estimate.file_size(track.path))
-        result = estimate.seconds(sizes, removes=len(removes) + len(replacements) + spelling_removes,
-                                  edits=len(edits))
+            replaced += 1
+        for phone_track, track in replaces:
+            if phone_track.pid not in taken:
+                sizes.append(estimate.file_size(track.path))
+                replaced += 1
+        result = estimate.seconds(sizes, removes=len(removes) + replaced + spelling_removes,
+                                  edits=len(tag_edits) + len(edits))
         return result
 
-    def apply_pending(self, sends: list, removes: list, updates: list, closing: bool = False, then=None) -> None:
-        """Applica: prima l'avviso per i brani da inviare che sull'iPhone ci sono già in un altro formato
-        (check_duplicates; non all'uscita, dove si è già confermato), poi _apply_pending. Un brano lasciato fuori
-        resta in attesa."""
+    def jobs_notes(self, jobs: list) -> str:
+        """Le righe in più della finestra di Applica: gli album da ricopiare interi per la grafia, le playlist da
+        sistemare a mano dopo un rimpiazzo."""
+        _sends, _removes, updates, replaces, _edits = self._split_jobs(jobs)
+        _rest, whole, blocked = self.split_for_spelling(updates + replaces)
+        text = self._spelling_text(whole, blocked)
+        replaced = []
+        for phone_track, _track in replaces + whole:
+            replaced.append(phone_track)
+        reminder = playlist_reminder(replaced)
+        if reminder:
+            text += "\n\nI brani da ricopiare sono nelle playlist fatte sull'iPhone (alla fine te le ricordo):\n" + \
+                reminder
+        return text
+
+    @staticmethod
+    def _split_jobs(jobs: list) -> tuple:
+        """(da copiare [Track], da eliminare [PhoneTrack], Usa i tag [(PhoneTrack, Track)], Ricopia [(PhoneTrack,
+        Track)], Cambia i tag [(PhoneTrack, valori)])."""
+        sends = []
+        removes = []
+        updates = []
+        replaces = []
+        edits = []
+        for job in jobs:
+            if job.action == SEND:
+                sends.append(job.track)
+            elif job.action == DELETE:
+                removes.append(job.phone)
+            elif job.action == UPDATE:
+                updates.append((job.phone, job.track))
+            elif job.action == REPLACE:
+                replaces.append((job.phone, job.track))
+            elif job.action == EDIT:
+                edits.append((job.phone, job.values))
+        result = (sends, removes, updates, replaces, edits)
+        return result
+
+    def apply_jobs(self, jobs: list, closing: bool = False, then=None) -> None:
+        """Applica le azioni scelte nella finestra di Applica (già confermate lì): prima l'avviso per i brani da
+        copiare che sull'iPhone ci sono già in un altro formato (check_duplicates; non all'uscita, dove si è già
+        confermato). Un brano lasciato fuori resta in attesa. closing: all'uscita dal programma (nessun messaggio se
+        tutto riesce); then(), se c'è, alla fine."""
+        sends, removes, updates, replaces, edits = self._split_jobs(jobs)
         proceed = True
         if sends and not closing:
             proceed, sends = self.check_duplicates(sends)     # Annulla ferma tutto Applica
-        if proceed and (sends or removes or updates or closing):     # all'uscita sempre: alla fine then() chiude
-            self._apply_pending(sends, removes, updates, closing, then)
+        anything = bool(sends or removes or updates or replaces or edits)
+        if proceed and anything and (self._connected or closing):
+            self._run_jobs(sends, removes, updates, replaces, edits, closing, then)
+        elif proceed and anything:
+            QMessageBox.information(self, "Applica", "Connetti l'iPhone per applicare le azioni in attesa.")
         elif proceed:
-            self._window.statusBar().showMessage("Niente da applicare: i brani da inviare erano già sull'iPhone in un "
-                                                 "altro formato", 8000)
+            self._window.statusBar().showMessage("Niente da applicare: i brani da copiare erano già sull'iPhone in "
+                                                 "un altro formato", 8000)
+        if closing and not (proceed and anything) and then is not None:
+            then()            # niente da fare davvero: si esce lo stesso
 
-    def _apply_pending(self, sends: list, removes: list, updates: list, closing: bool = False, then=None) -> None:
-        """Le modifiche in attesa della scheda PC (passo 5) tutte insieme: invia (Track), togli (PhoneTrack), aggiorna
-        ((PhoneTrack, Track): Cambia tag o Rimpiazza, come per una modifica dei tag). closing: all'uscita dal
-        programma, già confermato (nessuna domanda e, se tutto riesce, nessun messaggio alla fine); then(), se c'è,
-        alla fine. Gli album con la grafia diversa si reinviano interi (split_for_spelling)."""
-        rest, whole, blocked = self.split_for_spelling(updates)
-        edits, replacements = phone_actions.plan_updates(rest)
-        lines = []
-        if sends:
-            lines.append(f"• {len(sends)} brani da inviare")
-        if removes:
-            lines.append(f"• {len(removes)} brani da togliere dall'iPhone (sul PC non cambia niente)")
-        if edits:
-            lines.append(f"• {len(edits)} brani da aggiornare con Cambia tag (restano ascolti e playlist)")
-        if replacements:
-            lines.append(f"• {len(replacements)} brani da rimpiazzare (artista, artista dell'album o un campo da "
-                         "svuotare: perdono ascolti e playlist)")
-        if whole:
-            lines.append(f"• {len(whole)} brani da reinviare con il loro album intero, per la grafia (perdono ascolti e "
-                         "playlist)")
+    def _run_jobs(self, sends: list, removes: list, updates: list, replaces: list, edits: list, closing: bool,
+                  then) -> None:
+        """Le azioni tutte insieme: copia, elimina, cambia i tag, poi Usa i tag e Ricopia (gli album con la grafia
+        diversa si ricopiano interi, split_for_spelling)."""
+        rest, whole, _blocked = self.split_for_spelling(updates + replaces)
+        taken = set()
+        for phone_track, _track in whole:
+            taken.add(phone_track.pid)
+        update_rest = []
+        for phone_track, track in updates:
+            if phone_track.pid not in taken:
+                update_rest.append((phone_track, track))
+        replace_rest = []
+        for phone_track, track in replaces:
+            if phone_track.pid not in taken:
+                replace_rest.append((phone_track, track))
+        tag_edits, replacements = phone_actions.plan_updates(update_rest)
+        replacements = replacements + replace_rest
         replaced = []
         for phone_track, _track in replacements + whole:
             replaced.append(phone_track)
-        count = len(sends) + len(removes) + len(edits) + len(replacements) + len(whole)
-        text = ("Applicare all'iPhone le modifiche in attesa (PC → iPhone)?\n\n" + "\n".join(lines) + "\n\n"
-                + estimate.summary(count, self.pending_seconds(sends, removes, updates))
-                + self._spelling_text(whole, blocked))
-        reminder = playlist_reminder(replaced)
-        if reminder:
-            text += "\n\nI brani da rimpiazzare sono nelle playlist (alla fine te le ricordo):\n" + reminder
-        if lines and (closing or self._confirm("Applica", text)):
-            overlay = self._window.overlay
+        overlay = self._window.overlay
+        edit_entries = list(edits) + list(tag_edits)
 
-            def updates_action(progress, cancel):
-                value = phone_actions.ActionReport()
-                if edits or replacements:
-                    value = phone_actions.update_from_pc(edits, replacements, overlay, progress, cancel, config_dir())
-                return value
+        def updates_action(progress, cancel):
+            value = phone_actions.ActionReport()
+            if edit_entries or replacements:
+                value = phone_actions.update_from_pc(edit_entries, replacements, overlay, progress, cancel,
+                                                     config_dir())
+            return value
 
-            spelling_and_updates = self._with_spelling(whole, updates_action)
+        spelling_and_updates = self._with_spelling(whole, updates_action)
 
-            def action(progress, cancel):
-                report = phone_actions.ActionReport()
-                if sends:
-                    report.add(phone_actions.send_tracks(sends, overlay, progress, cancel, config_dir()))
-                if removes and not cancel.is_set():
-                    report.add(phone_actions.delete_tracks(removes, progress, config_dir()))
-                if (edits or replacements or whole) and not cancel.is_set():
-                    report.add(spelling_and_updates(progress, cancel))
-                return report
+        def action(progress, cancel):
+            report = phone_actions.ActionReport()
+            if sends:
+                report.add(phone_actions.send_tracks(sends, overlay, progress, cancel, config_dir()))
+            if removes and not cancel.is_set():
+                report.add(phone_actions.delete_tracks(removes, progress, config_dir()))
+            if (edit_entries or replacements or whole) and not cancel.is_set():
+                report.add(spelling_and_updates(progress, cancel))
+            return report
 
-            self._write("Applica all'iPhone", "sistemati sull'iPhone", action, _playlist_note(replaced),
-                        quiet=closing, then=then)
-        elif closing and then is not None:
-            then()           # niente da fare davvero: si esce lo stesso
-
-    def _replace_selected(self) -> None:
-        pairs = self._stale_pairs(self._selected_phone_tracks())
-        if pairs:
-            self.replace_pairs(pairs)
+        self._write("Applica sull'iPhone", "fatti sull'iPhone", action, _playlist_note(replaced), quiet=closing,
+                    then=then)
 
     def refresh(self) -> None:
-        """Il pulsante Aggiorna (e F5): rilegge la musica dell'iPhone, o senza iPhone rifà il confronto con il PC."""
+        """Il pulsante Rileggi (e F5): rilegge la musica dell'iPhone, o senza iPhone rifà il confronto con il PC."""
         self._refresh_music()
 
     def _delete_current(self) -> None:
         """Il tasto Canc sull'elenco: Elimina dall'iPhone i brani selezionati (se nessuno lo è, quello con il
-        cursore), dopo la conferma."""
+        cursore), in attesa fino ad Applica."""
         current = self._music_view.currentItem()
         if not self._music_view.selectedItems() and current is not None:
             current.setSelected(True)
-        if self._connected and not self._window.runner.is_busy:
-            self._delete_selected()
-        else:
-            self._window.statusBar().showMessage("Elimina dall'iPhone: connetti l'iPhone (e attendi la fine "
-                                                 "dell'operazione in corso)", 8000)
+        self._delete_selected()
 
     def _edit_current(self) -> None:
-        """Il tasto E sull'elenco: Cambia tag sui brani selezionati (se nessuno lo è, su quello con il cursore)."""
+        """Il tasto E sull'elenco: Cambia i tag sui brani selezionati (se nessuno lo è, su quello con il cursore)."""
         current = self._music_view.currentItem()
         if not self._music_view.selectedItems() and current is not None:
             current.setSelected(True)
-        if self._connected and not self._window.runner.is_busy:
-            self._edit_selected()
-        else:
-            self._window.statusBar().showMessage("Cambia tag: connetti l'iPhone (e attendi la fine dell'operazione "
-                                                 "in corso)", 8000)
+        self._edit_selected()
 
     def _edit_selected(self) -> None:
         items = []
         for item in self._selected_phone_tracks():
             if item.from_computer:
                 items.append(item)
+        self._edit_items(items)
+
+    def _edit_items(self, items: list) -> None:
+        """Cambia i tag sull'iPhone: la finestra dei campi, poi in attesa fino ad Applica. Con la casella "Anche sul
+        PC" gli stessi tag vanno sui file del PC associati come modifiche in sospeso (i file non cambiano)."""
         if items:
-            dialog = PhoneTagDialog(self, items)
+            linked = []
+            for item in items:
+                state, track = self._pc_states.get(item.pid, (PC_NONE, None))
+                if state in (PC_SAME, PC_STALE) and track is not None:
+                    linked.append(track)
+            dialog = PhoneTagDialog(self, items, len(linked))
             if dialog.exec():
                 values = dialog.values
-
-                def action(progress, _cancel):
-                    value = phone_actions.edit_tracks(items, values, progress)
-                    return value
-
-                # il PC non cambia: la differenza si vede (⟳, nome del file in giallo) e si allinea a mano
-                self._write("Cambia tag sull'iPhone", "modificati", action)
+                extra = ""
+                if dialog.also_pc and linked:
+                    pairs = []
+                    for track in linked:
+                        new_tags = track.tags.copy()
+                        for name, value in values.items():
+                            setattr(new_tags, name, _pc_value(name, value))
+                        pairs.append((track, new_tags))
+                    self._window.apply_tag_changes(pairs)
+                    extra = f"; sul PC gli stessi tag per {songs(len(linked))}, in sospeso (i file non cambiano)"
+                self._window.queue_edits(items, values, extra)
 
     def _delete_selected(self) -> None:
         items = []
         for item in self._selected_phone_tracks():
             if item.from_computer:
                 items.append(item)
-        self.delete_items(items)
-
-    def delete_items(self, items: list) -> None:
         if items:
-            names = []
-            for item in items[:8]:
-                names.append(f"• {item.display_artist} — {item.tags.title}")
-            if len(items) > 8:
-                names.append(f"… e altri {len(items) - 8}")
-            text = (f"Eliminare {len(items)} brani dall'app Musica dell'iPhone?\n\n" + "\n".join(names) + "\n\n"
-                    + estimate.summary(len(items), estimate.seconds([], removes=len(items))) +
-                    "\n\nSpariscono dall'iPhone con i loro ascolti. Sul PC non cambia niente. "
-                    + phone_actions.DELETE_WAIT_NOTE)
-            if self._confirm("Elimina dall'iPhone", text):
-                def action(progress, _cancel):
-                    value = phone_actions.delete_tracks(items, progress, config_dir())
-                    return value
+            self._window.queue_deletes(items)
+        else:
+            self._window.statusBar().showMessage("Nessun brano da eliminare: quelli scelti non sono stati messi da un "
+                                                 "computer", 8000)
 
-                self._write("Eliminazione dall'iPhone", "eliminati", action)
+    def pending_changed(self) -> None:
+        """La coda delle azioni in attesa è cambiata: i brani con un'azione hanno il titolo in corsivo blu e lo dicono
+        nel suggerimento."""
+        window = self._window
+        view = self._music_view
+        italic = QFont()
+        italic.setItalic(True)
+        for index in range(view.topLevelItemCount()):
+            row = view.topLevelItem(index)
+            pid = row.data(COL_TITLE, PID_ROLE)
+            item = self._by_pid.get(pid)
+            action = window.pending.get_phone(pid, include_edit=True) if item is not None else ""
+            if not action and item is not None and item.sync_id:
+                link = window.registry.get(item.sync_id)
+                if link is not None and link.here:
+                    action = window.pending.get(link.path)
+            if action:
+                row.setFont(COL_TITLE, italic)
+                row.setForeground(COL_TITLE, QBrush(PENDING_COLOR))
+                row.setToolTip(COL_TITLE, f"In attesa: {PENDING_NAMES.get(action, action)} (Applica)")
+            elif row.font(COL_TITLE).italic():
+                row.setFont(COL_TITLE, QFont())
+                row.setForeground(COL_TITLE, QBrush())
+                row.setToolTip(COL_TITLE, self._origin_text(item) if item is not None else "")
 
     # ------------------------------------------------------------------ collega al PC (adozione)
 
@@ -2048,12 +2005,14 @@ class IPhonePanel(QWidget):
 
     # ------------------------------------------------------------------ salva su PC
 
-    def _save_selected(self) -> None:
-        items = self._selected_phone_tracks()
+    def _save_selected(self, items: list = None) -> None:
+        """Copia da iPhone a PC: i brani scelti (o quelli selezionati), subito, dopo la scelta della cartella."""
+        if items is None:
+            items = self._selected_phone_tracks()
         if not items:
-            QMessageBox.information(self, "Salva su PC", "Seleziona prima uno o più brani nell'elenco.")
+            QMessageBox.information(self, "Copia da iPhone a PC", "Seleziona prima uno o più brani nell'elenco.")
         elif not self._connected:
-            QMessageBox.information(self, "Salva su PC", "Connetti l'iPhone per copiarne i brani sul PC.")
+            QMessageBox.information(self, "Copia da iPhone a PC", "Connetti l'iPhone per copiarne i brani sul PC.")
         else:
             start = str(self._window.library_dir())
             folder = QFileDialog.getExistingDirectory(
@@ -2117,7 +2076,7 @@ class IPhonePanel(QWidget):
             message += "\n\nNon copiati:\n" + "\n".join(details)
         if transfer.cancelled or copy_report.cancelled:
             message += "\n\nOperazione annullata."
-        QMessageBox.information(self, "Salva su PC", message)
+        QMessageBox.information(self, "Copia da iPhone a PC", message)
         if self._window.root_folder == target:
             self._window.load_folder(target)
 
@@ -2169,6 +2128,11 @@ class IPhonePanel(QWidget):
     @property
     def connected(self) -> bool:
         result = self._connected
+        return result
+
+    @property
+    def device_name(self) -> str:
+        result = self._device_name
         return result
 
     def _check_device(self) -> None:

@@ -1139,7 +1139,7 @@ def compare_with_library(phone_tracks: list, library_tracks: list) -> list:
         issues.append(Issue(
             KIND_ONLY_ON_DEVICE, SEVERITY_MEDIUM, f"{len(orphans)} brani sull'iPhone che non sono sul PC",
             "Non c'è un brano con lo stesso artista, album e titolo nella Libreria del PC. Se vuoi conservarli, "
-            "salvali sul PC dalla scheda iPhone (tasto destro → Salva su PC); a volte sono solo scritti in modo "
+            "salvali sul PC dalla scheda iPhone (tasto destro → Copia da iPhone a PC); a volte sono solo scritti in modo "
             "diverso.", names, rule_id="I3"))
     return issues
 
