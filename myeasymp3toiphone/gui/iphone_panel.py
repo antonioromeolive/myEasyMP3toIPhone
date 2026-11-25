@@ -9,8 +9,8 @@ from pathlib import Path
 from PySide6.QtCore import QRect, Qt, QTimer
 from PySide6.QtGui import QBrush, QColor, QFont, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
-    QAbstractItemView, QCheckBox, QDialog, QDialogButtonBox, QFileDialog, QFormLayout, QFrame, QHBoxLayout,
-    QHeaderView, QLabel, QLineEdit, QMenu, QMessageBox, QPushButton, QSplitter, QToolButton, QTreeWidget,
+    QAbstractItemView, QCheckBox, QDialog, QDialogButtonBox, QFileDialog, QFrame, QHBoxLayout,
+    QHeaderView, QLabel, QLineEdit, QMenu, QMessageBox, QPushButton, QScrollArea, QSplitter, QToolButton, QTreeWidget,
     QTreeWidgetItem, QVBoxLayout, QWidget,
 )
 
@@ -28,6 +28,8 @@ from .icons import icon
 from .widgets import ICON_COLOR, ActionBar, ChipBar
 from .compare_tip import comparison_html, show_on_tooltip
 from .file_actions import add_file_entries
+from .phone_tag_panel import PhoneTagPanel
+from .tag_editor import ALBUM_COVER_TRIES as COVER_TRIES
 from .theme import album_band, album_bands, set_role
 from .browser import SORT_ROLE, LibraryBrowser, SortableItem
 
@@ -285,99 +287,6 @@ def _playlist_note(phone_tracks: list) -> str:
     return result
 
 
-class PhoneTagDialog(QDialog):
-    """Cambia i tag dei brani dell'iPhone. Un campo vuoto non cambia; per più brani, il titolo non si cambia.
-    linked: quanti hanno la sorgente certa sul PC; la casella "Anche sul PC" (spenta) mette gli stessi tag sui loro
-    file come modifiche in sospeso (also_pc)."""
-
-    def __init__(self, parent, phone_tracks: list, linked: int = 0) -> None:
-        super().__init__(parent)
-        self.setWindowTitle("Cambia i tag sull'iPhone")
-        self.also_pc = False
-        single = phone_tracks[0].tags if len(phone_tracks) == 1 else None
-        self.fields = {}
-        form = QFormLayout()
-        for name, label in (("title", "Titolo"), ("album", "Album"), ("genre", "Genere"), ("year", "Anno"),
-                            ("track_number", "N. traccia"), ("disc_number", "N. disco")):
-            edit = QLineEdit()
-            if single is not None:
-                value = getattr(single, name)
-                edit.setText("" if value in (None, "") else str(value))
-            else:
-                edit.setPlaceholderText("(invariato)")
-            if name == "title" and single is None:
-                edit.setEnabled(False)
-                edit.setPlaceholderText("(si cambia un brano alla volta)")
-            self.fields[name] = edit
-            form.addRow(label + ":", edit)
-        self._original = {}
-        for name, edit in self.fields.items():
-            self._original[name] = edit.text()
-        flags = set()
-        for item in phone_tracks:
-            flags.add(bool(item.tags.compilation))
-        self.compilation = QCheckBox("Compilation (album di artisti vari)")
-        if len(flags) > 1:
-            self.compilation.setTristate(True)
-            self.compilation.setCheckState(Qt.PartiallyChecked)
-            self.compilation.setToolTip("Valori diversi tra i brani scelti: lasciala così per non cambiarla.")
-        else:
-            self.compilation.setChecked(True in flags)
-        self._original_compilation = self.compilation.checkState()
-        form.addRow("", self.compilation)
-        note = QLabel(f"{len(phone_tracks)} brani. Artista e artista dell'album non si cambiano qui: sull'iPhone "
-                      "rinominerebbero l'artista per tutti i suoi brani. Cambiali nella scheda PC, poi usa "
-                      "<i>Ricopia da PC a iPhone</i>. Anno o numero 0: lo svuota.<br>Una compilation "
-                      "vuole anche l'artista dell'album <i>Artisti vari</i>: se nell'app Musica i brani non si "
-                      "raccolgono in un solo album, metti la spunta e \"Artisti vari\" nella scheda PC e usa "
-                      "<i>Ricopia da PC a iPhone</i>.")
-        note.setWordWrap(True)
-        note.setTextFormat(Qt.RichText)
-        note.setStyleSheet("color: gray")
-        self._also_pc = QCheckBox(f"Anche sul PC: gli stessi tag per i {linked} brani con il file su questo PC, come "
-                                  "modifiche in sospeso (i file non cambiano)")
-        self._also_pc.setToolTip("Spenta, il PC resta com'è e la differenza si vede (⟳). Per scrivere i tag nei file "
-                                 "del PC c'è Usa i tag da iPhone a PC.")
-        self._also_pc.setEnabled(linked > 0)
-        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        buttons.button(QDialogButtonBox.Ok).setText("Metti in attesa")
-        buttons.button(QDialogButtonBox.Ok).setToolTip("L'iPhone cambia con Applica (la barra blu in alto)")
-        buttons.accepted.connect(self._check)
-        buttons.rejected.connect(self.reject)
-        layout = QVBoxLayout(self)
-        layout.addLayout(form)
-        layout.addWidget(note)
-        layout.addWidget(self._also_pc)
-        layout.addWidget(buttons)
-        self.values = {}
-        self.resize(480, 300)
-
-    def _check(self) -> None:
-        values = {}
-        problem = ""
-        for name, edit in self.fields.items():
-            text = edit.text().strip()
-            if edit.isEnabled() and text and text != self._original[name]:
-                if name in ("year", "track_number", "disc_number"):
-                    if text.isascii() and text.isdigit() and int(text) <= 9999:   # "²" è isdigit ma non un int
-                        values[name] = int(text)
-                    else:
-                        problem = f"{name.replace('_', ' ')}: serve un numero"
-                else:
-                    values[name] = text
-        state = self.compilation.checkState()
-        if state != self._original_compilation and state != Qt.PartiallyChecked:
-            values["compilation"] = state == Qt.Checked
-        if problem:
-            QMessageBox.warning(self, "Cambia i tag", problem)
-        elif not values:
-            QMessageBox.information(self, "Cambia i tag", "Non hai cambiato niente.")
-        else:
-            self.values = values
-            self.also_pc = self._also_pc.isChecked()
-            self.accept()
-
-
 class AlignToPcDialog(QDialog):
     """Usa i tag da iPhone a PC: l'elenco dei file che verranno modificati, con ogni campo (ora → diventa). Una
     casella per campo, con quanti file cambia: si scrivono solo i campi scelti (chosen_plan), così una correzione fatta
@@ -515,6 +424,7 @@ class IPhonePanel(QWidget):
         layout = QVBoxLayout(self)
         layout.addWidget(self._build_device_card())
         layout.addWidget(self._build_music_box(), 1)
+        self._update_tag_panel()
         self._update_enabled()
         self._auto_tried = False      # già tentato il collegamento automatico per questo iPhone collegato
         self._driver_warned = False
@@ -602,6 +512,7 @@ class IPhonePanel(QWidget):
         self._music_view.customContextMenuRequested.connect(self._show_menu)
         self._music_view.viewport().installEventFilter(self)    # il suggerimento di Sul PC, al passaggio del mouse
         self._music_view.itemSelectionChanged.connect(self._update_action_bar)
+        self._music_view.itemSelectionChanged.connect(self._update_tag_panel)
         edit_shortcut = QShortcut(QKeySequence("E"), self._music_view, context=Qt.WidgetShortcut)
         edit_shortcut.activated.connect(self._edit_current)       # E: Cambia i tag sul brano su cui si è
         delete_shortcut = QShortcut(QKeySequence(Qt.Key_Delete), self._music_view, context=Qt.WidgetShortcut)
@@ -635,16 +546,99 @@ class IPhonePanel(QWidget):
         lists = QSplitter(Qt.Vertical)
         lists.addWidget(self._browser)
         lists.addWidget(tracks_box)
-        lists.setSizes([200, 420])
+        lists.setSizes([240, 520])
         lists.setStretchFactor(1, 1)
+        # a destra i tag dei brani scelti, come l'editor della scheda PC: si chiude (✕) e si riapre con Cambia i tag
+        # o il tasto E
+        splitter = QSplitter()
+        splitter.addWidget(lists)
+        splitter.addWidget(self._build_tag_panel())
+        splitter.setSizes([1040, 330])
+        splitter.setStretchFactor(0, 1)
 
         box = QWidget()
         box_layout = QVBoxLayout(box)
         box_layout.setContentsMargins(0, 0, 0, 0)
         box_layout.addLayout(search_row)
         box_layout.addWidget(self._show)
-        box_layout.addWidget(lists, 1)
+        box_layout.addWidget(splitter, 1)
         return box
+
+    def _build_tag_panel(self) -> QWidget:
+        """Il riquadro dei tag a destra, con il titolo e la ✕ come nella scheda PC."""
+        self._tag_panel = PhoneTagPanel()
+        self._tag_panel.queue_requested.connect(self._queue_tag_edit)
+        self._tag_scroll = QScrollArea()
+        self._tag_scroll.setWidget(self._tag_panel)
+        self._tag_scroll.setWidgetResizable(True)
+        self._tag_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self._tag_scroll.setMinimumWidth(320)
+        self._tag_box = QWidget()
+        title = QLabel("Cambia i tag")
+        title.setObjectName("panelTitle")
+        close = QToolButton()
+        close.setText("✕")
+        close.setToolTip("Chiude l'editor dei tag: si riapre con Cambia i tag o il tasto E")
+        close.clicked.connect(lambda: self._tag_box.setVisible(False))
+        head = QHBoxLayout()
+        head.addWidget(title, 1)
+        head.addWidget(close)
+        layout = QVBoxLayout(self._tag_box)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addLayout(head)
+        layout.addWidget(self._tag_scroll, 1)
+        return self._tag_box
+
+    def _update_tag_panel(self) -> None:
+        """I brani selezionati nel riquadro dei tag (se è aperto)."""
+        if hasattr(self, "_tag_panel") and not self._tag_box.isHidden():
+            self._show_in_tag_panel(self._selected_phone_tracks())
+
+    def _show_in_tag_panel(self, items: list) -> None:
+        """Il riquadro dei tag con items: quanti hanno il file associato su questo PC e la copertina di quel file."""
+        linked = self._linked_tracks(items)
+        cover, note = self._cover_for(items)
+        self._tag_panel.set_tracks(items, len(linked), cover, note)
+
+    def _linked_tracks(self, items: list) -> list:
+        """I file del PC (Track) associati con certezza ai brani dell'iPhone items."""
+        result = []
+        for item in items:
+            state, track = self._pc_states.get(item.pid, (PC_NONE, None))
+            if state in (PC_SAME, PC_STALE) and track is not None:
+                result.append(track)
+        return result
+
+    def _cover_for(self, items: list) -> tuple:
+        """(immagine o None, da dove viene) per il riquadro dei tag: quella del file associato sul PC, per brani di un
+        solo album (l'immagine che ha l'iPhone non si legge da qui)."""
+        cover = None
+        note = ""
+        albums = set()
+        for item in items:
+            albums.add((group_name(item.display_artist), group_name(item.tags.album)))
+        coverless = False
+        for item in items:
+            if item.album_without_cover:
+                coverless = True
+        if len(albums) == 1:
+            linked = self._linked_tracks(items[:COVER_TRIES])
+            index = 0
+            while cover is None and index < len(linked):
+                cover = self._window.cover_of(linked[index])
+                index += 1
+            if cover is not None:
+                note = "Dal file associato sul PC"
+            elif linked:
+                note = "Il file associato sul PC non ha la copertina"
+            else:
+                note = "Nessun file associato sul PC: l'immagine che ha l'iPhone non si legge da qui"
+        elif albums:
+            note = "Brani di album diversi"
+        if coverless:
+            note += "\nSull'iPhone l'album non ha l'immagine: Ricopia le copertine da PC a iPhone (tasto destro)"
+        result = (cover, note.strip())
+        return result
 
     def _bar_items(self) -> list:
         """I brani per la barra delle azioni: quelli selezionati o, senza selezione, quelli dell'artista o dell'album
@@ -1922,35 +1916,32 @@ class IPhonePanel(QWidget):
         self._edit_selected()
 
     def _edit_selected(self) -> None:
-        items = []
-        for item in self._selected_phone_tracks():
-            if item.from_computer:
-                items.append(item)
-        self._edit_items(items)
+        self._edit_items(self._selected_phone_tracks())
 
     def _edit_items(self, items: list) -> None:
-        """Cambia i tag sull'iPhone: la finestra dei campi, poi in attesa fino ad Applica. Con la casella "Anche sul
-        PC" gli stessi tag vanno sui file del PC associati come modifiche in sospeso (i file non cambiano)."""
+        """Cambia i tag sull'iPhone: il riquadro dei tag a destra (si riapre se era chiuso) con items, il cursore nel
+        primo campo. Con Metti in attesa vanno in attesa fino ad Applica (_queue_tag_edit)."""
         if items:
-            linked = []
-            for item in items:
-                state, track = self._pc_states.get(item.pid, (PC_NONE, None))
-                if state in (PC_SAME, PC_STALE) and track is not None:
-                    linked.append(track)
-            dialog = PhoneTagDialog(self, items, len(linked))
-            if dialog.exec():
-                values = dialog.values
-                extra = ""
-                if dialog.also_pc and linked:
-                    pairs = []
-                    for track in linked:
-                        new_tags = track.tags.copy()
-                        for name, value in values.items():
-                            setattr(new_tags, name, _pc_value(name, value))
-                        pairs.append((track, new_tags))
-                    self._window.apply_tag_changes(pairs)
-                    extra = f"; sul PC gli stessi tag per {songs(len(linked))}, in sospeso (i file non cambiano)"
-                self._window.queue_edits(items, values, extra)
+            self._tag_box.setVisible(True)
+            self._show_in_tag_panel(items)
+            if self._tag_panel.focus_first_field():
+                self._tag_scroll.ensureWidgetVisible(self._tag_panel.focusWidget() or self._tag_panel)
+
+    def _queue_tag_edit(self, items: list, values: dict, also_pc: bool) -> None:
+        """Metti in attesa del riquadro dei tag. Con la casella "Anche sul PC" gli stessi tag vanno sui file del PC
+        associati come modifiche in sospeso (i file non cambiano)."""
+        linked = self._linked_tracks(items)
+        extra = ""
+        if also_pc and linked:
+            pairs = []
+            for track in linked:
+                new_tags = track.tags.copy()
+                for name, value in values.items():
+                    setattr(new_tags, name, _pc_value(name, value))
+                pairs.append((track, new_tags))
+            self._window.apply_tag_changes(pairs)
+            extra = f"; sul PC gli stessi tag per {songs(len(linked))}, in sospeso (i file non cambiano)"
+        self._window.queue_edits(items, values, extra)
 
     def _delete_selected(self) -> None:
         items = []

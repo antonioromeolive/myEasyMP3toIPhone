@@ -1414,7 +1414,6 @@ def test_everything_for_the_iphone_waits_for_apply(tmp_path, monkeypatch):
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     from PySide6.QtWidgets import QApplication
     from myeasymp3toiphone import provenance
-    from myeasymp3toiphone.gui import iphone_panel
     from myeasymp3toiphone.gui.apply_dialog import ApplyDialog, summary
     from myeasymp3toiphone.gui.main_window import MainWindow
     from myeasymp3toiphone.pending import DELETE, EDIT, REPLACE, SEND
@@ -1477,19 +1476,18 @@ def test_everything_for_the_iphone_waits_for_apply(tmp_path, monkeypatch):
         assert dialog.jobs == [] and window.pending.total() == 0 and not dialog._apply.isEnabled()
         dialog.close()
 
-        # Cambia i tag con "Anche sul PC": gli stessi tag sul file del PC, in sospeso
-        monkeypatch.setattr(iphone_panel.PhoneTagDialog, "exec", lambda dialog: True)
-        original_init = iphone_panel.PhoneTagDialog.__init__
-
-        def init(dialog, *args):
-            original_init(dialog, *args)
-            dialog.values = {"genre": "Jazz"}
-            dialog.also_pc = True
-
-        monkeypatch.setattr(iphone_panel.PhoneTagDialog, "__init__", init)
+        # Cambia i tag (il riquadro a destra, riaperto dopo la ✕) con "Anche sul PC": gli stessi tag sul file del PC,
+        # in sospeso; la casella si rispegne
+        panel._tag_box.setVisible(False)
         panel._edit_items([phone[1]])
+        tags_panel = panel._tag_panel
+        assert not panel._tag_box.isHidden() and tags_panel.fields["title"].text() == phone[1].tags.title
+        assert tags_panel._also_pc.isEnabled()
+        tags_panel.fields["genre"].setText("Jazz")
+        tags_panel._also_pc.setChecked(True)
+        tags_panel._check()
         assert window.overlay.is_edited(here[1].path) and here[1].tags.genre == "Jazz"
-        assert "sul PC gli stessi tag" in window._pending_last.text()
+        assert "sul PC gli stessi tag" in window._pending_last.text() and not tags_panel._also_pc.isChecked()
     finally:
         window._exit_checked = True
         window.close()
@@ -1497,28 +1495,54 @@ def test_everything_for_the_iphone_waits_for_apply(tmp_path, monkeypatch):
 
 
 def test_change_tags_on_the_iphone_checks_and_converts_the_values(monkeypatch):
-    """Cambia i tag (scheda iPhone): i numeri si controllano ("²" no), un campo uguale o vuoto non cambia, 0 svuota; con
-    "Anche sul PC" i valori diventano quelli di un TrackTags del PC."""
+    """Cambia i tag (riquadro della scheda iPhone): i numeri si controllano ("²" no), un campo uguale o vuoto non
+    cambia, 0 svuota; artista e tracce totali non si cambiano; con più brani il titolo non si cambia e i valori diversi
+    lo dicono; i brani non messi da un computer si vedono ma non si cambiano; con "Anche sul PC" i valori diventano
+    quelli di un TrackTags del PC."""
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     from PySide6.QtWidgets import QApplication, QMessageBox
-    from myeasymp3toiphone.gui.iphone_panel import PhoneTagDialog, _pc_value
+    from myeasymp3toiphone.gui.iphone_panel import _pc_value
+    from myeasymp3toiphone.gui.phone_tag_panel import ONE_AT_A_TIME, PhoneTagPanel
+    from myeasymp3toiphone.gui.tag_editor import MIXED
     app = QApplication.instance() or QApplication([])
     warnings = []
+    queued = []
     monkeypatch.setattr(QMessageBox, "warning", lambda *args: warnings.append(args[2]))
     monkeypatch.setattr(QMessageBox, "information", lambda *args: warnings.append(args[2]))
-    dialog = PhoneTagDialog(None, [_phone(1, "Uno", "Gruppo Finto", "Disco", year="2000")], 1)
-    dialog.fields["year"].setText("²")
-    dialog._check()
-    assert warnings == ["year: serve un numero"] and dialog.values == {}
-    dialog.fields["year"].setText("0")                                  # 0 svuota
-    dialog.fields["track_number"].setText(" 7 ")
-    dialog.fields["album"].setText("Disco")                             # uguale: non cambia
-    dialog._check()
-    assert dialog.values == {"year": 0, "track_number": 7} and not dialog.also_pc
+    panel = PhoneTagPanel()
+    panel.queue_requested.connect(lambda items, values, also_pc: queued.append((len(items), values, also_pc)))
+    one = _phone(1, "Uno", "Gruppo Finto", "Disco", year="2000")
+    one.sync_id = 11
+    panel.set_tracks([one], 1)
+    assert panel.fields["artist"].isReadOnly() and not panel.fields["title"].isReadOnly()
+    assert panel.fields["track_total"].isReadOnly() and panel._also_pc.isEnabled()
+    assert not panel._save_button.isEnabled()
+    panel.fields["year"].setText("²")
+    panel._check()
+    assert warnings == ["year: serve un numero"] and queued == []
+    panel.fields["year"].setText("0")                                   # 0 svuota
+    panel.fields["track_number"].setText(" 7 ")
+    panel.fields["album"].setText("Disco")                              # uguale: non cambia
+    panel.fields["artist"].setText("Altro")                             # non si cambia sull'iPhone
+    panel._check()
+    assert queued == [(1, {"year": 0, "track_number": 7}, False)]
+
+    two = _phone(2, "Due", "Gruppo Finto", "Disco", year="2001")
+    two.sync_id = 12
+    bought = _phone(3, "Tre", "Gruppo Finto", "Disco")                  # sync_id 0: acquistato sul telefono
+    panel.set_tracks([one, two, bought], 0)
+    assert not panel.fields["title"].isEnabled() and panel.fields["title"].placeholderText() == ONE_AT_A_TIME
+    assert panel.fields["year"].placeholderText() == MIXED and panel.fields["album"].text() == "Disco"
+    assert "1 dei brani scelti" in panel._kinds.text() and not panel._also_pc.isEnabled()
+    panel.fields["genre"].setText("Jazz")
+    panel._check()
+    assert queued[-1] == (2, {"genre": "Jazz"}, False)
+    panel.set_tracks([bought])
+    assert not panel.fields["album"].isEnabled() and not panel.focus_first_field()
     assert (_pc_value("year", 0), _pc_value("year", 1999), _pc_value("track_number", 0),
             _pc_value("disc_number", 2), _pc_value("compilation", 1), _pc_value("genre", "Jazz")) == \
         ("", "1999", None, 2, True, "Jazz")
-    dialog.close()
+    panel.close()
     app.processEvents()
 
 

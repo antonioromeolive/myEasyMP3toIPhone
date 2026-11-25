@@ -2883,4 +2883,28 @@ CATALOG = {
         'not rebuilt with the new tracks (they are missing from the playlists): {0}',
     'non lette prima di ricopiare: non si rifanno da sole ({0})':
         "not read before copying again: they won't be rebuilt automatically ({0})",
+    'Dal file associato sul PC':
+        'From the linked file on the PC',
+    'Il file associato sul PC non ha la copertina':
+        'The linked file on the PC has no cover',
+    "Nessun file associato sul PC: l'immagine che ha l'iPhone non si legge da qui":
+        "No linked file on the PC: the iPhone's own image can't be read from here",
+    'Brani di album diversi':
+        'Tracks of different albums',
+    "\nSull'iPhone l'album non ha l'immagine: Ricopia le copertine da PC a iPhone (tasto destro)":
+        '\nOn the iPhone the album has no image: Copy the covers again from PC to iPhone (right click)',
+    "Non si cambia qui: sull'iPhone l'artista si rinominerebbe per tutti i suoi brani. Cambialo nella scheda PC, poi usa Ricopia da PC a iPhone.":
+        'Not changed here: on the iPhone the artist would be renamed for all their tracks. Change it in the PC tab, then use Copy again from PC to iPhone.',
+    "Non si cambia sull'iPhone: cambialo nella scheda PC, poi usa Ricopia da PC a iPhone.":
+        'Not changed on the iPhone: change it in the PC tab, then use Copy again from PC to iPhone.',
+    'Anche sul PC':
+        'Also on the PC',
+    "Si cambiano titolo (un brano alla volta), album, numeri, anno, genere e Compilation: vanno in attesa e l'iPhone cambia con Applica. Un campo vuoto non cambia; anno o numero 0 lo svuota. Artista e artista dell'album si cambiano nella scheda PC, poi Ricopia da PC a iPhone.":
+        "You can change title (one track at a time), album, numbers, year, genre and Compilation: they wait in the queue and the iPhone changes with Apply. An empty field doesn't change; year or number 0 clears it. Artist and album artist are changed in the PC tab, then Copy again from PC to iPhone.",
+    '{0} brani selezionati: i campi cambiati valgono per tutti':
+        '{0} tracks selected: the changed fields apply to all of them',
+    "Non messi sull'iPhone da un computer (acquistati, scaricati o di un altro programma): i tag si vedono ma non si cambiano":
+        "Not put on the iPhone by a computer (bought, downloaded or from another program): the tags are shown but can't be changed",
+    '{0} dei brani scelti non sono stati messi da un computer: i loro tag non cambiano':
+        "{0} of the chosen tracks were not put there by a computer: their tags don't change",
 }

@@ -118,8 +118,8 @@ senza brani selezionati in tabella usano l'artista o l'album scelti negli elench
 
 **Scorciatoie** sulla tabella dei brani (per i brani selezionati o, se non ce n'è nessuno, per quello su cui sei;
 mentre scrivi in *Cerca* o nell'editor valgono come tasti normali):
-- **E**: **Cambia i tag**: nella scheda PC il cursore nell'editor dei tag (campo *Titolo*, già selezionato), nella
-  scheda iPhone la finestra *Cambia i tag sull'iPhone* (va in attesa);
+- **E**: **Cambia i tag**: il cursore nel riquadro dei tag a destra (campo *Titolo*, già selezionato), nella scheda PC
+  come nella scheda iPhone (lì va in attesa);
 - **Canc**: **Elimina dall'iPhone**, in attesa fino ad *Applica* (nella scheda PC i brani che ci sono con la
   sorgente associata). I file del PC non si cancellano mai;
 - **F5**, in tutta la finestra: **Rileggi** della scheda che vedi (PC: rilegge la cartella; iPhone: rilegge la sua
@@ -364,6 +364,12 @@ album* e *Ricopia le copertine* (per i brani scelti o, senza scelta, per tutti),
 brani senza sorgente…*, *Associa le probabili ≈*, *Associa la sorgente proposta in rosso*, *Togli la sorgente* e
 *Rifai le playlist per artista sull'iPhone…*.
 
+**Il riquadro dei tag**, a destra, è fatto come quello della scheda PC: i tag dei brani selezionati come li mostra l'app
+Musica e la copertina del file associato sul PC (l'immagine che ha l'iPhone non si legge da qui; se l'album sull'iPhone
+non ha l'immagine lo dice). Si cambiano titolo (un brano alla volta), album, numeri, anno, genere e *Compilation*:
+**Metti in attesa** e l'iPhone cambia con *Applica*. Artista, artista dell'album e totali si vedono ma non si cambiano
+qui; i brani non messi da un computer si vedono soltanto. Si chiude con la ✕ e si riapre con *Cambia i tag* o **E**.
+
 **La musica dell'app Musica.** Connesso l'iPhone, la scheda **iPhone** mostra i brani dell'app *Musica* con i
 titoli, gli artisti e gli album che mostra l'app: il programma ne copia sul PC il database (`MediaLibrary.sqlitedb`)
 e lo legge, perché sul telefono i file hanno nomi casuali (`F12/ABCD.mp3`). Sono solo i brani con un file
@@ -414,8 +420,8 @@ accenti non sono evidenziati: sull'iPhone sono lo stesso gruppo.
     PC → diventa*); con **Modifica N file** li scrive nei file (MP3 in ID3v2.3; WMA, WAV e AIFF no), senza
     annullamento. Le modifiche in sospeso di quei file entrano nel file insieme; una copertina in sospeso resta in
     sospeso;
-  - **Cambia i tag…** (tasto **E**): titolo (un brano alla volta), album, genere, anno, numeri, *Compilation*; va in
-    attesa. La casella **Anche sul PC** (spenta) mette gli stessi tag sui file del PC associati, come modifiche in
+  - **Cambia i tag…** (tasto **E**, nel riquadro a destra): titolo (un brano alla volta), album, genere, anno, numeri,
+    *Compilation*; va in attesa. La casella **Anche sul PC** (spenta, si rispegne dopo ogni volta) mette gli stessi tag sui file del PC associati, come modifiche in
     sospeso (i file non cambiano);
   - **Copia i brani mancanti degli album da PC a iPhone** e **Ricopia le copertine da PC a iPhone** (vedi sotto),
     in attesa;
@@ -439,7 +445,7 @@ CopyTrans Manager (*AirTrafficControl*), senza iTunes e senza sincronizzare tutt
 | Scheda **PC** | **Copia da PC a iPhone** | i brani che non sono sull'iPhone: una copia con i tag e la copertina modificati (i file del PC non cambiano) |
 | Schede **PC** e **iPhone** | **Ricopia da PC a iPhone** | i brani **associati** con tag diversi (⟳): vedi *Ricopia* qui sotto |
 | Schede **PC** e **iPhone** | **Usa i tag da PC a iPhone** | i brani associati ⟳ prendono i tag del PC: dove basta si cambiano i tag (restano ascolti e playlist), per artista e artista dell'album si ricopiano |
-| Scheda **iPhone** | **Cambia i tag…** | titolo (un brano alla volta), album, genere, anno, numero di traccia e di disco, la spunta **Compilation** (a tre stati con brani diversi); un campo vuoto non cambia, 0 svuota anno o numero |
+| Scheda **iPhone** | **Cambia i tag…** (riquadro a destra) | titolo (un brano alla volta), album, genere, anno, numero di traccia e di disco, la spunta **Compilation** (a tre stati con brani diversi); un campo vuoto non cambia, 0 svuota anno o numero |
 | Schede **PC** e **iPhone** | **Elimina dall'iPhone** | toglie i brani dall'app Musica; l'iPhone cancella i loro file da solo, entro qualche minuto |
 
 Tutte vanno **in attesa** e partono con **Applica** (vedi [Le azioni in attesa](#le-azioni-in-attesa-e-applica)).

@@ -330,7 +330,7 @@ class MainWindow(QMainWindow):
         self.editor = TagEditor()
         self.editor.apply_requested.connect(self._apply_tag_changes)
         self.editor.revert_requested.connect(self._revert_tag_changes)
-        self.editor.cover_provider = self._cover_of
+        self.editor.cover_provider = self.cover_of
         self.editor.edited_check = lambda track: self.overlay.is_edited(track.path)
         self.editor.renumber_requested.connect(self._renumber_selection)
         # E sulla tabella dei brani: il cursore nell'editor dei tag (solo quando la tabella ha il fuoco: in Cerca la E
@@ -1626,7 +1626,7 @@ class MainWindow(QMainWindow):
         if self.overlay.is_edited(track.path):
             prepare_copy(copy, track.tags, self.overlay.cover_for(track.path))
 
-    def _cover_of(self, track):
+    def cover_of(self, track):
         """La copertina da mostrare: quella nuova in sospeso, altrimenti quella del file."""
         result = self.overlay.cover_for(track.path)
         if result is None:
