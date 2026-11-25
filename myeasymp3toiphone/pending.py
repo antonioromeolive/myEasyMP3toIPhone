@@ -143,6 +143,8 @@ class Pending:
     def __init__(self, home: Path) -> None:
         self.home = home
         self.items = {}
+        self._version = 0             # cresce a ogni cambio delle voci (la cache di _phone_paths)
+        self._paths_cache = None
         data = read_json(home / PENDING_FILE)
         if isinstance(data, dict) and isinstance(data.get("items"), dict):
             if data.get("version") == OLD_VERSION:
@@ -177,17 +179,28 @@ class Pending:
         """L'azione in attesa per un file del PC: la sua voce, o quella di un brano dell'iPhone che viene da lui."""
         key = path_key(path)
         entry = self.items.get(FILE_PREFIX + key)
-        result = entry["action"] if entry is not None else ""
-        if not result:
+        if entry is not None:
+            result = entry["action"]
+        else:
+            result = self._phone_paths().get(key, "")
+        return result
+
+    def _phone_paths(self) -> dict:
+        """{path_key del file del PC: azione} delle voci per brano dell'iPhone (Cambia i tag no), rifatto solo quando
+        le voci cambiano: get() si chiama per ogni brano mostrato."""
+        if self._paths_cache is None or self._paths_cache[0] != self._version:
+            paths = {}
             for item_key, item in self.items.items():
-                if not result and item["action"] != EDIT and item_key.startswith(PHONE_PREFIX) and \
-                        item.get("path") and path_key(item["path"]) == key:
-                    result = item["action"]
+                if item["action"] != EDIT and item_key.startswith(PHONE_PREFIX) and item.get("path"):
+                    paths[path_key(item["path"])] = item["action"]
+            self._paths_cache = (self._version, paths)
+        result = self._paths_cache[1]
         return result
 
     def set(self, path, action: str) -> None:
         """La voce di un file del PC ("" la toglie); toglie le altre azioni sullo stesso file (Cambia i tag a parte)."""
         key = path_key(path)
+        self._version += 1
         self._drop_path(key)
         if action:
             self.items[FILE_PREFIX + key] = {"action": action}
@@ -213,6 +226,7 @@ class Pending:
         """La voce di un brano dell'iPhone; path: il suo file del PC (Ricopia, Usa i tag), le cui altre voci si
         tolgono. Cambia i tag (EDIT) unisce i valori nuovi a quelli già in attesa."""
         key = phone_key(pid)
+        self._version += 1
         if action == EDIT:
             entry = self.items.get(key)
             merged = dict(entry.get("values", {})) if entry is not None and entry["action"] == EDIT else {}
@@ -231,6 +245,7 @@ class Pending:
 
     def remove(self, keys) -> int:
         removed = 0
+        self._version += 1
         for key in keys:
             if self.items.pop(key, None) is not None:
                 removed += 1
@@ -254,11 +269,13 @@ class Pending:
 
     def clear(self) -> None:
         self.items = {}
+        self._version += 1
 
     def reconcile(self, tracks: list, status_of) -> int:
         """Toglie le azioni già fatte o non più possibili per i file del PC tra i brani (status_of(track) -> stato); i
         file che non sono tra i brani (un'altra cartella aperta) restano. Restituisce quante ne ha tolte."""
         removed = 0
+        self._version += 1
         for track in tracks:
             key = FILE_PREFIX + path_key(track.path)
             entry = self.items.get(key)
@@ -275,6 +292,7 @@ class Pending:
         for item in phone_tracks:
             by_pid[item.pid] = item
         removed = 0
+        self._version += 1
         for key in list(self.items):
             pid = key_pid(key)
             if pid is not None:

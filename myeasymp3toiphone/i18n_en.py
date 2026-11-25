@@ -2593,4 +2593,88 @@ CATALOG = {
         'the track has no album with an identifier: use Copy again from PC to iPhone',
     "Non c'è un brano con lo stesso artista, album e titolo nella Libreria del PC. Se vuoi conservarli, salvali sul PC dalla scheda iPhone (tasto destro → Copia da iPhone a PC); a volte sono solo scritti in modo diverso.":
         'There is no track with the same artist, album and title in the PC Library. If you want to keep them, save them on the PC from the iPhone tab (right click → Copy from iPhone to PC); sometimes they are just written differently.',
+    'save':
+        'save',
+    'replace':
+        'replace',
+    'edit':
+        'edit',
+    'cover':
+        'cover',
+    'link':
+        'link',
+    'probable':
+        'probable',
+    'proposed':
+        'proposed',
+    'unlink':
+        'unlink',
+    'note':
+        'note',
+    'Copia da iPhone a PC…':
+        'Copy from iPhone to PC…',
+    'Rileggi':
+        'Reload',
+    "F5. Rilegge la musica dell'app Musica dall'iPhone connesso; senza iPhone rifà il confronto con il PC":
+        "F5. Reloads the Music app's music from the connected iPhone; without iPhone redoes the comparison with the PC",
+    'Come funziona: i segni delle colonne e dove sono le azioni':
+        'How it works: the signs of the columns and where the actions are',
+    'Scegli dei brani, o un artista o un album:':
+        'Choose some tracks, or an artist or an album:',
+    '1 brano scelto:':
+        '1 track chosen:',
+    '{0} brani scelti:':
+        '{0} tracks chosen:',
+    'Associa al file sul PC tutti i brani senza sorgente…':
+        'Link to the file on the PC all the tracks without a source…',
+    "Rifai le playlist per artista sull'iPhone…":
+        'Redo the playlists by artist on the iPhone…',
+    "{0} nell'app Musica · {1}":
+        '{0} in the Music app · {1}',
+    'all':
+        'all',
+    'Tutti i brani della cartella aperta (del formato scelto)':
+        'All the tracks of the open folder (of the chosen format)',
+    'absent':
+        'absent',
+    "Non sull'iPhone":
+        'Not on the iPhone',
+    "I brani che nell'app Musica dell'iPhone non ci sono (anche quelli in attesa di Copia da PC a iPhone)":
+        "The tracks that are not in the iPhone's Music app (also those waiting for Copy from PC to iPhone)",
+    '✔ Uguali':
+        '✔ Same',
+    "Sull'iPhone c'è questo brano, con la sorgente certa e gli stessi tag":
+        'This track is on the iPhone, with a certain source and the same tags',
+    '⟳ Tag diversi':
+        '⟳ Different tags',
+    "Sull'iPhone c'è questo brano, con la sorgente certa ma tag diversi: Usa i tag o Ricopia":
+        'This track is on the iPhone, with a certain source but different tags: Use the tags or Copy again',
+    '≈ Da rivedere':
+        '≈ To review',
+    "Sull'iPhone c'è un brano con gli stessi tag, ma non è collegato a questo file: associalo nella scheda iPhone":
+        "On the iPhone there is a track with the same tags, but it isn't linked to this file: link it in the iPhone tab",
+    'edited':
+        'edited',
+    '✎ Modificati':
+        '✎ Edited',
+    'Brani con modifiche dei tag in sospeso (i file non cambiano)':
+        "Tracks with pending tag changes (the files don't change)",
+    'pending':
+        'pending',
+    '＋ In attesa':
+        '＋ Pending',
+    "Brani con un'azione per l'iPhone in attesa di Applica":
+        'Tracks with an action for the iPhone waiting for Apply',
+    'F5. Rilegge la cartella aperta: i file nuovi, tolti o cambiati (gli altri dalla cache dei tag). Con Maiusc premuto rilegge tutti i file da zero.':
+        'F5. Reloads the open folder: new, removed or changed files (the others from the tag cache). With Shift held it reloads all the files from scratch.',
+    'copy':
+        'copy',
+    'export':
+        'export',
+    "Chiude l'editor dei tag: si riapre con Cambia i tag o il tasto E":
+        'Closes the tag editor: it opens again with Change the tags or the E key',
+    'Esporta in una cartella…':
+        'Export to a folder…',
+    'Strumenti ▾':
+        'Tools ▾',
 }

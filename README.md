@@ -89,8 +89,20 @@ sull'intestazione:
 - **Formato** (accanto a *Cerca*): solo MP3, FLAC, M4A, OGG/Opus o WMA/WAV/AIFF, con il numero di brani di
   ciascuno. Vale per gli elenchi, la tabella, *Esporta*, *Verifica album online*, *Controlla la musica* e l'invio
   all'app Musica.
-- **Aggiorna** (in alto a destra): rilegge la cartella aperta, cioè i file nuovi, tolti o cambiati (gli altri dalla
+- **Rileggi** (F5, in alto a destra): rilegge la cartella aperta, cioè i file nuovi, tolti o cambiati (gli altri dalla
   cache dei tag); con **Maiusc** premuto rilegge tutti i file da zero.
+
+**I filtri a pulsanti**, sotto *Cerca*, con quanti brani ha ognuno (fanno anche da legenda della colonna *iPhone*):
+**Tutti**, **Non sull'iPhone** (anche quelli in attesa di essere copiati), **✔ Uguali**, **⟳ Tag diversi**, **≈ Da
+rivedere**, **✎ Modificati** (modifiche dei tag in sospeso) e **＋ In attesa** (un'azione per l'iPhone aspetta
+*Applica*). Se ne sceglie uno alla volta; valgono insieme a *Cerca*, *Formato* e agli elenchi Artisti e Album.
+
+**La barra delle azioni**, sopra la tabella: *N brani scelti* (i selezionati o, se non ce n'è nessuno, quelli
+dell'artista o dell'album scelti negli elenchi) e i pulsanti con le stesse voci del tasto destro: **Copia N brani da
+PC a iPhone**, **Ricopia da PC a iPhone**, **Usa i tag da PC a iPhone**, **Elimina dall'iPhone** (tutti in attesa),
+**Cambia i tag…** (apre l'editor a destra) ed **Esporta in una cartella…**. Sotto, in grigio, quanti sono già in
+attesa e quanti sono abbinati solo per i tag (≈). L'**editor dei tag** si chiude con la ✕ in alto e si riapre con
+*Cambia i tag* o il tasto **E**.
 
 La tabella dei brani si ordina cliccando sull'intestazione di una colonna (Artista, Album, Titolo, Anno…); finché non
 la clicchi i brani sono in ordine di artista, album, disco e traccia. *Esporta*, *Verifica album online* e *Invia all'app Musica*
@@ -102,7 +114,7 @@ mentre scrivi in *Cerca* o nell'editor valgono come tasti normali):
   scheda iPhone la finestra *Cambia i tag sull'iPhone* (va in attesa);
 - **Canc**: **Elimina dall'iPhone**, in attesa fino ad *Applica* (nella scheda PC i brani che ci sono con la
   sorgente associata). I file del PC non si cancellano mai;
-- **F5**, in tutta la finestra: **Aggiorna** della scheda che vedi (PC: rilegge la cartella; iPhone: rilegge la sua
+- **F5**, in tutta la finestra: **Rileggi** della scheda che vedi (PC: rilegge la cartella; iPhone: rilegge la sua
   musica). *Verifica album online* è **F7**, *Controlla la musica* **F6**.
 
 Artisti e album che differiscono solo per maiuscole, accenti o spazi ("Queen" e "queen") sono un gruppo solo, mostrato
@@ -318,6 +330,18 @@ autorizzazione negata) lo dice lì, e *Connetti iPhone* riprova. Senza il driver
 dalla scheda PC (con le azioni in attesa: **iPhone ● · 5 in attesa**). Dopo *Disconnetti* il programma non si riconnette da solo finché non premi *Connetti iPhone* o stacchi
 e riattacchi il cavo. Staccando il cavo l'iPhone risulta disconnesso.
 
+**Il riquadro dell'iPhone**, in cima alla scheda: nome e stato della connessione, quanti brani ci sono e di quando
+è l'elenco, **Rileggi** (F5), **Connetti/Disconnetti iPhone** e **?**, che apre la spiegazione dei segni delle colonne
+e di dove sono le azioni. Sotto, sempre, l'avviso di non premere *Sincronizza* in iTunes.
+
+**La barra delle azioni** sopra i brani dell'iPhone ha le voci del tasto destro per i brani scelti (o, senza
+selezione, per quelli dell'artista o dell'album scelti): **Copia N brani da iPhone a PC…**, **Ricopia da PC a
+iPhone**, **Usa i tag da PC a iPhone**, **Cambia i tag…**, **Associa al file sul PC…**, **Elimina dall'iPhone**. Il
+menu **Strumenti** ha il resto: *Usa i tag da iPhone a PC…*, *Mostra nella scheda PC*, *Copia i brani mancanti degli
+album* e *Ricopia le copertine* (per i brani scelti o, senza scelta, per tutti), *Associa al file sul PC tutti i
+brani senza sorgente…*, *Associa le probabili ≈*, *Associa la sorgente proposta in rosso*, *Togli la sorgente* e
+*Rifai le playlist per artista sull'iPhone…*.
+
 **La musica dell'app Musica.** Connesso l'iPhone, la scheda **iPhone** mostra i brani dell'app *Musica* con i
 titoli, gli artisti e gli album che mostra l'app: il programma ne copia sul PC il database (`MediaLibrary.sqlitedb`)
 e lo legge, perché sul telefono i file hanno nomi casuali (`F12/ABCD.mp3`). Sono solo i brani con un file
@@ -379,7 +403,7 @@ accenti non sono evidenziati: sull'iPhone sono lo stesso gruppo.
   - **File della sorgente** → *Copia nome file*, *Copia percorso completo*, *Copia cartella*, *Apri la cartella in
     Esplora risorse*, come nella scheda PC.
 - L'elenco letto resta in `iphone_musica.json` nella cartella dati: scheda iPhone, colonna *iPhone* e scansione
-  funzionano anche a telefono disconnesso. **Aggiorna** lo rilegge dall'iPhone connesso; senza iPhone rifà il
+  funzionano anche a telefono disconnesso. **Rileggi** lo rilegge dall'iPhone connesso; senza iPhone rifà il
   confronto con il PC.
 
 ### Scrivere nell'app Musica
@@ -427,7 +451,8 @@ Tutte vanno **in attesa** e partono con **Applica** (vedi [Le azioni in attesa](
 - La spunta **Compilation** di *Cambia i tag* cambia solo il brano. Una compilation vuole anche l'artista dell'album
   *Artisti vari*: se nell'app Musica i brani non si raccolgono in un solo album, metti spunta e "Artisti vari"
   nella scheda PC e usa *Ricopia da PC a iPhone*, che manda brano e album insieme.
-- **Playlist per artista…** (scheda iPhone, sotto l'elenco) rifà le playlist dell'iPhone. Prima legge musica e
+- **Rifai le playlist per artista sull'iPhone…** (scheda iPhone, menu **Strumenti** della barra delle azioni) rifà
+  le playlist dell'iPhone. Prima legge musica e
   playlist dall'iPhone e mostra il piano; non scrive niente finché non confermi:
   - **per artista**: una playlist per ogni *artista dell'album* (non l'artista dei singoli brani) con almeno 2 album
     e 5 brani; i dischi di un album ("CD 1", "CD 2") contano come un album solo. Dentro: gli album per anno, poi
@@ -470,9 +495,9 @@ Nella scheda iPhone la colonna **Sorgente** dice da quale file viene ogni brano:
 | *senza file* | un brano "fantasma": è nell'elenco dell'app Musica ma il suo file sull'iPhone non c'è (non si può ascoltare); toglilo con *Elimina dall'iPhone* |
 
 Sopra l'elenco dei brani ci sono gli elenchi **Artisti** e **Album**, come nella scheda PC (senza le spunte): un
-artista o un album scelto mostra solo i suoi brani, insieme a *Cerca* e *Mostra*.
+artista o un album scelto mostra solo i suoi brani, insieme a *Cerca* e ai filtri a pulsanti.
 
-Il menu **Mostra** filtra l'elenco per sorgente (per esempio solo i brani *senza sorgente*), e per la colonna *Sul PC*:
+I **filtri a pulsanti** (prima il menu *Mostra*), con quanti brani ha ognuno, filtrano l'elenco per sorgente (per esempio solo i brani *senza sorgente*), e per la colonna *Sul PC*:
 *Da rivedere: abbinati solo per i tag (≈)*, *Sorgente con tag diversi (⟳)* (anche solo la grafia), *Con una
 sorgente proposta (in rosso)* e *Album senza immagine sull'iPhone*.
 
@@ -556,7 +581,7 @@ doppioni del PC e quelli dell'iPhone si gestiscono in modo del tutto separato.
 
 **Brani fantasma.** A ogni lettura dell'iPhone il programma guarda anche quali file ci sono nelle cartelle della musica
 del telefono (una lettura per cartella, non per brano): un brano dell'elenco il cui file non c'è è un *fantasma*.
-La colonna *Sorgente* dice *senza file*, la barra di stato li conta, *Mostra → Senza file sull'iPhone* li elenca e
+La colonna *Sorgente* dice *senza file*, la barra di stato li conta, il filtro *Senza file sull'iPhone* li elenca e
 *Controlla la musica* dell'iPhone li segnala tra i file illeggibili. Non si tolgono da soli: tasto destro →
 *Elimina dall'iPhone*.
 
@@ -565,7 +590,8 @@ FLAC l'impronta dell'audio che il file porta nella sua intestazione, per gli M4A
 brano dell'iPhone si riconosce anche se titolo, album o artista sono diversi da quelli del PC (le compilation, i
 brani "sciolti"): su 40 brani messi sull'iPhone da CopyTrans, 40 sono stati ritrovati così sul PC.
 
-**Associa sorgenti** (pulsante della scheda iPhone, o tasto destro su più brani) ritrova il file del PC dei brani
+**Associa sorgenti** (scheda iPhone: *Strumenti → Associa al file sul PC tutti i brani senza sorgente*, o
+*Associa al file sul PC* per i brani scelti) ritrova il file del PC dei brani
 dell'iPhone (messi da CopyTrans, da un altro computer…) e lo scrive nel registro. Una finestra chiede:
 
 - **Brani:** tutti quelli senza sorgente, oppure quelli selezionati (anche con una sorgente: la si può sostituire);

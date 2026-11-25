@@ -9,9 +9,9 @@ from pathlib import Path
 from PySide6.QtCore import QRect, Qt, QTimer
 from PySide6.QtGui import QBrush, QColor, QFont, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
-    QAbstractItemView, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFileDialog, QFormLayout, QGroupBox, QHBoxLayout,
-    QHeaderView, QLabel, QLineEdit, QMenu, QMessageBox, QPushButton, QSplitter, QTreeWidget, QTreeWidgetItem,
-    QVBoxLayout, QWidget,
+    QAbstractItemView, QCheckBox, QDialog, QDialogButtonBox, QFileDialog, QFormLayout, QFrame, QHBoxLayout,
+    QHeaderView, QLabel, QLineEdit, QMenu, QMessageBox, QPushButton, QSplitter, QToolButton, QTreeWidget,
+    QTreeWidgetItem, QVBoxLayout, QWidget,
 )
 
 from .. import adoption, estimate, iphone, phone_actions, provenance
@@ -24,6 +24,7 @@ from ..phone_library import (
     spelling_differences,
 )
 from .apply_dialog import songs
+from .widgets import ActionBar, ChipBar
 from .compare_tip import comparison_html, show_on_tooltip
 from .file_actions import add_file_entries
 from .theme import album_band, album_bands, set_role
@@ -107,6 +108,13 @@ def _pc_value(name: str, value):
         result = str(value)
     return result
 
+
+# le voci del tasto destro sui brani dell'iPhone, in ordine (None: separatore)
+PHONE_MENU_ORDER = ("save", "show_pc", None, "replace", "tags", "tags_to_pc", "edit", "complete", "cover", None, "link",
+                    "probable", "proposed", "unlink", None, "delete", "note")
+# i pulsanti della barra delle azioni senza brani scelti
+BAR_LABELS = {"save": "Copia da iPhone a PC…", "replace": "Ricopia da PC a iPhone", "tags": "Usa i tag da PC a iPhone",
+              "edit": "Cambia i tag…", "link": "Associa al file sul PC…", "delete": "Elimina dall'iPhone"}
 
 INFO_TEXT = (
     "<b>Come funziona.</b> Qui vedi la musica dell'app <b>Musica</b> dell'iPhone, con i titoli, gli artisti e gli "
@@ -409,24 +417,9 @@ class IPhonePanel(QWidget):
         self._proposed = {}           # pid -> adoption.Proposal: la sorgente proposta, in rosso
         self._pc_dirty = True
 
-        self._status = QLabel(NOT_CONNECTED)
-        self._status.setStyleSheet("font-size: 15px; font-weight: bold;")
-        self._connect_button = QPushButton(CONNECT_TEXT)
-        self._connect_button.setMinimumWidth(170)
-        self._connect_button.clicked.connect(self._toggle_connection)
         self._manual_off = False      # disconnesso a mano: niente riconnessione automatica fino al cavo staccato
-        top = QHBoxLayout()
-        top.addWidget(self._status, 1)
-        top.addWidget(self._connect_button)
-
-        info = QLabel(INFO_TEXT)
-        info.setWordWrap(True)
-        info.setTextFormat(Qt.RichText)
-        info.setStyleSheet("background: palette(alternate-base); padding: 8px; border-radius: 4px;")
-
         layout = QVBoxLayout(self)
-        layout.addLayout(top)
-        layout.addWidget(info)
+        layout.addWidget(self._build_device_card())
         layout.addWidget(self._build_music_box(), 1)
         self._update_enabled()
         self._auto_tried = False      # già tentato il collegamento automatico per questo iPhone collegato
@@ -437,23 +430,64 @@ class IPhonePanel(QWidget):
         self._poll.start()
         QTimer.singleShot(1500, self._check_device)
 
+    def _build_device_card(self) -> QFrame:
+        """Il riquadro dell'iPhone, in cima: nome e stato, quanti brani e di quando è l'elenco, Rileggi,
+        Connetti/Disconnetti, ? (come funziona) e l'avviso di non sincronizzare con iTunes."""
+        card = QFrame()
+        card.setObjectName("deviceCard")
+        self._status = QLabel(NOT_CONNECTED)
+        self._status.setObjectName("deviceName")
+        self._listing_note = QLabel()
+        self._listing_note.setObjectName("deviceInfo")
+        self._listing_note.setWordWrap(True)
+        texts = QVBoxLayout()
+        texts.setSpacing(2)
+        texts.addWidget(self._status)
+        texts.addWidget(self._listing_note)
+        self._refresh_button = QPushButton("Rileggi")
+        self._refresh_button.setToolTip("F5. Rilegge la musica dell'app Musica dall'iPhone connesso; senza iPhone rifà "
+                                        "il confronto con il PC")
+        self._refresh_button.clicked.connect(self._refresh_music)
+        self._connect_button = QPushButton(CONNECT_TEXT)
+        self._connect_button.setMinimumWidth(170)
+        self._connect_button.clicked.connect(self._toggle_connection)
+        self._help_button = QToolButton()
+        self._help_button.setText("?")
+        self._help_button.setCheckable(True)
+        self._help_button.setToolTip("Come funziona: i segni delle colonne e dove sono le azioni")
+        self._info = QLabel(INFO_TEXT)
+        self._info.setWordWrap(True)
+        self._info.setTextFormat(Qt.RichText)
+        self._info.setObjectName("helpText")
+        self._info.setVisible(False)
+        self._help_button.toggled.connect(self._info.setVisible)
+        warning = QLabel(f"⚠ {SYNC_WARNING}")
+        warning.setObjectName("warningLine")
+        warning.setWordWrap(True)
+        top = QHBoxLayout()
+        top.addLayout(texts, 1)
+        top.addWidget(self._refresh_button)
+        top.addWidget(self._connect_button)
+        top.addWidget(self._help_button)
+        layout = QVBoxLayout(card)
+        layout.addLayout(top)
+        layout.addWidget(warning)
+        layout.addWidget(self._info)
+        return card
+
     # ------------------------------------------------------------------ elenco dell'app Musica
 
-    def _build_music_box(self) -> QGroupBox:
+    def _build_music_box(self) -> QWidget:
         self._search = QLineEdit()
         self._search.setPlaceholderText("Cerca per titolo, artista o album…")
         self._search.setClearButtonEnabled(True)
         self._search.textChanged.connect(self._apply_search)
         self._count = QLabel()
-        self._show = QComboBox()
-        for text, _rule in SHOW_FILTERS:
-            self._show.addItem(tr(text))
-        self._show.setToolTip("Quali brani mostrare, secondo la loro origine (il registro della provenienza)")
+        # i filtri a pulsanti (prima il menu "Mostra"), con quanti brani ha ognuno
+        self._show = ChipBar([text for text, _rule in SHOW_FILTERS])
         self._show.currentIndexChanged.connect(lambda _index: self._apply_search())
         search_row = QHBoxLayout()
         search_row.addWidget(self._search, 1)
-        search_row.addWidget(QLabel("Mostra:"))
-        search_row.addWidget(self._show)
         search_row.addWidget(self._count)
 
         self._music_view = BandedTree()
@@ -467,10 +501,11 @@ class IPhonePanel(QWidget):
         self._music_view.setContextMenuPolicy(Qt.CustomContextMenu)
         self._music_view.customContextMenuRequested.connect(self._show_menu)
         self._music_view.viewport().installEventFilter(self)    # il suggerimento di Sul PC, al passaggio del mouse
+        self._music_view.itemSelectionChanged.connect(self._update_action_bar)
         edit_shortcut = QShortcut(QKeySequence("E"), self._music_view, context=Qt.WidgetShortcut)
         edit_shortcut.activated.connect(self._edit_current)       # E: Cambia i tag sul brano su cui si è
         delete_shortcut = QShortcut(QKeySequence(Qt.Key_Delete), self._music_view, context=Qt.WidgetShortcut)
-        delete_shortcut.activated.connect(self._delete_current)   # Canc: Elimina dall'iPhone (con la conferma)
+        delete_shortcut.activated.connect(self._delete_current)   # Canc: Elimina dall'iPhone, in attesa
         header = self._music_view.header()
         # dopo l'ordinamento (che la vista fa su questo stesso segnale) le tinte degli album si rifanno
         header.sortIndicatorChanged.connect(lambda _column, _order: QTimer.singleShot(0, self._update_bands))
@@ -480,48 +515,99 @@ class IPhonePanel(QWidget):
         for column, width in COLUMN_WIDTHS.items():
             self._music_view.setColumnWidth(column, width)
 
-        self._refresh_button = QPushButton("Aggiorna")
-        self._refresh_button.setToolTip("Rilegge la musica dell'app Musica dall'iPhone connesso; senza iPhone rifà "
-                                        "il confronto con il PC")
-        self._refresh_button.clicked.connect(self._refresh_music)
-        self._save_button = QPushButton("Salva i selezionati sul PC (iPhone → PC)…")
-        self._save_button.clicked.connect(self._save_selected)
-        self._adopt_button = QPushButton("Associa sorgenti…")
-        self._adopt_button.setToolTip("Ritrova sul PC la sorgente (il file) dei brani dell'iPhone, di quelli "
-                                      "selezionati o di tutti quelli senza sorgente: nome della cartella, impronta "
-                                      "dell'audio, regole e AI per i dubbi. Scrive solo il registro della "
-                                      "provenienza: né i brani né i file cambiano.")
-        self._adopt_button.clicked.connect(self._adopt)
-        self._playlist_button = QPushButton("Playlist per artista…")
-        self._playlist_button.setToolTip("Rifà le playlist dell'iPhone: una per artista dell'album (con più album) e "
-                                         "una per compilation; cancella quelle messe da un computer. Prima mostra "
-                                         "tutto; c'è anche una prova. I brani non cambiano.")
-        self._playlist_button.clicked.connect(self._plan_playlists)
-        self._listing_note = QLabel()
-        self._listing_note.setStyleSheet("color: gray")
-        buttons = QHBoxLayout()
-        buttons.addWidget(self._refresh_button)
-        buttons.addWidget(self._save_button)
-        buttons.addWidget(self._adopt_button)
-        buttons.addWidget(self._playlist_button)
-        buttons.addStretch(1)
-        buttons.addWidget(self._listing_note)
+        # la barra delle azioni sopra i brani: le stesse voci del tasto destro, per i brani scelti; Strumenti per le
+        # azioni su tutti i brani (Associa, Playlist…)
+        self._actions = ActionBar([("save", ""), ("replace", ""), ("tags", ""), ("edit", ""), ("link", ""),
+                                   ("delete", "danger")])
+        self._tools = QMenu(self)
+        self._tools.aboutToShow.connect(self._fill_tools)
+        self._actions.set_menu(self._tools)
 
         self._browser = LibraryBrowser()       # Artisti e Album, come nella scheda PC (senza spunte)
         self._browser.filter_changed.connect(self._apply_search)
         self._browser.menu_requested.connect(self._browser_menu)
+        tracks_box = QWidget()
+        tracks_layout = QVBoxLayout(tracks_box)
+        tracks_layout.setContentsMargins(0, 0, 0, 0)
+        tracks_layout.setSpacing(4)
+        tracks_layout.addWidget(self._actions)
+        tracks_layout.addWidget(self._music_view, 1)
         lists = QSplitter(Qt.Vertical)
         lists.addWidget(self._browser)
-        lists.addWidget(self._music_view)
+        lists.addWidget(tracks_box)
         lists.setSizes([200, 420])
         lists.setStretchFactor(1, 1)
 
-        box = QGroupBox("Musica nell'app Musica dell'iPhone")
+        box = QWidget()
         box_layout = QVBoxLayout(box)
+        box_layout.setContentsMargins(0, 0, 0, 0)
         box_layout.addLayout(search_row)
+        box_layout.addWidget(self._show)
         box_layout.addWidget(lists, 1)
-        box_layout.addLayout(buttons)
         return box
+
+    def _bar_items(self) -> list:
+        """I brani per la barra delle azioni: quelli selezionati o, senza selezione, quelli dell'artista o dell'album
+        scelti negli elenchi (quelli che si vedono)."""
+        result = self._selected_phone_tracks()
+        if not result and self._browser.track_filter() is not None:
+            view = self._music_view
+            for index in range(view.topLevelItemCount()):
+                row = view.topLevelItem(index)
+                item = self._by_pid.get(row.data(COL_TITLE, PID_ROLE))
+                if item is not None and not row.isHidden():
+                    result.append(item)
+        return result
+
+    def _update_action_bar(self) -> None:
+        if hasattr(self, "_actions"):
+            items = self._bar_items()
+            entries = self._phone_entry_map(items) if items else {}
+            bar = {}
+            for key in ("save", "replace", "tags", "edit", "link", "delete"):
+                if key in entries:
+                    bar[key] = entries[key]
+                else:
+                    bar[key] = (tr(BAR_LABELS[key]), False, None)
+            if not items:
+                who = "Scegli dei brani, o un artista o un album:"
+            elif len(items) == 1:
+                who = "1 brano scelto:"
+            else:
+                who = f"{len(items)} brani scelti:"
+            self._actions.set_entries(who, bar, entries.get("note", ("", False, None))[0])
+
+    def _fill_tools(self) -> None:
+        """Il menu Strumenti: le azioni per i brani scelti che non stanno nella barra e quelle su tutti i brani."""
+        menu = self._tools
+        menu.clear()
+        items = self._bar_items()
+        everything = list(self._phone_tracks)
+        entries = self._phone_entry_map(items) if items else {}
+        rows = [
+            entries.get("tags_to_pc", ("Usa i tag da iPhone a PC: scegli dei brani ⟳…", False, None)),
+            entries.get("show_pc", ("Mostra nella scheda PC: scegli dei brani", False, None)),
+            None,
+            self._complete_entry(items if items else everything),
+            self._cover_entry(items if items else everything),
+            None,
+            ("Associa al file sul PC tutti i brani senza sorgente…", not self._window.runner.is_busy, self._adopt),
+            entries.get("probable", ("Associa le probabili ≈: scegli dei brani", False, None)),
+            entries.get("proposed", ("Associa la sorgente proposta in rosso: scegli dei brani", False, None)),
+            entries.get("unlink", ("Togli la sorgente: scegli dei brani", False, None)),
+            None,
+            ("Rifai le playlist per artista sull'iPhone…", self._connected and not self._window.runner.is_busy,
+             self._plan_playlists),
+        ]
+        for row in rows:
+            if row is None:
+                menu.addSeparator()
+            else:
+                text, enabled, slot = row
+                action = menu.addAction(text)
+                action.setEnabled(enabled and slot is not None)
+                if slot is not None:
+                    action.triggered.connect(slot)
 
     def set_phone_tracks(self, tracks: list, note: str) -> None:
         """L'elenco da mostrare (letto ora dall'iPhone o salvato l'ultima volta); note dice da dove viene."""
@@ -530,7 +616,7 @@ class IPhonePanel(QWidget):
         for item in self._phone_tracks:
             self._by_pid[item.pid] = item
         self._group_albums()
-        self._listing_note.setText(note)
+        self._listing_note.setText(f"{songs(len(tracks))} nell'app Musica · {note}")
         self._fill_music()
 
     def _group_albums(self) -> None:
@@ -830,18 +916,22 @@ class IPhonePanel(QWidget):
 
     def _apply_search(self) -> None:
         words = self._search.text().casefold().split()
-        rule = SHOW_FILTERS[max(0, self._show.currentIndex())][1]
+        chosen_rule = max(0, self._show.currentIndex())
         chosen = self._browser.track_filter()     # None, o (artisti, album) scelti negli elenchi
         shown = 0
+        counts = [0] * len(SHOW_FILTERS)          # quanti brani ha ogni filtro a pulsanti (tutti i brani)
         view = self._music_view
         for index in range(view.topLevelItemCount()):
             row = view.topLevelItem(index)
             text = " ".join([row.text(COL_TITLE), row.text(COL_ARTIST), row.text(COL_ALBUM)]).casefold()
             pid = row.data(COL_TITLE, PID_ROLE)
             item = self._by_pid.get(pid)
-            visible = rule(row.data(COL_ORIGIN, ORIGIN_ROLE), row.data(COL_PC, PC_STATE_ROLE),
-                           row.data(COL_SOURCE_FILE, PROPOSED_ROLE),
-                           item is not None and item.album_without_cover)
+            values = (row.data(COL_ORIGIN, ORIGIN_ROLE), row.data(COL_PC, PC_STATE_ROLE),
+                      row.data(COL_SOURCE_FILE, PROPOSED_ROLE), item is not None and item.album_without_cover)
+            for position, (_text, rule) in enumerate(SHOW_FILTERS):
+                if rule(*values):
+                    counts[position] += 1
+            visible = SHOW_FILTERS[chosen_rule][1](*values)
             for word in words:
                 if word not in text:
                     visible = False
@@ -851,11 +941,13 @@ class IPhonePanel(QWidget):
             if visible:
                 shown += 1
         self._update_bands()
+        self._show.set_counts(counts)
         total = view.topLevelItemCount()
         if words or self._show.currentIndex() > 0 or chosen is not None:
             self._count.setText(f"{shown} di {total} brani")
         else:
             self._count.setText(f"{total} brani")
+        self._update_action_bar()
 
     def _update_bands(self) -> None:
         """Le tinte degli album, per le righe che si vedono nell'ordine in cui si vedono."""
@@ -1215,11 +1307,10 @@ class IPhonePanel(QWidget):
     def _show_menu(self, position) -> None:
         self._tracks_menu(self._music_view.viewport().mapToGlobal(position))
 
-    def phone_entries(self, items: list) -> list:
-        """Le azioni per brani dell'iPhone (tasto destro sui brani o su un artista/album, barra delle azioni):
-        [(testo, attiva, funzione)], None per un separatore, funzione None per una nota grigia. Quelle verso l'iPhone
-        vanno in attesa (Applica) e non chiedono l'iPhone connesso; Copia da iPhone a PC, Usa i tag da iPhone a PC e
-        le associazioni sono subito, con la loro conferma."""
+    def _phone_entry_map(self, items: list) -> dict:
+        """Le azioni per brani dell'iPhone, per nome: {chiave: (testo, attiva, funzione)}; "note" è una nota grigia
+        (funzione None). Quelle verso l'iPhone vanno in attesa (Applica) e non chiedono l'iPhone connesso; Copia da
+        iPhone a PC, Usa i tag da iPhone a PC e le associazioni sono subito, con la loro conferma."""
         busy = self._window.runner.is_busy
         writable = []
         for item in items:
@@ -1239,34 +1330,47 @@ class IPhonePanel(QWidget):
             if link is not None and link.here:
                 linked_here.append(item)
         stale_text = songs(len(stale)) if stale else "nessun brano ⟳ con la sorgente"
-        result = [
-            (f"Copia {songs(len(items))} da iPhone a PC…", self._connected and not busy,
-             lambda: self._save_selected(items)),
-            (f"Mostra nella scheda PC ({songs(len(on_pc))})",
-             bool(on_pc), lambda: self._window.show_tracks({str(track.path) for track in on_pc})),
-            None,
-            (f"Ricopia da PC a iPhone: {stale_text}", bool(stale), lambda: self._window.queue_pairs(stale, REPLACE)),
-            (f"Usa i tag da PC a iPhone: {stale_text}", bool(stale), lambda: self._align_to_phone(stale)),
-            (f"Usa i tag da iPhone a PC: {stale_text}…", bool(stale) and not busy, lambda: self._align_to_pc(stale)),
-            (f"Cambia i tag: {songs(len(writable))}…", bool(writable), lambda: self._edit_items(writable)),
-            self._complete_entry(items),
-            self._cover_entry(items),
-            None,
-            ("Associa al file sul PC…" if len(writable) == 1 else f"Associa al file sul PC: {songs(len(writable))}…",
-             bool(writable) and not busy, lambda: self._link_sources(writable)),
-            (f"Associa le probabili ≈: {songs(len(probable))}", bool(probable) and not busy,
-             lambda: self._link_probable(probable)),
-            (f"Associa la sorgente proposta in rosso: {songs(len(proposed))}", bool(proposed) and not busy,
-             lambda: self._link_proposed(proposed)),
-            (f"Togli la sorgente: {songs(len(linked_here))}", bool(linked_here) and not busy,
-             lambda: self._unlink(linked_here)),
-            None,
-            (f"Elimina {songs(len(writable))} dall'iPhone" if writable else "Elimina dall'iPhone: nessun brano",
-             bool(writable), lambda: self._window.queue_deletes(writable)),
-        ]
+        result = {
+            "save": (f"Copia {songs(len(items))} da iPhone a PC…", self._connected and not busy,
+                     lambda: self._save_selected(items)),
+            "show_pc": (f"Mostra nella scheda PC ({songs(len(on_pc))})", bool(on_pc),
+                        lambda: self._window.show_tracks({str(track.path) for track in on_pc})),
+            "replace": (f"Ricopia da PC a iPhone: {stale_text}", bool(stale),
+                        lambda: self._window.queue_pairs(stale, REPLACE)),
+            "tags": (f"Usa i tag da PC a iPhone: {stale_text}", bool(stale), lambda: self._align_to_phone(stale)),
+            "tags_to_pc": (f"Usa i tag da iPhone a PC: {stale_text}…", bool(stale) and not busy,
+                           lambda: self._align_to_pc(stale)),
+            "edit": (f"Cambia i tag: {songs(len(writable))}…", bool(writable), lambda: self._edit_items(writable)),
+            "complete": self._complete_entry(items),
+            "cover": self._cover_entry(items),
+            "link": ("Associa al file sul PC…" if len(writable) == 1 else
+                     f"Associa al file sul PC: {songs(len(writable))}…", bool(writable) and not busy,
+                     lambda: self._link_sources(writable)),
+            "probable": (f"Associa le probabili ≈: {songs(len(probable))}", bool(probable) and not busy,
+                         lambda: self._link_probable(probable)),
+            "proposed": (f"Associa la sorgente proposta in rosso: {songs(len(proposed))}", bool(proposed) and not busy,
+                         lambda: self._link_proposed(proposed)),
+            "unlink": (f"Togli la sorgente: {songs(len(linked_here))}", bool(linked_here) and not busy,
+                       lambda: self._unlink(linked_here)),
+            "delete": (f"Elimina {songs(len(writable))} dall'iPhone" if writable else
+                       "Elimina dall'iPhone: nessun brano", bool(writable),
+                       lambda: self._window.queue_deletes(writable)),
+        }
         if len(writable) < len(items):
-            result.append((f"{songs(len(items) - len(writable))} acquistati o scaricati sul telefono: un computer non "
-                           "li può cambiare né togliere", False, None))
+            result["note"] = (f"{songs(len(items) - len(writable))} acquistati o scaricati sul telefono: un computer "
+                              "non li può cambiare né togliere", False, None)
+        return result
+
+    def phone_entries(self, items: list) -> list:
+        """Le voci del tasto destro sui brani dell'iPhone, in ordine (None: un separatore): [(testo, attiva,
+        funzione)], funzione None per una nota grigia."""
+        entries = self._phone_entry_map(items)
+        result = []
+        for key in PHONE_MENU_ORDER:
+            if key is None:
+                result.append(None)
+            elif key in entries:
+                result.append(entries[key])
         return result
 
     def browser_menu_entries(self, items: list) -> list:
@@ -2084,9 +2188,7 @@ class IPhonePanel(QWidget):
 
     def _update_enabled(self) -> None:
         self._refresh_button.setEnabled(True)
-        self._save_button.setEnabled(self._connected)
-        self._adopt_button.setEnabled(True)
-        self._playlist_button.setEnabled(self._connected)
+        self._update_action_bar()
         self._show_connection(CONNECTED if self._connected else NOT_CONNECTED_STATE)
 
     def _show_connection(self, state: str) -> None:

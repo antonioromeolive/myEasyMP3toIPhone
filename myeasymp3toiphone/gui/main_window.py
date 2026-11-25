@@ -13,8 +13,8 @@ from PySide6.QtCore import QByteArray, QItemSelection, QItemSelectionModel, QSiz
 from PySide6.QtGui import QAction, QColor, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QAbstractItemView, QApplication, QComboBox, QDialog, QDialogButtonBox, QFileDialog, QFrame, QHBoxLayout,
-    QHeaderView, QLabel, QLineEdit, QListWidget, QListWidgetItem, QMainWindow, QMenu, QMessageBox, QPushButton, QScrollArea, QSplitter, QStyle, QTableView, QTabWidget,
-    QToolBar, QVBoxLayout, QWidget,
+    QHeaderView, QLabel, QLineEdit, QListWidget, QListWidgetItem, QMainWindow, QMenu, QMessageBox, QPushButton,
+    QScrollArea, QSplitter, QStyle, QTableView, QTabWidget, QToolBar, QToolButton, QVBoxLayout, QWidget,
 )
 
 from ..albumcheck import (
@@ -41,7 +41,8 @@ from ..tags import prepare_copy, protect_folder, read_cover
 from ..version import app_version
 from .about import AboutDialog
 from .album_check_dialog import AlbumCheckDialog, AlbumCheckOptionsDialog
-from .apply_dialog import GROUPS, ApplyDialog, songs, summary
+from .apply_dialog import ApplyDialog, songs, summary
+from .widgets import ActionBar, ChipBar
 from .browser import LibraryBrowser
 from .compare_tip import comparison_html, show_on_tooltip
 from .file_actions import add_file_entries
@@ -77,6 +78,18 @@ PENDING_TIP = {SEND: "In attesa: da copiare da PC a iPhone (Applica)",
                DELETE: "In attesa: da eliminare dall'iPhone (Applica)",
                UPDATE: "In attesa: i tag da portare da PC a iPhone (Applica)",
                REPLACE: "In attesa: da ricopiare da PC a iPhone (Applica)"}
+# i filtri a pulsanti della scheda PC: (chiave, testo, suggerimento); la chiave è una categoria di _categories
+PC_CHIPS = [
+    ("all", "Tutti", "Tutti i brani della cartella aperta (del formato scelto)"),
+    ("absent", "Non sull'iPhone", "I brani che nell'app Musica dell'iPhone non ci sono (anche quelli in attesa di "
+                                  "Copia da PC a iPhone)"),
+    ("same", "✔ Uguali", "Sull'iPhone c'è questo brano, con la sorgente certa e gli stessi tag"),
+    ("stale", "⟳ Tag diversi", "Sull'iPhone c'è questo brano, con la sorgente certa ma tag diversi: Usa i tag o Ricopia"),
+    ("probable", "≈ Da rivedere", "Sull'iPhone c'è un brano con gli stessi tag, ma non è collegato a questo file: "
+                                  "associalo nella scheda iPhone"),
+    ("edited", "✎ Modificati", "Brani con modifiche dei tag in sospeso (i file non cambiano)"),
+    ("pending", "＋ In attesa", "Brani con un'azione per l'iPhone in attesa di Applica"),
+]
 PHRASES = {SEND: "da copiare da PC a iPhone", REMOVE: "da eliminare dall'iPhone", DELETE: "da eliminare dall'iPhone",
            UPDATE: "con i tag da portare da PC a iPhone", REPLACE: "da ricopiare da PC a iPhone",
            EDIT: "con i tag da cambiare sull'iPhone"}
@@ -209,9 +222,9 @@ class MainWindow(QMainWindow):
         for label, _extensions in FORMATS:
             self._format.addItem(tr(label))
         self._format.currentIndexChanged.connect(lambda _index: self._rebuild_views())
-        self._reload_button = QPushButton("Aggiorna")
-        self._reload_button.setToolTip("Rilegge la cartella aperta: i file nuovi, tolti o cambiati (gli altri dalla "
-                                       "cache dei tag). Con Maiusc premuto rilegge tutti i file da zero.")
+        self._reload_button = QPushButton("Rileggi")
+        self._reload_button.setToolTip("F5. Rilegge la cartella aperta: i file nuovi, tolti o cambiati (gli altri "
+                                       "dalla cache dei tag). Con Maiusc premuto rilegge tutti i file da zero.")
         self._reload_button.clicked.connect(self.reload_folder)
         top = QHBoxLayout()
         top.addWidget(self._search, 1)
@@ -224,6 +237,13 @@ class MainWindow(QMainWindow):
         self._hidden_button.clicked.connect(self._show_hidden_folders)
         top.addWidget(self._hidden_button)
         self._update_hidden_button()
+        # i filtri a pulsanti, con quanti brani ha ognuno: fanno anche da legenda dei segni della colonna iPhone
+        self._chips = ChipBar([text for _key, text, _tip in PC_CHIPS])
+        self._chips.set_tips([tip for _key, _text, tip in PC_CHIPS])
+        self._chips.currentIndexChanged.connect(lambda _index: self._fill_table())
+        # la barra delle azioni sopra la tabella: le stesse voci del tasto destro, per i brani scelti
+        self._actions = ActionBar([("copy", "go"), ("replace", ""), ("tags", ""), ("delete", "danger"),
+                                   ("edit", ""), ("export", "")])
 
         self.browser = LibraryBrowser()
         self.browser.filter_changed.connect(self._fill_table)
@@ -269,10 +289,10 @@ class MainWindow(QMainWindow):
         # resta una lettera)
         edit_shortcut = QShortcut(QKeySequence("E"), self._table, context=Qt.WidgetShortcut)
         edit_shortcut.activated.connect(self._edit_current_track)
-        # Canc sulla tabella: i brani selezionati via dall'iPhone (dopo la conferma; i file del PC mai)
+        # Canc sulla tabella: i brani selezionati in attesa per Elimina dall'iPhone (i file del PC mai)
         delete_shortcut = QShortcut(QKeySequence(Qt.Key_Delete), self._table, context=Qt.WidgetShortcut)
         delete_shortcut.activated.connect(self._remove_selected_from_phone)
-        # F5, in tutta la finestra: Aggiorna della scheda che si vede
+        # F5, in tutta la finestra: Rileggi della scheda che si vede
         refresh_shortcut = QShortcut(QKeySequence(Qt.Key_F5), self)
         refresh_shortcut.activated.connect(self._refresh_current_tab)
         editor_scroll = QScrollArea()
@@ -281,22 +301,45 @@ class MainWindow(QMainWindow):
         editor_scroll.setWidgetResizable(True)
         editor_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         editor_scroll.setMinimumWidth(320)
+        # l'editor dei tag si chiude (✕) e si riapre con Cambia i tag o il tasto E
+        self._editor_panel = QWidget()
+        editor_title = QLabel("Cambia i tag")
+        editor_title.setObjectName("panelTitle")
+        close_editor = QToolButton()
+        close_editor.setText("✕")
+        close_editor.setToolTip("Chiude l'editor dei tag: si riapre con Cambia i tag o il tasto E")
+        close_editor.clicked.connect(lambda: self._editor_panel.setVisible(False))
+        editor_head = QHBoxLayout()
+        editor_head.addWidget(editor_title, 1)
+        editor_head.addWidget(close_editor)
+        editor_layout = QVBoxLayout(self._editor_panel)
+        editor_layout.setContentsMargins(0, 0, 0, 0)
+        editor_layout.addLayout(editor_head)
+        editor_layout.addWidget(editor_scroll, 1)
 
+        tracks_box = QWidget()
+        tracks_layout = QVBoxLayout(tracks_box)
+        tracks_layout.setContentsMargins(0, 0, 0, 0)
+        tracks_layout.setSpacing(4)
+        tracks_layout.addWidget(self._actions)
+        tracks_layout.addWidget(self._table, 1)
         left = QSplitter(Qt.Vertical)
         left.addWidget(self.browser)
-        left.addWidget(self._table)
+        left.addWidget(tracks_box)
         left.setSizes([240, 520])
         left.setStretchFactor(1, 1)
         splitter = QSplitter()
         splitter.addWidget(left)
-        splitter.addWidget(editor_scroll)
+        splitter.addWidget(self._editor_panel)
         splitter.setSizes([1040, 330])
         splitter.setStretchFactor(0, 1)
 
         tab = QWidget()
         layout = QVBoxLayout(tab)
         layout.addLayout(top)
+        layout.addWidget(self._chips)
         layout.addWidget(splitter, 1)
+        self._update_action_bar()
         return tab
 
     def _build_pending_bar(self) -> QFrame:
@@ -388,6 +431,7 @@ class MainWindow(QMainWindow):
                                          "con tag diversi, ≈ forse lo stesso (abbinato solo per i tag: da rivedere), "
                                          "vuoto = non c'è; la spunta: voglio il brano sull'iPhone")
         self.iphone_panel.set_phone_tracks(tracks, label)
+        self._update_chip_counts()
         self._fill_table()
         self.browser.refresh_phone_states()
         self._update_pending_bar()
@@ -680,6 +724,7 @@ class MainWindow(QMainWindow):
         assign_groups(self.tracks)
         self._update_format_counts()
         self.browser.set_data(group_by_album(self.format_tracks()), self.check_results)
+        self._update_chip_counts()
         self._fill_table(keep_tracks)
         self.iphone_panel.pc_changed()
         self._update_pending_bar()
@@ -701,12 +746,85 @@ class MainWindow(QMainWindow):
                 result = track.album_key[0] in artists
         return result
 
+    def _categories(self, track) -> set:
+        """I filtri a pulsanti (PC_CHIPS) in cui sta un brano: tutti; non sull'iPhone, ✔, ⟳ o ≈ (come la colonna
+        iPhone); modificato; in attesa."""
+        result = {"all"}
+        if self.overlay.is_edited(track.path):
+            result.add("edited")
+        if self._phone_index is not None and not track.error:
+            if self.pending.get(track.path):
+                result.add("pending")
+            status, _phone_track, linked = self._device_state(track)
+            if status == DEVICE_ABSENT:
+                result.add("absent")
+            elif not linked:
+                result.add("probable")
+            elif status == DEVICE_SAME:
+                result.add("same")
+            else:
+                result.add("stale")
+        return result
+
+    def _update_chip_counts(self) -> None:
+        """Il numero di brani di ogni filtro a pulsanti, tra quelli del formato scelto."""
+        counts = {}
+        for key, _text, _tip in PC_CHIPS:
+            counts[key] = 0
+        for track in self.format_tracks():
+            for key in self._categories(track):
+                counts[key] += 1
+        values = []
+        for key, _text, _tip in PC_CHIPS:
+            values.append(counts[key])
+        self._chips.set_counts(values)
+
+    def _update_action_bar(self) -> None:
+        """La barra delle azioni sopra la tabella: le voci del tasto destro (pc_entries) per i brani scelti (o, senza
+        selezione, quelli dell'artista o dell'album scelti negli elenchi), più Cambia i tag ed Esporta."""
+        if hasattr(self, "_actions"):
+            tracks = self.selected_tracks()
+            entries = self.pc_entries(tracks) if tracks else []
+            bar = {}
+            notes = []
+            keys = ["copy", "replace", "tags", "delete"]
+            index = 0
+            for text, enabled, slot in entries:
+                if slot is not None and index < len(keys):
+                    bar[keys[index]] = (text, enabled, slot)
+                    index += 1
+                elif slot is None:
+                    notes.append(text)
+            for key in keys:
+                if key not in bar:
+                    bar[key] = (tr({"copy": "Copia da PC a iPhone", "replace": "Ricopia da PC a iPhone",
+                                    "tags": "Usa i tag da PC a iPhone", "delete": "Elimina dall'iPhone"}[key]),
+                                False, None)
+            bar["edit"] = ("Cambia i tag…", bool(tracks), self._open_editor)
+            bar["export"] = ("Esporta in una cartella…", bool(tracks), self._export_selection)
+            if not tracks:
+                who = "Scegli dei brani, o un artista o un album:"
+            elif len(tracks) == 1:
+                who = "1 brano scelto:"
+            else:
+                who = f"{len(tracks)} brani scelti:"
+            self._actions.set_entries(who, bar, " · ".join(notes))
+
+    def _open_editor(self) -> None:
+        """Cambia i tag (barra delle azioni, tasto destro): l'editor a destra, con il cursore nel primo campo."""
+        self._editor_panel.setVisible(True)
+        if self.editor.focus_first_field():
+            self._editor_scroll.ensureWidgetVisible(self.editor.focusWidget() or self.editor)
+
     def _visible_tracks(self) -> list:
         track_filter = self._track_filter()
         needle = self._search.text().strip().lower()
+        chip = PC_CHIPS[self._chips.currentIndex()][0]
         visible = []
         for track in self.format_tracks():
             shown = self._passes(track, track_filter)
+            if shown and chip != "all":
+                shown = chip in self._categories(track)
             if shown and needle:
                 haystack = " ".join([track.title, track.tags.artist, track.tags.album_artist,
                                      track.tags.album]).lower()
@@ -862,6 +980,9 @@ class MainWindow(QMainWindow):
         self._save_pending()
         self._restyle_rows([])
         self.browser.refresh_phone_states()
+        self._update_chip_counts()
+        if PC_CHIPS[self._chips.currentIndex()][0] == "pending":
+            self._fill_table()
         self._update_pending_bar()
         self.iphone_panel.pending_changed()
 
@@ -977,6 +1098,7 @@ class MainWindow(QMainWindow):
                                                            "l'iPhone")
             self._undo_button.setEnabled(total > 0)
             self._update_tab_text()
+            self._update_action_bar()
 
     def _undo_pending(self) -> None:
         total = self.pending.total()
@@ -1220,8 +1342,7 @@ class MainWindow(QMainWindow):
         current = self._table.currentIndex()
         if not self._selected_rows() and current.isValid():
             self._table.selectRow(current.row())
-        if self.editor.focus_first_field():
-            self._editor_scroll.ensureWidgetVisible(self.editor.focusWidget() or self.editor)
+        self._open_editor()
 
     def _selection_changed(self) -> None:
         """L'editor dei brani selezionati; senza brani selezionati ma con un album scelto negli elenchi, la copertina
@@ -1232,6 +1353,7 @@ class MainWindow(QMainWindow):
             self.editor.show_album(self.browser.album_tracks(next(iter(albums))))
         else:
             self.editor.set_tracks(tracks)
+        self._update_action_bar()
 
     def _busy_changed(self, busy: bool) -> None:
         for action in self._task_actions:

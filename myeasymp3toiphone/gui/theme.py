@@ -34,6 +34,7 @@ RED_DARK = "#962d22"
 GRAY_BACK = "rgba(128, 128, 128, 0.22)"
 GRAY_TEXT = "rgba(128, 128, 128, 0.95)"
 GRAY_BORDER = "rgba(128, 128, 128, 0.35)"
+AMBER_TEXT = "#b36b00"         # gli avvisi (non sincronizzare con iTunes): si legge sul chiaro e sullo scuro
 
 STYLE_SHEET = f"""
 QPushButton {{
@@ -83,6 +84,29 @@ QToolButton:pressed {{ background-color: rgba(47, 111, 179, 0.40); }}
 QToolButton:disabled {{ color: {GRAY_TEXT}; }}
 
 QAbstractItemView {{ selection-background-color: {SELECTION}; selection-color: white; }}
+
+QPushButton[role="chip"] {{
+    background-color: transparent; color: palette(text); font-weight: 600;
+    border: 1px solid {GRAY_BORDER}; border-radius: 13px; padding: 3px 12px;
+}}
+QPushButton[role="chip"]:hover {{ background-color: rgba(47, 111, 179, 0.15); }}
+QPushButton[role="chip"]:checked {{ background-color: {BLUE}; color: white; border-color: {BLUE_DARK}; }}
+QPushButton[role="chip"][empty="true"] {{ color: {GRAY_TEXT}; }}
+QPushButton[role="chip"][empty="true"]:checked {{ color: white; }}
+
+QFrame#actionBar {{
+    background-color: rgba(47, 111, 179, 0.07); border: 1px solid rgba(47, 111, 179, 0.25); border-radius: 6px;
+}}
+QLabel#actionWho {{ font-weight: bold; }}
+QLabel#actionNote {{ color: {GRAY_TEXT}; }}
+QFrame#deviceCard {{
+    background-color: rgba(47, 111, 179, 0.06); border: 1px solid rgba(47, 111, 179, 0.35); border-radius: 8px;
+}}
+QLabel#deviceName {{ font-size: 15px; font-weight: bold; }}
+QLabel#deviceInfo {{ color: {GRAY_TEXT}; }}
+QLabel#warningLine {{ color: {AMBER_TEXT}; }}
+QLabel#helpText {{ background: palette(alternate-base); padding: 8px; border-radius: 4px; }}
+QLabel#panelTitle {{ font-weight: bold; }}
 """
 
 

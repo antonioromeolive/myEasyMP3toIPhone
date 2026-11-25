@@ -8,7 +8,6 @@ com'è e si possono rimettere dalle schede. "Applica N azioni" fa partire quelle
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QDialog, QDialogButtonBox, QHBoxLayout, QLabel, QPushButton, QToolButton, QTreeWidget, QTreeWidgetItem,
     QVBoxLayout, QWidget,

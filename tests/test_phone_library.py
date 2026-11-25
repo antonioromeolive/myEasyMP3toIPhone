@@ -1418,3 +1418,58 @@ def test_everything_for_the_iphone_waits_for_apply(tmp_path, monkeypatch):
         window._exit_checked = True
         window.close()
         app.processEvents()
+
+
+def test_filter_chips_and_action_bars(tmp_path):
+    """I filtri a pulsanti contano i brani e filtrano la tabella; la barra delle azioni ha le voci del tasto destro
+    per i brani scelti; il menu Strumenti della scheda iPhone si riempie all'apertura."""
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtWidgets import QApplication
+    from myeasymp3toiphone import provenance
+    from myeasymp3toiphone.gui import iphone_panel, main_window
+    from myeasymp3toiphone.gui.main_window import MainWindow
+    app = QApplication.instance() or QApplication([])
+    window = MainWindow()
+    try:
+        here = [_pc("Uno", "Gruppo Finto", "Disco"), _pc("Due", "Gruppo Finto", "Disco", year="2001"),
+                _pc("Tre", "Gruppo Finto", "Disco"), _pc("Quattro", "Gruppo Finto", "Disco")]
+        window.tracks = here
+        phone = [_phone(1, "Uno", "Gruppo Finto", "Disco"), _phone(2, "Due", "Gruppo Finto", "Disco", year="2000"),
+                 _phone(4, "Quattro", "Gruppo Finto", "Disco")]
+        phone[0].sync_id, phone[1].sync_id, phone[2].sync_id = 11, 12, 14
+        registry = provenance.Registry()
+        for item, track in zip(phone[:2], here[:2]):
+            registry.record(provenance.Link(sync_id=item.sync_id, pc=provenance.computer_name(), path=str(track.path)))
+        window.registry = registry
+        window.set_phone_tracks(phone, "iPhone di prova")
+        window._rebuild_views()
+        keys = [key for key, _text, _tip in main_window.PC_CHIPS]
+        counts = dict(zip(keys, window._chips._counts))
+        assert counts == {"all": 4, "absent": 1, "same": 1, "stale": 1, "probable": 1, "edited": 0, "pending": 0}
+        window._chips.setCurrentIndex(keys.index("stale"))
+        assert [track.title for track in window._visible] == ["Due"]
+        window._table.selectAll()
+        bar = window._actions
+        assert bar._who.text() == "1 brano scelto:"
+        assert bar.button("replace").text() == "Ricopia da PC a iPhone: 1 brano" and bar.button("replace").isEnabled()
+        assert not bar.button("copy").isEnabled()
+        bar.button("tags").click()                                   # Usa i tag da PC a iPhone: in attesa
+        assert window.pending.total() == 1 and dict(zip(keys, window._chips._counts))["pending"] == 1
+        window._chips.setCurrentIndex(0)
+
+        panel = window.iphone_panel
+        panel._fill_music()
+        texts = [text for text, _rule in iphone_panel.SHOW_FILTERS]
+        shown = dict(zip(texts, panel._show._counts))
+        assert shown["Tutti i brani"] == 3 and shown["Da rivedere: abbinati solo per i tag (≈)"] == 1
+        panel._music_view.selectAll()
+        assert panel._actions._who.text() == "3 brani scelti:"
+        assert panel._actions.button("delete").text() == "Elimina 3 brani dall'iPhone"
+        panel._fill_tools()
+        tools = [action.text() for action in panel._tools.actions() if action.text()]
+        assert "Associa al file sul PC tutti i brani senza sorgente…" in tools
+        assert any(text.startswith("Usa i tag da iPhone a PC: 1 brano") for text in tools)
+    finally:
+        window._exit_checked = True
+        window.close()
+        app.processEvents()
