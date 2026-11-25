@@ -204,3 +204,41 @@ def test_album_check_options_dialog():
     assert dialog.services() == ["deezer", "apple", "musicbrainz"]
     dialog.close()
     app.processEvents()
+
+
+def test_checks_tab_runs_the_album_check_and_shows_results(monkeypatch):
+    """La linguetta Controlli: F7 la apre; Avvia la verifica parte con le scelte del riquadro; durante c'è Ferma; alla
+    fine i risultati compaiono sotto, senza finestre a parte."""
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtWidgets import QApplication
+    from myeasymp3toiphone.gui.album_check_dialog import AlbumCheckDialog
+    from myeasymp3toiphone.gui.main_window import MainWindow
+    app = QApplication.instance() or QApplication([])
+    window = MainWindow()
+    try:
+        window.tracks = _album(["Uno", "Due"])
+        window._rebuild_views()
+        panel = window.checks_panel
+        assert window._tabs.tabText(window._tabs.indexOf(panel)) == "Controlli"
+        window._check_albums()                                      # F7
+        assert window._tabs.currentWidget() is panel
+        panel.refresh()
+        options = panel.album_options
+        assert "Verificare 1 album" in options._header.text() and options.start_button.isEnabled()
+        window.album_clients["deezer"] = FakeService("deezer", ["Uno", "Due"])
+        options.boxes["apple"].setChecked(False)
+        options.boxes["deezer"].setChecked(True)
+        options.start_button.click()
+        assert not options.stop_button.isHidden() or not window._album_job.running
+        deadline = time.monotonic() + 10
+        while window._album_job.running and time.monotonic() < deadline:
+            app.processEvents()
+            time.sleep(0.01)
+        app.processEvents()
+        assert isinstance(panel.results.widget(1), AlbumCheckDialog)
+        assert options.stop_button.isHidden() and "finita" in options.progress.text()
+        window._scan()                                              # F6: Controlla la musica, nella stessa linguetta
+        assert window._tabs.currentWidget() is panel
+    finally:
+        window.close()
+        app.processEvents()

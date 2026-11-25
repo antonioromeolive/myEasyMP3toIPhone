@@ -2731,4 +2731,50 @@ CATALOG = {
         'Other computers: none.',
     'Una cartella della musica':
         'A music folder',
+    "<b>Cosa succede dopo.</b> La verifica va in background: puoi continuare a usare il programma (qui e nella barra di stato si vede a che punto è, <i>Ferma</i> la interrompe). L'icona accanto a ogni album nell'elenco Album ne dice l'esito man mano. Alla fine i risultati compaiono qui sotto: per ogni album le tracce dell'edizione trovata e i tuoi file, le tracce mancanti in rosso; puoi scegliere un'altra edizione e <i>Correggere i tag</i> con quei dati e la copertina (restano in sospeso, per le copie: i file del PC non cambiano).":
+        "<b>What happens next.</b> The check runs in the background: you can keep using the program (here and in the status bar you see how far it is, <i>Stop</i> interrupts it). The icon next to each album in the Album list tells its outcome as it goes. At the end the results appear below: for each album the tracks of the edition found and your files, the missing tracks in red; you can choose another edition and <i>Correct the tags</i> with that data and the cover (they stay pending, for the copies: the PC files don't change).",
+    'Avvia la verifica':
+        'Start the check',
+    'Interrompe la verifica: i risultati già trovati restano':
+        'Interrupts the check: the results already found stay',
+    '<b>Verificare {0} album</b> (quelli scelti negli elenchi della scheda PC, o tutti).':
+        '<b>Check {0} albums</b> (those chosen in the lists of the PC tab, or all).',
+    "{0}  <span style='color: gray; font-weight: normal'>{1}</span>":
+        "{0}  <span style='color: gray; font-weight: normal'>{1}</span>",
+    "Confronta i tuoi brani tra loro (e con l'iPhone), senza cataloghi online: doppioni, artisti scritti in modi diversi, album divisi, tag mancanti.":
+        'Compares your tracks with each other (and with the iPhone), without online catalogs: duplicates, artists written in different ways, split albums, missing tags.',
+    'Confronta gli album con i cataloghi su internet: brani mancanti, tag giusti, copertina. In background.':
+        'Compares the albums with the catalogs on the internet: missing tracks, right tags, cover. In the background.',
+    'Qui compaiono i risultati di Controlla la musica.':
+        'The results of Check the music appear here.',
+    'Risultati del controllo':
+        'Results of the scan',
+    'Qui compaiono i risultati di Verifica album online, alla fine o quando la fermi.':
+        'The results of Check albums online appear here, at the end or when you stop it.',
+    'Risultati della verifica':
+        'Results of the check',
+    'Vedi':
+        'See',
+    'La linguetta Controlli, con la verifica e i suoi risultati':
+        'The Checks tab, with the check and its results',
+    'Controlli':
+        'Checks',
+    'F7: la linguetta Controlli. Confronta gli album scelti (o tutti) con i cataloghi online (Deezer, Apple Music, Discogs, MusicBrainz): brani mancanti, tag giusti, copertina. In background':
+        'F7: the Checks tab. Compares the chosen albums (or all) with the online catalogs (Deezer, Apple Music, Discogs, MusicBrainz): missing tracks, right tags, cover. In the background',
+    "F6: la linguetta Controlli. Cerca i problemi confrontando i tuoi brani tra loro (cartelle aperte o iPhone), senza cataloghi online: file non aggiornati, album con pochi brani, collezioni divise, artisti scritti in modi diversi, brani duplicati (con l'AI, se configurata)":
+        'F6: the Checks tab. Looks for problems by comparing your tracks with each other (open folders or iPhone), without online catalogs: files not updated, albums with few tracks, split collections, artists written in different ways, duplicate tracks (with the AI, if configured)',
+    'Cartelle della musica, AI della scansione, lingua, profili AI e chiavi':
+        'Music folders, scan AI, language, AI profiles and keys',
+    'La verifica è già in corso: aspetta la fine o premi Ferma.':
+        'The check is already running: wait for the end or press Stop.',
+    'In corso: 0 di {0} album':
+        'Running: 0 of {0} albums',
+    'In corso: {0} di {1} album':
+        'Running: {0} of {1} albums',
+    'Interruzione…':
+        'Stopping…',
+    'Avvia il controllo':
+        'Start the scan',
+    "Aspetta la fine dell'operazione in corso.":
+        'Wait for the current operation to finish.',
 }

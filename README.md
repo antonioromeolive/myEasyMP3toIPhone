@@ -49,8 +49,9 @@ Per l'iPhone serve l'app gratuita **Dispositivi Apple** dal Microsoft Store (opp
 > **Tutto ciò che cambia l'iPhone va in attesa** e parte solo con **Applica** (vedi
 > [Le azioni in attesa](#le-azioni-in-attesa-e-applica)).
 
-Due schede: **PC** (i brani della cartella aperta) e **iPhone** (la musica dell'app *Musica* dell'iPhone, vedi
-[L'iPhone](#liphone)).
+Tre linguette: **PC** (i brani delle cartelle aperte), **iPhone** (la musica dell'app *Musica* dell'iPhone, vedi
+[L'iPhone](#liphone)) e **Controlli** (*Controlla la musica* e *Verifica album online*, con i loro risultati: vedi
+[Controlla la musica](#controlla-la-musica) e [Verifica album online](#verifica-album-online)).
 
 | Pulsante | Cosa fa |
 |---|---|
@@ -58,8 +59,6 @@ Due schede: **PC** (i brani della cartella aperta) e **iPhone** (la musica dell'
 | **Apri cartella** | mostra i brani di una cartella qualsiasi, in sola lettura (da riga di comando: `myEasyMP3toIPhone --open <cartella>`) |
 | **Importa cartella** | copia una cartella nella Libreria in `Artista / Album (Anno) / NN - Titolo.ext`, con le modifiche in sospeso applicate alle copie |
 | **Esporta** | copia i brani selezionati (o quelli dell'artista o dell'album scelti negli elenchi) in una cartella, con la stessa struttura e le modifiche in sospeso |
-| **Verifica album online** | confronta gli album con i cataloghi online (Deezer, Apple Music, Discogs, MusicBrainz): elenca i brani mancanti, propone i tag corretti e la copertina (in sospeso, per le copie); in background (vedi [Verifica album online](#verifica-album-online)) |
-| **Controlla la musica** | cerca i problemi confrontando i tuoi brani tra loro (cartella aperta o musica dell'iPhone), senza cataloghi online, con i controlli che scegli (vedi sotto) |
 | **Impostazioni** | **cartelle della musica** di questo PC (e quale è la Libreria), AI della scansione, **lingua dell'interfaccia** (italiano o inglese), profili AI |
 | **Informazioni** | versione, cartella dati, variabili d'ambiente e da dove viene ciascuna, dove sono le chiavi |
 
@@ -264,11 +263,13 @@ OneDrive…) compare in rosso, con il motivo nel suggerimento, e non interrompe 
 
 ## Controlla la musica
 
-*Controlla la musica* (F6, la "scansione") analizza la cartella aperta, oppure la musica dell'app *Musica* dell'iPhone confrontata con la
-Libreria (si può fare anche a iPhone disconnesso, con l'ultimo elenco letto). Nella finestra scegli **quali controlli
+*Controlla la musica* (linguetta **Controlli**, riquadro a sinistra; **F6** la apre, la "scansione") analizza i brani
+aperti nella scheda PC, oppure la musica dell'app *Musica* dell'iPhone confrontata con le cartelle della musica del PC
+(si può fare anche a iPhone disconnesso, con l'ultimo elenco letto). Nel riquadro scegli **quali controlli
 fare** (le caselle della tabella qui sotto, ognuna con una riga di spiegazione; le scelte si ricordano). Prima
 applica delle regole locali, veloci e gratuite; poi, se scegli di usarla, l'AI. Il rapporto resta in
-`.myEasyMP3toIPhone\scansioni\`. Ogni problema può avere una **correzione**: si applica dalla finestra dei risultati, dopo
+`.myEasyMP3toIPhone\scansioni\`; **Avvia il controllo** lo fa partire e i risultati compaiono sotto, in *Risultati del
+controllo*. Ogni problema può avere una **correzione**: si applica dai risultati, dopo
 una conferma, come **modifiche in sospeso** (i file sul PC non cambiano; vanno sulle copie inviate all'iPhone); *Mostra
 i brani* li seleziona nella scheda PC. I problemi trovati sull'iPhone non hanno correzioni automatiche: si correggono i
 brani sul PC e poi si usa *Usa i tag da PC a iPhone* o *Ricopia da PC a iPhone*, o si cambiano dalla scheda iPhone
@@ -300,11 +301,12 @@ In console: `myEasyMP3toIPhone-cli --scan <cartella> [--ai "<profilo>"]`.
 
 ## Verifica album online
 
-*Verifica album online* (F7) confronta gli album scelti negli elenchi (o tutti) con un **catalogo su internet**: dice
+*Verifica album online* (linguetta **Controlli**, riquadro a destra; **F7** la apre) confronta gli album scelti negli
+elenchi della scheda PC (o tutti) con un **catalogo su internet**: dice
 se manca qualche brano e propone i tag giusti e la copertina. È diverso da *Controlla la musica*, che confronta i tuoi
 brani tra loro (e con l'iPhone), senza cataloghi.
 
-Nella finestra si scelgono i **cataloghi** (le scelte si ricordano):
+Nel riquadro si scelgono i **cataloghi** (le scelte si ricordano), poi **Avvia la verifica**:
 
 | Catalogo | Com'è | Predefinito |
 |---|---|---|
@@ -314,16 +316,16 @@ Nella finestra si scelgono i **cataloghi** (le scelte si ricordano):
 | **MusicBrainz** | il più completo, ma una richiesta al secondo | spento |
 
 Con più cataloghi scelti **si provano in quest'ordine** (dal più veloce), album per album, **finché uno dà l'album
-completo**; se nessuno lo dà, vale il risultato migliore (quello con meno brani mancanti) e la finestra dei risultati
-dice quali cataloghi sono stati provati e con che esito. La casella **AI per scegliere tra edizioni dubbie** (spenta di
+completo**; se nessuno lo dà, vale il risultato migliore (quello con meno brani mancanti) e i risultati dicono quali
+cataloghi sono stati provati e con che esito. La casella **AI per scegliere tra edizioni dubbie** (spenta di
 base) interviene solo quando due edizioni di un album sono ugualmente probabili: l'AI della scansione riceve titoli e
 numero dei brani e le edizioni trovate, e ne sceglie una (il motivo si vede nei risultati). CDDB/freedb ha chiuso nel
 2020; il suo erede gnudb vuole la struttura del CD (TOC), che dei file non hanno.
 
-**In background.** La verifica non blocca il programma: la barra di stato dice a che punto è (*Ferma* la interrompe,
-i risultati già trovati restano) e l'icona di ogni album nell'elenco *Album* ne mostra l'esito man mano. Alla fine si
-apre la finestra dei **risultati** (non blocca la finestra principale; si riapre con *Risultati della verifica…* nella
-barra di stato): per ogni album le tracce dell'edizione trovata e i tuoi file, le **mancanti in rosso** e quelle non
+**In background.** La verifica non blocca il programma: il riquadro e la barra di stato dicono a che punto è
+(*Ferma*, nel riquadro, la interrompe; i risultati già trovati restano; *Vedi*, nella barra di stato, porta alla
+linguetta) e l'icona di ogni album nell'elenco *Album* ne mostra l'esito man mano. Alla fine, o quando la fermi, i
+**risultati** compaiono sotto, in *Risultati della verifica*: per ogni album le tracce dell'edizione trovata e i tuoi file, le **mancanti in rosso** e quelle non
 riconosciute in grigio. Si può scegliere un'altra edizione, *Correggere i tag con questi dati* (titolo, numeri di
 traccia e disco, album, artista album, anno, e la copertina: tutto in sospeso, per le copie) e *Apri su …* la pagina
 dell'edizione nel catalogo. Aprire un'altra cartella ferma la verifica in corso.

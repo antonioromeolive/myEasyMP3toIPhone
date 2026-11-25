@@ -2,14 +2,15 @@
 # Author: Antonio Romeo (with Claude Code et al.)
 # SPDX-License-Identifier: MIT (see the LICENSE file for the full terms)
 
-"""Controlla la musica dall'interfaccia: cosa controllare (la cartella aperta o la musica dell'app Musica
-dell'iPhone) e quali controlli fare, l'avvio e la finestra dei risultati, da cui si applicano le correzioni."""
+"""Controlla la musica dall'interfaccia: cosa controllare (i brani aperti o la musica dell'app Musica dell'iPhone) e
+quali controlli fare, l'avvio e i risultati, da cui si applicano le correzioni. Scelte e risultati stanno nella
+linguetta Controlli (embedded=True: dentro la linguetta, con "Avvia il controllo" e senza "Chiudi")."""
 
 from __future__ import annotations
 
 from html import escape
 
-from PySide6.QtCore import QUrl, Qt
+from PySide6.QtCore import QUrl, Qt, Signal
 from PySide6.QtGui import QBrush, QColor, QDesktopServices
 from PySide6.QtWidgets import (
     QAbstractItemView, QCheckBox, QDialog, QDialogButtonBox, QGridLayout, QGroupBox, QHBoxLayout, QHeaderView, QLabel,
@@ -33,24 +34,19 @@ GREY = QColor(130, 130, 130)
 
 
 class ScanTargetDialog(QDialog):
-    """Cosa controllare, quali controlli fare (ricordati) e se usare l'AI."""
+    """Cosa controllare, quali controlli fare (ricordati) e se usare l'AI. embedded: dentro la linguetta Controlli,
+    con il pulsante "Avvia il controllo" (start_requested) al posto di Avvia/Annulla; refresh() rifà le scelte che
+    dipendono da cosa è aperto."""
 
-    def __init__(self, window, phone_count: int, profile_name: str) -> None:
+    start_requested = Signal()
+
+    def __init__(self, window, phone_count: int, profile_name: str, embedded: bool = False) -> None:
         super().__init__(window)
         self.setWindowTitle(TITLE)
-        opened = window.open_description()
-        self.local = QRadioButton(f"I brani aperti nella scheda PC ({opened})" if opened else "Nessuna cartella aperta")
-        self.local.setEnabled(bool(opened) and bool(window.tracks))
-        if phone_count:
-            self.device = QRadioButton(f"La musica dell'app Musica dell'iPhone ({phone_count} brani, "
-                                       f"{window.phone_label}), confrontata con le cartelle della musica del PC")
-        else:
-            self.device = QRadioButton("L'iPhone (connettilo una volta: la sua musica resta ricordata)")
-        self.device.setEnabled(phone_count > 0)
-        if self.local.isEnabled():
-            self.local.setChecked(True)
-        else:
-            self.device.setChecked(self.device.isEnabled())
+        if embedded:
+            self.setWindowFlags(Qt.Widget)
+        self.local = QRadioButton()
+        self.device = QRadioButton()
 
         off = set(window.app_settings.scan_checks_off)
         self.boxes = {}
@@ -83,20 +79,11 @@ class ScanTargetDialog(QDialog):
         choose.addWidget(none_button)
         choose.addStretch(1)
 
-        self.use_ai = QCheckBox(f"Usa l'AI ({profile_name})" if profile_name else "Usa l'AI (scegli un profilo in "
-                                "Impostazioni → Generale)")
-        self.use_ai.setEnabled(bool(profile_name))
-        self.use_ai.setChecked(bool(profile_name) and window.app_settings.scan_use_ai)
+        self.use_ai = QCheckBox()
         note = QLabel("Brani duplicati: la prima volta si legge l'impronta dell'audio di ogni file (qualche minuto per "
                       "una collezione grande), poi si ricorda. Il rapporto resta nella cartella dati (scansioni).")
         note.setWordWrap(True)
         note.setStyleSheet("color: gray")
-        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        self.start_button = buttons.button(QDialogButtonBox.Ok)
-        self.start_button.setText("Avvia")
-        buttons.button(QDialogButtonBox.Cancel).setText("Annulla")
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
         layout = QVBoxLayout(self)
         layout.addWidget(self.local)
         layout.addWidget(self.device)
@@ -104,8 +91,44 @@ class ScanTargetDialog(QDialog):
         layout.addLayout(choose)
         layout.addWidget(self.use_ai)
         layout.addWidget(note)
-        layout.addWidget(buttons)
-        self.resize(760, 520)
+        if embedded:
+            self.start_button = QPushButton("Avvia il controllo")
+            self.start_button.setProperty("role", "go")
+            self.start_button.clicked.connect(self.start_requested.emit)
+            start_row = QHBoxLayout()
+            start_row.addStretch(1)
+            start_row.addWidget(self.start_button)
+            layout.addLayout(start_row)
+        else:
+            buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+            self.start_button = buttons.button(QDialogButtonBox.Ok)
+            self.start_button.setText("Avvia")
+            buttons.button(QDialogButtonBox.Cancel).setText("Annulla")
+            buttons.accepted.connect(self.accept)
+            buttons.rejected.connect(self.reject)
+            layout.addWidget(buttons)
+            self.resize(760, 520)
+        self.refresh(window, phone_count, profile_name)
+
+    def refresh(self, window, phone_count: int, profile_name: str) -> None:
+        """Le scelte che dipendono da cosa è aperto: i brani della scheda PC, la musica dell'iPhone, il profilo AI."""
+        opened = window.open_description()
+        self.local.setText(f"I brani aperti nella scheda PC ({opened})" if opened else "Nessuna cartella aperta")
+        self.local.setEnabled(bool(opened) and bool(window.tracks))
+        if phone_count:
+            self.device.setText(f"La musica dell'app Musica dell'iPhone ({phone_count} brani, {window.phone_label}), "
+                                "confrontata con le cartelle della musica del PC")
+        else:
+            self.device.setText("L'iPhone (connettilo una volta: la sua musica resta ricordata)")
+        self.device.setEnabled(phone_count > 0)
+        if self.local.isEnabled() and not self.device.isChecked():
+            self.local.setChecked(True)
+        elif not self.local.isEnabled():
+            self.device.setChecked(self.device.isEnabled())
+        self.use_ai.setText(f"Usa l'AI ({profile_name})" if profile_name else "Usa l'AI (scegli un profilo in "
+                            "Impostazioni → Generale)")
+        self.use_ai.setEnabled(bool(profile_name))
+        self.use_ai.setChecked(bool(profile_name) and window.app_settings.scan_use_ai)
         self._update_start()
 
     def _set_all(self, checked: bool) -> None:
@@ -145,11 +168,25 @@ class ScanLauncher:
                 result = profile
         return result
 
+    def profile_name(self) -> str:
+        profile = self._profile()
+        result = profile.name if profile is not None else ""
+        return result
+
     def start(self) -> None:
+        """Le scelte in una finestra, poi il controllo (senza la linguetta Controlli)."""
+        window = self.window
+        dialog = ScanTargetDialog(window, len(window.phone_tracks), self.profile_name())
+        if dialog.exec():
+            self.run(dialog)
+
+    def run(self, dialog) -> None:
+        """Il controllo con le scelte fatte (finestra o linguetta Controlli), ricordate nelle impostazioni."""
         window = self.window
         profile = self._profile()
-        dialog = ScanTargetDialog(window, len(window.phone_tracks), profile.name if profile else "")
-        if dialog.exec():
+        if window.runner.is_busy:
+            QMessageBox.information(window, TITLE, "Aspetta la fine dell'operazione in corso.")
+        else:
             window.app_settings.scan_use_ai = dialog.use_ai.isChecked()
             window.app_settings.scan_checks_off = dialog.checks_off()
             window.app_settings.scan_musicbrainz = dialog.musicbrainz.isChecked()
@@ -230,14 +267,23 @@ class ScanLauncher:
             saved = save_report(report, config_dir() / REPORTS_FOLDER)
         except OSError as exc:
             QMessageBox.warning(self.window, TITLE, f"Rapporto non salvato: {exc}")
-        ScanDialog(report, saved, self).exec()
+        panel = getattr(self.window, "checks_panel", None)
+        if panel is not None:
+            panel.show_scan_results(ScanDialog(report, saved, self, embedded=True))
+        else:
+            ScanDialog(report, saved, self).exec()
 
 
 class ScanDialog(QDialog):
-    def __init__(self, report, saved, launcher: ScanLauncher) -> None:
+    """I risultati di Controlla la musica; embedded: dentro la linguetta Controlli, senza "Chiudi"."""
+
+    def __init__(self, report, saved, launcher: ScanLauncher, embedded: bool = False) -> None:
         super().__init__(launcher.window)
         self.setWindowTitle(f"{TITLE}: {report.target}")
-        self.resize(1150, 680)
+        if embedded:
+            self.setWindowFlags(Qt.Widget)
+        else:
+            self.resize(1150, 680)
         self.report = report
         self.saved = saved
         self.launcher = launcher
@@ -278,14 +324,15 @@ class ScanDialog(QDialog):
         open_button = QPushButton("Apri il rapporto")
         open_button.setEnabled(saved is not None)
         open_button.clicked.connect(lambda: QDesktopServices.openUrl(QUrl.fromLocalFile(str(saved))))
-        close_button = QPushButton("Chiudi")
-        close_button.clicked.connect(self.accept)
         buttons = QHBoxLayout()
         buttons.addWidget(self.fix_button)
         buttons.addWidget(self.show_button)
         buttons.addStretch(1)
         buttons.addWidget(open_button)
-        buttons.addWidget(close_button)
+        if not embedded:
+            close_button = QPushButton("Chiudi")
+            close_button.clicked.connect(self.accept)
+            buttons.addWidget(close_button)
 
         layout = QVBoxLayout(self)
         layout.addWidget(header)

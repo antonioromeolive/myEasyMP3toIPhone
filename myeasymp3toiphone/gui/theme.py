@@ -102,6 +102,10 @@ QLabel#actionNote {{ color: {GRAY_TEXT}; }}
 QFrame#deviceCard {{
     background-color: rgba(47, 111, 179, 0.06); border: 1px solid rgba(47, 111, 179, 0.35); border-radius: 8px;
 }}
+QFrame#checkCard {{
+    background-color: rgba(47, 111, 179, 0.04); border: 1px solid rgba(47, 111, 179, 0.30); border-radius: 8px;
+}}
+QLabel#cardTitle {{ font-size: 15px; font-weight: bold; }}
 QLabel#deviceName {{ font-size: 15px; font-weight: bold; }}
 QLabel#deviceInfo {{ color: {GRAY_TEXT}; }}
 QLabel#warningLine {{ color: {AMBER_TEXT}; }}

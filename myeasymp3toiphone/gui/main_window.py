@@ -40,7 +40,8 @@ from ..tag_cache import TagCache, cached_track
 from ..tags import prepare_copy, protect_folder, read_cover
 from ..version import app_version
 from .about import AboutDialog
-from .album_check_dialog import AlbumCheckDialog, AlbumCheckOptionsDialog
+from .album_check_dialog import AlbumCheckDialog
+from .checks_panel import ChecksPanel
 from .apply_dialog import ApplyDialog, songs, summary
 from .widgets import ActionBar, ChipBar
 from .browser import LibraryBrowser
@@ -144,8 +145,9 @@ class MainWindow(QMainWindow):
         self._album_stop = QPushButton("Ferma")
         self._album_stop.setToolTip("Interrompe Verifica album online: i risultati già trovati restano")
         self._album_stop.clicked.connect(self._stop_album_check)
-        self._album_results_button = QPushButton("Risultati della verifica…")
-        self._album_results_button.clicked.connect(self._open_album_results)
+        self._album_results_button = QPushButton("Vedi")
+        self._album_results_button.setToolTip("La linguetta Controlli, con la verifica e i suoi risultati")
+        self._album_results_button.clicked.connect(lambda: self.show_checks(album=True))
         for widget in (self._album_label, self._album_stop, self._album_results_button):
             self.statusBar().addPermanentWidget(widget)
             widget.setVisible(False)
@@ -166,6 +168,8 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central)
         self._update_pending_bar()
         self.scan_launcher = ScanLauncher(self)
+        self.checks_panel = ChecksPanel(self)
+        self._tabs.addTab(self.checks_panel, "Controlli")
         QTimer.singleShot(0, self._startup)
 
     # ================================================================== costruzione interfaccia
@@ -187,27 +191,31 @@ class MainWindow(QMainWindow):
              "Copia una cartella nella Libreria, ordinandola per Artista/Album", "Ctrl+I"),
             ("Esporta", QStyle.SP_ArrowUp, self._export_selection,
              "Copia i brani selezionati in una cartella, ordinati per Artista/Album", "Ctrl+E"),
-            ("Verifica album online", QStyle.SP_DialogApplyButton, self._check_albums,
-             "Confronta gli album scelti (o tutti) con i cataloghi online (Deezer, Apple Music, Discogs, "
-             "MusicBrainz): brani mancanti, tag giusti, copertina. In background", "F7"),
-            ("Controlla la musica", QStyle.SP_FileDialogContentsView, self._scan,
-             "Cerca i problemi confrontando i tuoi brani tra loro (cartella aperta o iPhone), senza cataloghi "
-             "online: file non aggiornati, album con pochi brani, collezioni divise, artisti scritti in modi "
-             "diversi, brani duplicati (con l'AI, se configurata)", "F6"),
+            ("Verifica album online", None, self._check_albums,
+             "F7: la linguetta Controlli. Confronta gli album scelti (o tutti) con i cataloghi online (Deezer, Apple "
+             "Music, Discogs, MusicBrainz): brani mancanti, tag giusti, copertina. In background", "F7"),
+            ("Controlla la musica", None, self._scan,
+             "F6: la linguetta Controlli. Cerca i problemi confrontando i tuoi brani tra loro (cartelle aperte o "
+             "iPhone), senza cataloghi online: file non aggiornati, album con pochi brani, collezioni divise, artisti "
+             "scritti in modi diversi, brani duplicati (con l'AI, se configurata)", "F6"),
             ("Impostazioni", GEAR, self._open_settings,
-             "Cartella della Libreria, profili AI e chiavi", "Ctrl+,"),
+             "Cartelle della musica, AI della scansione, lingua, profili AI e chiavi", "Ctrl+,"),
             ("Informazioni", QStyle.SP_MessageBoxInformation, self._open_about,
              "Versione, cartella dati, variabili d'ambiente e dove sono salvate le chiavi", None),
         ]
         self._task_actions = []
         for text, icon, slot, tip, shortcut in definitions:
-            action = QAction(gear_icon() if icon == GEAR else style.standardIcon(icon), text, self)
+            if icon is None:                 # solo il tasto: Controlla e Verifica stanno nella linguetta Controlli
+                action = QAction(text, self)
+                self.addAction(action)
+            else:
+                action = QAction(gear_icon() if icon == GEAR else style.standardIcon(icon), text, self)
+                toolbar.addAction(action)
             action.setToolTip(tip)
             action.setStatusTip(tip)
             if shortcut is not None:
                 action.setShortcut(QKeySequence(shortcut))
             action.triggered.connect(slot)
-            toolbar.addAction(action)
             self._task_actions.append(action)
 
     def _build_library_tab(self) -> QWidget:
@@ -563,7 +571,14 @@ class MainWindow(QMainWindow):
         AboutDialog(self).exec()
 
     def _scan(self) -> None:
-        self.scan_launcher.start()
+        """F6: la linguetta Controlli, su Controlla la musica."""
+        self.show_checks()
+        self.checks_panel.focus_scan()
+
+    def show_checks(self, album: bool = False) -> None:
+        self._tabs.setCurrentWidget(self.checks_panel)
+        if album:
+            self.checks_panel.results.setCurrentIndex(1)
 
     def open_music(self) -> None:
         """La mia musica: tutte le cartelle della musica di questo computer insieme (la Libreria si crea se manca)."""
@@ -1449,7 +1464,7 @@ class MainWindow(QMainWindow):
         self.activateWindow()
 
     def _refresh_current_tab(self) -> None:
-        """F5: Aggiorna della scheda che si vede (PC: rilegge la cartella; iPhone: rilegge la sua musica)."""
+        """F5: Rileggi della scheda che si vede (iPhone: rilegge la sua musica; le altre: le cartelle aperte)."""
         if self._tabs.currentWidget() is self.iphone_panel:
             self.iphone_panel.refresh()
         else:
@@ -1654,6 +1669,14 @@ class MainWindow(QMainWindow):
 
     # ================================================================== verifica album
 
+    def albums_to_check(self) -> list:
+        result = self._albums_to_check()
+        return result
+
+    def album_discogs_ready(self) -> bool:
+        result = self.album_clients[SERVICE_DISCOGS].available()
+        return result
+
     def _albums_to_check(self) -> list:
         groups = group_by_album(self.format_tracks())
         track_filter = self._track_filter()
@@ -1664,27 +1687,30 @@ class MainWindow(QMainWindow):
         return selected
 
     def _check_albums(self) -> None:
+        """F7: la linguetta Controlli, su Verifica album online."""
+        self.show_checks(album=True)
+        self.checks_panel.focus_album()
+
+    def start_album_check_from_panel(self) -> None:
+        """Avvia la verifica della linguetta Controlli, con le sue scelte (ricordate)."""
         albums = self._albums_to_check()
+        options = self.checks_panel.album_options
         if self._album_job is not None and self._album_job.running:
-            QMessageBox.information(self, "Verifica album online", "La verifica è già in corso (barra di stato): "
-                                    "aspetta la fine o premi Ferma.")
+            QMessageBox.information(self, "Verifica album online", "La verifica è già in corso: aspetta la fine o "
+                                    "premi Ferma.")
         elif not albums:
             QMessageBox.information(self, "Verifica album online", "Non ci sono album da verificare.")
         else:
             provider = self.iphone_panel._ai_provider()
             settings = self.app_settings
-            dialog = AlbumCheckOptionsDialog(self, len(albums), list(settings.album_services), settings.album_ai,
-                                             provider.profile.name if provider is not None else "",
-                                             self.album_clients[SERVICE_DISCOGS].available())
-            if dialog.exec():
-                settings.album_services = dialog.services()
-                settings.album_ai = dialog.use_ai
-                self.save_settings()
-                clients = []
-                for service in dialog.services():
-                    clients.append(self.album_clients[service])
-                chooser = ai_chooser(provider) if dialog.use_ai and provider is not None else None
-                self._start_album_check(albums, clients, chooser)
+            settings.album_services = options.services()
+            settings.album_ai = options.use_ai
+            self.save_settings()
+            clients = []
+            for service in options.services():
+                clients.append(self.album_clients[service])
+            chooser = ai_chooser(provider) if options.use_ai and provider is not None else None
+            self._start_album_check(albums, clients, chooser)
 
     def _start_album_check(self, albums: list, clients: list, chooser) -> None:
         """Verifica album online in background: il programma resta usabile, gli esiti arrivano album per album."""
@@ -1704,24 +1730,30 @@ class MainWindow(QMainWindow):
         job.failed.connect(lambda message: self._album_check_done(message))
         self._album_job = job
         self._album_label.setText(f"Verifica album online: 0 di {len(albums)}")
-        for widget in (self._album_label, self._album_stop):
+        for widget in (self._album_label, self._album_results_button):
             widget.setVisible(True)
-        self._album_stop.setEnabled(True)
-        self._album_results_button.setVisible(False)
+        self._album_stop.setVisible(False)              # Ferma sta nella linguetta Controlli
+        self._album_panel_state(True, f"In corso: 0 di {len(albums)} album")
         job.start()
+
+    def _album_panel_state(self, running: bool, text: str) -> None:
+        panel = getattr(self, "checks_panel", None)
+        if panel is not None:
+            panel.album_state(running, text)
 
     def _album_checked(self, result) -> None:
         self._album_results.append(result)
         self.store_check_result(result)
         self.browser.refresh_check_icons(self.check_results)
         self._album_label.setText(f"Verifica album online: {len(self._album_results)} di {self._album_total}")
-        self._album_results_button.setVisible(True)
+        self._album_panel_state(True, f"In corso: {len(self._album_results)} di {self._album_total} album")
 
     def _stop_album_check(self) -> None:
         if self._album_job is not None:
             self._album_job.cancel()
             self._album_stop.setEnabled(False)
             self._album_label.setText("Verifica album online: interruzione…")
+            self._album_panel_state(True, "Interruzione…")
 
     def _album_summary(self) -> str:
         complete = 0
@@ -1744,19 +1776,15 @@ class MainWindow(QMainWindow):
             self._album_label.setText(f"Verifica album online interrotta: {self._album_summary()}")
         else:
             self._album_label.setText(f"Verifica album online finita: {self._album_summary()}")
+        self._album_panel_state(False, self._album_label.text())
         self._album_results_button.setVisible(bool(self._album_results))
-        if self._album_results and not cancelled:
+        if self._album_results:
             self._open_album_results()
 
     def _open_album_results(self) -> None:
-        """La finestra dei risultati, non modale: si può continuare a usare il programma."""
-        if self._album_dialog is not None:
-            self._album_dialog.close()
+        """I risultati nella linguetta Controlli (si può continuare a usare il programma)."""
         if self._album_results:
-            dialog = AlbumCheckDialog(self._album_results, self)
-            dialog.finished.connect(lambda _code: self.refresh_after_tag_change())
-            self._album_dialog = dialog
-            dialog.show()
+            self.checks_panel.show_album_results(AlbumCheckDialog(self._album_results, self, embedded=True))
 
     # ================================================================== chiusura
 
