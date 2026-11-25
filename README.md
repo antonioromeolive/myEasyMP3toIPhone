@@ -56,9 +56,9 @@ Tre linguette: **PC** (i brani delle cartelle aperte), **iPhone** (la musica del
 | Pulsante | Cosa fa |
 |---|---|
 | **La mia musica** (Ctrl+L) | mostra insieme tutte le **cartelle della musica** di questo PC (*Impostazioni → Cartelle della musica*; una di loro è la **Libreria**, predefinita `Musica\myEasyMP3toIPhone`) |
-| **Apri cartella** | mostra i brani di una cartella qualsiasi, in sola lettura (da riga di comando: `myEasyMP3toIPhone --open <cartella>`) |
-| **Importa cartella** | copia una cartella nella Libreria in `Artista / Album (Anno) / NN - Titolo.ext`, con le modifiche in sospeso applicate alle copie |
-| **Esporta** | copia i brani selezionati (o quelli dell'artista o dell'album scelti negli elenchi) in una cartella, con la stessa struttura e le modifiche in sospeso |
+| **Apri cartella…** | mostra i brani di una cartella qualsiasi, in sola lettura (da riga di comando: `myEasyMP3toIPhone --open <cartella>`) |
+| **Importa nella Libreria…** | copia una cartella nella Libreria in `Artista / Album (Anno) / NN - Titolo.ext`, con le modifiche in sospeso applicate alle copie |
+| **Esporta…** | copia i brani selezionati (o quelli dell'artista o dell'album scelti negli elenchi) in una cartella, con la stessa struttura e le modifiche in sospeso |
 | **Impostazioni** | **cartelle della musica** di questo PC (e quale è la Libreria), AI della scansione, **lingua dell'interfaccia** (italiano o inglese), profili AI |
 | **Informazioni** | versione, cartella dati, variabili d'ambiente e da dove viene ciascuna, dove sono le chiavi |
 
@@ -130,6 +130,12 @@ con la grafia più usata (a parità, quella con le maiuscole). Anche "AA.VV.", "
 simili sono **un artista solo**, e i loro album con lo stesso nome un album solo; altri nomi che valgono come loro si
 aggiungono in *Impostazioni → Generale → Altri nomi per "Artisti vari"*. I tag dei file non cambiano: la scansione
 segnala la variante, perché l'iPhone la considera un artista diverso.
+
+**La barra in alto** è a gruppi: la musica (*La mia musica*, *Apri cartella…*), le copie (*Importa nella
+Libreria…*, *Esporta…*) e, a destra, *Impostazioni* e *Informazioni*. **I pulsanti** hanno un colore che dice cosa
+fanno: **verde** l'azione principale (*Applica*, *Copia da PC a iPhone*, *Connetti iPhone*, *Avvia…*), **rosso** quelli
+che cancellano o interrompono (*Elimina dall'iPhone*, *Disconnetti*, *Ferma*), neutri gli altri (bordo blu al passaggio
+del mouse), grigi quando non si possono premere. Le icone sono disegnate dal programma.
 
 La riga scelta è **blu con il testo bianco** in tutti gli elenchi e le tabelle, anche in quello che non stai usando
 (negli elenchi Artisti e Album si vede sempre cosa è scelto). Nelle tabelle dei brani (schede PC e iPhone) **ogni
@@ -1027,4 +1033,4 @@ L'icona si rigenera con `.venv\Scripts\python tools\make_icon.py`.
 | `myeasymp3toiphone/environment.py` | il rapporto delle variabili (`--env`, *Informazioni*) |
 | `myeasymp3toiphone/home_backup.py` | la copia della cartella dati prima di un cambio di formato |
 | `myeasymp3toiphone/startup.py` | l'avvio: copia, variabili, migrazioni, registro, log |
-| `myeasymp3toiphone/gui/` | l'interfaccia PySide6 (la tabella dei brani è un modello Qt, `track_model.py`: veloce anche con decine di migliaia di brani) |
+| `myeasymp3toiphone/gui/` | l'interfaccia PySide6 (la tabella dei brani è un modello Qt, `track_model.py`: veloce anche con decine di migliaia di brani; `widgets.py` i filtri a pulsanti e la barra delle azioni; `checks_panel.py` la linguetta Controlli; `icons.py` le icone; `theme.py` i colori) |

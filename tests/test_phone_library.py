@@ -1087,7 +1087,6 @@ def test_moved_sources_are_found_again(tmp_path, monkeypatch):
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     from PySide6.QtWidgets import QApplication
     from myeasymp3toiphone import adoption, provenance
-    from myeasymp3toiphone.gui import iphone_panel
     from myeasymp3toiphone.gui.main_window import MainWindow
     from myeasymp3toiphone.overlay import path_key
     from myeasymp3toiphone.relocate import REASON_SAME_AUDIO, REASON_SAME_FILE_AUDIO, relocate

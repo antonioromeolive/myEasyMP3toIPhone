@@ -18,6 +18,12 @@ from PySide6.QtWidgets import (
 )
 
 from ..i18n import tr
+from .icons import icon
+
+ICON_COLOR = "#2f6fb3"          # le icone dei pulsanti neutri (su quelli verdi e rossi sono bianche)
+# l'icona di ogni azione della barra (le chiavi di ActionBar)
+ACTION_ICONS = {"copy": "plus", "replace": "swap", "tags": "tag", "delete": "trash", "edit": "pencil",
+                "export": "export", "save": "save", "link": "link"}
 
 
 class FlowLayout(QLayout):
@@ -182,10 +188,13 @@ class ActionBar(QFrame):
         for key, role in keys:
             button = QPushButton()
             button.setProperty("role", role)
+            if key in ACTION_ICONS:
+                button.setIcon(icon(ACTION_ICONS[key], "white" if role in ("go", "danger") else ICON_COLOR))
             button.clicked.connect(lambda _checked=False, name=key: self._run(name))
             self._buttons[key] = button
             row.addWidget(button)
-        self.menu_button = QPushButton("Strumenti ▾")
+        self.menu_button = QPushButton("Strumenti")
+        self.menu_button.setIcon(icon("tools", ICON_COLOR))
         self.menu_button.setVisible(False)
         row.addWidget(self.menu_button)
         layout = QVBoxLayout(self)
@@ -194,7 +203,7 @@ class ActionBar(QFrame):
         layout.addLayout(row)
         layout.addWidget(self._note)             # la nota grigia sotto i pulsanti, su tutta la larghezza
 
-    def set_menu(self, menu: QMenu, text: str = "Strumenti ▾") -> None:
+    def set_menu(self, menu: QMenu, text: str = "Strumenti") -> None:
         self.menu_button.setText(text)
         self.menu_button.setMenu(menu)
         self.menu_button.setVisible(True)

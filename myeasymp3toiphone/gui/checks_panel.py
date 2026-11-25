@@ -12,6 +12,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QSplitter, QTabWidget, QVBoxLayout, QWidget
 
 from .album_check_dialog import AlbumCheckOptionsDialog
+from .icons import icon
 from .scan_dialog import ScanTargetDialog
 
 SCAN_PAGE, ALBUM_PAGE = 0, 1
@@ -55,6 +56,9 @@ class ChecksPanel(QWidget):
                                                      embedded=True)
         self.album_options.start_requested.connect(window.start_album_check_from_panel)
         self.album_options.stop_button.clicked.connect(window._stop_album_check)
+        self.scan_options.start_button.setIcon(icon("play", "white"))
+        self.album_options.start_button.setIcon(icon("play", "white"))
+        self.album_options.stop_button.setIcon(icon("stop", "white"))
         cards = QWidget()
         row = QHBoxLayout(cards)
         row.setContentsMargins(0, 0, 0, 0)

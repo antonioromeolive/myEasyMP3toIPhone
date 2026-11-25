@@ -14,7 +14,7 @@ from PySide6.QtGui import QAction, QColor, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QAbstractItemView, QApplication, QComboBox, QDialog, QDialogButtonBox, QFileDialog, QFrame, QHBoxLayout,
     QHeaderView, QLabel, QLineEdit, QListWidget, QListWidgetItem, QMainWindow, QMenu, QMessageBox, QPushButton,
-    QScrollArea, QSplitter, QStyle, QTableView, QTabWidget, QToolBar, QToolButton, QVBoxLayout, QWidget,
+    QScrollArea, QSizePolicy, QSplitter, QTableView, QTabWidget, QToolBar, QToolButton, QVBoxLayout, QWidget,
 )
 
 from ..albumcheck import (
@@ -51,7 +51,7 @@ from .iphone_panel import IPhonePanel, show_entries_menu
 from .scan_dialog import ScanLauncher
 from .settings_dialog import SettingsDialog
 from .tag_editor import TagEditor
-from .theme import GEAR, gear_icon
+from .icons import icon
 from .track_model import COL_DEVICE, COL_TITLE, COLUMNS, TrackTableModel
 from .worker import BackgroundJob, TaskRunner
 
@@ -68,6 +68,7 @@ FINGERPRINT_SUFFIXES = {".mp3", ".flac", ".m4a", ".m4b", ".mp4"}   # provenance.
 FINGERPRINT_BATCH = 200       # impronte per giro: annullare (nuova cartella, uscita) aspetta al massimo un giro
 FINGERPRINT_NOTICE = 100      # da quanti file in su lo si dice nella barra di stato
 FINGERPRINTS_TO_DO, FINGERPRINTS_DONE = "impronte_da_fare", "impronte_fatte"   # i messaggi del lavoro in sottofondo
+SPACER = object()             # nella barra in alto: quello che segue va a destra
 MUSIC_MARK = "*"              # last_opened: erano aperte le cartelle della musica
 EXIT_NOW, EXIT_AFTER_APPLY, EXIT_CANCEL ="esci_ora", "esci_dopo_applica", "resta_aperto"   # all'uscita
 PENDING_LOOK = {SEND: ("＋", QColor(40, 110, 230), QColor(40, 110, 230, 40)),
@@ -175,21 +176,24 @@ class MainWindow(QMainWindow):
     # ================================================================== costruzione interfaccia
 
     def _build_toolbar(self) -> None:
+        """La barra in alto, a gruppi: la musica (La mia musica, Apri cartella), copiare (Importa, Esporta) e, a
+        destra, Impostazioni e Informazioni. Controlla e Verifica sono solo tasti (F6, F7): stanno nella linguetta
+        Controlli."""
         toolbar = QToolBar("Azioni")
-        toolbar.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
-        toolbar.setIconSize(QSize(28, 28))
+        toolbar.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+        toolbar.setIconSize(QSize(20, 20))
         toolbar.setMovable(False)
         self.addToolBar(toolbar)
-        style = self.style()
         definitions = [
-            ("La mia musica", QStyle.SP_DirHomeIcon, self.open_music,
+            ("La mia musica", icon("music"), self.open_music,
              "Mostra tutte le cartelle della musica di questo PC (Impostazioni → Cartelle della musica)", "Ctrl+L"),
-            ("Apri cartella", QStyle.SP_DirOpenIcon, self._open_folder,
+            ("Apri cartella…", icon("folder"), self._open_folder,
              "Mostra i brani di una cartella qualsiasi, in sola lettura: i file non vengono mai modificati",
              "Ctrl+O"),
-            ("Importa cartella", QStyle.SP_ArrowDown, self._import_folder,
+            None,
+            ("Importa nella Libreria…", icon("import"), self._import_folder,
              "Copia una cartella nella Libreria, ordinandola per Artista/Album", "Ctrl+I"),
-            ("Esporta", QStyle.SP_ArrowUp, self._export_selection,
+            ("Esporta…", icon("export"), self._export_selection,
              "Copia i brani selezionati in una cartella, ordinati per Artista/Album", "Ctrl+E"),
             ("Verifica album online", None, self._check_albums,
              "F7: la linguetta Controlli. Confronta gli album scelti (o tutti) con i cataloghi online (Deezer, Apple "
@@ -198,25 +202,34 @@ class MainWindow(QMainWindow):
              "F6: la linguetta Controlli. Cerca i problemi confrontando i tuoi brani tra loro (cartelle aperte o "
              "iPhone), senza cataloghi online: file non aggiornati, album con pochi brani, collezioni divise, artisti "
              "scritti in modi diversi, brani duplicati (con l'AI, se configurata)", "F6"),
-            ("Impostazioni", GEAR, self._open_settings,
+            SPACER,
+            ("Impostazioni", icon("gear"), self._open_settings,
              "Cartelle della musica, AI della scansione, lingua, profili AI e chiavi", "Ctrl+,"),
-            ("Informazioni", QStyle.SP_MessageBoxInformation, self._open_about,
+            ("Informazioni", icon("info"), self._open_about,
              "Versione, cartella dati, variabili d'ambiente e dove sono salvate le chiavi", None),
         ]
         self._task_actions = []
-        for text, icon, slot, tip, shortcut in definitions:
-            if icon is None:                 # solo il tasto: Controlla e Verifica stanno nella linguetta Controlli
-                action = QAction(text, self)
-                self.addAction(action)
+        for definition in definitions:
+            if definition is None:
+                toolbar.addSeparator()
+            elif definition is SPACER:              # Impostazioni e Informazioni a destra
+                spacer = QWidget()
+                spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+                toolbar.addWidget(spacer)
             else:
-                action = QAction(gear_icon() if icon == GEAR else style.standardIcon(icon), text, self)
-                toolbar.addAction(action)
-            action.setToolTip(tip)
-            action.setStatusTip(tip)
-            if shortcut is not None:
-                action.setShortcut(QKeySequence(shortcut))
-            action.triggered.connect(slot)
-            self._task_actions.append(action)
+                text, picture, slot, tip, shortcut = definition
+                if picture is None:          # solo il tasto: Controlla e Verifica stanno nella linguetta Controlli
+                    action = QAction(text, self)
+                    self.addAction(action)
+                else:
+                    action = QAction(picture, text, self)
+                    toolbar.addAction(action)
+                action.setToolTip(tip)
+                action.setStatusTip(tip)
+                if shortcut is not None:
+                    action.setShortcut(QKeySequence(shortcut))
+                action.triggered.connect(slot)
+                self._task_actions.append(action)
 
     def _build_library_tab(self) -> QWidget:
         self._search = QLineEdit()
@@ -235,6 +248,7 @@ class MainWindow(QMainWindow):
         self._reload_button.setToolTip("F5. Rilegge la cartella aperta: i file nuovi, tolti o cambiati (gli altri "
                                        "dalla cache dei tag). Con Maiusc premuto rilegge tutti i file da zero.")
         self._reload_button.clicked.connect(self.reload_folder)
+        self._reload_button.setIcon(icon("refresh"))
         self._folders_combo = QComboBox()
         self._folders_combo.setToolTip("Quali cartelle mostrare: tutte le cartelle della musica di questo PC "
                                        "(Impostazioni), una sola, o un'altra cartella qualsiasi")
@@ -379,6 +393,7 @@ class MainWindow(QMainWindow):
         self._undo_button.clicked.connect(self._undo_pending)
         self._apply_button = QPushButton("Applica…")
         self._apply_button.setProperty("role", "go")
+        self._apply_button.setIcon(icon("check", "white"))
         self._apply_button.clicked.connect(self._apply_pending)
         row = QHBoxLayout(self._pending_bar)
         row.setContentsMargins(10, 6, 10, 6)

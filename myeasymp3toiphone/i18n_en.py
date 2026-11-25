@@ -2777,4 +2777,12 @@ CATALOG = {
         'Start the scan',
     "Aspetta la fine dell'operazione in corso.":
         'Wait for the current operation to finish.',
+    'Apri cartella…':
+        'Open folder…',
+    'Importa nella Libreria…':
+        'Import into the Library…',
+    'Esporta…':
+        'Export…',
+    'Strumenti':
+        'Tools',
 }

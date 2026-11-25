@@ -3,7 +3,6 @@
 # SPDX-License-Identifier: MIT (see the LICENSE file for the full terms)
 
 import os
-import stat
 import time
 
 import pytest

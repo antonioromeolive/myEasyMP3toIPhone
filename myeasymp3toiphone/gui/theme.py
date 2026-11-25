@@ -2,9 +2,11 @@
 # Author: Antonio Romeo (with Claude Code et al.)
 # SPDX-License-Identifier: MIT (see the LICENSE file for the full terms)
 
-"""I colori del programma: barre dei titoli (intestazioni delle colonne, riquadri, scheda scelta) in blu, pulsanti
-colorati quando si possono premere e grigi quando no, rossi quelli che cancellano qualcosa
-(QPushButton con la proprietà role="danger": mark_danger).
+"""I colori del programma: barre dei titoli (intestazioni delle colonne, riquadri, scheda scelta) in blu; i pulsanti
+con una gerarchia: neutri di serie (bordo blu al passaggio del mouse), **verdi** per l'azione principale (role="go":
+Applica, Copia da PC a iPhone, Avvia…), **rossi** per quelli che cancellano o interrompono (role="danger":
+mark_danger), grigi quando non si possono premere. I filtri a pulsanti (role="chip") sono pillole, blu quando
+scelte. Le icone sono in icons.py.
 
 Lo stile Fusion serve perché lo stile nativo di Windows ignora in parte i colori dei pulsanti. I grigi sono
 semitrasparenti e il testo sul blu è bianco: si leggono sia con il tema chiaro sia con quello scuro di Windows.
@@ -38,21 +40,22 @@ AMBER_TEXT = "#b36b00"         # gli avvisi (non sincronizzare con iTunes): si l
 
 STYLE_SHEET = f"""
 QPushButton {{
-    background-color: {BLUE}; color: white;
-    border: 1px solid {BLUE_DARK}; border-radius: 4px; padding: 5px 14px;
+    background-color: rgba(128, 128, 128, 0.10); color: palette(button-text);
+    border: 1px solid {GRAY_BORDER}; border-radius: 6px; padding: 5px 12px;
 }}
-QPushButton:hover {{ background-color: {BLUE_LIGHT}; }}
-QPushButton:pressed {{ background-color: {BLUE_DARK}; }}
-QPushButton:default {{ border: 2px solid {BLUE_DARK}; }}
-QPushButton[role="go"] {{ background-color: {GREEN}; border-color: {GREEN_DARK}; }}
+QPushButton:hover {{ background-color: rgba(47, 111, 179, 0.14); border-color: {BLUE}; }}
+QPushButton:pressed {{ background-color: rgba(47, 111, 179, 0.28); }}
+QPushButton:default {{ border: 1px solid {BLUE}; }}
+QPushButton[role="go"] {{ background-color: {GREEN}; color: white; border-color: {GREEN_DARK}; font-weight: 600; }}
 QPushButton[role="go"]:hover {{ background-color: {GREEN_LIGHT}; }}
 QPushButton[role="go"]:pressed {{ background-color: {GREEN_DARK}; }}
-QPushButton[role="danger"] {{ background-color: {RED}; border-color: {RED_DARK}; }}
+QPushButton[role="danger"] {{ background-color: {RED}; color: white; border-color: {RED_DARK}; font-weight: 600; }}
 QPushButton[role="danger"]:hover {{ background-color: {RED_LIGHT}; }}
 QPushButton[role="danger"]:pressed {{ background-color: {RED_DARK}; }}
 QPushButton:disabled, QPushButton[role="danger"]:disabled, QPushButton[role="go"]:disabled {{
-    background-color: {GRAY_BACK}; color: {GRAY_TEXT}; border: 1px solid {GRAY_BORDER};
+    background-color: {GRAY_BACK}; color: {GRAY_TEXT}; border: 1px solid {GRAY_BORDER}; font-weight: normal;
 }}
+QPushButton::menu-indicator {{ subcontrol-position: right center; right: 6px; }}
 
 QHeaderView::section {{
     background-color: {BLUE}; color: white; font-weight: bold;
@@ -77,8 +80,12 @@ QTabBar::tab {{
 QTabBar::tab:selected {{ background-color: {BLUE}; color: white; border-color: {BLUE_DARK}; }}
 QTabBar::tab:hover:!selected {{ background-color: rgba(47, 111, 179, 0.30); }}
 
-QToolBar {{ background-color: rgba(47, 111, 179, 0.10); border: none; spacing: 4px; }}
-QToolButton {{ border-radius: 4px; padding: 3px; }}
+QToolBar {{
+    background-color: rgba(47, 111, 179, 0.06); border: none; border-bottom: 1px solid rgba(47, 111, 179, 0.25);
+    spacing: 2px; padding: 4px 8px;
+}}
+QToolBar::separator {{ background-color: {GRAY_BORDER}; width: 1px; margin: 6px 8px; }}
+QToolButton {{ border-radius: 6px; padding: 4px 10px; }}
 QToolButton:hover {{ background-color: rgba(47, 111, 179, 0.25); }}
 QToolButton:pressed {{ background-color: rgba(47, 111, 179, 0.40); }}
 QToolButton:disabled {{ color: {GRAY_TEXT}; }}
@@ -148,40 +155,6 @@ def album_band(band: int, shade: int) -> QColor:
     return result
 
 
-GEAR = "icona_rotella"             # al posto di un'icona standard di Qt: Qt non ha la rotella delle impostazioni
-GEAR_TEETH = 8
-GEAR_COLOR = QColor(150, 162, 176)
-
-
-def gear_icon(size: int = 64):
-    """La rotella dell'ingranaggio (Impostazioni), disegnata: un anello con GEAR_TEETH denti e il foro in mezzo."""
-    from PySide6.QtCore import QPointF, QRectF, Qt
-    from PySide6.QtGui import QIcon, QPainter, QPainterPath, QPixmap, QTransform
-    pixmap = QPixmap(size, size)
-    pixmap.fill(Qt.transparent)
-    center = size / 2
-    outer = size * 0.34          # il bordo dell'anello
-    tooth_width = size * 0.16
-    tooth_length = size * 0.13
-    shape = QPainterPath()
-    shape.addEllipse(QPointF(center, center), outer, outer)
-    for index in range(GEAR_TEETH):
-        tooth = QPainterPath()
-        tooth.addRoundedRect(QRectF(center - tooth_width / 2, center - outer - tooth_length, tooth_width,
-                                    tooth_length + size * 0.06), size * 0.03, size * 0.03)
-        turn = QTransform().translate(center, center).rotate(index * 360 / GEAR_TEETH).translate(-center, -center)
-        shape = shape.united(turn.map(tooth))
-    hole = QPainterPath()
-    hole.addEllipse(QPointF(center, center), size * 0.14, size * 0.14)
-    shape = shape.subtracted(hole)
-    painter = QPainter(pixmap)
-    painter.setRenderHint(QPainter.Antialiasing)
-    painter.fillPath(shape, GEAR_COLOR)
-    painter.end()
-    result = QIcon(pixmap)
-    return result
-
-
 def install_italian(app) -> bool:
     """I pulsanti standard di Qt in italiano (OK, Annulla, Sì, No…): la traduzione di Qt stessa, se c'è."""
     from PySide6.QtCore import QLibraryInfo, QLocale, QTranslator
@@ -195,7 +168,7 @@ def install_italian(app) -> bool:
 
 
 def set_role(button, role: str) -> None:
-    """Il colore di un pulsante: "go" verde (avvia), "danger" rosso (cancella o interrompe), "" il blu normale."""
+    """Il colore di un pulsante: "go" verde (avvia), "danger" rosso (cancella o interrompe), "" neutro."""
     button.setProperty("role", role)
     button.style().unpolish(button)
     button.style().polish(button)

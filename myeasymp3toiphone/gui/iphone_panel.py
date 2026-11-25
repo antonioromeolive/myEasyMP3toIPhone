@@ -24,7 +24,8 @@ from ..phone_library import (
     spelling_differences,
 )
 from .apply_dialog import songs
-from .widgets import ActionBar, ChipBar
+from .icons import icon
+from .widgets import ICON_COLOR, ActionBar, ChipBar
 from .compare_tip import comparison_html, show_on_tooltip
 from .file_actions import add_file_entries
 from .theme import album_band, album_bands, set_role
@@ -435,6 +436,8 @@ class IPhonePanel(QWidget):
         Connetti/Disconnetti, ? (come funziona) e l'avviso di non sincronizzare con iTunes."""
         card = QFrame()
         card.setObjectName("deviceCard")
+        phone_icon = QLabel()
+        phone_icon.setPixmap(icon("phone", ICON_COLOR).pixmap(36, 36))
         self._status = QLabel(NOT_CONNECTED)
         self._status.setObjectName("deviceName")
         self._listing_note = QLabel()
@@ -448,11 +451,14 @@ class IPhonePanel(QWidget):
         self._refresh_button.setToolTip("F5. Rilegge la musica dell'app Musica dall'iPhone connesso; senza iPhone rifà "
                                         "il confronto con il PC")
         self._refresh_button.clicked.connect(self._refresh_music)
+        self._refresh_button.setIcon(icon("refresh", ICON_COLOR))
         self._connect_button = QPushButton(CONNECT_TEXT)
+        self._connect_button.setIcon(icon("phone", "white"))
         self._connect_button.setMinimumWidth(170)
         self._connect_button.clicked.connect(self._toggle_connection)
         self._help_button = QToolButton()
         self._help_button.setText("?")
+        self._help_button.setIcon(icon("help", ICON_COLOR))
         self._help_button.setCheckable(True)
         self._help_button.setToolTip("Come funziona: i segni delle colonne e dove sono le azioni")
         self._info = QLabel(INFO_TEXT)
@@ -465,6 +471,7 @@ class IPhonePanel(QWidget):
         warning.setObjectName("warningLine")
         warning.setWordWrap(True)
         top = QHBoxLayout()
+        top.addWidget(phone_icon)
         top.addLayout(texts, 1)
         top.addWidget(self._refresh_button)
         top.addWidget(self._connect_button)
