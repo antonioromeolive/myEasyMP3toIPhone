@@ -1315,3 +1315,43 @@ def test_complete_the_album_sends_only_the_missing_tracks_of_that_copy(tmp_path)
         window._exit_checked = True
         window.close()
         app.processEvents()
+
+
+def test_warning_for_songs_already_on_the_iphone_in_another_format(monkeypatch):
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtWidgets import QApplication
+    from myeasymp3toiphone.gui.main_window import MainWindow
+    from myeasymp3toiphone.phone_library import format_duplicates
+
+    def pc(folder, title, suffix, length=200.0, album="Raccolta Finta"):
+        return Track(path=Path(f"D:/{folder}/{title}{suffix}"), length=length,
+                     tags=TrackTags(title=title, artist="Cantante Finto", album=album))
+
+    phone = [_phone(1, "Uno", "Cantante Finto", "Raccolta Finta")]      # sull'iPhone in MP3, 200 s
+    flac_one = pc("musica.flac", "Uno", ".flac", 201.0)                 # la stessa canzone in FLAC: avviso
+    other_album = pc("altro", "Uno", ".mp3", 200.0, "Altro Disco")      # stesso formato, altra raccolta: niente
+    live = pc("musica.flac", "Uno", ".flac", 260.0)                     # altra durata (dal vivo): niente
+    two_mp3 = pc("musica.ok", "Due", ".mp3")                            # nello stesso invio due formati: se ne
+    two_flac = pc("musica.flac", "Due", ".flac")                        # tiene uno, la cartella preferita
+    duplicates, remaining = format_duplicates([flac_one, other_album, live, two_flac, two_mp3], phone,
+                                              ("musica.ok", "musica.flac"))
+    assert [(track.path.parent.name, track.tags.title) for track, _reason in duplicates] == [
+        ("musica.flac", "Uno"), ("musica.flac", "Due")]
+    assert "sull'iPhone in MP3" in duplicates[0][1] and "nello stesso invio" in duplicates[1][1]
+    assert remaining == [other_album, live, two_mp3]
+
+    app = QApplication.instance() or QApplication([])
+    window = MainWindow()
+    try:
+        window.set_phone_tracks(phone, "iPhone di prova")
+        panel = window.iphone_panel
+        sent = []
+        monkeypatch.setattr(panel, "_send_tracks", lambda tracks: sent.append(tracks))
+        panel.send_tracks([flac_one, other_album])           # i test scelgono "Invia senza questi"
+        assert sent == [[other_album]]
+        panel.send_tracks([flac_one])                         # erano tutti doppioni: niente da inviare
+        assert sent == [[other_album]] and "Niente da inviare" in window.statusBar().currentMessage()
+    finally:
+        window._exit_checked = True
+        window.close()
+        app.processEvents()

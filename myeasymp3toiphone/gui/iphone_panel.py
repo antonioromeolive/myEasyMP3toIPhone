@@ -17,7 +17,7 @@ from ..config import config_dir
 from ..i18n import tr
 from ..library import Track, album_folder, album_groups, copy_organized, group_name, scan_folder, short_folder
 from ..phone_library import (
-    DEVICE_ABSENT, DEVICE_SAME, comparison, differences, pc_matches, playlist_reminder, spelling_differences,
+    DEVICE_ABSENT, DEVICE_SAME, comparison, format_duplicates, differences, pc_matches, playlist_reminder, spelling_differences,
 )
 from .compare_tip import comparison_html, show_on_tooltip
 from .file_actions import add_file_entries
@@ -1501,8 +1501,51 @@ class IPhonePanel(QWidget):
         result = box.clickedButton() is accept
         return result
 
+    def check_duplicates(self, sends: list) -> tuple:
+        """Prima di un invio: se qualche brano c'è già sull'iPhone in un altro formato (o nello stesso invio in due
+        formati, phone_library.format_duplicates), un avviso con l'elenco: Invia senza questi (la scelta
+        predefinita), Invia anche questi o Annulla. (si va avanti: False solo con Annulla, brani da inviare: anche
+        nessuno, se erano tutti doppioni)."""
+        duplicates, remaining = format_duplicates(sends, self._phone_tracks,
+                                                  tuple(self._window.app_settings.preferred_folders))
+        result = (True, sends)
+        if duplicates:
+            lines = []
+            for track, reason in duplicates[:10]:
+                artist = track.tags.artist or track.tags.album_artist
+                lines.append(f"• {artist} — {track.tags.title} ({track.path.suffix[1:].upper()}): {reason}")
+            if len(duplicates) > 10:
+                lines.append(f"… e altri {len(duplicates) - 10}")
+            text = (f"{len(duplicates)} dei {len(sends)} brani da inviare ci sono già sull'iPhone in un altro formato "
+                    "(stesso artista, titolo e durata), o ci sono due volte in questo invio:\n\n" + "\n".join(lines) +
+                    "\n\nInviandoli, sull'iPhone avresti la stessa canzone due volte.")
+            box = QMessageBox(QMessageBox.Warning, "Brani già presenti in un altro formato", text, QMessageBox.NoButton,
+                              self)
+            skip = box.addButton(f"Invia senza questi ({len(remaining)} brani)", QMessageBox.AcceptRole)
+            everything = box.addButton(f"Invia anche questi ({len(sends)} brani)", QMessageBox.ActionRole)
+            box.addButton("Annulla", QMessageBox.RejectRole)
+            box.setDefaultButton(skip)
+            box.exec()
+            clicked = box.clickedButton()
+            if clicked is skip:
+                result = (True, remaining)          # anche vuoto: si va avanti, senza invii
+            elif clicked is everything:
+                result = (True, sends)
+            else:
+                result = (False, [])
+        return result
+
     def send_tracks(self, tracks: list) -> None:
-        """Dalla scheda PC: i brani nell'app Musica dell'iPhone (con le modifiche in sospeso)."""
+        """Dalla scheda PC: i brani nell'app Musica dell'iPhone (con le modifiche in sospeso). Prima l'avviso per i
+        brani che sull'iPhone ci sono già in un altro formato (check_duplicates)."""
+        proceed, tracks = self.check_duplicates(tracks)
+        if proceed and tracks:
+            self._send_tracks(tracks)
+        elif proceed:
+            self._window.statusBar().showMessage("Niente da inviare: erano tutti già sull'iPhone in un altro formato",
+                                                 8000)
+
+    def _send_tracks(self, tracks: list) -> None:
         formats = {}
         sizes = []
         for track in tracks:
@@ -1567,6 +1610,19 @@ class IPhonePanel(QWidget):
         return result
 
     def apply_pending(self, sends: list, removes: list, updates: list, closing: bool = False, then=None) -> None:
+        """Applica: prima l'avviso per i brani da inviare che sull'iPhone ci sono già in un altro formato
+        (check_duplicates; non all'uscita, dove si è già confermato), poi _apply_pending. Un brano lasciato fuori
+        resta in attesa."""
+        proceed = True
+        if sends and not closing:
+            proceed, sends = self.check_duplicates(sends)     # Annulla ferma tutto Applica
+        if proceed and (sends or removes or updates or closing):     # all'uscita sempre: alla fine then() chiude
+            self._apply_pending(sends, removes, updates, closing, then)
+        elif proceed:
+            self._window.statusBar().showMessage("Niente da applicare: i brani da inviare erano già sull'iPhone in un "
+                                                 "altro formato", 8000)
+
+    def _apply_pending(self, sends: list, removes: list, updates: list, closing: bool = False, then=None) -> None:
         """Le modifiche in attesa della scheda PC (passo 5) tutte insieme: invia (Track), togli (PhoneTrack), aggiorna
         ((PhoneTrack, Track): Cambia tag o Rimpiazza, come per una modifica dei tag). closing: all'uscita dal
         programma, già confermato (nessuna domanda e, se tutto riesce, nessun messaggio alla fine); then(), se c'è,

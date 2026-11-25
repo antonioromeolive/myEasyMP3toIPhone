@@ -2339,6 +2339,24 @@ CATALOG = {
         '• {0} tracks to send again with their whole album, for the spelling (they lose plays and playlists)',
     'Ritrovati e associati {0} file spostati':
         'Found and linked {0} moved files',
+    "{0} dei {1} brani da inviare ci sono già sull'iPhone in un altro formato (stesso artista, titolo e durata), o ci sono due volte in questo invio:\n\n":
+        '{0} of the {1} tracks to send are already on the iPhone in another format (same artist, title and length), or are twice in this transfer:\n\n',
+    "\n\nInviandoli, sull'iPhone avresti la stessa canzone due volte.":
+        '\n\nSending them, you would have the same song twice on the iPhone.',
+    'Brani già presenti in un altro formato':
+        'Tracks already there in another format',
+    'Invia senza questi ({0} brani)':
+        'Send without these ({0} tracks)',
+    'Invia anche questi ({0} brani)':
+        'Send these too ({0} tracks)',
+    "Niente da inviare: erano tutti già sull'iPhone in un altro formato":
+        'Nothing to send: they were all already on the iPhone in another format',
+    "Niente da applicare: i brani da inviare erano già sull'iPhone in un altro formato":
+        'Nothing to apply: the tracks to send were already on the iPhone in another format',
+    "c'è già sull'iPhone in {0}":
+        'already on the iPhone in {0}',
+    "nello stesso invio c'è anche in {0}: {1}":
+        'also in this transfer in {0}: {1}',
     "Completa l'album (PC → iPhone): invia {0} brani che mancano ({1} album)":
         'Complete the album (PC → iPhone): send the {0} missing tracks ({1} albums)',
     "Completa l'album (PC → iPhone): sull'iPhone non manca niente (o i brani non hanno la sorgente)":

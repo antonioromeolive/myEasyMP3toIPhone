@@ -431,6 +431,60 @@ def spelling_differences(pc_tags: TrackTags, phone_tags: TrackTags) -> list:
     return result
 
 
+SAME_SONG_SECONDS = 2.0       # due brani con lo stesso artista e titolo sono la stessa canzone se la durata è questa
+
+
+def _song_key(tags: TrackTags) -> tuple:
+    result = (group_name(tags.artist or tags.album_artist or ""), group_name(tags.title or ""))
+    return result
+
+
+def _same_length(first: float, second: float) -> bool:
+    """Durate uguali entro SAME_SONG_SECONDS; una durata che non si conosce (0) non esclude niente."""
+    result = not first or not second or abs(first - second) <= SAME_SONG_SECONDS
+    return result
+
+
+def format_duplicates(sends: list, phone_tracks: list, preferred: tuple = ()) -> tuple:
+    """Prima di un invio: ([(Track, motivo)] dei brani che sono la stessa canzone di una già sull'iPhone o di un altro
+    brano dello stesso invio, ma in un altro formato (stesso artista, stesso titolo, durata entro SAME_SONG_SECONDS,
+    estensione diversa), [Track] da inviare senza quelli). Tra due copie nello stesso invio si tiene quella della
+    prima cartella preferita (library.preference), poi il percorso più corto. Lo stesso brano nello stesso formato
+    (un'altra raccolta) non conta."""
+    from .library import preference
+    on_phone = {}
+    for item in phone_tracks:
+        on_phone.setdefault(_song_key(item.tags), []).append((Path(item.remote_path).suffix.lower(), item.length))
+    groups = {}
+    for track in sends:
+        groups.setdefault(_song_key(track.tags), []).append(track)
+    duplicates = []
+    dropped = set()
+    for key, tracks in groups.items():
+        ordered = sorted(tracks, key=lambda track: (preference(track.path, preferred), len(str(track.path))))
+        kept = []
+        for track in ordered:
+            suffix = track.path.suffix.lower()
+            reason = ""
+            for phone_suffix, length in on_phone.get(key, []):
+                if not reason and phone_suffix != suffix and _same_length(length, track.length):
+                    reason = f"c'è già sull'iPhone in {phone_suffix[1:].upper()}"
+            for other in kept:
+                if not reason and other.path.suffix.lower() != suffix and _same_length(other.length, track.length):
+                    reason = f"nello stesso invio c'è anche in {other.path.suffix[1:].upper()}: {other.path.parent.name}"
+            if reason:
+                duplicates.append((track, reason))
+                dropped.add(id(track))
+            else:
+                kept.append(track)
+    remaining = []
+    for track in sends:
+        if id(track) not in dropped:
+            remaining.append(track)
+    result = (duplicates, remaining)
+    return result
+
+
 def changed_fields(pc_tags: TrackTags, phone_tags: TrackTags) -> list:
     """I nomi dei campi (COMPARED_FIELDS) diversi tra il PC e l'iPhone, con le regole di comparison."""
     labels = {}

@@ -456,6 +456,14 @@ restano con la grafia dell'iPhone (la conferma lo dice). Il reinvio si fa sempre
 vecchi (allora lo dice). Come *Rimpiazza*, i brani reinviati perdono ascolti e playlist. Un brano di servizio
 rimasto da un'operazione interrotta si toglie alla successiva.
 
+**Lo stesso brano in un altro formato.** Prima di ogni invio di brani nuovi (*Invia all'iPhone*, *Completa
+l'album*, *Applica*) il programma controlla se qualcuno c'è già sull'iPhone in un altro formato (stesso artista,
+stesso titolo, durata uguale entro 2 secondi, estensione diversa: per esempio il FLAC di un brano che sull'iPhone è
+MP3), o se nello stesso invio ci sono due copie in formati diversi. Se sì, un avviso li elenca: **Invia senza
+questi** (scelta predefinita; tra due copie nello stesso invio resta quella della prima cartella preferita), **Invia
+anche questi** o **Annulla**. La stessa canzone nello stesso formato in un'altra raccolta non conta. All'uscita
+(*Applica ed esci*) l'avviso non compare: si è già confermato.
+
 **Completa l'album (PC → iPhone)** (tasto destro sui brani, o su un artista o un album): per un album di cui
 sull'iPhone ci sono solo alcuni brani, invia gli altri. Dai brani scelti con la sorgente associata (✔, ⟳) risale alla
 loro copia dell'album sul PC (la stessa cartella, con i dischi "CD1", "CD2" insieme, e lo stesso album) e manda
