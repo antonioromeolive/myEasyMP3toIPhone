@@ -943,7 +943,8 @@ class MainWindow(QMainWindow):
         values = []
         for key, _text, _tip in PC_CHIPS:
             values.append(counts[key])
-        self._chips.set_counts(values)
+        if self._chips.set_counts(values):         # il filtro scelto era rimasto vuoto: di nuovo Tutti
+            self._fill_table()
 
     def _update_action_bar(self) -> None:
         """La barra delle azioni sopra la tabella: le voci del tasto destro (pc_entries) per i brani scelti (o, senza
@@ -987,16 +988,20 @@ class MainWindow(QMainWindow):
         needle = self._search.text().strip().lower()
         chip = PC_CHIPS[self._chips.currentIndex()][0]
         visible = []
+        without_chip = 0                          # quanti si vedrebbero con il filtro Tutti
         for track in self.format_tracks():
             shown = self._passes(track, track_filter)
-            if shown and chip != "all":
-                shown = chip in self._categories(track)
             if shown and needle:
                 haystack = " ".join([track.title, track.tags.artist, track.tags.album_artist,
                                      track.tags.album]).lower()
                 shown = needle in haystack
             if shown:
+                without_chip += 1
+            if shown and chip != "all":
+                shown = chip in self._categories(track)
+            if shown:
                 visible.append(track)
+        self._chips.set_shown(len(visible), without_chip)
         # lo stesso album in due copie (due cartelle, o FLAC e MP3 nella stessa cartella): prima tutta una copia, poi
         # l'altra, non mescolate
         visible.sort(key=lambda t: (t.album_key[0].lower(), t.album_key[1].lower(), album_folder(t.path).lower(),

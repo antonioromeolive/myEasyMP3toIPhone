@@ -925,6 +925,7 @@ class IPhonePanel(QWidget):
         chosen_rule = max(0, self._show.currentIndex())
         chosen = self._browser.track_filter()     # None, o (artisti, album) scelti negli elenchi
         shown = 0
+        without_rule = 0                          # quanti si vedrebbero con il filtro Tutti
         counts = [0] * len(SHOW_FILTERS)          # quanti brani ha ogni filtro a pulsanti (tutti i brani)
         view = self._music_view
         for index in range(view.topLevelItemCount()):
@@ -937,23 +938,29 @@ class IPhonePanel(QWidget):
             for position, (_text, rule) in enumerate(SHOW_FILTERS):
                 if rule(*values):
                     counts[position] += 1
-            visible = SHOW_FILTERS[chosen_rule][1](*values)
+            matches = True                            # Cerca e gli elenchi Artisti/Album, senza il filtro
             for word in words:
                 if word not in text:
-                    visible = False
-            if visible and chosen is not None:
-                visible = self._in_chosen(row.data(COL_TITLE, PID_ROLE), chosen)
+                    matches = False
+            if matches and chosen is not None:
+                matches = self._in_chosen(row.data(COL_TITLE, PID_ROLE), chosen)
+            if matches:
+                without_rule += 1
+            visible = matches and SHOW_FILTERS[chosen_rule][1](*values)
             row.setHidden(not visible)
             if visible:
                 shown += 1
-        self._update_bands()
-        self._show.set_counts(counts)
-        total = view.topLevelItemCount()
-        if words or self._show.currentIndex() > 0 or chosen is not None:
-            self._count.setText(f"{shown} di {total} brani")
+        if self._show.set_counts(counts):
+            self._apply_search()                      # il filtro scelto era rimasto vuoto: di nuovo con Tutti
         else:
-            self._count.setText(f"{total} brani")
-        self._update_action_bar()
+            self._update_bands()
+            self._show.set_shown(shown, without_rule)
+            total = view.topLevelItemCount()
+            if words or self._show.currentIndex() > 0 or chosen is not None:
+                self._count.setText(f"{shown} di {total} brani")
+            else:
+                self._count.setText(f"{total} brani")
+            self._update_action_bar()
 
     def _update_bands(self) -> None:
         """Le tinte degli album, per le righe che si vedono nell'ordine in cui si vedono."""

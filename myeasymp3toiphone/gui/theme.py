@@ -116,6 +116,7 @@ QLabel#cardTitle {{ font-size: 15px; font-weight: bold; }}
 QLabel#deviceName {{ font-size: 15px; font-weight: bold; }}
 QLabel#deviceInfo {{ color: {GRAY_TEXT}; }}
 QLabel#warningLine {{ color: {AMBER_TEXT}; }}
+QLabel#chipNote {{ color: {AMBER_TEXT}; font-weight: 600; margin-left: 8px; }}
 QLabel#helpText {{ background: palette(alternate-base); padding: 8px; border-radius: 4px; }}
 QLabel#panelTitle {{ font-weight: bold; }}
 """

@@ -1472,3 +1472,33 @@ def test_filter_chips_and_action_bars(tmp_path):
         window._exit_checked = True
         window.close()
         app.processEvents()
+
+
+def test_empty_filter_goes_back_to_all_and_hidden_tracks_are_told(tmp_path):
+    """Il filtro "In attesa" dopo che la coda si svuota torna su Tutti (prima la tabella restava vuota mentre l'album
+    diceva 20 brani); quando un filtro nasconde dei brani la nota lo dice, con Mostra tutti."""
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtWidgets import QApplication
+    from myeasymp3toiphone.gui import main_window
+    from myeasymp3toiphone.gui.main_window import MainWindow
+    from myeasymp3toiphone.pending import SEND
+    app = QApplication.instance() or QApplication([])
+    window = MainWindow()
+    try:
+        here = [_pc("Uno", "Gruppo Finto", "Disco"), _pc("Due", "Gruppo Finto", "Disco")]
+        window.tracks = here
+        window.set_phone_tracks([_phone(9, "Altro", "Altro Gruppo", "Altro Disco")], "iPhone di prova")
+        window._rebuild_views()
+        keys = [key for key, _text, _tip in main_window.PC_CHIPS]
+        window.queue_files([here[0]], SEND)
+        window._chips.setCurrentIndex(keys.index("pending"))
+        assert [track.title for track in window._visible] == ["Uno"]
+        chips = window._chips
+        assert not chips._note.isHidden() and "si vedono 1 di 2 brani" in chips._note.text()
+        window._undo_pending()                                   # la coda si svuota (QMessageBox: Sì)
+        assert chips.currentIndex() == 0 and len(window._visible) == 2
+        assert chips._note.isHidden() and chips._reset.isHidden()
+    finally:
+        window._exit_checked = True
+        window.close()
+        app.processEvents()

@@ -2785,4 +2785,10 @@ CATALOG = {
         'Export…',
     'Strumenti':
         'Tools',
+    'Mostra tutti':
+        'Show all',
+    'Torna al filtro Tutti':
+        'Back to the All filter',
+    'Filtro «{0}»: si vedono {1} di {2} brani':
+        'Filter «{0}»: showing {1} of {2} tracks',
 }

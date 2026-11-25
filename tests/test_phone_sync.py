@@ -378,3 +378,22 @@ def test_plan_updates_from_pc():
     assert [(item.sync_id, values) for item, values in edits] == [(2, {"title": "Nuovo", "year": 2001,
                                                                        "track_number": 0})]
     assert [item.sync_id for item, _track in replacements] == [3, 4, 5]
+
+
+def test_variable_bitrate_mp3_without_vbr_header(tmp_path):
+    """Un MP3 a bitrate variabile senza intestazione Xing/VBRI: mutagen non sa dire il modo e ne stima male la
+    durata; contando i frame la durata è esatta e il bitrate è la media (prima veniva rifiutato come "bitrate
+    costante non standard"). Un MP3 costante resta al suo valore standard."""
+    frame_128 = bytes([0xFF, 0xFB, 0x90, 0x64]) + b"\x00" * (417 - 4)       # MPEG1 Layer III 44,1 kHz
+    frame_320 = bytes([0xFF, 0xFB, 0xE0, 0x64]) + b"\x00" * (1044 - 4)
+    path = tmp_path / "variabile.mp3"
+    data = b""
+    for index in range(400):
+        data += frame_320 if index % 3 else frame_128
+    path.write_bytes(b"ID3\x03\x00\x00\x00\x00\x00\x0a" + b"\x00" * 10 + data + b"TAG" + b"\x00" * 125)
+    assert ps.scan_mp3_frames(path) == (460800, 255, 44100)
+    info = ps.mp3_info(path)
+    assert (info.bit_rate_kbps, info.samples, info.total_time_ms) == (255, 460800, 10448)
+    steady = tmp_path / "costante.mp3"
+    write_mp3(steady)
+    assert ps.mp3_info(steady).bit_rate_kbps == 128

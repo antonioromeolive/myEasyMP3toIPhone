@@ -125,7 +125,26 @@ class ChipBar(QWidget):
             self._buttons.append(button)
         self._buttons[0].setChecked(True)
         self._group.idToggled.connect(self._toggled)
+        # quando un filtro nasconde dei brani lo si dice, con Mostra tutti: senza, una tabella vuota sembra un errore
+        self._note = QLabel()
+        self._note.setObjectName("chipNote")
+        self._reset = QPushButton("Mostra tutti")
+        self._reset.setToolTip("Torna al filtro Tutti")
+        self._reset.clicked.connect(lambda: self.setCurrentIndex(0))
+        layout.addWidget(self._note)
+        layout.addWidget(self._reset)
+        self._note.setVisible(False)
+        self._reset.setVisible(False)
         self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
+
+    def set_shown(self, shown: int, total: int) -> None:
+        """Quanti brani si vedono con il filtro scelto, su quanti si vedrebbero con Tutti (stessa ricerca, stesso
+        artista o album): se il filtro ne nasconde, la nota e Mostra tutti."""
+        hidden = self.currentIndex() > 0 and shown < total
+        if hidden:
+            self._note.setText(f"Filtro «{tr(self._texts[self.currentIndex()])}»: si vedono {shown} di {total} brani")
+        self._note.setVisible(hidden)
+        self._reset.setVisible(hidden)
 
     def _toggled(self, index: int, checked: bool) -> None:
         if checked:
@@ -151,9 +170,17 @@ class ChipBar(QWidget):
         result = self._texts.index(text) if text in self._texts else -1
         return result
 
-    def set_counts(self, counts: list) -> None:
-        """Il numero accanto a ogni filtro (None: senza numero); un filtro con 0 è più tenue."""
+    def set_counts(self, counts: list) -> bool:
+        """Il numero accanto a ogni filtro (None: senza numero); un filtro con 0 è più tenue. Il filtro scelto che
+        arriva a 0 (per esempio "In attesa" dopo Applica) torna da solo su Tutti, senza segnale: restituisce True e
+        chi chiama rifà il filtro."""
         self._counts = list(counts)
+        current = self.currentIndex()
+        reset = 0 < current < len(self._counts) and self._counts[current] == 0
+        if reset:
+            self._group.blockSignals(True)
+            self._buttons[0].setChecked(True)
+            self._group.blockSignals(False)
         for index, button in enumerate(self._buttons):
             count = self._counts[index] if index < len(self._counts) else None
             label = tr(self._texts[index])
@@ -162,6 +189,7 @@ class ChipBar(QWidget):
             button.style().unpolish(button)
             button.style().polish(button)
         self.updateGeometry()
+        return reset
 
     def set_tips(self, tips: list) -> None:
         for button, tip in zip(self._buttons, tips):

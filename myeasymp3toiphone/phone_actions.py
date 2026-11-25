@@ -291,7 +291,9 @@ async def _send_batches(pending: list, progress: Optional[ProgressFn], cancel, r
                     uploads.append(phone_sync.Upload(pid, copy, snapshot.destination(pid, audio.extension), cover))
                     included.append(item)
                 except (PhoneSyncError, TagError, OSError) as exc:
-                    report.errors.append((_label(track.tags, track.path.stem), str(exc)))
+                    # il messaggio nomina il file del PC, non la copia temporanea ("0.mp3")
+                    message = str(exc).replace(f"{start + index}{track.path.suffix.lower()}", track.path.name, 1)
+                    report.errors.append((_label(track.tags, track.path.stem), message))
             if operations:
                 if progress is not None:
                     progress(start, len(pending), f"invio all'iPhone di {len(operations)} brani")

@@ -385,8 +385,62 @@ class AudioInfo:
         return result
 
 
+# i bitrate dei frame Layer III, per indice dell'intestazione (0 = "free", 15 = non valido)
+FRAME_KBPS = {1: (0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320),
+              2: (0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160)}
+FRAME_RATES = {3: (44100, 48000, 32000), 2: (22050, 24000, 16000), 0: (11025, 12000, 8000)}   # bit della versione
+
+
+def _id3_end(data: bytes) -> int:
+    """Dove finisce il tag ID3v2 in testa al file (0 senza tag)."""
+    result = 0
+    if data[:3] == b"ID3" and len(data) >= 10:
+        size = (data[6] << 21) | (data[7] << 14) | (data[8] << 7) | data[9]
+        footer = 10 if data[5] & 0x10 else 0
+        result = 10 + size + footer
+    return result
+
+
+def scan_mp3_frames(path: Path):
+    """Conta i frame MPEG Layer III del file: (campioni, kbit/s medi, frequenza) o None se non ne trova. Serve per
+    gli MP3 a bitrate variabile SENZA intestazione Xing/VBRI: mutagen ne stima la durata e il bitrate dal primo
+    frame (a volte molto lontani dal vero); contando i frame la durata è esatta e il bitrate è la media vera."""
+    data = path.read_bytes()
+    end = len(data) - (128 if data[-128:-125] == b"TAG" else 0)
+    offset = _id3_end(data)
+    samples = 0
+    audio_bytes = 0
+    rate = 0
+    while 0 <= offset and offset + 4 <= end:
+        first, second, third = data[offset], data[offset + 1], data[offset + 2]
+        version_bits = (second >> 3) & 3
+        bitrate_index = third >> 4
+        rate_index = (third >> 2) & 3
+        valid = (first == 0xFF and (second & 0xE0) == 0xE0 and version_bits != 1 and ((second >> 1) & 3) == 1
+                 and 0 < bitrate_index < 15 and rate_index < 3)
+        if valid:
+            mpeg1 = version_bits == 3
+            kbps = FRAME_KBPS[1 if mpeg1 else 2][bitrate_index]
+            frame_rate = FRAME_RATES[version_bits][rate_index]
+            padding = (third >> 1) & 1
+            size = (144000 * kbps // frame_rate if mpeg1 else 72000 * kbps // frame_rate) + padding
+            samples += 1152 if mpeg1 else 576
+            audio_bytes += size
+            rate = frame_rate
+            offset += size
+        else:
+            offset = data.find(b"\xff", offset + 1)       # avanti fino alla prossima possibile sincronia
+    if samples and rate:
+        result = (samples, int(round(audio_bytes * 8 * rate / samples / 1000)), rate)
+    else:
+        result = None
+    return result
+
+
 def mp3_info(path: Path) -> AudioInfo:
-    """Formato e durata di un MP3 (MPEG 1, 2 o 2.5, Layer III), come li vuole insert_track."""
+    """Formato e durata di un MP3 (MPEG 1, 2 o 2.5, Layer III), come li vuole insert_track. Bitrate costante: un
+    valore standard. Variabile, anche senza intestazione Xing/VBRI (mutagen dice "non so"): la media, con la durata
+    contata frame per frame (scan_mp3_frames)."""
     from mutagen.mp3 import MP3, BitrateMode
     try:
         info = MP3(str(path)).info
@@ -397,11 +451,13 @@ def mp3_info(path: Path) -> AudioInfo:
     _require(info.sample_rate in MPEG_RATES[version] and info.channels in (1, 2),
              f"{path.name}: frequenza o canali non validi per l'iPhone")
     kbps = int(round(info.bitrate / 1000))
-    if info.bitrate_mode == BitrateMode.CBR or info.bitrate_mode == BitrateMode.UNKNOWN:
-        _require(kbps in MPEG_CBR_KBPS[version], f"{path.name}: bitrate costante non standard ({kbps} kbit/s)")
-    else:
-        _require(8 <= kbps <= 320, f"{path.name}: bitrate medio fuori dai limiti ({kbps} kbit/s)")
     samples = int(round(info.length * info.sample_rate))
+    if info.bitrate_mode == BitrateMode.UNKNOWN:
+        counted = scan_mp3_frames(path)
+        if counted is not None and counted[2] == info.sample_rate:
+            samples, kbps, _rate = counted
+    standard_cbr = info.bitrate_mode == BitrateMode.CBR and kbps in MPEG_CBR_KBPS[version]
+    _require(standard_cbr or 8 <= kbps <= 320, f"{path.name}: bitrate medio fuori dai limiti ({kbps} kbit/s)")
     _require(samples > 0, f"{path.name}: durata nulla")
     result = AudioInfo(MPEG_FORMATS[version], kbps, info.sample_rate, info.channels, samples)
     return result
