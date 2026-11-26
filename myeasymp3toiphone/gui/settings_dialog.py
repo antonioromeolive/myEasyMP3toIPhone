@@ -2,8 +2,9 @@
 # Author: Antonio Romeo (with Claude Code et al.)
 # SPDX-License-Identifier: MIT (see the LICENSE file for the full terms)
 
-"""Le Impostazioni: le cartelle della musica di questo PC (una è la Libreria), l'AI della scansione e i profili AI (come in myCalibreTools: ogni
-chiave o indirizzo accetta $NOME; scritti in chiaro vanno nella Gestione credenziali di Windows)."""
+"""Le Impostazioni: le cartelle della musica di questo PC (una è la Libreria), l'AI della scansione, i profili AI (come in myCalibreTools: ogni
+chiave o indirizzo accetta $NOME; scritti in chiaro vanno nella Gestione credenziali di Windows) e le suonerie (la
+cartella e ffmpeg)."""
 
 from __future__ import annotations
 
@@ -17,7 +18,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout, QWidget,
 )
 
-from .. import environment
+from .. import environment, ringtones
 from ..i18n import DEFAULT_LANGUAGE, LANGUAGES, tr
 from ..ai import AIError, connection_test, make_provider
 from ..config import (
@@ -54,6 +55,7 @@ class SettingsDialog(QDialog):
         tabs.addTab(self._build_general_tab(), "Generale")
         tabs.addTab(self._build_folders_tab(), "Cartelle della musica")
         tabs.addTab(self._build_profiles_tab(), "Profili AI")
+        tabs.addTab(self._build_ringtones_tab(), "Suonerie")
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
@@ -325,6 +327,67 @@ class SettingsDialog(QDialog):
         widget = QWidget()
         widget.setLayout(form)
         return widget
+
+    def _build_ringtones_tab(self) -> QWidget:
+        """La cartella delle suonerie e ffmpeg (che l'utente installa da sé: il programma non lo contiene)."""
+        self.r_folder = QLineEdit(self.settings.ringtone_folder)
+        self.r_folder.setPlaceholderText(tr("non ancora scelta: la chiede la prima suoneria"))
+        self.r_folder.setToolTip("Dove vanno le suonerie create con Crea una suoneria e quelle copiate dall'iPhone. "
+                                 "Se sta dentro una cartella della musica, la scheda PC non la mostra.")
+        folder_button = QPushButton("Sfoglia…")
+        folder_button.clicked.connect(self._choose_ringtone_folder)
+        folder_row = QHBoxLayout()
+        folder_row.addWidget(self.r_folder, 1)
+        folder_row.addWidget(folder_button)
+        self.r_ffmpeg = QLineEdit(self.settings.ffmpeg_path)
+        self.r_ffmpeg.setPlaceholderText(tr("vuoto: ffmpeg del PATH"))
+        self.r_ffmpeg.setToolTip("Il file ffmpeg.exe, o la cartella che lo contiene. Vuoto: quello nel PATH.")
+        self.r_ffmpeg.textChanged.connect(lambda _text: self._show_ffmpeg())
+        ffmpeg_button = QPushButton("Sfoglia…")
+        ffmpeg_button.clicked.connect(self._choose_ffmpeg)
+        ffmpeg_row = QHBoxLayout()
+        ffmpeg_row.addWidget(self.r_ffmpeg, 1)
+        ffmpeg_row.addWidget(ffmpeg_button)
+        self.r_ffmpeg_state = QLabel()
+        self.r_ffmpeg_state.setWordWrap(True)
+        note = QLabel("Crea una suoneria (tasto destro su un brano nella scheda PC o iPhone) usa <b>ffmpeg</b>, che il "
+                      "programma non contiene: installalo tu (per esempio <i>winget install ffmpeg</i>). Le suonerie "
+                      "si vedono e si inviano all'iPhone dalla scheda Suonerie.")
+        note.setWordWrap(True)
+        note.setStyleSheet("color: gray")
+        form = QFormLayout()
+        form.addRow("Cartella delle suonerie", folder_row)
+        form.addRow("ffmpeg", ffmpeg_row)
+        form.addRow("", self.r_ffmpeg_state)
+        form.addRow(note)
+        widget = QWidget()
+        widget.setLayout(form)
+        self._show_ffmpeg()
+        return widget
+
+    def _choose_ringtone_folder(self) -> None:
+        chosen = QFileDialog.getExistingDirectory(self, "La cartella delle suonerie",
+                                                  self.r_folder.text() or self._library)
+        if chosen:
+            self.r_folder.setText(os.path.normpath(chosen))
+
+    def _choose_ffmpeg(self) -> None:
+        chosen, _filter = QFileDialog.getOpenFileName(self, "ffmpeg.exe", self.r_ffmpeg.text(),
+                                                      "ffmpeg (ffmpeg.exe);;Programmi (*.exe)")
+        if chosen:
+            self.r_ffmpeg.setText(os.path.normpath(chosen))
+
+    def _show_ffmpeg(self) -> None:
+        found = ringtones.find_ffmpeg(self.r_ffmpeg.text())
+        if found is not None:
+            self.r_ffmpeg_state.setText(tr(f"✔ trovato: {found}"))
+            self.r_ffmpeg_state.setStyleSheet("color: #2e8b57")
+        elif self.r_ffmpeg.text().strip():
+            self.r_ffmpeg_state.setText(tr("✖ non trovato: scegli il file ffmpeg.exe"))
+            self.r_ffmpeg_state.setStyleSheet("color: #c0392b")
+        else:
+            self.r_ffmpeg_state.setText(tr("✖ ffmpeg non è nel PATH: installalo o scegli il file ffmpeg.exe"))
+            self.r_ffmpeg_state.setStyleSheet("color: #c0392b")
 
     def _fill_scan_profiles(self) -> None:
         chosen = self.g_scan_profile.currentText() or self.settings.scan_profile
@@ -682,6 +745,8 @@ class SettingsDialog(QDialog):
             if entry.strip():
                 various.append(entry.strip())
         self.settings.various_artists = various
+        self.settings.ringtone_folder = self.r_folder.text().strip()
+        self.settings.ffmpeg_path = self.r_ffmpeg.text().strip()
         chosen =self.g_scan_profile.currentText()
         if chosen == tr(NO_AI):
             self.settings.scan_profile = ""

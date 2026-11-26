@@ -24,6 +24,11 @@ L'unica eccezione: **Usa i tag da iPhone a PC** (scheda iPhone) scrive i tag nei
 dice che non si può annullare. Ogni nuova scrittura nei file del PC deve passare da una finestra così: chiara e
 approvata, mai automatica.
 
+Le suonerie hanno la loro cartella (`settings.ringtone_folder`, esclusa dalla scheda PC): **Crea una suoneria** vi
+scrive solo file nuovi (ffmpeg `-n`, `ringtones.unique_target`) e il brano di partenza non cambia; **Rinomina** e
+**Sposta nel cestino** (scheda Suonerie) valgono solo per i `.m4r` di quella cartella (`ringtones.in_folder`), dopo
+una conferma. ffmpeg non si distribuisce: lo installa l'utente.
+
 PC e iPhone non si allineano da soli: cancellare o cambiare sull'iPhone non cambia il PC, cambiare sul PC non cambia
 l'iPhone (niente domande a finestra "aggiorna anche l'altra parte"). La differenza si vede (⟳, nome del file in giallo)
 e il brano resta associato; si allinea solo con un'azione esplicita: Usa i tag da PC a iPhone / da iPhone a PC,
@@ -37,7 +42,9 @@ serie e quella dell'editor si rispegne dopo ogni salvataggio. L'importazione dal
 Copia, Ricopia, Usa i tag da PC a iPhone, Cambia i tag, Elimina (e le spunte della colonna iPhone) mettono una voce in
 `pending.Pending` (per file del PC o per brano dell'iPhone) e partono solo con **Applica**, che mostra
 `apply_dialog.ApplyDialog` (ogni azione si toglie con la ✕). Una nuova azione verso l'iPhone segue la stessa strada:
-mai una scrittura sull'iPhone direttamente da un menu. Restano immediati, con la loro conferma: Copia da iPhone a PC,
+mai una scrittura sull'iPhone direttamente da un menu. Così anche le suonerie: *Invia come suoneria* ed *Elimina
+dall'iPhone* della scheda Suonerie sono voci `RING_SEND` / `RING_DELETE` della stessa coda, e partono con Applica
+(`phone_ringtones.apply_ringtones`: una sessione che chiede solo la classe Ringtone, mai Media). Restano immediati, con la loro conferma: Copia da iPhone a PC,
 Usa i tag da iPhone a PC, le associazioni (solo il registro), Playlist per artista (anteprima e prova). I nomi delle
 azioni dicono il verso a parole ("da PC a iPhone", "da iPhone a PC").
 

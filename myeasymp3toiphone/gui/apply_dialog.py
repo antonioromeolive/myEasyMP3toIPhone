@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: MIT (see the LICENSE file for the full terms)
 
 """Applica: la finestra delle azioni sull'iPhone in attesa, raggruppate per specie (Copia, Ricopia, Usa i tag, Cambia i
-tag, Elimina). La ✕ di una riga, o "Togli il gruppo", toglie le azioni dalla coda subito: non partono, il brano resta
+tag, Elimina, e le suonerie). La ✕ di una riga, o "Togli il gruppo", toglie le azioni dalla coda subito: non partono, il brano resta
 com'è e si possono rimettere dalle schede. "Applica N azioni" fa partire quelle rimaste (jobs)."""
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
 
 from .. import estimate
 from ..i18n import tr
-from ..pending import DELETE, EDIT, REPLACE, SEND, UPDATE
+from ..pending import DELETE, EDIT, REPLACE, RING_ACTIONS, RING_DELETE, RING_SEND, SEND, UPDATE
 
 # (azione, nome del gruppo, cosa fa, la frase della barra "in attesa")
 GROUPS = (
@@ -28,6 +28,10 @@ GROUPS = (
     (EDIT, "Cambia i tag sull'iPhone", "i tag scritti con Cambia i tag nella scheda iPhone",
      "con i tag da cambiare sull'iPhone"),
     (DELETE, "Elimina dall'iPhone", "i file del PC non cambiano", "da eliminare dall'iPhone"),
+    (RING_SEND, "Invia come suoneria (PC → iPhone)", "i .m4r della cartella delle suonerie",
+     "da inviare da PC a iPhone"),
+    (RING_DELETE, "Elimina le suonerie dall'iPhone", "solo quelle messe da un computer; i file del PC non cambiano",
+     "da eliminare dall'iPhone"),
 )
 REMOVE_COLOR = QColor(192, 57, 43)     # la ✕ e "Togli il gruppo"
 MAX_EXPANDED = 300                     # un gruppo più grande si apre chiuso (si apre con la freccia)
@@ -41,6 +45,17 @@ def songs(count: int) -> str:
     return result
 
 
+def ringtones_text(count: int) -> str:
+    result = "1 suoneria" if count == 1 else f"{count} suonerie"
+    return result
+
+
+def counted(action: str, count: int) -> str:
+    """"3 brani" o, per le azioni sulle suonerie, "3 suonerie"."""
+    result = ringtones_text(count) if action in RING_ACTIONS else songs(count)
+    return result
+
+
 def summary(jobs: list) -> str:
     """"4 brani da copiare da PC a iPhone · 1 brano da eliminare dall'iPhone" (vuota senza azioni)."""
     parts = []
@@ -50,7 +65,7 @@ def summary(jobs: list) -> str:
             if job.action == action:
                 count += 1
         if count:
-            parts.append(f"{songs(count)} {tr(phrase)}")
+            parts.append(f"{counted(action, count)} {tr(phrase)}")
     result = " · ".join(parts)
     return result
 
@@ -58,6 +73,17 @@ def summary(jobs: list) -> str:
 def describe(job) -> tuple:
     """(brano, dettaglio) di un'azione: "Artista — Titolo", e l'album o i campi che cambiano."""
     from ..phone_library import COMPARED_FIELDS, changed_fields
+    from ..ringtones import format_ms
+    if job.action == RING_SEND:
+        result = (f"♪ {job.track.name}", f"{format_ms(job.track.duration_ms)} · {job.track.path.name}")
+    elif job.action == RING_DELETE:
+        result = (f"♪ {job.phone.name}", job.phone.file_name)
+    else:
+        result = _describe_track(job, COMPARED_FIELDS, changed_fields)
+    return result
+
+
+def _describe_track(job, compared_fields, changed_fields) -> tuple:
     if job.phone is not None:
         tags = job.phone.tags
         artist = job.phone.display_artist
@@ -68,7 +94,7 @@ def describe(job) -> tuple:
     if job.action == SEND:
         detail = f"{tags.album} · {job.track.path.suffix[1:].upper()}"
     elif job.action in (UPDATE, REPLACE) and job.track is not None:
-        labels = dict(COMPARED_FIELDS)
+        labels = dict(compared_fields)
         fields = []
         for field_name in changed_fields(job.track.tags, tags):
             fields.append(tr(labels.get(field_name, field_name)))

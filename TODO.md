@@ -49,30 +49,32 @@ sono tutti AAC.
 - **Riquadro dei tag tagliato** (scheda iPhone): la casella "Anche sul PC: …" su una riga sola allargava il riquadro;
   corretto (casella corta, spiegazione in una riga che va a capo; lo stesso per "Anche sull'iPhone" nella scheda PC).
 
-## Suonerie verso l'iPhone — per ora non interessa
+## Suonerie (fatto il 26/11/2026)
 
-Oggi un `.m4a` è sempre musica; le suonerie dell'utente stanno in `…\Suonerie` (cartelle escluse). Se servirà:
-le suonerie dell'iPhone sono `.m4r` (AAC, al massimo ~40 s) in `/iTunes_Control/Ringtones`, registrate in
-`/iTunes_Control/iTunes/Ringtones.plist` (come iTunes/Finder, iMazing). Prima provare a mano con pymobiledevice3 (AFC)
-se le versioni recenti di iOS le accettano ancora così; poi un'azione "Invia come suoneria (PC → iPhone)" che va in
-attesa e parte con **Applica**, come tutte le scritture sull'iPhone.
+**Prova a mano sul telefono** (iOS 27.2.1, script nella cartella temporanea della sessione): `Ringtones.plist` via AFC
+non serve più (sull'iPhone era vuoto); le suonerie passano da una sessione ATC della classe **Ringtone** (file delle
+operazioni firmato in `/iTunes_Control/Ringtones/Sync`, ancora in `Ringtones/SyncAnchor.plist`), come go-tunes.
+Inviata "PROVA suoneria" (8 s): compare in Impostazioni → Suoni e suona; poi tolta con `delete_track`: sparita.
+Sull'iPhone restano le due suonerie dell'utente fatte sul telefono (in `/Purchases`) e 3 `.m4r` del 2019 non
+registrati (resti). Un file delle operazioni di un altro programma (22/03/2026, 3 eliminazioni) è stato consumato
+dall'iPhone alla prima richiesta di sincronizzazione; le sue firme sono state tolte (copia nella cartella della
+sessione).
 
-**Crea una suoneria da un brano** (idea dell'utente):
-- **Da dove parte:** tasto destro su un brano nella scheda PC o nella scheda iPhone → *Crea una suoneria…* (dall'iPhone
-  il brano si legge, in sola lettura).
-- **La finestra:** forma d'onda o cursore, inizio e fine (al massimo ~40 s), ascolto del pezzo (QtMultimedia),
-  dissolvenza facoltativa. Il risultato è un `.m4r` (AAC) nuovo nella cartella delle suonerie: il brano non cambia.
-- **Scheda Suonerie** (nuova, accanto a PC e iPhone): le suonerie della **cartella delle suonerie** (quelle create
-  qui e quelle già presenti), e quelle sull'iPhone. Da qui *Invia come suoneria (PC → iPhone)*, in attesa fino ad
-  **Applica**.
-- **Impostazioni → Suonerie:** la cartella delle suonerie (dove si salvano i nuovi `.m4r`) e il **percorso di
-  ffmpeg**, che l'utente installa da sé: **ffmpeg non si distribuisce con il programma**. Senza ffmpeg la voce del
-  menu spiega cosa manca. Una cartella delle suonerie dentro una cartella della musica va esclusa dalla scheda PC.
-- Regole del progetto: nuova impostazione → "Quale valore vince" del README.
+Fatto: *Crea una suoneria…* (schede PC e iPhone; forma d'onda, inizio e fine, dissolvenze, ascolto con ffmpeg +
+winsound invece di QtMultimedia: ~20 MB in meno nella build), scheda **Suonerie** (Invia come suoneria e Elimina
+dall'iPhone in attesa fino ad Applica; Copia da iPhone a PC, Ascolta, Rinomina, Sposta nel cestino), *Impostazioni →
+Suonerie* (cartella, ffmpeg: vuoto = PATH), cartella delle suonerie esclusa dalla scheda PC.
+
+**Da provare con l'iPhone attaccato** (build nuova): invio e eliminazione da Applica, insieme ad azioni sulla musica
+nello stesso Applica; il catalogo `/iTunes_Control/iTunes/Ringtones.plist` che il programma ora scrive (l'iPhone non
+lo legge: serve a riconoscere le suonerie messe da un computer); *Crea una suoneria* da un brano dell'iPhone senza
+sorgente sul PC (si legge dall'iPhone). Da decidere: i 3 `.m4r` resti del 2019 (LXGU, PLGD, SIOL: "04 Time", "06
+Money" e uno senza titolo) si potrebbero togliere via AFC, oggi la scheda li mostra soltanto.
 
 ## `$NOME` in tutti i campi di percorso (Impostazioni)
 
-Il campo del percorso di ffmpeg accetta `$NOME` (una variabile d'ambiente), espanso all'avvio; lo stesso per **tutti** i
+Il campo del percorso di ffmpeg accetta già `$NOME` e `%NOME%` (espansi quando si usa, ma senza un campo che mostri il
+valore espanso, e senza una variabile d'ambiente sua: l'utente ha scelto "vuoto = PATH"); lo stesso per **tutti** i
 percorsi delle Impostazioni: cartelle della musica, Libreria, cartelle escluse, cartella delle suonerie. Oggi
 `config._expanded` espande già `%NOME%`, `$NOME` e `~` per Libreria e cartelle della musica, ma solo se scritti a mano
 in `settings.json`: le Impostazioni le scelgono con la finestra delle cartelle e non lasciano scrivere; le cartelle

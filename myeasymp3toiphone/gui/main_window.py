@@ -34,8 +34,11 @@ from ..phone_library import (
 )
 from ..overlay import TagOverlay, path_key
 from ..pending import (
-    DELETE, EDIT, FILE_PREFIX, REMOVE, REPLACE, SEND, UPDATE, Job, Pending, key_pid, toggled, wanted,
+    DELETE, EDIT, FILE_PREFIX, REMOVE, REPLACE, RING_DELETE, RING_PHONE_PREFIX, RING_PREFIX, RING_SEND, SEND, UPDATE,
+    Job, Pending, key_pid, toggled, wanted,
 )
+from .. import ringtones
+from ..phone_ringtones import ORIGIN_COMPUTER, PhoneRingtone
 from ..tag_cache import TagCache, cached_track
 from ..tags import prepare_copy, protect_folder, read_cover
 from ..version import app_version
@@ -48,6 +51,8 @@ from .browser import LibraryBrowser
 from .compare_tip import comparison_html, show_on_tooltip
 from .file_actions import add_file_entries
 from .iphone_panel import IPhonePanel, show_entries_menu
+from .ringtone_dialog import RingtoneDialog
+from .ringtones_panel import RingtonesPanel
 from .scan_dialog import ScanLauncher
 from .settings_dialog import SettingsDialog
 from .tag_editor import TagEditor
@@ -95,7 +100,8 @@ PC_CHIPS = [
 ]
 PHRASES = {SEND: "da copiare da PC a iPhone", REMOVE: "da eliminare dall'iPhone", DELETE: "da eliminare dall'iPhone",
            UPDATE: "con i tag da portare da PC a iPhone", REPLACE: "da ricopiare da PC a iPhone",
-           EDIT: "con i tag da cambiare sull'iPhone"}
+           EDIT: "con i tag da cambiare sull'iPhone", RING_SEND: "da inviare da PC a iPhone",
+           RING_DELETE: "da eliminare dall'iPhone"}
 
 
 
@@ -179,6 +185,9 @@ class MainWindow(QMainWindow):
         self._tabs.addTab(self._build_library_tab(), "PC")
         self.iphone_panel = IPhonePanel(self)
         self._tabs.addTab(self.iphone_panel, "iPhone")
+        self.ringtones_panel = RingtonesPanel(self)
+        self._tabs.addTab(self.ringtones_panel, "Suonerie")
+        self._tabs.currentChanged.connect(self._tab_changed)
         central = QWidget()
         central_layout = QVBoxLayout(central)
         central_layout.setContentsMargins(6, 6, 6, 0)
@@ -192,6 +201,10 @@ class MainWindow(QMainWindow):
         QTimer.singleShot(0, self._startup)
 
     # ================================================================== costruzione interfaccia
+
+    def _tab_changed(self, _index: int) -> None:
+        if self._tabs.currentWidget() is self.ringtones_panel:
+            self.ringtones_panel.tab_shown()
 
     def _build_toolbar(self) -> None:
         """La barra in alto, a gruppi: la musica (La mia musica, Apri cartella), copiare (Importa, Esporta) e, a
@@ -602,6 +615,7 @@ class MainWindow(QMainWindow):
                 self.open_music()
             else:
                 self._apply_hidden()               # le cartelle escluse, se sono cambiate
+            self.ringtones_panel.refresh_pc()      # la cartella delle suonerie, se è cambiata
 
     def _open_about(self) -> None:
         AboutDialog(self).exec()
@@ -697,14 +711,24 @@ class MainWindow(QMainWindow):
         return result
 
     def without_hidden(self, tracks: list) -> list:
+        """I brani senza quelli delle cartelle nascoste e della cartella delle suonerie (anche se sta dentro una
+        cartella della musica: le suonerie non sono musica)."""
         hidden = []
         for folder in self.app_settings.hidden_folders:
             hidden.append(self._folder_key(folder))
+        ringtone_folder = self.app_settings.ringtone_path()
+        if ringtone_folder is not None:
+            hidden.append(self._folder_key(ringtone_folder))
         result = []
         for track in tracks:
             if not hidden or not self._is_hidden(track.path, hidden):
                 result.append(track)
         return result
+
+    def ringtone_folder_changed(self) -> None:
+        """Scelta un'altra cartella delle suonerie: la scheda PC non la mostra (_apply_hidden), la scheda Suonerie sì."""
+        self._apply_hidden()
+        self.ringtones_panel.refresh_pc()
 
     def _update_hidden_button(self) -> None:
         count = len(self.app_settings.hidden_folders)
@@ -1181,6 +1205,8 @@ class MainWindow(QMainWindow):
             self._fill_table()
         self._update_pending_bar()
         self.iphone_panel.pending_changed()
+        if hasattr(self, "ringtones_panel"):
+            self.ringtones_panel.pending_changed()
 
     def _sent_since(self, key: str, since: str) -> bool:
         """Il file (overlay.path_key) è stato mandato all'iPhone da questo PC dall'ora since in poi: una Ricopia
@@ -1217,7 +1243,14 @@ class MainWindow(QMainWindow):
         for key, entry in self.pending.entries():
             action = entry["action"]
             pid = key_pid(key)
-            if pid is None:
+            if key.startswith(RING_PREFIX):
+                if Path(entry["path"]).is_file() and hasattr(self, "ringtones_panel"):
+                    jobs.append(Job(key, RING_SEND, track=self.ringtones_panel.pc_ringtone(entry["path"])))
+            elif key.startswith(RING_PHONE_PREFIX):
+                ringtone = PhoneRingtone(entry.get("name") or Path(entry["path"]).stem, entry["path"],
+                                         ORIGIN_COMPUTER, entry["pid"])
+                jobs.append(Job(key, RING_DELETE, phone=ringtone))
+            elif pid is None:
                 track = self._by_path.get(key[len(FILE_PREFIX):])
                 if track is not None and not track.error and self._phone_index is not None:
                     status, phone_track, linked = self._device_state(track)
@@ -1492,6 +1525,7 @@ class MainWindow(QMainWindow):
             menu.addSeparator()
             edit = menu.addAction("Cambia i tag…")
             edit.triggered.connect(self._edit_current_track)
+            self.add_ringtone_entry(menu, tracks[0].path, tracks[0].title, len(tracks) == 1)
             menu.addSeparator()
             paths = []
             for track in tracks:
@@ -1508,6 +1542,43 @@ class MainWindow(QMainWindow):
             hide.triggered.connect(lambda: self.hide_folders(distinct))
             menu.setToolTipsVisible(True)
             menu.exec(where)
+
+    def ringtone_entry(self, single: bool) -> tuple:
+        """(testo, attiva, suggerimento) della voce Crea una suoneria: senza ffmpeg dice cosa manca."""
+        if not single:
+            result = ("Crea una suoneria… (scegli un brano solo)", False, "")
+        elif ringtones.find_ffmpeg(self.app_settings.ffmpeg_path) is None:
+            result = ("Crea una suoneria… (manca ffmpeg: Impostazioni → Suonerie)", False, ringtones.FFMPEG_MISSING)
+        else:
+            result = ("Crea una suoneria…", True, "Un pezzo del brano (al massimo 40 s) diventa un .m4r nuovo nella "
+                                                  "cartella delle suonerie: il brano non cambia")
+        return result
+
+    def add_ringtone_entry(self, menu, path, title: str, single: bool, label: str = "") -> None:
+        text, enabled, tip = self.ringtone_entry(single)
+        action = menu.addAction(text)
+        action.setEnabled(enabled)
+        action.setToolTip(tip)
+        action.triggered.connect(lambda: self.create_ringtone(Path(path), title, label))
+
+    def create_ringtone(self, source: Path, title: str, label: str = "", cleanup=None) -> None:
+        """Crea una suoneria dal file source (del PC, o una copia temporanea di un brano dell'iPhone; cleanup() la
+        toglie alla fine): la finestra, poi la scheda Suonerie aggiornata e, se chiesto, l'invio in attesa."""
+        ffmpeg = ringtones.find_ffmpeg(self.app_settings.ffmpeg_path)
+        if ffmpeg is None:
+            QMessageBox.information(self, "Crea una suoneria", ringtones.FFMPEG_MISSING)
+        else:
+            folder = self.ringtones_panel.ensure_folder()
+            if folder is not None:
+                dialog = RingtoneDialog(self, ffmpeg, source, title or source.stem, folder, label or source.name)
+                dialog.exec()
+                if dialog.created is not None:
+                    self.ringtones_panel.refresh_pc()
+                    if dialog.send:
+                        self.ringtones_panel.queue_send([self.ringtones_panel.pc_ringtone(dialog.created)])
+                    self.statusBar().showMessage(f"Suoneria creata: {dialog.created} (scheda Suonerie)", 10000)
+        if cleanup is not None:
+            cleanup()
 
     def selected_tracks(self) -> list:
         """Brani selezionati in tabella; altrimenti quelli dell'artista o dell'album scelti negli elenchi."""

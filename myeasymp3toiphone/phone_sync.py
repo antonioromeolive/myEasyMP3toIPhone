@@ -305,7 +305,13 @@ class AtcSession:
     async def request_sync(self, identity: LibraryIdentity, host_name: str, media_anchor: int) -> Signer:
         """RequestingSync e attesa di ReadyForSync, che deve riportare la stessa ancora Media."""
         check_sync_allowed(self.sync_allowed)
-        await self.send(requesting_sync(identity, host_name, media_anchor))
+        result = await self.request_dataclass_sync(requesting_sync(identity, host_name, media_anchor), "Media",
+                                                   media_anchor)
+        return result
+
+    async def request_dataclass_sync(self, request: dict, dataclass_name: str, anchor: int) -> Signer:
+        """Manda request (RequestingSync) e aspetta ReadyForSync, che deve riportare la stessa ancora per la classe."""
+        await self.send(request)
         signer = None
         frames = 0
         while signer is None and frames < 64:
@@ -315,9 +321,9 @@ class AtcSession:
             if command == "ReadyForSync":
                 params = message.get("Params") or {}
                 anchors = params.get("DataclassAnchors") or {}
-                _require(str(anchors.get("Media")) == str(media_anchor),
-                         f"l'iPhone ha un'ancora diversa da quella del suo database ({anchors.get('Media')} invece di "
-                         f"{media_anchor}): rileggi la musica dell'iPhone e riprova")
+                _require(str(anchors.get(dataclass_name)) == str(anchor),
+                         f"l'iPhone ha un'ancora diversa da quella letta ({anchors.get(dataclass_name)} invece di "
+                         f"{anchor}): rileggi l'iPhone e riprova")
                 reply = (params.get("DeviceInfo") or {}).get("Grappa")
                 _require(isinstance(reply, bytes), "ReadyForSync senza Grappa")
                 signer = Signer(reply)
@@ -735,6 +741,197 @@ async def run_session(lockdown, identity: LibraryIdentity, state: CatalogState, 
             await service.close()
     report.anchor_after = revision
     return report
+
+
+# --------------------------------------------------------------------------- le suonerie (classe Ringtone)
+#
+# Una sessione a parte, che chiede solo la classe Ringtone: la musica (Media) non entra nella sessione. Forma da
+# go-tunes (https://github.com/yinyajiang/go-tunes, licenza MIT, (c) 2026 yajiang) e dalla ricostruzione di rustunes
+# (docs/10 §5.5: i file delle operazioni di Ringtone vanno in iTunes_Control/Ringtones/Sync). Provata il 26/11/2026 su
+# un iPhone con iOS 27.2.1: invio ed eliminazione accettati, la suoneria compare (e sparisce) in Impostazioni → Suoni.
+# L'ancora è quella di iTunes_Control/Ringtones/SyncAnchor.plist, che l'iPhone aggiorna (+1 a ogni sessione).
+
+RINGTONE = "Ringtone"
+RINGTONE_FOLDER = "iTunes_Control/Ringtones"
+RINGTONE_SYNC = RINGTONE_FOLDER + "/Sync"
+RINGTONE_OPERATIONS_PATH = RINGTONE_SYNC + "/Sync_00000000.plist"
+RINGTONE_SIGNATURE_PATH = RINGTONE_OPERATIONS_PATH + ".cig"
+RINGTONE_ANCHOR_PATH = RINGTONE_FOLDER + "/SyncAnchor.plist"
+RINGTONE_AIRLOCK = "Airlock/Ringtone"
+MAX_RINGTONE_MS = 40000        # l'host di Apple rifiuta una suoneria più lunga (rustunes, docs/06)
+
+
+def requesting_ringtone_sync(identity: LibraryIdentity, host_name: str, anchor: int) -> dict:
+    host = {"Grappa": HOST_REQUEST, "Version": HOST_VERSION, "LibraryID": identity.library_id,
+            "SyncHostName": host_name, "SyncedDataclasses": [RINGTONE], "WindowsOSVersion": "10.0",
+            "Type": "iTunes", "Wakeable": 0, "SyncedAssetTypes": [RINGTONE]}
+    result = {"Session": 2, "Command": "RequestingSync",
+              "Params": {"HostInfo": host, "DataclassAnchors": {RINGTONE: str(anchor)},
+                         "Dataclasses": [RINGTONE, "Keybag"]}}
+    return result
+
+
+def finished_ringtone_metadata(new_anchor: int) -> dict:
+    """La fine dei metadati di una sessione Delta delle sole suonerie (Ringtone 1): mai Media, mai un Reset."""
+    result = {"Session": 2, "Command": "FinishedSyncingMetadata",
+              "Params": {"DataclassAnchors": {RINGTONE: str(new_anchor)}, "SyncTypes": {RINGTONE: 1, "Keybag": 1}}}
+    return result
+
+
+def check_ringtone_allowed(params: dict) -> None:
+    _require(isinstance(params, dict), "SyncAllowed senza parametri")
+    _require(params.get("DataProtected") is False, "l'iPhone è bloccato: sbloccalo e riprova")
+    _require(params.get("EducationModeEnabled") is False, "iPhone in modalità educativa")
+    _require(RINGTONE not in (params.get("DisabledAssetTypes") or []), "l'iPhone non accetta suonerie da un computer")
+
+
+def insert_ringtone(pid: int, name: str, total_time_ms: int, guid: str) -> dict:
+    """Una suoneria nuova: il nome che mostra l'iPhone, la durata (al massimo 40 s) e un GUID di 16 cifre esadecimali."""
+    _require(pid != 0, "suoneria senza identificativo")
+    _require(0 < total_time_ms <= MAX_RINGTONE_MS, "una suoneria dura al massimo 40 secondi")
+    _require(len(guid) == 16 and all(char in "0123456789ABCDEF" for char in guid), "GUID della suoneria non valido")
+    title = _text(name, "nome della suoneria")
+    result = {"operation": "insert_track", "pid": _signed(pid),
+              "item": {"title": title, "sort_name": title, "is_ringtone": True, "total_time_ms": int(total_time_ms)},
+              "ringtone_info": {"guid": guid}}
+    return result
+
+
+def delete_ringtone(pid: int, path: str) -> dict:
+    """Toglie una suoneria messa da un computer; path: "/iTunes_Control/Ringtones/ABCD.m4r"."""
+    _require(pid != 0, "suoneria senza identificativo")
+    _require(path.startswith("/" + RINGTONE_FOLDER + "/") and path.lower().endswith(".m4r"),
+             "una suoneria messa da un computer sta in iTunes_Control/Ringtones")
+    result = {"operation": "delete_track", "pid": _signed(pid), "device_path": path, "path": path}
+    return result
+
+
+async def read_ringtone_anchor(afc) -> int:
+    """L'ancora delle suonerie (0 se l'iPhone non ne ha ancora ricevute da un computer)."""
+    result = 0
+    if await afc.exists(RINGTONE_ANCHOR_PATH):
+        try:
+            document = plistlib.loads(await afc.get_file_contents(RINGTONE_ANCHOR_PATH))
+            result = int(str(document.get("syncAnchor", "0")))
+        except Exception as exc:  # noqa: BLE001 - plistlib e int sollevano tipi diversi
+            raise PhoneSyncError("l'ancora delle suonerie dell'iPhone non si legge") from exc
+    return result
+
+
+async def _clear_ringtone_leftovers(afc, anchor: int) -> None:
+    """I resti nella cartella di sincronizzazione delle suonerie: un file delle operazioni con una revisione già
+    passata (l'iPhone l'ha già applicato, o non lo applicherà più) e le firme senza il loro file si tolgono; un file
+    con una revisione più alta dell'ancora è di una sincronizzazione non finita: ci si ferma."""
+    if await afc.exists(RINGTONE_SYNC):
+        names = []
+        for name in await afc.listdir(RINGTONE_SYNC):
+            if name not in (".", ".."):
+                names.append(name)
+        for name in names:
+            path = f"{RINGTONE_SYNC}/{name}"
+            if name.endswith(".plist"):
+                try:
+                    revision = int(plistlib.loads(await afc.get_file_contents(path)).get("revision", 0))
+                except Exception:  # noqa: BLE001 - un file rovinato non sarà mai applicato
+                    revision = 0
+                _require(revision <= anchor, f"nella cartella delle suonerie dell'iPhone c'è {name}: un'altra "
+                                             "sincronizzazione non è finita, niente da fare")
+                await afc.rm(path)
+            elif ".plist.cig" in name:
+                await afc.rm(path)
+
+
+async def run_ringtone_session(lockdown, identity: LibraryIdentity, host_name: str, operations: list,
+                               uploads: list, timestamp) -> SessionReport:
+    """Una sessione Delta delle sole suonerie: file delle operazioni firmato in iTunes_Control/Ringtones/Sync,
+    FinishedSyncingMetadata, l'audio chiesto (Airlock/Ringtone, poi FileComplete), SyncFinished. uploads: Upload con
+    destination "iTunes_Control/Ringtones/ABCD.m4r". Prima di FinishedSyncingMetadata ogni errore lascia l'iPhone
+    com'era."""
+    from pymobiledevice3.services.afc import AfcService
+
+    _require(0 < len(operations) <= MAX_OPERATIONS, "numero di operazioni fuori dai limiti")
+    report = SessionReport(operations=len(operations), uploaded=[], declined=[])
+    by_asset = {}
+    for upload in uploads:
+        _require(upload.destination.startswith(RINGTONE_FOLDER + "/"), "una suoneria va in iTunes_Control/Ringtones")
+        by_asset[str(_signed(upload.pid))] = upload
+    async with AfcService(lockdown) as afc:
+        anchor = await read_ringtone_anchor(afc)
+        report.anchor_before = anchor
+        revision = anchor + 1
+        buffer = io.BytesIO()
+        plistlib.dump({"revision": revision, "timestamp": timestamp, "operations": list(operations)}, buffer,
+                      fmt=plistlib.FMT_BINARY, sort_keys=True)
+        payload = buffer.getvalue()
+        for asset_id, upload in by_asset.items():
+            await _require_absent(afc, upload.destination)
+            await _require_absent(afc, f"{RINGTONE_AIRLOCK}/{asset_id}")
+        await _clear_ringtone_leftovers(afc, anchor)
+        service = await lockdown.start_lockdown_service(ATC_SERVICE)
+        session = AtcSession(service)
+        try:
+            sync_allowed = await session.handshake()
+            check_ringtone_allowed(sync_allowed)
+            signer = await session.request_dataclass_sync(requesting_ringtone_sync(identity, host_name, anchor),
+                                                          RINGTONE, anchor)
+            signature = signer.sign(payload)
+            if not await afc.exists(RINGTONE_SYNC):
+                await afc.makedirs(RINGTONE_SYNC)
+            await afc.set_file_contents(RINGTONE_OPERATIONS_PATH, payload)
+            await afc.set_file_contents(RINGTONE_SIGNATURE_PATH, signature)
+            _require(await afc.get_file_contents(RINGTONE_OPERATIONS_PATH) == payload and
+                     await afc.get_file_contents(RINGTONE_SIGNATURE_PATH) == signature,
+                     "il file delle operazioni riletto dall'iPhone è diverso: non confermo niente")
+            await session.send(finished_ringtone_metadata(revision))
+            finished = False
+            while not finished:
+                message = await session.receive()
+                command = message["Command"]
+                if command == "SyncFinished":
+                    finished = True
+                elif command == "AssetManifest":
+                    await _serve_ringtones(afc, session, message, by_asset, report)
+                elif command in ("Progress", "SyncAllowed", "InstalledAssets", "AssetMetrics"):
+                    pass
+                elif command == "SyncFailed":
+                    raise PhoneSyncError(f"l'iPhone ha interrotto la sincronizzazione delle suonerie (codice "
+                                         f"{(message.get('Params') or {}).get('ErrorCode')})")
+                elif command == "IdleExit":
+                    raise PhoneSyncError("l'iPhone ha chiuso la sincronizzazione per inattività")
+                else:
+                    raise PhoneSyncError(f"messaggio inatteso durante la sincronizzazione: {command}")
+        finally:
+            report.messages = list(session.received)
+            await service.close()
+    report.anchor_after = revision
+    return report
+
+
+async def _serve_ringtones(afc, session: AtcSession, message: dict, by_asset: dict, report: SessionReport) -> None:
+    """L'audio delle suonerie di questa sessione (in Airlock/Ringtone, poi FileComplete); FileError per il resto."""
+    manifest = (message.get("Params") or {}).get("AssetManifest") or {}
+    for dataclass_name, entries in manifest.items():
+        for entry in entries or []:
+            asset_id = str(entry.get("AssetID", ""))
+            upload = by_asset.get(asset_id)
+            if dataclass_name == RINGTONE and upload is not None and asset_id not in report.uploaded:
+                if not await afc.exists(RINGTONE_AIRLOCK):
+                    await afc.makedirs(RINGTONE_AIRLOCK)
+                staged = f"{RINGTONE_AIRLOCK}/{asset_id}.m4r"
+                data = upload.source.read_bytes()
+                await afc.set_file_contents(staged, data)
+                stat = await afc.stat(staged)
+                _require(int(stat.get("st_size", -1)) == len(data), "la suoneria caricata ha una dimensione diversa")
+                await afc.rename(staged, f"{RINGTONE_AIRLOCK}/{asset_id}")
+                await session.send({"Session": 2, "Command": "FileComplete",
+                                    "Params": {"AssetID": asset_id, "AssetPath": upload.destination,
+                                               "Dataclass": RINGTONE}})
+                report.uploaded.append(asset_id)
+            else:
+                await session.send({"Session": 2, "Command": "FileError",
+                                    "Params": {"AssetID": asset_id, "Dataclass": dataclass_name, "ErrorCode": 16,
+                                               "ErrorIsVisible": False}})
+                report.declined.append((asset_id, dataclass_name))
 
 
 async def _serve_manifest(afc, session: AtcSession, message: dict, by_asset: dict, report: SessionReport) -> None:

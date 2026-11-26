@@ -1351,8 +1351,8 @@ CATALOG = {
         "unexpected message in the handshake: {0}",
     "presentazione con l'iPhone incompleta":
         "incomplete handshake with the iPhone",
-    "l'iPhone ha un'ancora diversa da quella del suo database ({0} invece di {1}): rileggi la musica dell'iPhone e riprova":
-        "the iPhone has an anchor different from its database's ({0} instead of {1}): read the iPhone music again and retry",
+    "l'iPhone ha un'ancora diversa da quella letta ({0} invece di {1}): rileggi l'iPhone e riprova":
+        "the iPhone has an anchor different from the one read ({0} instead of {1}): read the iPhone again and retry",
     "ReadyForSync senza Grappa":
         "ReadyForSync without Grappa",
     "l'iPhone ha rifiutato la sincronizzazione (codice {0})":
@@ -2945,4 +2945,274 @@ CATALOG = {
         'Folder name ({0})',
     'Percorso della cartella ({0})':
         'Folder path ({0})',
+    'Invia come suoneria (PC → iPhone)':
+        'Send as ringtone (PC → iPhone)',
+    'i .m4r della cartella delle suonerie':
+        'the .m4r files of the ringtones folder',
+    'da inviare da PC a iPhone':
+        'to send from PC to iPhone',
+    "Elimina le suonerie dall'iPhone":
+        'Delete the ringtones from the iPhone',
+    'solo quelle messe da un computer; i file del PC non cambiano':
+        'only those put there by a computer; the PC files do not change',
+    '1 suoneria':
+        '1 ringtone',
+    '{0} suonerie':
+        '{0} ringtones',
+    'suoneria inviata da PC a iPhone':
+        'ringtone sent from PC to iPhone',
+    'suonerie inviate da PC a iPhone':
+        'ringtones sent from PC to iPhone',
+    "suoneria eliminata dall'iPhone":
+        'ringtone deleted from the iPhone',
+    "suonerie eliminate dall'iPhone":
+        'ringtones deleted from the iPhone',
+    "Connetti l'iPhone: il brano si legge dall'iPhone (sola lettura)":
+        'Connect the iPhone: the track is read from the iPhone (read only)',
+    'non letto':
+        'not read',
+    "Il brano non si legge dall'iPhone: {0}":
+        'The track cannot be read from the iPhone: {0}',
+    "Lettura del brano dall'iPhone":
+        'Reading the track from the iPhone',
+    'Suonerie':
+        'Ringtones',
+    'Crea una suoneria… (scegli un brano solo)':
+        'Create a ringtone… (choose a single track)',
+    'Crea una suoneria… (manca ffmpeg: Impostazioni → Suonerie)':
+        'Create a ringtone… (ffmpeg missing: Settings → Ringtones)',
+    'Crea una suoneria…':
+        'Create a ringtone…',
+    'Un pezzo del brano (al massimo 40 s) diventa un .m4r nuovo nella cartella delle suonerie: il brano non cambia':
+        'A part of the track (40 s at most) becomes a new .m4r in the ringtones folder: the track does not change',
+    'Crea una suoneria':
+        'Create a ringtone',
+    'Suoneria creata: {0} (scheda Suonerie)':
+        'Ringtone created: {0} (Ringtones tab)',
+    'Lettura del brano…':
+        'Reading the track…',
+    'start':
+        'start',
+    'end':
+        'end',
+    'new':
+        'new',
+    "Scegli il pezzo (al massimo {0} secondi): trascina sulla forma d'onda, sposta i bordi o scrivi inizio e fine. Il brano non cambia: la suoneria è un file nuovo nella cartella delle suonerie.":
+        'Choose the part ({0} seconds at most): drag on the waveform, move the edges or type start and end. The track does not change: the ringtone is a new file in the ringtones folder.',
+    "Dissolvenza all'inizio":
+        'Fade in',
+    'Dissolvenza alla fine':
+        'Fade out',
+    "Il nome che vedrai nell'elenco delle suonerie dell'iPhone (e del file sul PC)":
+        'The name you will see in the iPhone ringtone list (and of the file on the PC)',
+    "Mettila anche in attesa per l'iPhone (Invia come suoneria, parte con Applica)":
+        'Also queue it for the iPhone (Send as ringtone, runs with Apply)',
+    'Ascolta il pezzo':
+        'Play the part',
+    "L'ascolto c'è solo su Windows":
+        'Playback is available on Windows only',
+    'Cartella delle suonerie: {0}':
+        'Ringtones folder: {0}',
+    'Inizio':
+        'Start',
+    'Fine':
+        'End',
+    'Nome della suoneria':
+        'Ringtone name',
+    'Crea la suoneria':
+        'Create the ringtone',
+    'Il brano non si legge':
+        'The track cannot be read',
+    'Durata: {0} s (da {1} a {2})':
+        'Length: {0} s (from {1} to {2})',
+    'Scrivi il nome della suoneria.':
+        'Type the name of the ringtone.',
+    'messa da un computer':
+        'put there by a computer',
+    "fatta sull'iPhone":
+        'made on the iPhone',
+    'resto, non attiva':
+        'leftover, not active',
+    "Inviata da un computer: si toglie con Elimina dall'iPhone":
+        'Sent by a computer: remove it with Delete from the iPhone',
+    "Fatta sull'iPhone (GarageBand, app File): un computer non la può togliere, la puoi copiare sul PC":
+        'Made on the iPhone (GarageBand, Files app): a computer cannot remove it, you can copy it to the PC',
+    "Un file rimasto nella cartella delle suonerie dell'iPhone che nessun elenco registra: non è tra le suonerie che l'iPhone mostra. La puoi copiare sul PC":
+        'A file left in the iPhone ringtones folder that no list records: it is not among the ringtones the iPhone shows. You can copy it to the PC',
+    "<b>Le suonerie.</b> A sinistra i file <b>.m4r</b> della cartella delle suonerie del PC: li crei con <b>Crea una suoneria…</b> (tasto destro su un brano nella scheda PC o iPhone) o ce li metti tu. <b>Invia come suoneria (PC → iPhone)</b> li mette in attesa: partono con <b>Applica</b>, come la musica. A destra le suonerie dell'iPhone: <b>Copia da iPhone a PC</b> le salva nella cartella delle suonerie (file nuovi); <b>Elimina dall'iPhone</b> toglie quelle messe da un computer (in attesa fino ad Applica). Sull'iPhone le trovi in Impostazioni → Suoni e feedback aptico → Suoneria, in cima all'elenco.":
+        '<b>Ringtones.</b> On the left the <b>.m4r</b> files of the PC ringtones folder: you create them with <b>Create a ringtone…</b> (right click on a track in the PC or iPhone tab) or put them there yourself. <b>Send as ringtone (PC → iPhone)</b> queues them: they run with <b>Apply</b>, like the music. On the right the iPhone ringtones: <b>Copy from iPhone to PC</b> saves them in the ringtones folder (new files); <b>Delete from the iPhone</b> removes those put there by a computer (queued until Apply). On the iPhone you find them in Settings → Sounds &amp; Haptics → Ringtone, at the top of the list.',
+    'Scegli la cartella…':
+        'Choose the folder…',
+    'La cartella delle suonerie (anche in Impostazioni → Suonerie)':
+        'The ringtones folder (also in Settings → Ringtones)',
+    "Sull'iPhone":
+        'On the iPhone',
+    'Ascolta':
+        'Play',
+    'Rinomina…':
+        'Rename…',
+    'Sposta nel cestino…':
+        'Move to the Recycle Bin…',
+    'Sul PC: la cartella delle suonerie':
+        'On the PC: the ringtones folder',
+    "Leggi le suonerie dell'iPhone":
+        'Read the iPhone ringtones',
+    'Specie':
+        'Kind',
+    "File sull'iPhone":
+        'File on the iPhone',
+    'La cartella delle suonerie':
+        'The ringtones folder',
+    "Scegli prima la cartella delle suonerie: lì vanno le suonerie create e quelle copiate dall'iPhone.":
+        'First choose the ringtones folder: the ringtones you create and those copied from the iPhone go there.',
+    '<i>Cartella delle suonerie non ancora scelta</i>':
+        '<i>Ringtones folder not chosen yet</i>',
+    "<b>{0}</b> (non c'è ancora: si crea con la prima suoneria)":
+        '<b>{0}</b> (it does not exist yet: it is created with the first ringtone)',
+    '＋ in attesa (Applica)':
+        '＋ queued (Apply)',
+    'non si invia: {0}':
+        'cannot be sent: {0}',
+    'troppo lunga (max 40 s)':
+        'too long (max 40 s)',
+    "Connetti l'iPhone per leggerne le suonerie.":
+        'Connect the iPhone to read its ringtones.',
+    "lettura delle suonerie dell'iPhone":
+        'reading the iPhone ringtones',
+    "Suonerie dell'iPhone":
+        'iPhone ringtones',
+    "Suonerie dell'iPhone non ancora lette.":
+        'iPhone ringtones not read yet.',
+    '{0} suonerie su {1}':
+        '{0} ringtones on {1}',
+    'Appena aggiunte: {0} da inviare da PC a iPhone.':
+        'Just added: {0} to send from PC to iPhone.',
+    ' {0} non si possono inviare (non AAC o più lunghe di 40 s).':
+        ' {0} cannot be sent (not AAC or longer than 40 s).',
+    "Appena aggiunte: {0} da eliminare dall'iPhone. I file del PC non cambiano.":
+        'Just added: {0} to delete from the iPhone. The PC files do not change.',
+    'Nessuna suoneria da eliminare: quelle scelte non sono state messe da un computer':
+        'No ringtone to delete: the chosen ones were not put there by a computer',
+    'Rinomina':
+        'Rename',
+    'Il nuovo nome del file {0} (senza .m4r):':
+        'The new name of the file {0} (without .m4r):',
+    'Rinominato in {0}':
+        'Renamed to {0}',
+    'Sposta nel cestino':
+        'Move to the Recycle Bin',
+    'Spostare nel Cestino di Windows {0} file della cartella delle suonerie?':
+        'Move {0} files of the ringtones folder to the Windows Recycle Bin?',
+    "Si recuperano dal Cestino. Sull'iPhone non cambia niente.":
+        'They can be restored from the Recycle Bin. Nothing changes on the iPhone.',
+    "Connetti l'iPhone per copiarne le suonerie sul PC.":
+        'Connect the iPhone to copy its ringtones to the PC.',
+    'Copia delle suonerie da iPhone a PC':
+        'Copying the ringtones from iPhone to PC',
+    'Copiate da iPhone a PC: {0}, nella cartella {1}.':
+        'Copied from iPhone to PC: {0}, in the folder {1}.',
+    'Non copiate:':
+        'Not copied:',
+    'Copia {0} suonerie da iPhone a PC':
+        'Copy {0} ringtones from iPhone to PC',
+    'Copia la suoneria da iPhone a PC':
+        'Copy the ringtone from iPhone to PC',
+    "Elimina dall'iPhone ({0})":
+        'Delete from the iPhone ({0})',
+    "Elimina dall'iPhone: solo quelle messe da un computer":
+        'Delete from the iPhone: only those put there by a computer',
+    'non ancora scelta: la chiede la prima suoneria':
+        'not chosen yet: the first ringtone asks for it',
+    "Dove vanno le suonerie create con Crea una suoneria e quelle copiate dall'iPhone. Se sta dentro una cartella della musica, la scheda PC non la mostra.":
+        'Where the ringtones made with Create a ringtone and those copied from the iPhone go. If it is inside a music folder, the PC tab does not show it.',
+    'vuoto: ffmpeg del PATH':
+        'empty: ffmpeg from the PATH',
+    'Il file ffmpeg.exe, o la cartella che lo contiene. Vuoto: quello nel PATH.':
+        'The ffmpeg.exe file, or the folder containing it. Empty: the one in the PATH.',
+    "Crea una suoneria (tasto destro su un brano nella scheda PC o iPhone) usa <b>ffmpeg</b>, che il programma non contiene: installalo tu (per esempio <i>winget install ffmpeg</i>). Le suonerie si vedono e si inviano all'iPhone dalla scheda Suonerie.":
+        'Create a ringtone (right click on a track in the PC or iPhone tab) uses <b>ffmpeg</b>, which the program does not include: install it yourself (for example <i>winget install ffmpeg</i>). The ringtones are shown and sent to the iPhone from the Ringtones tab.',
+    'Cartella delle suonerie':
+        'Ringtones folder',
+    'ffmpeg':
+        'ffmpeg',
+    'ffmpeg (ffmpeg.exe);;Programmi (*.exe)':
+        'ffmpeg (ffmpeg.exe);;Programs (*.exe)',
+    '✔ trovato: {0}':
+        '✔ found: {0}',
+    '✖ non trovato: scegli il file ffmpeg.exe':
+        '✖ not found: choose the ffmpeg.exe file',
+    '✖ ffmpeg non è nel PATH: installalo o scegli il file ffmpeg.exe':
+        '✖ ffmpeg is not in the PATH: install it or choose the ffmpeg.exe file',
+    'computer':
+        'computer',
+    'iphone':
+        'iphone',
+    'resto':
+        'resto',
+    "il file non c'è più":
+        'the file is no longer there',
+    'il file {0}':
+        'the file {0}',
+    "dura più di 40 secondi: l'iPhone non la accetta":
+        'it lasts more than 40 seconds: the iPhone does not accept it',
+    "l'iPhone non l'ha tolta":
+        'the iPhone did not remove it',
+    "l'iPhone non l'ha ricevuta":
+        'the iPhone did not receive it',
+    "fatta sull'iPhone: un computer non la può togliere":
+        'made on the iPhone: a computer cannot remove it',
+    'suonerie':
+        'ringtones',
+    'Ringtone':
+        'Ringtone',
+    "l'iPhone non accetta suonerie da un computer":
+        'the iPhone does not accept ringtones from a computer',
+    'suoneria senza identificativo':
+        'ringtone without an identifier',
+    'una suoneria dura al massimo 40 secondi':
+        'a ringtone lasts 40 seconds at most',
+    'GUID della suoneria non valido':
+        'invalid ringtone GUID',
+    'nome della suoneria':
+        'ringtone name',
+    'una suoneria messa da un computer sta in iTunes_Control/Ringtones':
+        'a ringtone put there by a computer is in iTunes_Control/Ringtones',
+    "l'ancora delle suonerie dell'iPhone non si legge":
+        'the iPhone ringtone anchor cannot be read',
+    "nella cartella delle suonerie dell'iPhone c'è {0}: un'altra sincronizzazione non è finita, niente da fare":
+        'the iPhone ringtones folder contains {0}: another sync has not finished, nothing done',
+    'una suoneria va in iTunes_Control/Ringtones':
+        'a ringtone goes in iTunes_Control/Ringtones',
+    "l'iPhone ha interrotto la sincronizzazione delle suonerie (codice {0})":
+        'the iPhone interrupted the ringtone sync (code {0})',
+    'la suoneria caricata ha una dimensione diversa':
+        'the uploaded ringtone has a different size',
+    'Per creare una suoneria serve ffmpeg, che il programma non contiene: installalo (per esempio winget install ffmpeg) e, se non è nel PATH, scegli il file ffmpeg.exe in Impostazioni → Suonerie.':
+        'Creating a ringtone needs ffmpeg, which the program does not include: install it (for example winget install ffmpeg) and, if it is not in the PATH, choose the ffmpeg.exe file in Settings → Ringtones.',
+    'ffmpeg non è partito: {0}':
+        'ffmpeg did not start: {0}',
+    'ffmpeg non è riuscito: ':
+        'ffmpeg failed: ',
+    'codice {0}':
+        'code {0}',
+    '{0}: ffmpeg non ha letto audio':
+        '{0}: ffmpeg read no audio',
+    'aac':
+        'aac',
+    'ipod':
+        'ipod',
+    'wav':
+        'wav',
+    'Suoneria':
+        'Ringtone',
+    'Una suoneria dura al massimo {0} secondi.':
+        'A ringtone lasts {0} seconds at most.',
+    'non è AAC':
+        'is not AAC',
+    'non si legge ({0})':
+        'cannot be read ({0})',
+    'Si rinominano solo le suonerie della cartella delle suonerie.':
+        'Only the ringtones of the ringtones folder can be renamed.',
+    "C'è già un file {0}.":
+        'There is already a file {0}.',
 }

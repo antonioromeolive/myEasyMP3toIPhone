@@ -15,6 +15,10 @@ Due specie di voci, salvate nella cartella dati (iphone_in_attesa.json):
   (EDIT, con i valori), Ricopia e Usa i tag scelti nella scheda iPhone (REPLACE, UPDATE, con il file del PC in
   "path"). Valgono anche per un file del PC fuori dalle cartelle aperte.
 
+- per le **suonerie**: Invia come suoneria da PC a iPhone (RING_SEND, chiave "suoneria:" + overlay.path_key del .m4r,
+  con il file in "path") ed Elimina la suoneria dall'iPhone (RING_DELETE, chiave "suoneria_iphone:" + il nome del file
+  sull'iPhone, con "path", "pid" e "name"). Una versione precedente del programma le salta (e salvando le perde).
+
 Un brano ha al massimo un'azione (Cambia i tag a parte): una nuova voce per lo stesso file toglie quella vecchia.
 Dopo ogni lettura dell'iPhone quelle già fatte, o non più possibili, si tolgono da sole (reconcile,
 reconcile_phone). La versione 1 del file (solo voci per file) si legge ancora."""
@@ -38,11 +42,16 @@ UPDATE = "aggiorna"
 REPLACE = "ricopia"
 DELETE = "elimina"
 EDIT = "cambia_tag"
+RING_SEND = "suoneria_invia"
+RING_DELETE = "suoneria_elimina"
 FILE_ACTIONS = (SEND, REMOVE, UPDATE, REPLACE)
 PHONE_ACTIONS = (DELETE, EDIT, UPDATE, REPLACE)
-ACTIONS = (SEND, REMOVE, UPDATE, REPLACE, DELETE, EDIT)
+RING_ACTIONS = (RING_SEND, RING_DELETE)
+ACTIONS = (SEND, REMOVE, UPDATE, REPLACE, DELETE, EDIT, RING_SEND, RING_DELETE)
 FILE_PREFIX = "file:"
 PHONE_PREFIX = "pid:"
+RING_PREFIX = "suoneria:"
+RING_PHONE_PREFIX = "suoneria_iphone:"
 EDIT_FIELDS = ("title", "album", "genre", "year", "track_number", "disc_number", "compilation")
 TIME_FORMAT = "%Y-%m-%d %H:%M:%S"     # "at": quando la voce è entrata in coda (come le date del registro)
 
@@ -167,7 +176,11 @@ class Pending:
             action = entry.get("action")
             good_file = key.startswith(FILE_PREFIX) and action in FILE_ACTIONS
             good_phone = key_pid(key) is not None and action in PHONE_ACTIONS
-            if good_file or good_phone:
+            good_ring = ((key.startswith(RING_PREFIX) and action == RING_SEND) or
+                         (key.startswith(RING_PHONE_PREFIX) and action == RING_DELETE))
+            if good_ring:
+                self._load_ring_entry(key, entry)
+            elif good_file or good_phone:
                 kept = {"action": action}
                 if isinstance(entry.get("path"), str) and entry["path"]:
                     kept["path"] = entry["path"]
@@ -181,6 +194,19 @@ class Pending:
                     kept["values"] = values
                 if action != EDIT or kept.get("values"):
                     self.items[key] = kept
+
+    def _load_ring_entry(self, key: str, entry: dict) -> None:
+        """Una voce delle suonerie: serve il percorso (e per l'eliminazione il pid dell'iPhone)."""
+        path = entry.get("path")
+        pid = entry.get("pid")
+        if isinstance(path, str) and path and (entry["action"] == RING_SEND or isinstance(pid, int)):
+            kept = {"action": entry["action"], "path": path}
+            if entry["action"] == RING_DELETE:
+                kept["pid"] = pid
+                kept["name"] = str(entry.get("name") or "")
+            if isinstance(entry.get("at"), str):
+                kept["at"] = entry["at"]
+            self.items[key] = kept
 
     # ------------------------------------------------------------------ per file del PC
 
@@ -257,6 +283,57 @@ class Pending:
             if path:
                 entry["path"] = str(path)
             self.items[key] = entry
+
+    # ------------------------------------------------------------------ suonerie
+
+    def ringtone_action(self, path) -> str:
+        """L'azione in attesa per un .m4r del PC ("" se non c'è)."""
+        entry = self.items.get(RING_PREFIX + path_key(path))
+        result = entry["action"] if entry is not None else ""
+        return result
+
+    def set_ringtone(self, path, action: str) -> None:
+        """Invia come suoneria (RING_SEND) un .m4r del PC; "" toglie la voce."""
+        key = RING_PREFIX + path_key(path)
+        self.items.pop(key, None)
+        if action:
+            self.items[key] = {"action": action, "path": str(path), "at": _now()}
+
+    def phone_ringtone_action(self, file_name: str) -> str:
+        entry = self.items.get(RING_PHONE_PREFIX + file_name.lower())
+        result = entry["action"] if entry is not None else ""
+        return result
+
+    def set_phone_ringtone(self, ringtone, action: str) -> None:
+        """Elimina dall'iPhone (RING_DELETE) una suoneria messa da un computer (phone_ringtones.PhoneRingtone); ""
+        toglie la voce."""
+        key = RING_PHONE_PREFIX + ringtone.file_name.lower()
+        self.items.pop(key, None)
+        if action:
+            self.items[key] = {"action": action, "path": ringtone.path, "pid": int(ringtone.pid),
+                               "name": ringtone.name, "at": _now()}
+
+    def reconcile_ringtones(self, on_phone, phone_ringtones=None) -> int:
+        """Toglie le azioni sulle suonerie già fatte o non più possibili: un .m4r da inviare che non c'è più o che
+        sull'iPhone c'è già (on_phone(path) -> bool); con l'elenco dell'iPhone (phone_ringtones), una suoneria da
+        togliere che lì non c'è più. Restituisce quante ne ha tolte."""
+        present = None
+        if phone_ringtones is not None:
+            present = set()
+            for ringtone in phone_ringtones:
+                present.add(ringtone.file_name.lower())
+        removed = 0
+        for key in list(self.items):
+            entry = self.items[key]
+            drop = False
+            if key.startswith(RING_PREFIX):
+                drop = not Path(entry["path"]).is_file() or on_phone(Path(entry["path"]))
+            elif key.startswith(RING_PHONE_PREFIX) and present is not None:
+                drop = key[len(RING_PHONE_PREFIX):] not in present
+            if drop:
+                del self.items[key]
+                removed += 1
+        return removed
 
     # ------------------------------------------------------------------ insieme
 

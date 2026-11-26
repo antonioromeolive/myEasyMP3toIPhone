@@ -8,6 +8,7 @@ trovare i problemi della libreria (anche con l'AI) e trasferire la musica da e v
 - [Controlla la musica](#controlla-la-musica)
 - [Verifica album online](#verifica-album-online)
 - [L'iPhone](#liphone)
+- [Le suonerie](#le-suonerie)
 - [L'AI: profili e chiavi](#lai-profili-e-chiavi)
 - [Il file delle variabili (myEasyMP3toIPhone.env)](#il-file-delle-variabili-myeasymp3toiphoneenv)
 - [La cartella dati](#la-cartella-dati)
@@ -38,6 +39,8 @@ Per l'iPhone serve l'app gratuita **Dispositivi Apple** dal Microsoft Store (opp
 > che elenca ogni file e ogni campo che cambia (*Modifica N file*; non si può annullare). In cima, una casella per
 > campo con quanti file cambia: si scrivono solo i campi lasciati accesi (per esempio solo *Artista album*, perché
 > una correzione fatta sul PC in un altro campo non torni al valore vecchio dell'iPhone).
+> Le suonerie hanno la loro cartella: *Crea una suoneria* vi scrive solo file nuovi (il brano non cambia), e i suoi
+> `.m4r` si rinominano o vanno nel Cestino solo dalla scheda Suonerie, dopo una conferma.
 >
 > **PC e iPhone non si allineano da soli.** Cancellare o cambiare un brano sull'iPhone non cambia niente sul PC, e
 > cambiare i tag sul PC non cambia niente sull'iPhone: la differenza si vede (⟳, il nome del file in giallo) e il
@@ -49,8 +52,9 @@ Per l'iPhone serve l'app gratuita **Dispositivi Apple** dal Microsoft Store (opp
 > **Tutto ciò che cambia l'iPhone va in attesa** e parte solo con **Applica** (vedi
 > [Le azioni in attesa](#le-azioni-in-attesa-e-applica)).
 
-Tre linguette: **PC** (i brani delle cartelle aperte), **iPhone** (la musica dell'app *Musica* dell'iPhone, vedi
-[L'iPhone](#liphone)) e **Controlli** (*Controlla la musica* e *Verifica album online*, con i loro risultati: vedi
+Quattro linguette: **PC** (i brani delle cartelle aperte), **iPhone** (la musica dell'app *Musica* dell'iPhone, vedi
+[L'iPhone](#liphone)), **Suonerie** (i `.m4r` del PC e le suonerie dell'iPhone, vedi [Le suonerie](#le-suonerie)) e
+**Controlli** (*Controlla la musica* e *Verifica album online*, con i loro risultati: vedi
 [Controlla la musica](#controlla-la-musica) e [Verifica album online](#verifica-album-online)).
 
 | Pulsante | Cosa fa |
@@ -696,6 +700,43 @@ Il protocollo non è documentato da Apple: il programma segue la ricostruzione d
 gratuita *Dispositivi Apple* (o iTunes, se c'è già). Il vecchio invio tramite iTunes è stato tolto: con un iPhone
 caricato da un altro programma poteva far cancellare la musica del telefono.
 
+## Le suonerie
+
+**Crea una suoneria…** (tasto destro su un brano nella scheda PC o nella scheda iPhone): la forma d'onda del brano, il
+pezzo da usare (al massimo 39,5 secondi: l'iPhone rifiuta le suonerie oltre i 40) da scegliere trascinando o con i
+campi *Inizio* e *Fine*, le dissolvenze facoltative all'inizio e alla fine, **Ascolta il pezzo**. *Crea la suoneria*
+scrive un `.m4r` (AAC) **nuovo** nella **cartella delle suonerie**, con il nome scelto (" (2)" se c'è già): il brano
+non cambia. La casella *Mettila anche in attesa per l'iPhone* (spenta di serie) la mette subito in coda per l'invio. Da
+un brano dell'iPhone si parte dal suo file sul PC, se ha la sorgente; altrimenti lo si legge dall'iPhone (connesso) in
+una cartella temporanea, tolta alla fine.
+
+Serve **ffmpeg**, che il programma **non contiene**: installalo tu (per esempio `winget install ffmpeg`). Senza, la
+voce del menu dice che manca. *Impostazioni → Suonerie* sceglie la cartella delle suonerie e, se ffmpeg non è nel
+`PATH`, il file `ffmpeg.exe`.
+
+La linguetta **Suonerie**:
+
+| Dove | Azione | Quando |
+|---|---|---|
+| Sul PC (la cartella delle suonerie) | **Invia come suoneria (PC → iPhone)** | in attesa, parte con **Applica** |
+| Sul PC | **Ascolta**, **Rinomina…**, **Sposta nel cestino…** | subito, dopo una conferma; solo i `.m4r` della cartella |
+| Sull'iPhone | **Copia da iPhone a PC** | subito: file nuovi nella cartella delle suonerie |
+| Sull'iPhone | **Elimina dall'iPhone** | in attesa, parte con **Applica**; solo le suonerie messe da un computer |
+
+Sull'iPhone le suonerie sono di tre specie: **messe da un computer** (in `/iTunes_Control/Ringtones`, elencate nel
+catalogo che il computer tiene in `/iTunes_Control/iTunes/Ringtones.plist`), **fatte sull'iPhone** (GarageBand, app
+File: in `/Purchases`; si copiano sul PC, non si tolgono) e **resti** (file in `/iTunes_Control/Ringtones` che nessun
+elenco registra: non sono tra le suonerie dell'iPhone). La colonna *Sull'iPhone* (e *Sul PC*) segna ✔ una suoneria
+con lo stesso nome e la stessa durata (entro un secondo) dall'altra parte. Sull'iPhone si trovano in *Impostazioni →
+Suoni e feedback aptico → Suoneria*, in cima all'elenco.
+
+L'invio e l'eliminazione usano lo stesso servizio di sincronizzazione della musica, in una sessione che chiede **solo
+la classe delle suonerie** (Ringtone, mai Media): la musica non entra nella sessione. Il file delle operazioni va in
+`/iTunes_Control/Ringtones/Sync`, firmato come quello della musica; l'ancora è in
+`/iTunes_Control/Ringtones/SyncAnchor.plist`. Forma ricavata da [go-tunes](https://github.com/yinyajiang/go-tunes)
+(licenza MIT) e da rustunes; provata il 26/11/2026 su iOS 27.2.1 (invio ed eliminazione: la suoneria compare e
+sparisce in Impostazioni).
+
 ## L'AI: profili e chiavi
 
 *Impostazioni → Profili AI*, lo stesso meccanismo di myCalibreTools. Tipi: **Ollama**, **Azure OpenAI**, **OpenAI**,
@@ -979,6 +1020,20 @@ Le colonne dei file mostrano sempre il solo nome; il suggerimento delle celle mo
 4. L'AI è quella della scansione (*Impostazioni → Generale → AI della scansione*); senza un profilo la casella è spenta.
 5. Il paese del negozio di Apple Music è quello delle impostazioni internazionali di Windows (`it-IT` → `IT`); se non
    si legge, `US`.
+
+### La cartella delle suonerie
+
+1. *Impostazioni → Suonerie → Cartella delle suonerie* (`ringtone_folder` in `settings.json`; `%NOME%`, `$NOME` e una
+   `~` iniziale si espandono), o *Scegli la cartella…* nella scheda Suonerie. Vale subito. Se sta dentro una cartella
+   della musica, la scheda PC non la mostra (come una cartella nascosta).
+2. Senza: nessuna; la chiedono la prima *Crea una suoneria* e la prima *Copia da iPhone a PC* delle suonerie.
+
+### ffmpeg (Crea una suoneria, Ascolta)
+
+1. *Impostazioni → Suonerie → ffmpeg* (`ffmpeg_path` in `settings.json`): il file `ffmpeg.exe` o la cartella che lo
+   contiene (`%NOME%`, `$NOME` e `~` si espandono). Se lì non c'è, ffmpeg manca (il PATH non si guarda).
+2. Vuoto: `ffmpeg` nel `PATH`.
+3. Senza nessuno dei due: *Crea una suoneria* e *Ascolta* dicono che manca.
 
 ### La cartella aperta all'avvio
 

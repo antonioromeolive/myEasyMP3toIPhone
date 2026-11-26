@@ -543,6 +543,8 @@ class AppSettings:
     hidden_folders: list = field(default_factory=list)   # cartelle nascoste nella scheda PC (con le sottocartelle)
     preferred_folders: list = field(default_factory=list)  # con più copie di un brano, in ordine (library.preference)
     various_artists: list = field(default_factory=list)    # altri nomi che valgono come "AA.VV." (oltre a quelli fissi)
+    ringtone_folder: str = ""       # la cartella delle suonerie (.m4r); "" = non ancora scelta
+    ffmpeg_path: str = ""           # ffmpeg.exe (o la sua cartella) per Crea una suoneria; "" = quello nel PATH
     # le cartelle della musica di ogni computer: {nome del computer: {"folders": [cartelle], "library": cartella}}
     music_folders: dict = field(default_factory=dict)
     extra: dict = field(default_factory=dict)
@@ -563,6 +565,12 @@ class AppSettings:
             result = Path(_expanded(self.library_dir))
         else:
             result = default_library_dir()
+        return result
+
+    def ringtone_path(self) -> Path | None:
+        """La cartella delle suonerie (%NOME%, $NOME e ~ espansi); None se non è stata scelta."""
+        text = _expanded(self.ringtone_folder) if self.ringtone_folder else ""
+        result = Path(text) if text else None
         return result
 
     def music_dirs(self) -> list:

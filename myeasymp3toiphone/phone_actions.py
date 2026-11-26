@@ -54,6 +54,7 @@ class ActionReport:
     sent_tracks: list = field(default_factory=list)    # i brani del PC copiati davvero (library.Track)
     done_sync_ids: list = field(default_factory=list)  # i brani dell'iPhone eliminati o cambiati davvero
     playlists_restored: list = field(default_factory=list)   # playlist rifatte con i brani rimpiazzati (nomi)
+    done_keys: list = field(default_factory=list)   # le chiavi della coda delle azioni fatte (le suonerie)
 
     def add(self, other: "ActionReport") -> None:
         """Somma l'esito di un'altra azione (più azioni in un'operazione sola)."""
@@ -63,6 +64,7 @@ class ActionReport:
         self.sent_tracks += other.sent_tracks
         self.done_sync_ids += other.done_sync_ids
         self.playlists_restored += other.playlists_restored
+        self.done_keys += other.done_keys
         self.cancelled = self.cancelled or other.cancelled
         self.sessions += other.sessions
 

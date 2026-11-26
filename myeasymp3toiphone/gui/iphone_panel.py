@@ -4,6 +4,7 @@ verso il PC (Copia da iPhone a PC, Usa i tag da iPhone a PC) e le associazioni s
 La scrittura sull'iPhone passa per phone_actions (il servizio di sincronizzazione di Apple)."""
 
 import shutil
+import tempfile
 from pathlib import Path
 
 from PySide6.QtCore import QRect, Qt, QTimer
@@ -14,11 +15,11 @@ from PySide6.QtWidgets import (
     QTreeWidgetItem, QVBoxLayout, QWidget,
 )
 
-from .. import adoption, estimate, iphone, phone_actions, provenance
+from .. import adoption, estimate, iphone, phone_actions, phone_ringtones, provenance
 from ..config import config_dir
 from ..i18n import tr
 from ..library import Track, album_folder, album_groups, copy_organized, group_name, scan_folder, short_folder
-from ..pending import DELETE, EDIT, REMOVE, REPLACE, SEND, UPDATE
+from ..pending import DELETE, EDIT, REMOVE, REPLACE, RING_ACTIONS, RING_DELETE, RING_SEND, SEND, UPDATE
 from ..phone_library import (
     DEVICE_ABSENT, DEVICE_SAME, comparison, differences, format_duplicates, pc_matches, playlist_reminder,
     spelling_differences,
@@ -185,10 +186,13 @@ def done_jobs(jobs: list, report) -> list:
         sent.add(id(track))
     changed = set(report.done_sync_ids)
     result = []
+    keys = set(report.done_keys)
     for job in jobs:
         by_track = job.track is not None and id(job.track) in sent
-        by_phone = job.phone is not None and job.phone.sync_id in changed
-        if job.action in (SEND, REPLACE):
+        by_phone = job.phone is not None and getattr(job.phone, "sync_id", 0) in changed
+        if job.action in RING_ACTIONS:
+            done = job.key in keys
+        elif job.action in (SEND, REPLACE):
             done = by_track
         elif job.action == UPDATE:
             done = by_track or by_phone
@@ -204,7 +208,9 @@ DONE_TEXT = ((SEND, "brano copiato da PC a iPhone", "brani copiati da PC a iPhon
              (REPLACE, "brano ricopiato da PC a iPhone", "brani ricopiati da PC a iPhone"),
              (UPDATE, "brano con i tag presi dal PC", "brani con i tag presi dal PC"),
              (EDIT, "brano con i tag cambiati sull'iPhone", "brani con i tag cambiati sull'iPhone"),
-             (DELETE, "brano eliminato dall'iPhone", "brani eliminati dall'iPhone"))
+             (DELETE, "brano eliminato dall'iPhone", "brani eliminati dall'iPhone"),
+             (RING_SEND, "suoneria inviata da PC a iPhone", "suonerie inviate da PC a iPhone"),
+             (RING_DELETE, "suoneria eliminata dall'iPhone", "suonerie eliminate dall'iPhone"))
 
 
 def apply_report_text(report, done: list, total: int) -> str:
@@ -1623,12 +1629,60 @@ class IPhonePanel(QWidget):
                     if slot is not None:
                         action.triggered.connect(slot)
             menu.addSeparator()
+            self._add_ringtone_entry(menu, items)
+            menu.addSeparator()
             sources = QMenu("File della sorgente", menu)
             add_file_entries(sources, self._source_paths(items),
                              lambda text: self._window.statusBar().showMessage(text, 8000))
             menu.addMenu(sources).setEnabled(bool(self._source_paths(items)))
             menu.setToolTipsVisible(True)
             menu.exec(where)
+
+    def _add_ringtone_entry(self, menu, items: list) -> None:
+        """Crea una suoneria da un brano dell'iPhone: dal suo file sul PC (la sorgente) se c'è, altrimenti da una
+        copia letta dall'iPhone (connesso), che si toglie alla fine."""
+        window = self._window
+        text, enabled, tip = window.ringtone_entry(len(items) == 1)
+        source = None
+        if len(items) == 1:
+            link = window.registry.get(items[0].sync_id) if items[0].sync_id else None
+            if link is not None and link.here and Path(link.path).is_file():
+                source = Path(link.path)
+            elif enabled and not (self._connected and not window.runner.is_busy):
+                enabled = False
+                tip = "Connetti l'iPhone: il brano si legge dall'iPhone (sola lettura)"
+        action = menu.addAction(text)
+        action.setEnabled(enabled)
+        action.setToolTip(tip)
+        if len(items) == 1:
+            item = items[0]
+            label = f"{item.display_artist} — {item.tags.title}"
+            if source is not None:
+                action.triggered.connect(lambda: window.create_ringtone(source, item.tags.title, label))
+            else:
+                action.triggered.connect(lambda: self._ringtone_from_phone(item, label))
+
+    def _ringtone_from_phone(self, item, label: str) -> None:
+        """Legge il brano dall'iPhone in una cartella temporanea, poi Crea una suoneria."""
+        folder = Path(tempfile.mkdtemp(prefix="myEasyMP3toIPhone_brano_"))
+
+        def work(progress, cancel):
+            report, downloaded = iphone.download_music([item], folder, progress, cancel)
+            if not downloaded:
+                reason = report.errors[0][1] if report.errors else "non letto"
+                raise iphone.IPhoneError(f"Il brano non si legge dall'iPhone: {reason}")
+            value = downloaded[0][1]
+            return value
+
+        def done(path) -> None:
+            self._window.create_ringtone(Path(path), item.tags.title, label,
+                                         cleanup=lambda: shutil.rmtree(folder, ignore_errors=True))
+
+        def failed(message: str) -> None:
+            shutil.rmtree(folder, ignore_errors=True)
+            QMessageBox.warning(self, "Crea una suoneria", message)
+
+        self._window.runner.run("Lettura del brano dall'iPhone", work, done, failed)
 
     def _refresh_music(self) -> None:
         if not self._connected:
@@ -1873,6 +1927,9 @@ class IPhonePanel(QWidget):
         sizes, spelling_removes = self._spelling_cost(whole)
         for track in sends:
             sizes.append(estimate.file_size(track.path))
+        for job in jobs:
+            if job.action == RING_SEND:
+                sizes.append(estimate.file_size(job.track.path))
         replaced = 0
         for _phone_track, track in replacements:
             sizes.append(estimate.file_size(track.path))
@@ -1934,6 +1991,10 @@ class IPhonePanel(QWidget):
         errore (altrimenti ogni Applica li riproporrebbe). closing: all'uscita dal programma (nessun messaggio se
         tutto riesce); then(), se c'è, alla fine."""
         sends, removes, updates, replaces, edits = self._split_jobs(jobs)
+        ring_jobs = []
+        for job in jobs:
+            if job.action in RING_ACTIONS:
+                ring_jobs.append(job)
         proceed = True
         if sends and not closing:
             proceed, kept = self.check_duplicates(sends)      # Annulla ferma tutto Applica
@@ -1951,7 +2012,7 @@ class IPhonePanel(QWidget):
                 self._window.pending_skipped([job.key for job in dropped])
                 jobs = remaining
             sends = kept
-        anything = bool(sends or removes or updates or replaces or edits)
+        anything = bool(sends or removes or updates or replaces or edits or ring_jobs)
         if proceed and anything and (self._connected or closing):
             self._run_jobs(jobs, sends, removes, updates, replaces, edits, closing, then)
         elif proceed and anything:
@@ -1980,6 +2041,14 @@ class IPhonePanel(QWidget):
                 replace_rest.append((phone_track, track))
         tag_edits, replacements = phone_actions.plan_updates(update_rest)
         replacements = replacements + replace_rest
+        ring_sends = []
+        ring_deletes = []
+        for job in jobs:
+            if job.action == RING_SEND:
+                ring_sends.append(phone_ringtones.RingtoneSend(job.key, job.track.path, job.track.name,
+                                                                job.track.duration_ms))
+            elif job.action == RING_DELETE:
+                ring_deletes.append(phone_ringtones.RingtoneDelete(job.key, job.phone))
         replaced = []
         for phone_track, _track in replacements + whole:
             replaced.append(phone_track)
@@ -2003,6 +2072,8 @@ class IPhonePanel(QWidget):
                 report.add(phone_actions.delete_tracks(removes, progress, config_dir()))
             if (edit_entries or replacements or whole) and not cancel.is_set():
                 report.add(spelling_and_updates(progress, cancel))
+            if (ring_sends or ring_deletes) and not cancel.is_set():
+                report.add(phone_ringtones.apply_ringtones(ring_sends, ring_deletes, progress, cancel))
             return report
 
         outcome = {"done": []}
@@ -2016,6 +2087,8 @@ class IPhonePanel(QWidget):
                 keys.append(job.key)
             self._window.pending_done(keys, len(jobs) - len(keys))
             self._recheck_later(outcome["done"], RECHECK_TRIES)
+            if ring_sends or ring_deletes:
+                QTimer.singleShot(0, self._window.ringtones_panel.after_apply)
 
         self._write("Applica sull'iPhone", "", action, _playlist_note(replaced), after=after, quiet=closing,
                     then=then, describe=lambda report: apply_report_text(report, outcome["done"], len(jobs)))
