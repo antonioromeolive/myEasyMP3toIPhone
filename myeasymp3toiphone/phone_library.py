@@ -61,6 +61,18 @@ WHERE NOT EXISTS (SELECT 1 FROM best_artwork_token b
                         AND COALESCE(b.available_artwork_token, '') != '')
 """
 
+# i brani che stanno nella riga di un album con un altro artista dell'album: l'app Musica mostra l'album con
+# l'artista della riga, il programma con quello del brano. Succede quando l'artista dell'album di un brano è cambiato
+# sul posto: il brano resta nell'album vecchio (26/11/2026: 26 brani in 3 album, uno doppio "AA.VV." / "Artisti Vari"
+# con lo stesso sync_id). Una Ricopia lo rimette nell'album giusto.
+_MISFILED_QUERY = """
+SELECT i.item_pid, aa.album_artist
+FROM item i
+JOIN album a ON a.album_pid = i.album_pid
+LEFT JOIN album_artist aa ON aa.album_artist_pid = a.album_artist_pid
+WHERE a.album_artist_pid IS NOT NULL AND a.album_artist_pid != 0 AND i.album_artist_pid != a.album_artist_pid
+"""
+
 # le playlist normali: non la libreria (nascosta), non le smart (si aggiornano da sole), non le cartelle
 _PLAYLIST_QUERY = """
 SELECT ci.item_pid, c.name, c.sync_id
@@ -125,6 +137,15 @@ class PhoneTrack:
     computer_playlists: tuple = ()   # quelle tra loro messe da un computer: dopo un rimpiazzo si rifanno da sole
     missing_file: bool = False   # "fantasma": nel database dell'app Musica, ma il suo file sull'iPhone non c'è
     album_without_cover: bool = False   # il suo album sull'iPhone non ha l'immagine (_COVERLESS_ALBUM_QUERY)
+    # l'artista dell'album con cui l'app Musica mostra il suo album, quando è diverso da quello del brano
+    # (_MISFILED_QUERY); "" se coincidono
+    album_row_artist: str = ""
+
+    @property
+    def misfiled(self) -> bool:
+        """Sta in un album che l'app Musica mostra con un altro artista dell'album: una Ricopia lo sistema."""
+        result = bool(self.album_row_artist)
+        return result
 
     @property
     def from_computer(self) -> bool:
@@ -196,6 +217,12 @@ def read_music_database(path: Path) -> list:
                         coverless.add(_unsigned(album_sync_id))
             except sqlite3.Error:
                 coverless = set()       # tabella diversa (un altro iOS): nessun album segnato
+            misfiled = {}
+            try:
+                for item_pid, row_artist in connection.execute(_MISFILED_QUERY):
+                    misfiled[int(item_pid)] = _text(row_artist) or "?"
+            except sqlite3.Error:
+                misfiled = {}           # tabella diversa (un altro iOS): nessun brano segnato
         finally:
             connection.close()
     except sqlite3.Error as exc:
@@ -222,7 +249,8 @@ def read_music_database(path: Path) -> list:
                                  album_sync_id=_unsigned(album_sync_id), artist_sync_id=_unsigned(artist_sync_id),
                                  playlists=tuple(playlists.get(int(pid), ())),
                                  computer_playlists=_of_computer(playlists.get(int(pid), ()), from_computer),
-                                 album_without_cover=_unsigned(album_sync_id) in coverless))
+                                 album_without_cover=_unsigned(album_sync_id) in coverless,
+                                 album_row_artist=misfiled.get(int(pid), "")))
     tracks.sort(key=lambda item: (group_name(item.display_artist), group_name(item.tags.album),
                                   item.tags.disc_number or 1, item.tags.track_number or 9999,
                                   group_name(item.tags.title)))
@@ -296,6 +324,7 @@ def save_listing(home: Path, device: str, tracks: list) -> None:
     from_computer = set()
     missing = []
     coverless = []
+    misfiled = {}
     for item in tracks:
         rows.append([item.pid, item.remote_path, item.size, item.length, asdict(item.tags), item.sync_id,
                      item.album_sync_id, item.artist_sync_id])
@@ -306,11 +335,13 @@ def save_listing(home: Path, device: str, tracks: list) -> None:
             missing.append(item.pid)
         if item.album_without_cover:
             coverless.append(item.pid)
-    # playlist, fantasmi e album senza immagine a parte: le righe restano quelle che le versioni precedenti sanno
-    # leggere
+        if item.album_row_artist:
+            misfiled[str(item.pid)] = item.album_row_artist
+    # playlist, fantasmi, album senza immagine e brani nell'album sbagliato a parte: le righe restano quelle che le
+    # versioni precedenti sanno leggere
     data = {"version": LISTING_VERSION, "device": device, "saved_at": time.strftime("%Y-%m-%d %H:%M"),
             "tracks": rows, "playlists": playlists, "computer_playlists": sorted(from_computer),
-            "missing_files": missing, "albums_without_cover": coverless}
+            "missing_files": missing, "albums_without_cover": coverless, "album_row_artists": misfiled}
     home.mkdir(parents=True, exist_ok=True)
     path = home / LISTING_FILE
     temporary = path.with_name(path.name + ".tmp")
@@ -335,6 +366,7 @@ def load_listing(home: Path) -> dict:
             coverless = set()
             for pid in data.get("albums_without_cover") or []:
                 coverless.add(int(pid))
+            misfiled = data.get("album_row_artists") or {}
             for pid, remote, size, length, values, sync_id, album_sync_id, artist_sync_id in data.get("tracks", []):
                 known = {}
                 for name, value in values.items():
@@ -349,7 +381,8 @@ def load_listing(home: Path) -> dict:
                                          playlists=tuple(names),
                                          computer_playlists=_of_computer(names, from_computer),
                                          missing_file=int(pid) in missing,
-                                         album_without_cover=int(pid) in coverless))
+                                         album_without_cover=int(pid) in coverless,
+                                         album_row_artist=str(misfiled.get(str(pid), ""))))
             result = {"device": str(data.get("device", "")), "saved_at": str(data.get("saved_at", "")),
                       "tracks": tracks}
     except (OSError, ValueError, TypeError, AttributeError):

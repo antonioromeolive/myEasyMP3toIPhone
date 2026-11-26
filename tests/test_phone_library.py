@@ -1034,13 +1034,74 @@ def test_albums_without_cover_read_saved_and_planned(tmp_path):
         assert sorted(item.pid for item, _track in pairs) == [1, 2]    # l'album intero (una copertina basta)
         assert no_source == 1 and no_cover == 0
         assert panel._actions.button("cover").isHidden()               # nessun album senza immagine scelto
-        panel._show.setCurrentIndex(panel._show.count() - 1)          # Mostra: album senza immagine
+        from myeasymp3toiphone.gui.iphone_panel import COVERLESS_FILTER
+        panel._show.setCurrentIndex(COVERLESS_FILTER)                  # Mostra: album senza immagine
         assert panel._count.text() == "3 di 3 brani"
         button = panel._actions.button("cover")                        # il pulsante per sistemarli, nella barra
         assert not button.isHidden() and button.isEnabled()
         assert button.text().startswith("Ricopia le copertine da PC a iPhone: 1 album senza immagine; 1 senza")
         button.click()
         assert window.pending.get_phone(1) == "ricopia" and window.pending.get_phone(2) == "ricopia"
+    finally:
+        window._exit_checked = True
+        window.close()
+        app.processEvents()
+
+
+def test_tracks_in_the_wrong_album_read_saved_and_refiled(tmp_path):
+    """Un brano con l'artista dell'album "Artisti vari" che sull'iPhone sta nella riga di un album di "AA.VV.":
+    l'app Musica lo mostra in un altro album. Si legge, si ricorda nell'elenco salvato, si filtra e si rimette a posto
+    con Ricopia anche se i tag coincidono (✔)."""
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtWidgets import QApplication
+    from myeasymp3toiphone import provenance
+    from myeasymp3toiphone.gui.iphone_panel import MISFILED_FILTER
+    from myeasymp3toiphone.gui.main_window import MainWindow
+    path = tmp_path / "MediaLibrary.sqlitedb"
+    connection = _database(path)
+    connection.execute("INSERT INTO album_artist VALUES (2, 'AA.VV.', 7002)")
+    connection.execute("INSERT INTO album VALUES (3, 'Raccolta', 2, 8002)")      # la riga doppia, stesso sync_id
+    _add(connection, 105, "Canzone D", 2, 3, location="MNOP.mp3", album_artist=1)
+    connection.commit()
+    connection.close()
+    tracks = read_music_database(path)
+    rows = {}
+    for item in tracks:
+        rows[item.tags.title] = item.album_row_artist
+    assert rows == {"Canzone A": "", "Canzone B": "", "Canzone C": "", "Canzone D": "AA.VV."}
+    phone_library.save_listing(tmp_path, "iPhone di prova", tracks)
+    again = {}
+    for item in phone_library.load_listing(tmp_path)["tracks"]:
+        again[item.tags.title] = item.album_row_artist
+    assert again == rows
+
+    app = QApplication.instance() or QApplication([])
+    window = MainWindow()
+    try:
+        file = tmp_path / "d.mp3"
+        write_mp3(file)
+        window.tracks = [Track(path=file, tags=TrackTags(title="Uno", artist="Gruppo Finto", album="Disco"))]
+        phone = [_phone(1, "Uno", "Gruppo Finto", "Disco"), _phone(2, "Due", "Gruppo Finto", "Disco")]
+        phone[0].sync_id = 11
+        phone[0].album_row_artist = "AA.VV."              # ✔: stessi tag del PC, ma nell'album sbagliato
+        phone[1].sync_id = 12
+        phone[1].album_row_artist = "AA.VV."              # senza sorgente: non si può
+        registry = provenance.Registry()
+        registry.record(provenance.Link(sync_id=11, pc=provenance.computer_name(), path=str(file)))
+        window.registry = registry
+        window.set_phone_tracks(phone, "iPhone di prova")
+        app.processEvents()
+        panel = window.iphone_panel
+        pairs, blocked = panel.refile_plan(phone)
+        assert [item.pid for item, _track in pairs] == [1] and blocked == 1
+        assert panel._actions.button("refile").isHidden()
+        panel._show.setCurrentIndex(MISFILED_FILTER)
+        assert panel._count.text() == "2 di 2 brani"
+        button = panel._actions.button("refile")
+        assert not button.isHidden() and button.isEnabled()
+        assert button.text() == "Rimetti nell'album giusto (Ricopia da PC a iPhone): 1 brano, 1 album; 1 senza sorgente sul PC"
+        button.click()
+        assert window.pending.get_phone(1) == "ricopia" and window.pending.get_phone(2) == ""
     finally:
         window._exit_checked = True
         window.close()

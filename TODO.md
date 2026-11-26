@@ -35,6 +35,9 @@ sono tutti AAC.
   Musica usa la riga dell'album e ne mostra due. Brani vecchi (pid bassi), origine non chiara. Da fare: un controllo
   (in *Controlla la musica* dell'iPhone) per album con lo stesso `sync_id` in più righe, o con l'artista della riga
   diverso da quello dei suoi brani, che proponga Ricopia di quei brani; provare la Ricopia sui 7.
+  **Fatto** (filtro *Nell'album sbagliato sull'iPhone*, pulsante *Rimetti nell'album giusto*): sui dati veri 26 brani
+  in 3 album. **Da provare sul telefono**: con le due righe che hanno lo stesso `sync_id` non è certo che l'iPhone
+  rimetta i 7 brani nella riga giusta.
 - **L'elenco Compilation dell'app Musica** segue `album.all_compilations`, non la spunta dei brani: *Cambia i tag →
   Compilation* (`update_track`) cambia `item.is_compilation` ma non l'album ("PROVA Album Uno": brani 1, album 0, non
   compare tra le Compilation). Un invio o una Ricopia con Compilation e artista dell'album lo fa ricalcolare

@@ -22,7 +22,7 @@ from .icons import icon
 
 ICON_COLOR = "#2f6fb3"          # le icone dei pulsanti neutri (su quelli verdi e rossi sono bianche)
 # l'icona di ogni azione della barra (le chiavi di ActionBar)
-ACTION_ICONS = {"copy": "plus", "replace": "swap", "cover": "swap", "tags": "tag", "delete": "trash", "edit": "pencil",
+ACTION_ICONS = {"copy": "plus", "replace": "swap", "cover": "swap", "refile": "swap", "tags": "tag", "delete": "trash", "edit": "pencil",
                 "export": "export", "save": "save", "link": "link"}
 
 

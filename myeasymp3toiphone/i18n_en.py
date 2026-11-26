@@ -2617,8 +2617,16 @@ CATALOG = {
         'edit',
     'cover':
         'cover',
+    'refile':
+        'refile',
     'link':
         'link',
+    "Nell'album sbagliato sull'iPhone":
+        'In the wrong album on the iPhone',
+    "Rimetti nell'album giusto (Ricopia da PC a iPhone): {0}, {1} album":
+        'Put back in the right album (Copy again from PC to iPhone): {0}, {1} albums',
+    '\nNell\'app Musica sta in un album di "{0}", non del suo artista dell\'album: il pulsante Rimetti nell\'album giusto, nella barra sopra i brani':
+        '\nIn the Music app it is in an album by "{0}", not by its album artist: the Put back in the right album button, in the bar above the tracks',
     'probable':
         'probable',
     'proposed':

@@ -65,20 +65,22 @@ ORIGIN_ROLE = Qt.UserRole + 7     # l'origine com'è nel codice (il testo della 
 ORIGIN_NO_FILE = "senza file"     # brano "fantasma": il suo file sull'iPhone non c'è
 # il filtro "Mostra": (testo, funzione (origine, stato di Sul PC) -> visibile)
 SHOW_FILTERS = [
-    ("Tutti i brani", lambda origin, pc, proposed, coverless: True),
-    ("Senza sorgente (solo sull'iPhone)", lambda origin, pc, proposed, coverless: origin == ORIGIN_UNKNOWN),
-    ("Con la sorgente su questo PC", lambda origin, pc, proposed, coverless: origin == ORIGIN_HERE),
-    ("Da altri computer", lambda origin, pc, proposed, coverless: origin not in (ORIGIN_HERE, ORIGIN_UNKNOWN, ORIGIN_PHONE, ORIGIN_MISSING,
+    ("Tutti i brani", lambda origin, pc, proposed, coverless, misfiled: True),
+    ("Senza sorgente (solo sull'iPhone)", lambda origin, pc, proposed, coverless, misfiled: origin == ORIGIN_UNKNOWN),
+    ("Con la sorgente su questo PC", lambda origin, pc, proposed, coverless, misfiled: origin == ORIGIN_HERE),
+    ("Da altri computer", lambda origin, pc, proposed, coverless, misfiled: origin not in (ORIGIN_HERE, ORIGIN_UNKNOWN, ORIGIN_PHONE, ORIGIN_MISSING,
                                                             ORIGIN_NO_FILE)),
-    ("File del PC non trovato", lambda origin, pc, proposed, coverless: origin == ORIGIN_MISSING),
-    ("Acquistati o scaricati sul telefono", lambda origin, pc, proposed, coverless: origin == ORIGIN_PHONE),
-    ("Senza file sull'iPhone (fantasmi)", lambda origin, pc, proposed, coverless: origin == ORIGIN_NO_FILE),
-    ("Da rivedere: abbinati solo per i tag (≈)", lambda origin, pc, proposed, coverless: pc == PC_PROBABLE),
-    ("Sorgente con tag diversi (⟳)", lambda origin, pc, proposed, coverless: pc == PC_STALE),
-    ("Con una sorgente proposta (in rosso)", lambda origin, pc, proposed, coverless: bool(proposed)),
-    ("Album senza immagine sull'iPhone", lambda origin, pc, proposed, coverless: coverless),
+    ("File del PC non trovato", lambda origin, pc, proposed, coverless, misfiled: origin == ORIGIN_MISSING),
+    ("Acquistati o scaricati sul telefono", lambda origin, pc, proposed, coverless, misfiled: origin == ORIGIN_PHONE),
+    ("Senza file sull'iPhone (fantasmi)", lambda origin, pc, proposed, coverless, misfiled: origin == ORIGIN_NO_FILE),
+    ("Da rivedere: abbinati solo per i tag (≈)", lambda origin, pc, proposed, coverless, misfiled: pc == PC_PROBABLE),
+    ("Sorgente con tag diversi (⟳)", lambda origin, pc, proposed, coverless, misfiled: pc == PC_STALE),
+    ("Con una sorgente proposta (in rosso)", lambda origin, pc, proposed, coverless, misfiled: bool(proposed)),
+    ("Album senza immagine sull'iPhone", lambda origin, pc, proposed, coverless, misfiled: coverless),
+    ("Nell'album sbagliato sull'iPhone", lambda origin, pc, proposed, coverless, misfiled: misfiled),
 ]
-COVERLESS_FILTER = len(SHOW_FILTERS) - 1     # con questo filtro la barra mostra Ricopia le copertine
+COVERLESS_FILTER = len(SHOW_FILTERS) - 2     # con questo filtro la barra mostra Ricopia le copertine
+MISFILED_FILTER = len(SHOW_FILTERS) - 1      # e con questo Ricopia da PC a iPhone per rimettere i brani a posto
 PC_TIP = {PC_SAME: "Sul PC c'è la sorgente di questo brano, con gli stessi tag",
           PC_STALE: "Sul PC c'è la sorgente di questo brano, ma con tag diversi",
           PC_PROBABLE: "Da rivedere: sul PC c'è un brano con lo stesso titolo, album e artista, ma non è certo che "
@@ -532,7 +534,7 @@ class IPhonePanel(QWidget):
         # la barra delle azioni sopra i brani: le stesse voci del tasto destro, per i brani scelti; Strumenti per le
         # azioni su tutti i brani (Associa, Playlist…)
         self._actions = ActionBar([("save", ""), ("replace", ""), ("tags", ""), ("edit", ""), ("link", ""),
-                                   ("cover", ""), ("delete", "danger")])
+                                   ("cover", ""), ("refile", ""), ("delete", "danger")])
         self._tools = QMenu(self)
         self._tools.aboutToShow.connect(self._fill_tools)
         self._actions.set_menu(self._tools)
@@ -659,6 +661,14 @@ class IPhonePanel(QWidget):
         if coverless:
             note += ("\nSull'iPhone l'album non ha l'immagine: il pulsante Ricopia le copertine da PC a iPhone, nella "
                      "barra sopra i brani")
+        row_artists = set()
+        for item in items:
+            if item.misfiled:
+                row_artists.add(item.album_row_artist)
+        if row_artists:
+            names = ", ".join(sorted(row_artists))
+            note += (f"\nNell'app Musica sta in un album di \"{names}\", non del suo artista dell'album: il pulsante "
+                     "Rimetti nell'album giusto, nella barra sopra i brani")
         result = (cover, note.strip())
         return result
 
@@ -688,6 +698,9 @@ class IPhonePanel(QWidget):
             cover = self._cover_bar_entry(items)
             if cover is not None:                      # senza voce il pulsante si nasconde
                 bar["cover"] = cover
+            refile = self._refile_bar_entry(items)
+            if refile is not None:
+                bar["refile"] = refile
             if not items:
                 who = "Scegli dei brani, o un artista o un album:"
             elif len(items) == 1:
@@ -1048,7 +1061,8 @@ class IPhonePanel(QWidget):
             pid = row.data(COL_TITLE, PID_ROLE)
             item = self._by_pid.get(pid)
             values = (row.data(COL_ORIGIN, ORIGIN_ROLE), row.data(COL_PC, PC_STATE_ROLE),
-                      row.data(COL_SOURCE_FILE, PROPOSED_ROLE), item is not None and item.album_without_cover)
+                      row.data(COL_SOURCE_FILE, PROPOSED_ROLE), item is not None and item.album_without_cover,
+                      item is not None and item.misfiled)
             for position, (_text, rule) in enumerate(SHOW_FILTERS):
                 if rule(*values):
                     counts[position] += 1
@@ -1229,23 +1243,62 @@ class IPhonePanel(QWidget):
         result = (text, bool(pairs), lambda: self._window.queue_pairs(pairs, REPLACE))
         return result
 
+    def _visible_phone_tracks(self) -> list:
+        result = []
+        for index in range(self._music_view.topLevelItemCount()):
+            row = self._music_view.topLevelItem(index)
+            item = self._by_pid.get(row.data(COL_TITLE, PID_ROLE))
+            if item is not None and not row.isHidden():
+                result.append(item)
+        return result
+
     def _cover_bar_entry(self, items: list):
         """Il pulsante Ricopia le copertine nella barra: con il filtro "Album senza immagine sull'iPhone" (per i brani
         scelti o, senza scelta, per tutti quelli che si vedono) o quando tra i brani scelti c'è un album senza
         immagine. None quando non serve (il pulsante si nasconde)."""
-        coverless_filter = self._show.currentIndex() == COVERLESS_FILTER
         targets = list(items)
-        if coverless_filter and not targets:
-            for index in range(self._music_view.topLevelItemCount()):
-                row = self._music_view.topLevelItem(index)
-                item = self._by_pid.get(row.data(COL_TITLE, PID_ROLE))
-                if item is not None and not row.isHidden():
-                    targets.append(item)
+        if self._show.currentIndex() == COVERLESS_FILTER and not targets:
+            targets = self._visible_phone_tracks()
         coverless = False
         for item in targets:
             if item.album_without_cover:
                 coverless = True
         result = self._cover_entry(targets) if coverless else None
+        return result
+
+    def refile_plan(self, items: list) -> tuple:
+        """I brani di items che l'app Musica mostra in un album con un altro artista dell'album (misfiled): (coppie
+        (PhoneTrack, Track) da ricopiare dal PC, quanti non si possono perché senza la sorgente certa). Si ricopiano
+        anche se i tag coincidono (✔): il difetto è nella riga dell'album sull'iPhone, che il confronto non vede."""
+        pairs = []
+        blocked = 0
+        for item in items:
+            if item.misfiled:
+                state, track = self._pc_states.get(item.pid, (PC_NONE, None))
+                if item.from_computer and state in (PC_SAME, PC_STALE) and track is not None:
+                    pairs.append((item, track))
+                else:
+                    blocked += 1
+        result = (pairs, blocked)
+        return result
+
+    def _refile_bar_entry(self, items: list):
+        """Il pulsante Ricopia da PC a iPhone per i brani nell'album sbagliato: con il filtro "Nell'album sbagliato
+        sull'iPhone" (i brani scelti o, senza scelta, quelli che si vedono) o quando tra i brani scelti ce n'è uno.
+        None quando non serve."""
+        targets = list(items)
+        if self._show.currentIndex() == MISFILED_FILTER and not targets:
+            targets = self._visible_phone_tracks()
+        pairs, blocked = self.refile_plan(targets)
+        result = None
+        if pairs or blocked:
+            albums = set()
+            for item, _track in pairs:
+                albums.add(item.album_sync_id)
+            text = f"Rimetti nell'album giusto (Ricopia da PC a iPhone): {songs(len(pairs))}, {len(albums)} album"
+            if blocked:
+                text += f"; {blocked} senza sorgente sul PC"
+            result = (text, bool(pairs), lambda: self._window.queue_pairs(pairs, REPLACE))
         return result
 
     def _service_leftovers(self) -> list:

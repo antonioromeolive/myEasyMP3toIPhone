@@ -537,7 +537,15 @@ artista o un album scelto mostra solo i suoi brani, insieme a *Cerca* e ai filtr
 
 I **filtri a pulsanti** (prima il menu *Mostra*), con quanti brani ha ognuno, filtrano l'elenco per sorgente (per esempio solo i brani *senza sorgente*), e per la colonna *Sul PC*:
 *Da rivedere: abbinati solo per i tag (≈)*, *Sorgente con tag diversi (⟳)* (anche solo la grafia), *Con una
-sorgente proposta (in rosso)* e *Album senza immagine sull'iPhone*.
+sorgente proposta (in rosso)*, *Album senza immagine sull'iPhone* e *Nell'album sbagliato sull'iPhone*. Con
+*Album senza immagine* la barra mostra **Ricopia le copertine da PC a iPhone** (gli album i cui file del PC non hanno
+la copertina non si propongono: la Ricopia non gliela darebbe).
+
+**Nell'album sbagliato.** Sull'iPhone un album è una riga a sé, con il suo nome e il suo artista dell'album, e
+l'app Musica mostra quella. Se l'artista dell'album di un brano è cambiato sul posto, il brano resta nella riga
+vecchia: l'app lo mostra in un album con un altro artista (per esempio due "Raccolta", una di "AA.VV." e una di
+"Artisti Vari"), mentre il programma, che legge i brani, ne vede uno. Il filtro li trova e la barra mostra **Rimetti
+nell'album giusto (Ricopia da PC a iPhone)**: una Ricopia, anche per i brani ✔, in attesa fino ad *Applica*.
 
 **La grafia.** Quando un aggiornamento dal PC (*Ricopia da PC a iPhone*, *Usa i tag da PC a iPhone*, *Ricopia le
 copertine*, tutti con *Applica*) tocca un brano associato che sull'iPhone ha l'album o l'artista
