@@ -3243,4 +3243,74 @@ CATALOG = {
         'Only the ringtones of the ringtones folder can be renamed.',
     "C'è già un file {0}.":
         'There is already a file {0}.',
+    'Doppioni: stessa canzone nello stesso album':
+        'Duplicates: same song in the same album',
+    'Stessa canzone in più album (raccolte)':
+        'Same song in several albums (compilations)',
+    'keep':
+        'keep',
+    'dedupe':
+        'dedupe',
+    '\nDoppione: {0} copie di questa canzone nello stesso album. {1}. Nella barra sopra i brani: Togli le copie in più, o Tieni questa copia':
+        '\nDuplicate: {0} copies of this song in the same album. {1}. In the bar above the tracks: Remove the extra copies, or Keep this copy',
+    '\nLa stessa canzone anche in: ':
+        '\nThe same song also in: ',
+    "Togli le copie in più (Elimina dall'iPhone): {0}; resta la migliore di ogni canzone":
+        'Remove the extra copies (Delete from the iPhone): {0}; the best copy of each song stays',
+    "Tieni questa copia, togli le altre (Elimina dall'iPhone): {0}":
+        'Keep this copy, remove the others (Delete from the iPhone): {0}',
+    "\n\n{0} da copiare ci sono già sull'iPhone nello stesso album: sostituiscono la copia vecchia (prima si copia il nuovo, poi si toglie il vecchio; le playlist messe da un computer si rifanno da sole)":
+        '\n\n{0} to copy are already on the iPhone in the same album: they replace the old copy (first the new one is copied, then the old one is removed; playlists put there by a computer are rebuilt automatically)',
+    '. Si tolgono anche altre {0} dello stesso album':
+        '. Other {0} of the same album are removed too',
+    "\n\n{0} da copiare ci sono già sull'iPhone nello stesso album, acquistati o scaricati sul telefono: un computer non li può togliere, resteranno due copie.":
+        '\n\n{0} to copy are already on the iPhone in the same album, bought or downloaded on the phone: a computer cannot remove them, there will be two copies.',
+    'anno':
+        'year',
+    'numero':
+        'number',
+    '{0} ~{1} kbit/s':
+        '{0} ~{1} kbit/s',
+    "senza file sull'iPhone":
+        'no file on the iPhone',
+    "titolo uguale a quello di altre canzoni dell'album":
+        'same title as other songs of the album',
+    'tag diversi dal file del PC':
+        'tags different from the PC file',
+    "nell'album sbagliato":
+        'in the wrong album',
+    "aggiunte tra graffe nel nome dell'album":
+        'additions in braces in the album name',
+    'senza ':
+        'without ',
+    'album senza immagine':
+        'album without artwork',
+    'tag uguali al file del PC':
+        'tags equal to the PC file',
+    'in {0} playlist':
+        'in {0} playlists',
+    'Da tenere: ':
+        'To keep: ',
+    'tag sbagliati (':
+        'wrong tags (',
+    'qualità più bassa ({0} contro {1})':
+        'lower quality ({0} versus {1})',
+    'tag meno completi (':
+        'less complete tags (',
+    "l'altra copia ha i tag uguali al file del PC":
+        'the other copy has the same tags as the PC file',
+    "l'altra copia è in più playlist":
+        'the other copy is in more playlists',
+    "l'altra copia è stata messa da un computer":
+        'the other copy was put there by a computer',
+    'stessa qualità, file più grande ({0} MB contro {1} MB)':
+        'same quality, larger file ({0} MB versus {1} MB)',
+    'a parità di tutto si preferisce {0} al FLAC':
+        'everything else being equal, {0} is preferred to FLAC',
+    'copia equivalente, se ne tiene una':
+        'equivalent copy, one is kept',
+    '; acquistata o scaricata sul telefono: un computer non la può togliere':
+        '; bought or downloaded on the phone: a computer cannot remove it',
+    'Da togliere: ':
+        'To remove: ',
 }

@@ -46,6 +46,16 @@ sono tutti AAC.
 - Prova 3 del 26/11/2026: "PROVA Raccolta Due" (3 album, uno per cantante) con artista dell'album e Compilation
   cambiati nella scheda PC, *Anche sull'iPhone* → Applica (Usa i tag diventato Ricopia): un album solo. Restano 3 righe
   `album` vuote (una per cantante), invisibili nell'app.
+- **Doppioni sull'iPhone** (26/11/2026, fatto: filtri *Doppioni: stessa canzone nello stesso album* e *Stessa
+  canzone in più album*, pulsanti *Togli le copie in più* e *Tieni questa copia*, `phone_duplicates`). Sull'elenco
+  salvato: 81 canzoni doppie nello stesso album, 82 copie da togliere. Erano nati così: il 24/11 alle 12:11-12:16
+  (versione 0.1.33) lo stesso file mandato due volte, a volte nello stesso secondo (Gazzè *Platinum Collection* CD3,
+  Supertramp *Breakfast in America*); il 25/11 alle 13:45:52 un invio di 17 brani che c'erano già, senza togliere i
+  vecchi (probabilmente una Ricopia rimasta in coda, prima di 8ff0d4b; dal log non si capisce); *The Wall* da due
+  cartelle del PC; FLAC + MP3 dello stesso album (Tina Turner, Guccini, Falco). Da ora un invio di un brano che
+  sull'iPhone c'è già nello stesso album è una Ricopia (`send_plan`). **Da provare sul telefono**: *Togli le copie
+  in più* su tutti, poi Applica; un invio di un album già presente (deve sostituire, non aggiungere). Sui 15 brani di
+  Gazzè CD3 i titoli sull'iPhone sono sbagliati (tutti "Comunque Vada" o "Un uomo diverso"): da sistemare i tag.
 - **Riquadro dei tag tagliato** (scheda iPhone): la casella "Anche sul PC: …" su una riga sola allargava il riquadro;
   corretto (casella corta, spiegazione in una riga che va a capo; lo stesso per "Anche sull'iPhone" nella scheda PC).
 

@@ -5,6 +5,7 @@ La scrittura sull'iPhone passa per phone_actions (il servizio di sincronizzazion
 
 import shutil
 import tempfile
+from dataclasses import dataclass
 from pathlib import Path
 
 from PySide6.QtCore import QRect, Qt, QTimer
@@ -15,7 +16,7 @@ from PySide6.QtWidgets import (
     QTreeWidgetItem, QVBoxLayout, QWidget,
 )
 
-from .. import adoption, estimate, iphone, phone_actions, phone_ringtones, provenance
+from .. import adoption, estimate, iphone, phone_actions, phone_duplicates, phone_ringtones, provenance
 from ..config import config_dir
 from ..i18n import tr
 from ..library import Track, album_folder, album_groups, copy_organized, group_name, scan_folder, short_folder
@@ -64,24 +65,43 @@ ORIGIN_PHONE = "telefono"
 ORIGIN_MISSING = "file non trovato"
 ORIGIN_ROLE = Qt.UserRole + 7     # l'origine com'è nel codice (il testo della cella può essere tradotto)
 ORIGIN_NO_FILE = "senza file"     # brano "fantasma": il suo file sull'iPhone non c'è
-# il filtro "Mostra": (testo, funzione (origine, stato di Sul PC) -> visibile)
+@dataclass(frozen=True)
+class RowFacts:
+    """Quello che i filtri a pulsanti sanno di una riga."""
+    origin: str            # ORIGIN_*
+    pc: str                # PC_*, la colonna Sul PC
+    proposed: bool         # una sorgente proposta (in rosso)
+    coverless: bool        # album senza immagine sull'iPhone
+    misfiled: bool         # nell'album sbagliato sull'iPhone
+    duplicate: bool        # doppione: la stessa canzone nello stesso album
+    other_albums: bool     # la stessa canzone anche in altri album (legittimo)
+
+
+DUPLICATES_TEXT = "Doppioni: stessa canzone nello stesso album"
+OTHER_ALBUMS_TEXT = "Stessa canzone in più album (raccolte)"
+# il filtro "Mostra": (testo, funzione (RowFacts) -> visibile)
 SHOW_FILTERS = [
-    ("Tutti i brani", lambda origin, pc, proposed, coverless, misfiled: True),
-    ("Senza sorgente (solo sull'iPhone)", lambda origin, pc, proposed, coverless, misfiled: origin == ORIGIN_UNKNOWN),
-    ("Con la sorgente su questo PC", lambda origin, pc, proposed, coverless, misfiled: origin == ORIGIN_HERE),
-    ("Da altri computer", lambda origin, pc, proposed, coverless, misfiled: origin not in (ORIGIN_HERE, ORIGIN_UNKNOWN, ORIGIN_PHONE, ORIGIN_MISSING,
-                                                            ORIGIN_NO_FILE)),
-    ("File del PC non trovato", lambda origin, pc, proposed, coverless, misfiled: origin == ORIGIN_MISSING),
-    ("Acquistati o scaricati sul telefono", lambda origin, pc, proposed, coverless, misfiled: origin == ORIGIN_PHONE),
-    ("Senza file sull'iPhone (fantasmi)", lambda origin, pc, proposed, coverless, misfiled: origin == ORIGIN_NO_FILE),
-    ("Da rivedere: abbinati solo per i tag (≈)", lambda origin, pc, proposed, coverless, misfiled: pc == PC_PROBABLE),
-    ("Sorgente con tag diversi (⟳)", lambda origin, pc, proposed, coverless, misfiled: pc == PC_STALE),
-    ("Con una sorgente proposta (in rosso)", lambda origin, pc, proposed, coverless, misfiled: bool(proposed)),
-    ("Album senza immagine sull'iPhone", lambda origin, pc, proposed, coverless, misfiled: coverless),
-    ("Nell'album sbagliato sull'iPhone", lambda origin, pc, proposed, coverless, misfiled: misfiled),
+    ("Tutti i brani", lambda row: True),
+    ("Senza sorgente (solo sull'iPhone)", lambda row: row.origin == ORIGIN_UNKNOWN),
+    ("Con la sorgente su questo PC", lambda row: row.origin == ORIGIN_HERE),
+    ("Da altri computer", lambda row: row.origin not in (ORIGIN_HERE, ORIGIN_UNKNOWN, ORIGIN_PHONE, ORIGIN_MISSING,
+                                                         ORIGIN_NO_FILE)),
+    ("File del PC non trovato", lambda row: row.origin == ORIGIN_MISSING),
+    ("Acquistati o scaricati sul telefono", lambda row: row.origin == ORIGIN_PHONE),
+    ("Senza file sull'iPhone (fantasmi)", lambda row: row.origin == ORIGIN_NO_FILE),
+    ("Da rivedere: abbinati solo per i tag (≈)", lambda row: row.pc == PC_PROBABLE),
+    ("Sorgente con tag diversi (⟳)", lambda row: row.pc == PC_STALE),
+    ("Con una sorgente proposta (in rosso)", lambda row: bool(row.proposed)),
+    ("Album senza immagine sull'iPhone", lambda row: row.coverless),
+    ("Nell'album sbagliato sull'iPhone", lambda row: row.misfiled),
+    (DUPLICATES_TEXT, lambda row: row.duplicate),
+    (OTHER_ALBUMS_TEXT, lambda row: row.other_albums),
 ]
-COVERLESS_FILTER = len(SHOW_FILTERS) - 2     # con questo filtro la barra mostra Ricopia le copertine
-MISFILED_FILTER = len(SHOW_FILTERS) - 1      # e con questo Ricopia da PC a iPhone per rimettere i brani a posto
+_FILTER_TEXTS = [text for text, _rule in SHOW_FILTERS]
+COVERLESS_FILTER = _FILTER_TEXTS.index("Album senza immagine sull'iPhone")   # la barra mostra Ricopia le copertine
+MISFILED_FILTER = _FILTER_TEXTS.index("Nell'album sbagliato sull'iPhone")    # e Rimetti nell'album giusto
+DUPLICATES_FILTER = _FILTER_TEXTS.index(DUPLICATES_TEXT)                     # e Togli le copie in più
+DROP_COLOR = QColor(150, 150, 150)     # con il filtro dei doppioni: le copie da togliere, barrate e grigie
 PC_TIP = {PC_SAME: "Sul PC c'è la sorgente di questo brano, con gli stessi tag",
           PC_STALE: "Sul PC c'è la sorgente di questo brano, ma con tag diversi",
           PC_PROBABLE: "Da rivedere: sul PC c'è un brano con lo stesso titolo, album e artista, ma non è certo che "
@@ -138,7 +158,7 @@ def _pc_value(name: str, value):
 
 # le voci del tasto destro sui brani dell'iPhone, in ordine (None: separatore)
 PHONE_MENU_ORDER = ("save", "show_pc", None, "replace", "tags", "tags_to_pc", "edit", "complete", "cover", None, "link",
-                    "probable", "proposed", "unlink", None, "delete", "note")
+                    "probable", "proposed", "unlink", None, "keep", "dedupe", "delete", "note")
 # i pulsanti della barra delle azioni senza brani scelti
 BAR_LABELS = {"save": "Copia da iPhone a PC…", "replace": "Ricopia da PC a iPhone", "tags": "Usa i tag da PC a iPhone",
               "edit": "Cambia i tag…", "link": "Associa al file sul PC…", "delete": "Elimina dall'iPhone"}
@@ -428,6 +448,8 @@ class IPhonePanel(QWidget):
         self._spelling = {}           # pid -> ["album", "album_artist"]: scritti diversamente dal PC (sorgente certa)
         self._proposed = {}           # pid -> adoption.Proposal: la sorgente proposta, in rosso
         self._cover_known = {}        # sync_id dell'album -> i suoi file del PC hanno la copertina (cover_plan)
+        self._duplicates = phone_duplicates.Duplicates()   # doppioni e stessa canzone in più album (_compare_with_pc)
+        self._marked = set()          # pid delle righe segnate come doppioni (barrate o in grassetto)
         self._tag_shown = None        # cosa mostra il riquadro dei tag: si rifà solo quando cambia
         self._pc_dirty = True
 
@@ -540,7 +562,8 @@ class IPhonePanel(QWidget):
         # la barra delle azioni sopra i brani: le stesse voci del tasto destro, per i brani scelti; Strumenti per le
         # azioni su tutti i brani (Associa, Playlist…)
         self._actions = ActionBar([("save", ""), ("replace", ""), ("tags", ""), ("edit", ""), ("link", ""),
-                                   ("cover", ""), ("refile", ""), ("delete", "danger")])
+                                   ("cover", ""), ("refile", ""), ("dedupe", "danger"), ("keep", "danger"),
+                                   ("delete", "danger")])
         self._tools = QMenu(self)
         self._tools.aboutToShow.connect(self._fill_tools)
         self._actions.set_menu(self._tools)
@@ -675,7 +698,27 @@ class IPhonePanel(QWidget):
             names = ", ".join(sorted(row_artists))
             note += (f"\nNell'app Musica sta in un album di \"{names}\", non del suo artista dell'album: il pulsante "
                      "Rimetti nell'album giusto, nella barra sopra i brani")
+        if len(items) == 1:
+            note += self._duplicate_note(items[0])
         result = (cover, note.strip())
+        return result
+
+    def _duplicate_note(self, item) -> str:
+        """Per il riquadro dei tag: le altre copie della stessa canzone nello stesso album (e quale tenere) o in altri
+        album (legittime)."""
+        result = ""
+        chosen = self._duplicates.set_of.get(item.pid)
+        if chosen is not None:
+            result += (f"\nDoppione: {len(chosen.copies)} copie di questa canzone nello stesso album. "
+                       f"{chosen.reasons.get(item.pid, '')}. Nella barra sopra i brani: Togli le copie in più, o "
+                       "Tieni questa copia")
+        elsewhere = self._duplicates.other_albums.get(item.pid, [])
+        if elsewhere:
+            albums = []
+            for other in elsewhere:
+                if other.tags.album not in albums:
+                    albums.append(other.tags.album)
+            result += "\nLa stessa canzone anche in: " + ", ".join(albums)
         return result
 
     def _bar_items(self) -> list:
@@ -707,6 +750,7 @@ class IPhonePanel(QWidget):
             refile = self._refile_bar_entry(items)
             if refile is not None:
                 bar["refile"] = refile
+            bar.update(self.duplicate_entries(items, visible_too=True))
             if not items:
                 who = "Scegli dei brani, o un artista o un album:"
             elif len(items) == 1:
@@ -815,7 +859,23 @@ class IPhonePanel(QWidget):
         self._proposed = adoption.automatic_proposals(unlinked, self._window.tracks,
                                                       self._window.preferred_order(),
                                                       set(self._window.registry.links_here()))
+        same_tags = {}
+        for item in self._phone_tracks:
+            state = self._pc_states[item.pid][0]
+            if state in (PC_SAME, PC_STALE):
+                same_tags[item.pid] = state == PC_SAME
+        self._duplicates = phone_duplicates.find(self._phone_tracks, self._registry_paths(self._phone_tracks),
+                                                 same_tags)
         self._pc_dirty = False
+
+    def _registry_paths(self, items: list) -> dict:
+        """{pid: il file del PC associato nel registro} (anche di un altro computer): per riconoscere i doppioni."""
+        result = {}
+        for item in items:
+            link = self._window.registry.get(item.sync_id) if item.sync_id else None
+            if link is not None:
+                result[item.pid] = link.path
+        return result
 
     def _pc_state(self, item) -> tuple:
         """(PC_*, Track del PC o None). La sorgente del registro vale anche fuori dalla cartella aperta: il file si
@@ -1066,11 +1126,12 @@ class IPhonePanel(QWidget):
             text = " ".join([row.text(COL_TITLE), row.text(COL_ARTIST), row.text(COL_ALBUM)]).casefold()
             pid = row.data(COL_TITLE, PID_ROLE)
             item = self._by_pid.get(pid)
-            values = (row.data(COL_ORIGIN, ORIGIN_ROLE), row.data(COL_PC, PC_STATE_ROLE),
-                      row.data(COL_SOURCE_FILE, PROPOSED_ROLE), item is not None and item.album_without_cover,
-                      item is not None and item.misfiled)
+            facts = RowFacts(row.data(COL_ORIGIN, ORIGIN_ROLE), row.data(COL_PC, PC_STATE_ROLE),
+                             row.data(COL_SOURCE_FILE, PROPOSED_ROLE), item is not None and item.album_without_cover,
+                             item is not None and item.misfiled, pid in self._duplicates.set_of,
+                             pid in self._duplicates.other_albums)
             for position, (_text, rule) in enumerate(SHOW_FILTERS):
-                if rule(*values):
+                if rule(facts):
                     counts[position] += 1
             matches = True                            # Cerca e gli elenchi Artisti/Album, senza il filtro
             for word in words:
@@ -1080,13 +1141,14 @@ class IPhonePanel(QWidget):
                 matches = self._in_chosen(row.data(COL_TITLE, PID_ROLE), chosen)
             if matches:
                 without_rule += 1
-            visible = matches and SHOW_FILTERS[chosen_rule][1](*values)
+            visible = matches and SHOW_FILTERS[chosen_rule][1](facts)
             row.setHidden(not visible)
             if visible:
                 shown += 1
         if self._show.set_counts(counts):
             self._apply_search()                      # il filtro scelto era rimasto vuoto: di nuovo con Tutti
         else:
+            self._mark_duplicates(self._show.currentIndex() == DUPLICATES_FILTER)
             self._update_bands()
             self._show.set_shown(shown, without_rule)
             total = view.topLevelItemCount()
@@ -1096,6 +1158,35 @@ class IPhonePanel(QWidget):
                 self._count.setText(f"{total} brani")
             self._update_action_bar()
             self._update_tag_panel()     # un brano selezionato ora nascosto non resta nel riquadro dei tag
+
+    def _mark_duplicates(self, on: bool) -> None:
+        """Con il filtro dei doppioni: la copia da tenere in grassetto, quelle da togliere barrate e grigie, il perché
+        nel suggerimento dell'album. Il titolo resta com'è (corsivo blu per le azioni in attesa). Senza il filtro, le
+        righe tornano normali."""
+        view = self._music_view
+        plain_columns = (COL_NUMBER, COL_ARTIST, COL_ALBUM_ARTIST, COL_ALBUM, COL_YEAR, COL_GENRE, COL_LENGTH)
+        marked = set()
+        for index in range(view.topLevelItemCount()):
+            row = view.topLevelItem(index)
+            pid = row.data(COL_TITLE, PID_ROLE)
+            chosen = self._duplicates.set_of.get(pid) if on else None
+            if chosen is not None:
+                keep = chosen.best.pid == pid
+                font = QFont()
+                font.setBold(keep)
+                font.setStrikeOut(not keep)
+                brush = QBrush() if keep else QBrush(DROP_COLOR)
+                for column in plain_columns:
+                    row.setFont(column, font)
+                    row.setForeground(column, brush)
+                row.setToolTip(COL_ALBUM, chosen.reasons.get(pid, ""))
+                marked.add(pid)
+            elif pid in self._marked:
+                for column in plain_columns:
+                    row.setFont(column, QFont())
+                    row.setForeground(column, QBrush())
+                row.setToolTip(COL_ALBUM, "")
+        self._marked = marked
 
     def _update_bands(self) -> None:
         """Le tinte degli album, per le righe che si vedono nell'ordine in cui si vedono."""
@@ -1305,6 +1396,26 @@ class IPhonePanel(QWidget):
             if blocked:
                 text += f"; {blocked} senza sorgente sul PC"
             result = (text, bool(pairs), lambda: self._window.queue_pairs(pairs, REPLACE))
+        return result
+
+    def duplicate_entries(self, items: list, visible_too: bool = False) -> dict:
+        """Le voci per i doppioni: "dedupe" (Togli le copie in più: di ogni canzone toccata dai brani scelti si tiene
+        la copia migliore) e "keep" (Tieni questa copia: un brano scelto, si tolgono le altre copie dello stesso
+        album). visible_too: con il filtro dei doppioni e nessun brano scelto, per tutti quelli che si vedono. Solo
+        le voci che servono; vanno in attesa come Elimina dall'iPhone."""
+        targets = list(items)
+        if visible_too and not targets and self._show.currentIndex() == DUPLICATES_FILTER:
+            targets = self._visible_phone_tracks()
+        result = {}
+        drops = self._duplicates.to_remove(targets)
+        if drops:
+            result["dedupe"] = (f"Togli le copie in più (Elimina dall'iPhone): {songs(len(drops))}; resta la "
+                                "migliore di ogni canzone", True, lambda: self._window.queue_deletes(drops))
+        if len(items) == 1:
+            others = self._duplicates.others_of(items[0])
+            if others:
+                result["keep"] = (f"Tieni questa copia, togli le altre (Elimina dall'iPhone): {songs(len(others))}",
+                                  True, lambda: self._window.queue_deletes(others))
         return result
 
     def _service_leftovers(self) -> list:
@@ -1586,6 +1697,7 @@ class IPhonePanel(QWidget):
                        "Elimina dall'iPhone: nessun brano", bool(writable),
                        lambda: self._window.queue_deletes(writable)),
         }
+        result.update(self.duplicate_entries(items))
         if len(writable) < len(items):
             result["note"] = (f"{songs(len(items) - len(writable))} acquistati o scaricati sul telefono: un computer "
                               "non li può cambiare né togliere", False, None)
@@ -1938,6 +2050,8 @@ class IPhonePanel(QWidget):
             if phone_track.pid not in taken:
                 sizes.append(estimate.file_size(track.path))
                 replaced += 1
+        plan = self.send_plan(jobs)           # i file sono già tra quelli da copiare: si contano le copie vecchie
+        replaced += len(plan.replaces) + len(plan.removes)
         result = estimate.seconds(sizes, removes=len(removes) + replaced + spelling_removes,
                                   edits=len(tag_edits) + len(edits))
         return result
@@ -1946,8 +2060,10 @@ class IPhonePanel(QWidget):
         """Le righe in più della finestra di Applica: gli album da ricopiare interi per la grafia, le playlist da
         sistemare a mano dopo un rimpiazzo."""
         _sends, _removes, updates, replaces, _edits = self._split_jobs(jobs)
+        plan = self.send_plan(jobs)
+        replaces = replaces + plan.replaces
         _rest, whole, blocked = self.split_for_spelling(updates + replaces)
-        text = self._spelling_text(whole, blocked)
+        text = self._spelling_text(whole, blocked) + self._send_plan_text(plan)
         replaced = []
         for phone_track, _track in replaces + whole:
             replaced.append(phone_track)
@@ -1959,6 +2075,36 @@ class IPhonePanel(QWidget):
         if reminder:
             text += ("\n\nI brani da ricopiare sono in playlist fatte sul telefono: il computer non le può cambiare, "
                      "andranno sistemate a mano (alla fine te le ricordo):\n" + reminder)
+        return text
+
+    def send_plan(self, jobs: list):
+        """Copia da PC a iPhone di brani che sull'iPhone ci sono già nello stesso album (o lo stesso file già
+        mandato): sostituiscono la copia vecchia, con una Ricopia, invece di aggiungerne un'altra
+        (phone_duplicates.send_plan). I brani dell'iPhone che hanno già un'azione in coda non si toccano due volte."""
+        sends, removes, updates, replaces, edits = self._split_jobs(jobs)
+        busy = set()
+        for item in removes:
+            busy.add(item.pid)
+        for phone_track, _other in updates + replaces + edits:
+            busy.add(phone_track.pid)
+        result = phone_duplicates.send_plan(sends, self._phone_tracks, self._registry_paths(self._phone_tracks),
+                                            busy)
+        return result
+
+    @staticmethod
+    def _send_plan_text(plan) -> str:
+        """La nota della finestra di Applica per le sostituzioni all'invio."""
+        text = ""
+        if plan.replaces:
+            text += (f"\n\n{songs(len(plan.replaces))} da copiare ci sono già sull'iPhone nello stesso album: "
+                     "sostituiscono la copia vecchia (prima si copia il nuovo, poi si toglie il vecchio; le playlist "
+                     "messe da un computer si rifanno da sole)")
+            if plan.removes:
+                text += f". Si tolgono anche altre {songs(len(plan.removes))} dello stesso album"
+            text += "."
+        if plan.kept_old:
+            text += (f"\n\n{songs(len(plan.kept_old))} da copiare ci sono già sull'iPhone nello stesso album, "
+                     "acquistati o scaricati sul telefono: un computer non li può togliere, resteranno due copie.")
         return text
 
     @staticmethod
@@ -1991,6 +2137,10 @@ class IPhonePanel(QWidget):
         errore (altrimenti ogni Applica li riproporrebbe). closing: all'uscita dal programma (nessun messaggio se
         tutto riesce); then(), se c'è, alla fine."""
         sends, removes, updates, replaces, edits = self._split_jobs(jobs)
+        plan = self.send_plan(jobs)       # già sull'iPhone nello stesso album: si sostituisce, non si aggiunge
+        sends = plan.sends
+        replaces = replaces + plan.replaces
+        removes = removes + plan.removes
         ring_jobs = []
         for job in jobs:
             if job.action in RING_ACTIONS:
@@ -2000,6 +2150,8 @@ class IPhonePanel(QWidget):
             proceed, kept = self.check_duplicates(sends)      # Annulla ferma tutto Applica
             kept_ids = set()
             for track in kept:
+                kept_ids.add(id(track))
+            for _phone_track, track in plan.replaces:          # le sostituzioni restano
                 kept_ids.add(id(track))
             dropped = []
             remaining = []

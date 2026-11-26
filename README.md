@@ -216,7 +216,8 @@ per artista*.
   azioni non sono riuscite e perché. Le azioni riuscite escono subito dalla coda; quelle non riuscite restano in
   attesa per riprovarle. Poi il programma rilegge la musica dell'iPhone; se l'elenco non mostra ancora quello che è
   stato fatto (l'iPhone aggiorna il suo database poco dopo), lo rilegge da solo dopo 5 secondi, al più 3 volte.
-- Prima di copiare, l'avviso per i brani che sull'iPhone ci sono già in un altro formato (vedi sotto).
+- Prima di copiare, l'avviso per i brani che sull'iPhone ci sono già in un altro formato (vedi sotto); un brano che
+  sull'iPhone c'è già nello stesso album sostituisce la copia vecchia invece di aggiungersi (vedi sotto).
 - Un brano ha un'azione sola: una nuova (per esempio *Ricopia* dopo *Usa i tag*) prende il posto della vecchia.
 - Le azioni restano nella cartella dati (`iphone_in_attesa.json`) anche chiudendo il programma; quelle già fatte, o
   non più possibili, si tolgono da sole a ogni lettura dell'iPhone.
@@ -551,9 +552,36 @@ artista o un album scelto mostra solo i suoi brani, insieme a *Cerca* e ai filtr
 
 I **filtri a pulsanti** (prima il menu *Mostra*), con quanti brani ha ognuno, filtrano l'elenco per sorgente (per esempio solo i brani *senza sorgente*), e per la colonna *Sul PC*:
 *Da rivedere: abbinati solo per i tag (≈)*, *Sorgente con tag diversi (⟳)* (anche solo la grafia), *Con una
-sorgente proposta (in rosso)*, *Album senza immagine sull'iPhone* e *Nell'album sbagliato sull'iPhone*. Con
+sorgente proposta (in rosso)*, *Album senza immagine sull'iPhone*, *Nell'album sbagliato sull'iPhone*, *Doppioni:
+stessa canzone nello stesso album* e *Stessa canzone in più album (raccolte)*. Con
 *Album senza immagine* la barra mostra **Ricopia le copertine da PC a iPhone** (gli album i cui file del PC non hanno
 la copertina non si propongono: la Ricopia non gliela darebbe).
+
+**I doppioni.** La stessa canzone (stesso artista e titolo, durata entro 5 secondi) può stare sull'iPhone più volte:
+- **nello stesso album**, anche scritto in un altro modo ("The Wall CD1" e "The Wall (Disc 1)", aggiunte tra
+  graffe come "{…}" che non contano): è un doppione, e se ne tiene una copia sola;
+- **in album diversi** (l'album e una raccolta): è legittimo. Il filtro *Stessa canzone in più album* li mostra e il
+  riquadro dei tag dice in quali altri album c'è, ma il programma non propone di toglierli.
+
+Due brani associati a file diversi della stessa cartella del PC, con la stessa estensione, sono canzoni diverse anche
+con lo stesso titolo: sono tag sbagliati, non doppioni. Il riquadro dei tag lo segnala ("titolo uguale a quello di
+altre canzoni dell'album").
+
+**Quale copia tenere.** Con il filtro *Doppioni*, la copia da tenere è in grassetto e quelle da togliere sono
+barrate e grigie. Il perché è nel suggerimento della colonna Album e nel riquadro dei tag. L'ordine dei criteri:
+1. **i tag giusti**: perde una copia senza file sull'iPhone, con un titolo che nell'album hanno anche altre canzoni,
+   con tag diversi dal file del PC associato (⟳), nell'album sbagliato, o con aggiunte tra graffe nel nome
+   dell'album;
+2. **la qualità**: un FLAC e un MP3 a 320 kbit/s stanno sullo stesso gradino; un MP3 sotto i 320 perde contro il
+   FLAC, e tra due MP3 vince il bitrate più alto (stimato dalla dimensione e dalla durata);
+3. i tag più completi (titolo, artista, album, anno, genere, numero; l'immagine dell'album);
+4. i tag confermati dal PC (✔), poi le playlist (più è meglio), poi una copia messa da un computer, poi **a parità
+   di tutto l'MP3 a 320 kbit/s prima del FLAC**, poi il file più piccolo (entro il 5% sono uguali).
+
+Nella barra (e con il tasto destro): **Togli le copie in più** (per i brani scelti o, senza scelta, per tutti quelli
+che si vedono: di ogni canzone resta la migliore) e **Tieni questa copia, togli le altre**, per scegliere tu quale
+tenere. Tutte e due mettono in attesa *Elimina dall'iPhone*: non parte niente fino ad *Applica*. Una copia acquistata
+o scaricata sul telefono un computer non la può togliere.
 
 **Nell'album sbagliato.** Sull'iPhone un album è una riga a sé, con il suo nome e il suo artista dell'album, e
 l'app Musica mostra quella. Se l'artista dell'album di un brano è cambiato sul posto, il brano resta nella riga
@@ -580,8 +608,19 @@ altri e restano con la grafia dell'iPhone (la finestra lo dice). Il reinvio si f
 i nomi vecchi (allora lo dice). Come *Ricopia*, i brani reinviati perdono gli ascolti e le playlist fatte sul telefono (quelle di un computer si rifanno da sole). Un brano di servizio
 rimasto da un'operazione interrotta si toglie alla successiva.
 
+**Un brano che sull'iPhone c'è già nello stesso album si sostituisce.** Ad *Applica*, un brano da copiare (*Copia da
+PC a iPhone*) che sull'iPhone c'è già nello stesso album (stesso artista e titolo, durata entro 5 secondi, l'album
+anche scritto in un altro modo), oppure lo stesso file del PC già mandato, non si aggiunge: diventa una *Ricopia*
+della copia vecchia, quella in più playlist. Prima si copia il nuovo, poi si toglie il vecchio, così se l'invio non
+riesce la copia vecchia resta; le playlist messe da un computer si rifanno con il brano nuovo. Le altre copie dello
+stesso album si tolgono nella stessa operazione. La finestra di *Applica* lo dice prima. Non si toccano i brani
+dell'iPhone che hanno già un'azione in coda, né quelli acquistati o scaricati sul telefono: un computer non li può
+togliere, e la finestra avvisa che resteranno due copie. Un brano in un altro album (una raccolta) si aggiunge come
+sempre.
+
 **Lo stesso brano in un altro formato.** Ad *Applica*, prima di copiare brani nuovi (*Copia da PC a iPhone*, *Copia
-i brani mancanti degli album*, le spunte) il programma controlla se qualcuno c'è già sull'iPhone in un altro formato (stesso artista,
+i brani mancanti degli album*, le spunte) il programma controlla se qualcuno c'è già sull'iPhone in un altro formato,
+in un altro album (nello stesso album si sostituisce, vedi sopra) (stesso artista,
 stesso titolo, durata uguale entro 2 secondi, estensione diversa: per esempio il FLAC di un brano che sull'iPhone è
 MP3), o se nello stesso invio ci sono due copie in formati diversi. Se sì, un avviso li elenca: **Invia senza
 questi** (scelta predefinita; tra due copie nello stesso invio resta quella della prima cartella preferita; quelli
