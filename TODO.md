@@ -49,6 +49,24 @@ sono tutti AAC.
 - **Riquadro dei tag tagliato** (scheda iPhone): la casella "Anche sul PC: …" su una riga sola allargava il riquadro;
   corretto (casella corta, spiegazione in una riga che va a capo; lo stesso per "Anche sull'iPhone" nella scheda PC).
 
+## Ascolta il brano (richiesta del 26/11/2026)
+
+Il formato del file sotto la copertina è fatto (26/11/2026, al minimo per scelta dell'utente: formato, codec e
+compressione, `tags.audio_format`, letti dal file solo per il brano selezionato, niente cache). Restano possibili:
+lo stesso nella scheda iPhone; un filtro o una colonna dei brani sotto una certa qualità.
+
+1. **Ascolta il brano** come per le suonerie: doppio clic su un brano della tabella (oggi il doppio clic non fa niente)
+   e una voce *Ascolta* nel tasto destro. Serve un controllo visibile per fermarlo: una riga "▶ In ascolto: Artista —
+   Titolo  ■ Ferma" (sotto l'immagine nel riquadro a destra, o nella barra in basso), che resta finché suona; un altro
+   doppio clic cambia brano, *Esc* o ■ lo ferma, si ferma anche chiudendo il programma.
+   - Il lettore delle suonerie (`gui/ringtone_dialog.py`: ffmpeg → WAV temporaneo → `winsound`, senza QtMultimedia)
+     va bene per pochi secondi; per un brano intero il WAV è grande (~40 MB per 4 minuti) e va preparato prima di
+     suonare (attesa), e `winsound` non sa mettere in pausa né andare avanti: solo suonare e fermare. Da valutare:
+     preparare solo i primi 30-60 s (ascolto di prova) o tutto il brano in sottofondo; oppure un lettore che legga
+     direttamente il file (QtMultimedia: +20 MB nella build, il motivo per cui le suonerie non lo usano).
+   - Anche nella scheda iPhone per un brano con la sorgente sul PC (si suona il file del PC); senza sorgente, leggendo
+     il file dall'iPhone come fa *Crea una suoneria*.
+
 ## Suonerie (fatto il 26/11/2026)
 
 **Prova a mano sul telefono** (iOS 27.2.1, script nella cartella temporanea della sessione): `Ringtones.plist` via AFC

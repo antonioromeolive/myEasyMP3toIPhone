@@ -2685,6 +2685,26 @@ CATALOG = {
         "Tracks with pending tag changes (the files don't change)",
     'stray':
         'stray',
+    'costante':
+        'constant',
+    'variabile':
+        'variable',
+    'media':
+        'average',
+    'ALAC':
+        'ALAC',
+    'AAC':
+        'AAC',
+    'WMA Lossless':
+        'WMA Lossless',
+    'Vorbis':
+        'Vorbis',
+    'Opus':
+        'Opus',
+    'non compresso':
+        'uncompressed',
+    'senza perdita':
+        'lossless',
     'Fuori cartella':
         'Outside the folder',
     "Brani di un album che stanno in una cartella diversa da quella con il resto dell'album (CD1, Disc 2… contano come una cartella sola): sull'iPhone finiscono nello stesso album":

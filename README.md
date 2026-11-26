@@ -252,7 +252,8 @@ spunta mette il brano **in attesa**, con un segno diverso da quelli delle cose f
 **Tag.** A destra si modificano titolo, artista, artista album, album, numero di traccia e di disco, anno, genere,
 la spunta **Compilation** e la copertina (MP3, M4A, FLAC, OGG, Opus; copertina per MP3, M4A, FLAC). Con più brani
 selezionati, solo i campi modificati valgono per tutti; la spunta mostra un quadratino pieno a metà quando i brani
-sono diversi.
+sono diversi. Sotto la copertina, in piccolo, formato, codec e compressione del file (*MP3 · 320 kbit/s costante*,
+*FLAC · senza perdita · 917 kbit/s*, *M4A · AAC · 256 kbit/s*, *WAV · non compresso*); con più brani, solo i formati.
 
 **Tutti i tipi di tag**, come TagScanner e Mp3tag. Negli MP3 si leggono **ID3v2** (2.2, 2.3, 2.4), **APEv2** e il
 vecchio **ID3v1**, uniti campo per campo in quest'ordine: un campo vuoto si prende dal tipo seguente (un MP3 con solo

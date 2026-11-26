@@ -109,3 +109,15 @@ def test_old_cache_entries_of_mp3_with_empty_fields_are_read_again(tmp_path):
     cache = tag_cache.TagCache(home)
     assert len(cache) == 2 and "c:/m/vuoto.mp3" not in cache._entries
     assert ID3 is not None
+
+
+def test_audio_format(tmp_path):
+    from conftest import write_flac
+    from myeasymp3toiphone.tags import audio_format
+    write_mp3(tmp_path / "uno.mp3")
+    write_flac(tmp_path / "due.flac")
+    (tmp_path / "rotto.wav").write_bytes(b"non audio")
+    assert audio_format(tmp_path / "uno.mp3") == "MP3 · 128 kbit/s"
+    assert audio_format(tmp_path / "due.flac") == "FLAC · senza perdita"
+    assert audio_format(tmp_path / "rotto.wav") == ""             # non si legge: niente
+    assert audio_format(tmp_path / "manca.mp3") == ""

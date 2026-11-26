@@ -19,6 +19,8 @@ from mutagen.mp4 import MP4, MP4Cover
 from mutagen.oggopus import OggOpus
 from mutagen.oggvorbis import OggVorbis
 
+from .i18n import tr
+
 # tag solo in lettura: non si scrivono (nemmeno sulle copie) e all'iPhone non si inviano
 READ_ONLY_EXTENSIONS = {".wma", ".wav", ".aif", ".aiff"}
 AUDIO_EXTENSIONS = {".mp3", ".m4a", ".flac", ".ogg", ".opus"} | READ_ONLY_EXTENSIONS
@@ -463,6 +465,59 @@ def tag_kinds(path: Path) -> list:
         result = read_all_tags(path)[2]
     except TagError:
         result = []
+    return result
+
+
+UNCOMPRESSED_EXTENSIONS = {".wav", ".aif", ".aiff"}
+BITRATE_MODES = {"CBR": "costante", "VBR": "variabile", "ABR": "media"}
+
+
+def _codec_name(info) -> str:
+    """Il codec, quando il contenitore ne può avere più d'uno (M4A, WMA, OGG): "AAC", "ALAC", "Vorbis"…"""
+    description = str(getattr(info, "codec_description", "") or getattr(info, "codec_name", "") or "")
+    class_name = type(info).__name__
+    if "alac" in description.lower() or str(getattr(info, "codec", "")).lower() == "alac":
+        result = "ALAC"
+    elif "aac" in description.lower() or str(getattr(info, "codec", "")).lower().startswith("mp4a"):
+        result = "AAC"
+    elif "lossless" in description.lower():
+        result = "WMA Lossless"
+    elif class_name.startswith("OggVorbis"):
+        result = "Vorbis"
+    elif class_name.startswith("OggOpus"):
+        result = "Opus"
+    else:
+        result = ""
+    return result
+
+
+def audio_format(path: Path) -> str:
+    """Formato, codec e compressione del file, in breve: "MP3 · 320 kbit/s costante", "FLAC · senza perdita · 912
+    kbit/s", "M4A · AAC · 256 kbit/s", "WAV · non compresso". Vuoto se il file non si legge."""
+    path = Path(path)
+    extension = path.suffix[1:].upper()
+    try:
+        audio = mutagen.File(str(path))
+    except (mutagen.MutagenError, OSError):
+        audio = None
+    if audio is None or getattr(audio, "info", None) is None:
+        result = ""
+    else:
+        info = audio.info
+        parts = [extension]
+        codec = _codec_name(info)
+        if codec and codec.upper() != extension:
+            parts.append(codec)
+        kbits = int(round((getattr(info, "bitrate", 0) or 0) / 1000))
+        if path.suffix.lower() in UNCOMPRESSED_EXTENSIONS:
+            parts.append(tr("non compresso"))
+        else:
+            if path.suffix.lower() == ".flac" or codec in ("ALAC", "WMA Lossless"):
+                parts.append(tr("senza perdita"))
+            if kbits:
+                mode = tr(BITRATE_MODES.get(str(getattr(info, "bitrate_mode", "")).rsplit(".", 1)[-1], ""))
+                parts.append(f"{kbits} kbit/s {mode}".strip())
+        result = " · ".join(parts)
     return result
 
 

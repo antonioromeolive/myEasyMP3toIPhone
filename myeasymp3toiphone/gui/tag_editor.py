@@ -11,7 +11,9 @@ from PySide6.QtWidgets import (
     QPushButton, QVBoxLayout, QWidget,
 )
 
-from ..tags import BOOL_FIELDS, COVER_EXTENSIONS, INT_FIELDS, READ_ONLY_EXTENSIONS, TAG_FIELDS, read_cover, tag_kinds
+from ..tags import (
+    BOOL_FIELDS, COVER_EXTENSIONS, INT_FIELDS, READ_ONLY_EXTENSIONS, TAG_FIELDS, audio_format, read_cover, tag_kinds,
+)
 
 MIXED = "(valori diversi)"
 COVER_SIZE = 180
@@ -73,8 +75,13 @@ class TagEditor(QWidget):
         self._cover_label.setStyleSheet("border: 1px solid palette(mid);")
         self._cover_button = QPushButton("Cambia copertina…")
         self._cover_button.clicked.connect(self._choose_cover)
+        self._format_label = QLabel()          # formato, codec e compressione, in piccolo (tags.audio_format)
+        self._format_label.setAlignment(Qt.AlignHCenter)
+        self._format_label.setWordWrap(True)
+        self._format_label.setStyleSheet("color: gray; font-size: 8pt;")
         cover_layout = QVBoxLayout()
         cover_layout.addWidget(self._cover_label, alignment=Qt.AlignHCenter)
+        cover_layout.addWidget(self._format_label)
         cover_layout.addWidget(self._cover_button)
         cover_box = QGroupBox("Copertina")
         cover_box.setLayout(cover_layout)
@@ -198,6 +205,22 @@ class TagEditor(QWidget):
         self._restore_button.setEnabled(edited)
         self._update_buttons()
         self._show_cover(self._current_cover())
+        self._format_label.setText(self._format_text())
+        self._format_label.setVisible(bool(self._format_label.text()))
+
+    def _format_text(self) -> str:
+        """Un brano: formato, codec e compressione letti dal file. Più brani: i formati, dall'estensione (niente
+        letture di file: possono essere migliaia)."""
+        if len(self._tracks) == 1:
+            result = audio_format(self._tracks[0].path)
+        else:
+            extensions = []
+            for track in self._tracks:
+                extension = track.path.suffix[1:].upper()
+                if extension not in extensions:
+                    extensions.append(extension)
+            result = ", ".join(sorted(extensions))
+        return result
 
     def _kinds_text(self, read_only: bool) -> str:
         """Da quali tipi di tag vengono i valori (un brano), e se i tag si possono cambiare."""
