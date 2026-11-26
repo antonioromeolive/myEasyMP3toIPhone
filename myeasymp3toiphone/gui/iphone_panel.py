@@ -2054,6 +2054,7 @@ class IPhonePanel(QWidget):
                 for folder in folders:
                     progress(0, 0, f"lettura di {folder}")
                     pc_tracks.extend(scan_folder(folder, progress, cancel, tag_cache))
+                pc_tracks = window.without_hidden(pc_tracks)          # non le cartelle escluse
                 window.overlay.apply(pc_tracks)
             else:
                 for track in opened:

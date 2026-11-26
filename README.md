@@ -69,7 +69,11 @@ con la cartella dati condivisa tra due PC ognuno ha le sue, e quelle degli altri
 Nella scheda PC la scelta **Cartelle** mostra **tutte le cartelle della musica** insieme (come *La mia musica*), una
 sola, la cartella aperta con *Apri cartella* o **Apri un'altra cartella…**. *Associa sorgenti* può cercare in tutte;
 tra due copie dello stesso brano vince quella nella cartella più in alto. Togliere una cartella dall'elenco non
-cancella niente. La prima volta l'elenco ha solo la Libreria di prima.
+cancella niente; togliendo la Libreria diventa Libreria la prima cartella che resta (l'ultima non si toglie). La
+prima volta l'elenco ha solo la Libreria di prima. Una cartella aperta con *Apri cartella* (riaperta all'avvio) non
+fa parte dell'elenco: quando non c'è, la scheda lo dice e **Aggiungi la cartella aperta** la aggiunge. Sotto,
+**Cartelle escluse**: sottocartelle da non usare (per esempio le suonerie dentro la cartella della musica), le stesse
+di *Nascondi la cartella* (vedi sotto).
 
 **Elenchi Artisti e Album (i filtri).** Sopra la tabella dei brani due elenchi affiancati, ognuno ordinabile cliccando
 sull'intestazione:
@@ -156,8 +160,10 @@ da PC a iPhone*) e **Apri la cartella in Esplora risorse**
 (un file solo: selezionato; più cartelle: le prime 5).
 
 **Nascondi la cartella** (tasto destro sui brani): i brani delle cartelle che li contengono, sottocartelle comprese,
-spariscono dalla scheda PC (elenchi, tabella, controlli). I file non cambiano. Si ricorda tra un avvio e l'altro; il
-pulsante **Cartelle nascoste (N)…** in alto le elenca e mostra di nuovo quelle che spunti.
+spariscono dalla scheda PC (elenchi, tabella, controlli) e non si usano per *Associa sorgenti* e *Controlla la
+musica* dell'iPhone. I file non cambiano. Si ricorda tra un avvio e l'altro; il pulsante **Cartelle nascoste (N)…** in
+alto le elenca e mostra di nuovo quelle che spunti. Le stesse cartelle si aggiungono e si tolgono anche in
+*Impostazioni → Cartelle della musica → Cartelle escluse*.
 
 **Larghezza delle colonne.** Ogni colonna si allarga e si stringe trascinando il bordo dell'intestazione, in tutte e due
 le schede e negli elenchi Artisti e Album; se non ci stanno tutte compare la barra di scorrimento.
@@ -931,9 +937,10 @@ Le colonne dei file mostrano sempre il solo nome; il suggerimento delle celle mo
 
 ### Le cartelle nascoste
 
-1. `hidden_folders` in `settings.json`: si aggiunge con tasto destro → *Nascondi la cartella* nella scheda PC e si
-   toglie con *Cartelle nascoste (N)…*. Vale subito, per ogni cartella aperta (anche la Libreria), con le sottocartelle;
-   le maiuscole non contano.
+1. `hidden_folders` in `settings.json`: si aggiunge con tasto destro → *Nascondi la cartella* nella scheda PC o con
+   *Impostazioni → Cartelle della musica → Cartelle escluse*, e si toglie con *Cartelle nascoste (N)…* o nelle
+   Impostazioni. Vale subito, per ogni cartella aperta (anche la Libreria), con le sottocartelle, anche quando
+   *Associa sorgenti* e *Controlla la musica* dell'iPhone rileggono le cartelle; le maiuscole non contano.
 2. Senza: nessuna cartella nascosta.
 
 ### Le cartelle preferite

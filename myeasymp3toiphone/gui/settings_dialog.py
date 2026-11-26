@@ -80,7 +80,11 @@ class SettingsDialog(QDialog):
         self.f_add = QPushButton("Aggiungi una cartella…")
         self.f_add.clicked.connect(self._add_folder)
         self.f_remove = QPushButton("Togli")
+        self.f_remove.setToolTip("Toglie la cartella dall'elenco (non cancella niente). Togliendo la Libreria, "
+                                 "diventa Libreria la prima cartella che resta; l'ultima cartella non si toglie.")
         self.f_remove.clicked.connect(self._remove_folder)
+        self.f_add_open = QPushButton("Aggiungi la cartella aperta")
+        self.f_add_open.clicked.connect(self._add_open_folder)
         self.f_up = QPushButton("Su")
         self.f_up.clicked.connect(lambda: self._move_folder(-1))
         self.f_down = QPushButton("Giù")
@@ -89,12 +93,15 @@ class SettingsDialog(QDialog):
         self.f_library.setToolTip("La Libreria è dove vanno Importa cartella e Copia da iPhone a PC")
         self.f_library.clicked.connect(self._mark_library)
         buttons = QVBoxLayout()
-        for button in (self.f_add, self.f_remove, self.f_up, self.f_down, self.f_library):
+        for button in (self.f_add, self.f_add_open, self.f_remove, self.f_up, self.f_down, self.f_library):
             buttons.addWidget(button)
         buttons.addStretch(1)
         row = QHBoxLayout()
         row.addWidget(self.f_list, 1)
         row.addLayout(buttons)
+        self.f_open_note = QLabel()
+        self.f_open_note.setWordWrap(True)
+        self.f_open_note.setStyleSheet("color: gray")
         title = QLabel(f"<b>Cartelle della musica su {computer_name()}</b>")
         intro = QLabel("La scheda PC le mostra insieme (<i>La mia musica</i>, Ctrl+L) e <i>Associa sorgenti</i> cerca in "
                        "tutte. L'ordine conta: tra due copie dello stesso brano vince quella più in alto (le "
@@ -112,11 +119,97 @@ class SettingsDialog(QDialog):
         layout.addWidget(title)
         layout.addWidget(intro)
         layout.addLayout(row, 1)
+        layout.addWidget(self.f_open_note)
         layout.addWidget(other_label)
+        layout.addLayout(self._build_excluded_box(), 1)
         widget = QWidget()
         widget.setLayout(layout)
         self._update_folder_buttons()
         return widget
+
+    def _build_excluded_box(self) -> QVBoxLayout:
+        """Le cartelle escluse: le stesse di Nascondi la cartella (hidden_folders), con le sottocartelle."""
+        self.x_list = QListWidget()
+        self.x_list.setToolTip("I brani di queste cartelle e delle loro sottocartelle non si vedono nella scheda PC e "
+                               "non si usano per Associa sorgenti e i controlli. I file non cambiano.")
+        for folder in self.settings.hidden_folders:
+            self.x_list.addItem(str(folder))
+        self.x_list.currentRowChanged.connect(lambda _row: self._update_excluded_buttons())
+        self.x_add = QPushButton("Escludi una cartella…")
+        self.x_add.clicked.connect(self._add_excluded)
+        self.x_remove = QPushButton("Togli")
+        self.x_remove.setToolTip("La cartella torna a vedersi (i file non sono mai cambiati)")
+        self.x_remove.clicked.connect(self._remove_excluded)
+        buttons = QVBoxLayout()
+        buttons.addWidget(self.x_add)
+        buttons.addWidget(self.x_remove)
+        buttons.addStretch(1)
+        row = QHBoxLayout()
+        row.addWidget(self.x_list, 1)
+        row.addLayout(buttons)
+        title = QLabel("<b>Cartelle escluse</b>")
+        intro = QLabel("Sottocartelle da non usare, con le loro sottocartelle (per esempio le suonerie dentro la "
+                       "cartella della musica). Sono le stesse di <i>Nascondi la cartella</i> (tasto destro nella "
+                       "scheda PC) e di <i>Cartelle nascoste…</i>.")
+        intro.setWordWrap(True)
+        result = QVBoxLayout()
+        result.addWidget(title)
+        result.addWidget(intro)
+        result.addLayout(row, 1)
+        self._update_excluded_buttons()
+        return result
+
+    def excluded_folders(self) -> list:
+        result = []
+        for index in range(self.x_list.count()):
+            result.append(self.x_list.item(index).text())
+        return result
+
+    def _update_excluded_buttons(self) -> None:
+        self.x_remove.setEnabled(self.x_list.currentRow() >= 0)
+
+    def _add_excluded(self) -> None:
+        start = self.music_folders()[0] if self.f_list.count() else self._library
+        folder = QFileDialog.getExistingDirectory(self, "Una cartella da escludere", start)
+        if folder:
+            self.add_excluded_folder(folder)
+
+    def add_excluded_folder(self, folder: str) -> bool:
+        """Aggiunge una cartella alle escluse (scritta alla Windows); False se c'è già, comunque scritta."""
+        folder = os.path.normpath(folder)
+        known = set()
+        for existing in self.excluded_folders():
+            known.add(path_key(existing))
+        result = path_key(folder) not in known
+        if result:
+            self.x_list.addItem(folder)
+            self.x_list.setCurrentRow(self.x_list.count() - 1)
+        return result
+
+    def _remove_excluded(self) -> None:
+        row = self.x_list.currentRow()
+        if row >= 0:
+            self.x_list.takeItem(row)
+            self._update_excluded_buttons()
+
+    def open_folder(self) -> str:
+        """La cartella aperta con Apri cartella (riaperta all'avvio), se c'è e non è tra le cartelle della musica;
+        altrimenti ""."""
+        last = self.settings.last_opened
+        result = ""
+        if last and last != "*" and os.path.isdir(last):      # "*": erano aperte le cartelle della musica
+            known = set()
+            for existing in self.music_folders():
+                known.add(path_key(existing))
+            if path_key(os.path.normpath(last)) not in known:
+                result = os.path.normpath(last)
+        return result
+
+    def _add_open_folder(self) -> None:
+        folder = self.open_folder()
+        if folder:
+            self.add_music_folder(folder)
+            self._update_folder_buttons()
 
     def _add_folder_item(self, folder: str) -> None:
         item = QListWidgetItem(folder)
@@ -141,10 +234,16 @@ class SettingsDialog(QDialog):
         row = self.f_list.currentRow()
         chosen = row >= 0
         folder = self.f_list.item(row).data(Qt.UserRole) if chosen else ""
-        self.f_remove.setEnabled(chosen and folder != self._library)
+        self.f_remove.setEnabled(chosen and self.f_list.count() > 1)
         self.f_up.setEnabled(chosen and row > 0)
         self.f_down.setEnabled(chosen and row < self.f_list.count() - 1)
         self.f_library.setEnabled(chosen and folder != self._library)
+        opened = self.open_folder()
+        self.f_add_open.setVisible(bool(opened))
+        self.f_add_open.setToolTip(opened)
+        self.f_open_note.setVisible(bool(opened))
+        self.f_open_note.setText(f"All'avvio si apre {opened}: è stata aperta con Apri cartella e non è tra le "
+                                 "cartelle della musica. Per averla qui: \"Aggiungi la cartella aperta\".")
 
     def _add_folder(self) -> None:
         folder = QFileDialog.getExistingDirectory(self, "Una cartella della musica", self._library)
@@ -165,9 +264,13 @@ class SettingsDialog(QDialog):
         return result
 
     def _remove_folder(self) -> None:
+        """Toglie la cartella scelta (non l'ultima); se era la Libreria, la Libreria diventa la prima che resta."""
         row = self.f_list.currentRow()
-        if row >= 0 and self.f_list.item(row).data(Qt.UserRole) != self._library:
-            self.f_list.takeItem(row)
+        if row >= 0 and self.f_list.count() > 1:
+            removed = self.f_list.takeItem(row).data(Qt.UserRole)
+            if removed == self._library:
+                self._library = self.f_list.item(0).data(Qt.UserRole)
+                self._mark_items()
             self._update_folder_buttons()
 
     def _move_folder(self, step: int) -> None:
@@ -566,6 +669,7 @@ class SettingsDialog(QDialog):
             else:
                 set_secret(name, "")
         self.settings.set_music_dirs(self.music_folders(), self._library)
+        self.settings.hidden_folders = self.excluded_folders()
         self.settings.language = self.g_language.currentData() or DEFAULT_LANGUAGE
         self.settings.show_full_path = self.g_full_path.isChecked()
         preferred = []

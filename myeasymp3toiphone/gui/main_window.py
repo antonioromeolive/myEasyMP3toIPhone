@@ -600,6 +600,8 @@ class MainWindow(QMainWindow):
             self._fill_folder_combo()
             if (self.library_dir(), self.music_dirs()) != before and (showing or not self.root_folders):
                 self.open_music()
+            else:
+                self._apply_hidden()               # le cartelle escluse, se sono cambiate
 
     def _open_about(self) -> None:
         AboutDialog(self).exec()
@@ -694,7 +696,7 @@ class MainWindow(QMainWindow):
                 result = True
         return result
 
-    def _without_hidden(self, tracks: list) -> list:
+    def without_hidden(self, tracks: list) -> list:
         hidden = []
         for folder in self.app_settings.hidden_folders:
             hidden.append(self._folder_key(folder))
@@ -728,7 +730,7 @@ class MainWindow(QMainWindow):
 
     def _apply_hidden(self) -> None:
         before = len(self.tracks)
-        self.tracks = self._without_hidden(self._all_tracks)
+        self.tracks = self.without_hidden(self._all_tracks)
         self._update_hidden_button()
         if len(self.tracks) != before:
             self._rebuild_views()
@@ -801,7 +803,7 @@ class MainWindow(QMainWindow):
                 protect_folder(folder)
             self.overlay.apply(tracks)
             self._all_tracks = tracks
-            self.tracks = self._without_hidden(tracks)
+            self.tracks = self.without_hidden(tracks)
             self.root_folders = folders
             showing_music = self.showing_music()
             self.app_settings.last_opened = MUSIC_MARK if showing_music else str(folders[0])   # al prossimo avvio

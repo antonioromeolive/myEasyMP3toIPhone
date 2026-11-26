@@ -241,6 +241,7 @@ class ScanLauncher:
                 library_tracks = []
                 for folder in music:
                     library_tracks.extend(scan_folder(folder, progress, cancel, window.tag_cache))
+                library_tracks = window.without_hidden(library_tracks)   # non le cartelle escluse
             window.overlay.apply(library_tracks)
             known = PhoneFingerprints(config_dir())
             prints = {}

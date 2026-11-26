@@ -12,6 +12,14 @@ Oggi si inviano MP3, FLAC e AAC. ALAC vuole il suo formato di inserimento (rustu
 l'altro `gapless_heuristic_info`, `analysis_inhibit_flags`). Per ora non serve: i 20 M4A della musica dell'utente
 sono tutti AAC.
 
+## Suonerie verso l'iPhone — per ora non interessa
+
+Oggi un `.m4a` è sempre musica; le suonerie dell'utente stanno in `…\Suonerie` (cartelle escluse). Se servirà:
+le suonerie dell'iPhone sono `.m4r` (AAC, al massimo ~40 s) in `/iTunes_Control/Ringtones`, registrate in
+`/iTunes_Control/iTunes/Ringtones.plist` (come iTunes/Finder, iMazing). Prima provare a mano con pymobiledevice3 (AFC)
+se le versioni recenti di iOS le accettano ancora così; poi un'azione "Invia come suoneria (PC → iPhone)" che va in
+attesa e parte con **Applica**, come tutte le scritture sull'iPhone.
+
 ## Da provare con l'iPhone attaccato (solo brani PROVA, poi tolti)
 
 Fatto e provato senza telefono (test e finestre di prova); da confermare sul telefono vero:

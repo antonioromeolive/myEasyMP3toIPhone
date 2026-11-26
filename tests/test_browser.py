@@ -203,6 +203,40 @@ def test_nested_music_folders_read_once(tmp_path, monkeypatch):
     assert adopt_folders([Path("")]) == ([], [])
 
 
+def test_settings_folders_tab_remove_library_open_folder_and_excluded(tmp_path):
+    """Impostazioni → Cartelle della musica: la Libreria si toglie se resta un'altra cartella (diventa Libreria la
+    prima che resta), la cartella aperta con Apri cartella si aggiunge con un pulsante, le cartelle escluse sono
+    hidden_folders."""
+    from myeasymp3toiphone.config import AppSettings
+    from myeasymp3toiphone.gui.settings_dialog import SettingsDialog
+    QApplication.instance() or QApplication([])
+    library = tmp_path / "Libreria"
+    opened = tmp_path / "Musica"
+    opened.mkdir()
+    settings = AppSettings(library_dir=str(library), last_opened=str(opened),
+                           hidden_folders=[str(opened / "Vecchie")])
+    dialog = SettingsDialog(settings)
+    assert dialog.music_folders() == [str(library)]
+    dialog.f_list.setCurrentRow(0)
+    assert not dialog.f_remove.isEnabled()                       # l'ultima cartella non si toglie
+    assert dialog.open_folder() == str(opened) and not dialog.f_add_open.isHidden()
+    dialog._add_open_folder()
+    assert dialog.music_folders() == [str(library), str(opened)] and dialog.open_folder() == ""
+    assert dialog.f_add_open.isHidden()
+    dialog.f_list.setCurrentRow(0)
+    assert dialog.f_remove.isEnabled()
+    dialog._remove_folder()                                       # la Libreria: diventa Libreria quella che resta
+    assert dialog.music_folders() == [str(opened)] and dialog._library == str(opened)
+    assert dialog.excluded_folders() == [str(opened / "Vecchie")]
+    assert dialog.add_excluded_folder(str(opened / "Suonerie").replace("\\", "/"))
+    assert not dialog.add_excluded_folder(str(opened / "SUONERIE"))
+    dialog.x_list.setCurrentRow(0)
+    dialog._remove_excluded()
+    dialog.accept()
+    assert settings.hidden_folders == [str(opened / "Suonerie")]
+    assert settings.music_dirs() == [opened] and settings.library_path() == opened
+
+
 def test_hide_folder_in_pc_tab(tmp_path):
     """Nascondi la cartella: i suoi brani (e quelli delle sottocartelle) spariscono dalla scheda PC, si ricorda, si
     mostrano di nuovo. I file non cambiano."""

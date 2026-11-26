@@ -2735,6 +2735,24 @@ CATALOG = {
         'The Library is where Import folder and Copy from iPhone to PC go',
     '<b>Cartelle della musica su {0}</b>':
         '<b>Music folders on {0}</b>',
+    "Toglie la cartella dall'elenco (non cancella niente). Togliendo la Libreria, diventa Libreria la prima cartella che resta; l'ultima cartella non si toglie.":
+        'Removes the folder from the list (nothing is deleted). Removing the Library makes the first remaining folder the Library; the last folder cannot be removed.',
+    'Aggiungi la cartella aperta':
+        'Add the open folder',
+    'I brani di queste cartelle e delle loro sottocartelle non si vedono nella scheda PC e non si usano per Associa sorgenti e i controlli. I file non cambiano.':
+        'The tracks in these folders and their subfolders are not shown in the PC tab and are not used by Link sources and the checks. The files do not change.',
+    'Escludi una cartella…':
+        'Exclude a folder…',
+    'La cartella torna a vedersi (i file non sono mai cambiati)':
+        'The folder is shown again (the files never changed)',
+    '<b>Cartelle escluse</b>':
+        '<b>Excluded folders</b>',
+    'Sottocartelle da non usare, con le loro sottocartelle (per esempio le suonerie dentro la cartella della musica). Sono le stesse di <i>Nascondi la cartella</i> (tasto destro nella scheda PC) e di <i>Cartelle nascoste…</i>.':
+        'Subfolders not to use, with their subfolders (for example the ringtones inside the music folder). They are the same as <i>Hide the folder</i> (right click in the PC tab) and <i>Hidden folders…</i>.',
+    'Una cartella da escludere':
+        'A folder to exclude',
+    'All\'avvio si apre {0}: è stata aperta con Apri cartella e non è tra le cartelle della musica. Per averla qui: "Aggiungi la cartella aperta".':
+        'At startup {0} opens: it was opened with Open folder and is not among the music folders. To have it here: "Add the open folder".',
     "La scheda PC le mostra insieme (<i>La mia musica</i>, Ctrl+L) e <i>Associa sorgenti</i> cerca in tutte. L'ordine conta: tra due copie dello stesso brano vince quella più in alto (le <i>Cartelle preferite</i> di Generale, se ci sono, contano prima). Valgono solo su questo computer: con la cartella dati condivisa, ogni PC ha le sue.":
         'The PC tab shows them together (<i>My music</i>, Ctrl+L) and <i>Link sources</i> searches all of them. The order matters: between two copies of the same track the higher one wins (the <i>Preferred folders</i> of General, if any, count first). They apply only to this computer: with a shared data folder, each PC has its own.',
     'Altri computer (si vedono, non si usano qui):\n':
