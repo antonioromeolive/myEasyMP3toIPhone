@@ -552,16 +552,16 @@ artista o un album scelto mostra solo i suoi brani, insieme a *Cerca* e ai filtr
 
 I **filtri a pulsanti** (prima il menu *Mostra*), con quanti brani ha ognuno, filtrano l'elenco per sorgente (per esempio solo i brani *senza sorgente*), e per la colonna *Sul PC*:
 *Da rivedere: abbinati solo per i tag (≈)*, *Sorgente con tag diversi (⟳)* (anche solo la grafia), *Con una
-sorgente proposta (in rosso)*, *Album senza immagine sull'iPhone*, *Nell'album sbagliato sull'iPhone*, *Doppioni:
-stessa canzone nello stesso album* e *Stessa canzone in più album (raccolte)*. Con
+sorgente proposta (in rosso)*, *Album senza immagine sull'iPhone*, *Nell'album sbagliato sull'iPhone* e *Doppioni:
+stessa canzone nello stesso album*. Con
 *Album senza immagine* la barra mostra **Ricopia le copertine da PC a iPhone** (gli album i cui file del PC non hanno
 la copertina non si propongono: la Ricopia non gliela darebbe).
 
 **I doppioni.** La stessa canzone (stesso artista e titolo, durata entro 5 secondi) può stare sull'iPhone più volte:
 - **nello stesso album**, anche scritto in un altro modo ("The Wall CD1" e "The Wall (Disc 1)", aggiunte tra
   graffe come "{…}" che non contano): è un doppione, e se ne tiene una copia sola;
-- **in album diversi** (l'album e una raccolta): è legittimo. Il filtro *Stessa canzone in più album* li mostra e il
-  riquadro dei tag dice in quali altri album c'è, ma il programma non propone di toglierli.
+- **in album diversi** (l'album e una raccolta): è legittimo. Il riquadro dei tag dice in quali altri album c'è, ma
+  il programma non propone di toglierli e non ha un filtro per queste copie.
 
 Due brani associati a file diversi della stessa cartella del PC, con la stessa estensione, sono canzoni diverse anche
 con lo stesso titolo: sono tag sbagliati, non doppioni. Il riquadro dei tag lo segnala ("titolo uguale a quello di

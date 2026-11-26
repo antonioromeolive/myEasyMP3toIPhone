@@ -140,7 +140,8 @@ def test_panel_filters_buttons_and_send_replacement(tmp_path):
         panel = window.iphone_panel
         texts = [text for text, _rule in iphone_panel.SHOW_FILTERS]
         counts = dict(zip(texts, panel._show._counts))
-        assert counts[iphone_panel.DUPLICATES_TEXT] == 2 and counts[iphone_panel.OTHER_ALBUMS_TEXT] == 3
+        assert counts[iphone_panel.DUPLICATES_TEXT] == 2
+        assert "Stessa canzone in più album (raccolte)" not in counts       # legittime: nessun filtro
         assert panel._actions.button("dedupe").isHidden()
         panel._show.setCurrentIndex(iphone_panel.DUPLICATES_FILTER)
         assert panel._count.text() == "2 di 4 brani"

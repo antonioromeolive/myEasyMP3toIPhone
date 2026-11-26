@@ -46,8 +46,10 @@ sono tutti AAC.
 - Prova 3 del 26/11/2026: "PROVA Raccolta Due" (3 album, uno per cantante) con artista dell'album e Compilation
   cambiati nella scheda PC, *Anche sull'iPhone* → Applica (Usa i tag diventato Ricopia): un album solo. Restano 3 righe
   `album` vuote (una per cantante), invisibili nell'app.
-- **Doppioni sull'iPhone** (26/11/2026, fatto: filtri *Doppioni: stessa canzone nello stesso album* e *Stessa
-  canzone in più album*, pulsanti *Togli le copie in più* e *Tieni questa copia*, `phone_duplicates`). Sull'elenco
+- **Doppioni sull'iPhone** (26/11/2026, fatto: filtro *Doppioni: stessa canzone nello stesso album*, pulsanti
+  *Togli le copie in più* e *Tieni questa copia*, `phone_duplicates`; il filtro *Stessa canzone in più album* è stato
+  tolto perché non serviva a niente: le copie nelle raccolte sono legittime, il riquadro dei tag le nomina; se un
+  giorno serve spazio: copie vicine, colonna "Anche in", *Togli dalle raccolte*). Sull'elenco
   salvato: 81 canzoni doppie nello stesso album, 82 copie da togliere. Erano nati così: il 24/11 alle 12:11-12:16
   (versione 0.1.33) lo stesso file mandato due volte, a volte nello stesso secondo (Gazzè *Platinum Collection* CD3,
   Supertramp *Breakfast in America*); il 25/11 alle 13:45:52 un invio di 17 brani che c'erano già, senza togliere i

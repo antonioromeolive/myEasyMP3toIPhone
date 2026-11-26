@@ -74,11 +74,9 @@ class RowFacts:
     coverless: bool        # album senza immagine sull'iPhone
     misfiled: bool         # nell'album sbagliato sull'iPhone
     duplicate: bool        # doppione: la stessa canzone nello stesso album
-    other_albums: bool     # la stessa canzone anche in altri album (legittimo)
 
 
 DUPLICATES_TEXT = "Doppioni: stessa canzone nello stesso album"
-OTHER_ALBUMS_TEXT = "Stessa canzone in più album (raccolte)"
 # il filtro "Mostra": (testo, funzione (RowFacts) -> visibile)
 SHOW_FILTERS = [
     ("Tutti i brani", lambda row: True),
@@ -95,7 +93,6 @@ SHOW_FILTERS = [
     ("Album senza immagine sull'iPhone", lambda row: row.coverless),
     ("Nell'album sbagliato sull'iPhone", lambda row: row.misfiled),
     (DUPLICATES_TEXT, lambda row: row.duplicate),
-    (OTHER_ALBUMS_TEXT, lambda row: row.other_albums),
 ]
 _FILTER_TEXTS = [text for text, _rule in SHOW_FILTERS]
 COVERLESS_FILTER = _FILTER_TEXTS.index("Album senza immagine sull'iPhone")   # la barra mostra Ricopia le copertine
@@ -1128,8 +1125,7 @@ class IPhonePanel(QWidget):
             item = self._by_pid.get(pid)
             facts = RowFacts(row.data(COL_ORIGIN, ORIGIN_ROLE), row.data(COL_PC, PC_STATE_ROLE),
                              row.data(COL_SOURCE_FILE, PROPOSED_ROLE), item is not None and item.album_without_cover,
-                             item is not None and item.misfiled, pid in self._duplicates.set_of,
-                             pid in self._duplicates.other_albums)
+                             item is not None and item.misfiled, pid in self._duplicates.set_of)
             for position, (_text, rule) in enumerate(SHOW_FILTERS):
                 if rule(facts):
                     counts[position] += 1

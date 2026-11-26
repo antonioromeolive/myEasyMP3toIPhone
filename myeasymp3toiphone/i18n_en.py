@@ -3245,8 +3245,6 @@ CATALOG = {
         'There is already a file {0}.',
     'Doppioni: stessa canzone nello stesso album':
         'Duplicates: same song in the same album',
-    'Stessa canzone in più album (raccolte)':
-        'Same song in several albums (compilations)',
     'keep':
         'keep',
     'dedupe':
