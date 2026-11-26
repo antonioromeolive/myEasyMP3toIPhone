@@ -110,8 +110,17 @@ sull'intestazione:
 
 **I filtri a pulsanti**, sotto *Cerca*, con quanti brani ha ognuno (fanno anche da legenda della colonna *iPhone*):
 **Tutti**, **Non sull'iPhone** (anche quelli in attesa di essere copiati), **✔ Uguali**, **⟳ Tag diversi**, **≈ Da
-rivedere**, **✎ Modificati** (modifiche dei tag in sospeso) e **＋ In attesa** (un'azione per l'iPhone aspetta
-*Applica*). Se ne sceglie uno alla volta; valgono insieme a *Cerca*, *Formato* e agli elenchi Artisti e Album.
+rivedere**, **✎ Modificati** (modifiche dei tag in sospeso), **Fuori cartella** e **＋ In attesa** (un'azione per
+l'iPhone aspetta *Applica*). Se ne sceglie uno alla volta; valgono insieme a *Cerca*, *Formato* e agli elenchi Artisti e
+Album.
+
+**Fuori cartella**: i brani di un album (stesso album e stesso artista dell'album) finiti, in pochi, lontano dalla
+cartella con la maggior parte dell'album. Sul PC sembrano un'altra cosa, ma l'app Musica dell'iPhone li mette nello
+stesso album. Nella tabella la loro *Cartella* è in viola e in grassetto; il suggerimento dice dov'è il resto
+dell'album. Non contano come "fuori": le cartelle dei dischi (*CD1*, *Disc 2*, *Album (CD 2)*…), una cartella accanto
+alla principale (*Vol.1* e *Vol.2*), dentro o sopra di lei (*Album\MP3*), una cartella con almeno metà dei brani della
+principale (un'altra edizione o copia), un brano con lo stesso titolo di uno della cartella principale (una seconda
+copia, anche in un altro formato) e i brani senza album nei tag.
 
 **La barra delle azioni**, sopra la tabella: *N brani scelti* (i selezionati o, se non ce n'è nessuno, quelli
 dell'artista o dell'album scelti negli elenchi) e i pulsanti con le stesse voci del tasto destro: **Copia N brani da

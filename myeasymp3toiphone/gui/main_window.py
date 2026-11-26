@@ -24,7 +24,7 @@ from ..albumcheck import (
 from ..config import PRODUCT, AppSettings, config_dir
 from ..i18n import tr
 from ..library import (
-    album_folder, assign_groups, copy_organized, group_by_album, load_track, scan_folder, set_various_artist_names,
+    album_folder, album_strays, assign_groups, copy_organized, group_by_album, load_track, scan_folder, set_various_artist_names,
     track_sort_key,
 )
 from .. import estimate, provenance
@@ -96,6 +96,9 @@ PC_CHIPS = [
     ("probable", "≈ Da rivedere", "Sull'iPhone c'è un brano con gli stessi tag, ma non è collegato a questo file: "
                                   "associalo nella scheda iPhone"),
     ("edited", "✎ Modificati", "Brani con modifiche dei tag in sospeso (i file non cambiano)"),
+    ("stray", "Fuori cartella", "Brani di un album che stanno in una cartella diversa da quella con il resto "
+                                "dell'album (CD1, Disc 2… contano come una cartella sola): sull'iPhone finiscono "
+                                "nello stesso album"),
     ("pending", "＋ In attesa", "Brani con un'azione per l'iPhone in attesa di Applica"),
 ]
 PHRASES = {SEND: "da copiare da PC a iPhone", REMOVE: "da eliminare dall'iPhone", DELETE: "da eliminare dall'iPhone",
@@ -164,6 +167,7 @@ class MainWindow(QMainWindow):
         self._exit_checked = False     # le modifiche in attesa sono già state applicate (o lasciate) per uscire
         self._fingerprint_job = None   # le impronte in sottofondo (_start_fingerprints)
         self._by_path = {}             # overlay.path_key -> Track dei brani aperti (le azioni in attesa per file)
+        self._strays = {}              # id(Track) -> cartella principale del suo album (library.album_strays)
         self._last_pending = ""        # l'ultima cosa messa in attesa, sotto il totale nella barra blu
 
         self._album_label = QLabel()
@@ -937,6 +941,7 @@ class MainWindow(QMainWindow):
         for track in self.tracks:
             self._by_path[path_key(track.path)] = track
         assign_groups(self.tracks)
+        self._strays = album_strays(self.tracks)
         self._update_format_counts()
         self.browser.set_data(group_by_album(self.format_tracks()), self.check_results)
         self._update_chip_counts()
@@ -963,10 +968,12 @@ class MainWindow(QMainWindow):
 
     def _categories(self, track) -> set:
         """I filtri a pulsanti (PC_CHIPS) in cui sta un brano: tutti; non sull'iPhone, ✔, ⟳ o ≈ (come la colonna
-        iPhone); modificato; in attesa."""
+        iPhone); modificato; fuori dalla cartella del suo album; in attesa."""
         result = {"all"}
         if self.overlay.is_edited(track.path):
             result.add("edited")
+        if id(track) in self._strays:
+            result.add("stray")
         if self._phone_index is not None and not track.error:
             if self.pending.get(track.path):
                 result.add("pending")
@@ -1104,6 +1111,11 @@ class MainWindow(QMainWindow):
 
     def device_state(self, track) -> tuple:
         result = self._device_state(track)
+        return result
+
+    def stray_folder(self, track) -> str:
+        """La cartella principale dell'album di un brano che sta fuori da lì (library.album_strays), "" altrimenti."""
+        result = self._strays.get(id(track), "")
         return result
 
     def device_checked(self, row: int, checked: bool) -> None:

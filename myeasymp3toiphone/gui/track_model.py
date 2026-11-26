@@ -32,6 +32,7 @@ PROBABLE_ORDER = 2
 ERROR_COLOR = QColor(200, 40, 40)
 EDITED_COLOR = QColor(60, 130, 230)
 DIFFERENT_COLOR = QColor(230, 180, 0)    # il file è la sorgente di un brano dell'iPhone, ma i tag sono diversi
+STRAY_COLOR = QColor(205, 70, 195)       # il brano sta fuori dalla cartella del resto del suo album
 
 
 def format_length(seconds: float) -> str:
@@ -50,6 +51,8 @@ class TrackTableModel(QAbstractTableModel):
         self.device_header_tip = ""
         self._italic = QFont()
         self._italic.setItalic(True)
+        self._bold = QFont()
+        self._bold.setBold(True)
         self._bands = []                      # per riga: (tinta, chiara/scura) del suo album (theme.album_bands)
 
     # ------------------------------------------------------------------ dati
@@ -155,6 +158,8 @@ class TrackTableModel(QAbstractTableModel):
             result = QBrush(ERROR_COLOR)
         elif column == COL_TITLE and self.owner.overlay.is_edited(track.path):
             result = QBrush(EDITED_COLOR)
+        elif column == COL_FOLDER and self.owner.stray_folder(track):
+            result = QBrush(STRAY_COLOR)
         elif column in (COL_FILE, COL_FOLDER) and self._linked_but_different(track):
             result = QBrush(DIFFERENT_COLOR)
         elif column == COL_DEVICE:
@@ -181,6 +186,9 @@ class TrackTableModel(QAbstractTableModel):
         result = None
         if track.error:
             result = tr(track.error)
+        elif column == COL_FOLDER and self.owner.stray_folder(track):
+            result = tr(f"{track.path}\nIl resto dell'album è in un'altra cartella:\n{self.owner.stray_folder(track)}\n"
+                        "Sull'iPhone questi brani finiscono nello stesso album.")
         elif column in (COL_FILE, COL_FOLDER) and self._linked_but_different(track):
             result = tr(f"{track.path}\nSull'iPhone questo brano ha tag diversi: Usa i tag da PC a iPhone o da "
                         "iPhone a PC (tasto destro) sceglie quali tenere")
@@ -210,6 +218,8 @@ class TrackTableModel(QAbstractTableModel):
                 result = self._foreground(track, column)
             elif role == Qt.FontRole and column == COL_TITLE and self.owner.overlay.is_edited(track.path):
                 result = self._italic
+            elif role == Qt.FontRole and column == COL_FOLDER and self.owner.stray_folder(track):
+                result = self._bold
             elif role == Qt.ToolTipRole:
                 result = self._tooltip(track, column)
             elif role == Qt.TextAlignmentRole and column == COL_DEVICE:

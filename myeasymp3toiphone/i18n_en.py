@@ -2683,6 +2683,14 @@ CATALOG = {
         '✎ Edited',
     'Brani con modifiche dei tag in sospeso (i file non cambiano)':
         "Tracks with pending tag changes (the files don't change)",
+    'stray':
+        'stray',
+    'Fuori cartella':
+        'Outside the folder',
+    "Brani di un album che stanno in una cartella diversa da quella con il resto dell'album (CD1, Disc 2… contano come una cartella sola): sull'iPhone finiscono nello stesso album":
+        "Tracks of an album that sit in a different folder from the rest of the album (CD1, Disc 2… count as one folder): on the iPhone they end up in the same album",
+    "{0}\nIl resto dell'album è in un'altra cartella:\n{1}\nSull'iPhone questi brani finiscono nello stesso album.":
+        "{0}\nThe rest of the album is in another folder:\n{1}\nOn the iPhone these tracks end up in the same album.",
     'pending':
         'pending',
     '＋ In attesa':

@@ -1687,7 +1687,8 @@ def test_filter_chips_and_action_bars(tmp_path):
         window._rebuild_views()
         keys = [key for key, _text, _tip in main_window.PC_CHIPS]
         counts = dict(zip(keys, window._chips._counts))
-        assert counts == {"all": 4, "absent": 1, "same": 1, "stale": 1, "probable": 1, "edited": 0, "pending": 0}
+        assert counts == {"all": 4, "absent": 1, "same": 1, "stale": 1, "probable": 1, "edited": 0, "stray": 0,
+                          "pending": 0}
         window._chips.setCurrentIndex(keys.index("stale"))
         assert [track.title for track in window._visible] == ["Due"]
         window._table.selectAll()

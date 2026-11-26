@@ -344,3 +344,58 @@ def test_only_chosen_checks_run(tmp_path):
     only_variants = scan.scan_tracks(tracks, "prova", check_files=False, checks=frozenset({scan.CHECK_VARIANTS}))
     assert len(everything.issues) > len(only_variants.issues) > 0
     assert all(issue.rule_id.startswith("R14") for issue in only_variants.issues)
+
+
+def _album_track(path: str, title: str, album: str = "Raccolta Finta", album_artist: str = "Artisti Vari"):
+    from pathlib import Path
+    from myeasymp3toiphone.library import Track
+    result = Track(path=Path(path), tags=TrackTags(title=title, artist="Gruppo Finto", album_artist=album_artist,
+                                                   album=album))
+    return result
+
+
+def test_album_strays_marks_tracks_outside_the_main_folder():
+    from pathlib import Path
+    from myeasymp3toiphone.library import album_strays, assign_groups
+    main = [_album_track(f"C:/m/Raccolta Finta/{n:02d}.mp3", f"Brano {n}") for n in range(1, 6)]
+    stray = _album_track("C:/m/Altro Gruppo/Raccolta Finta (2012)/09.mp3", "Brano lontano")
+    copy = _album_track("C:/m/Copie/Raccolta Finta/01.flac", "Brano 1")           # seconda copia: non conta
+    discs = [_album_track("C:/m/Doppio/CD1/01.mp3", "Primo", album="Doppio Finto"),
+             _album_track("C:/m/Doppio/CD2/01.mp3", "Secondo", album="Doppio Finto")]   # dischi: una cartella
+    untagged = [_album_track("C:/m/A/01.mp3", "Senza album", album=""),
+                _album_track("C:/m/B/01.mp3", "Senza album 2", album="")]
+    # volumi accanto, una sottocartella, un'altra edizione con almeno metà dei brani: parti o copie, non brani persi
+    volumes = [_album_track(f"C:/m/Serie/Vol.{v}/{n:02d}.mp3", f"V{v} {n}", album="Serie Finta")
+               for v in (1, 2) for n in range(1, 5)]
+    inside = [_album_track("C:/m/Raccolta Finta/MP3/20.mp3", "Brano interno")]
+    edition = [_album_track(f"C:/z/Edizioni/Raccolta Finta Deluxe/{n:02d}.mp3", f"Remaster {n}") for n in range(1, 4)]
+    tracks = main + [stray, copy] + discs + untagged + volumes + inside + edition
+    assign_groups(tracks)
+    strays = album_strays(tracks)
+    assert strays == {id(stray): str(Path("C:/m/Raccolta Finta"))}
+
+
+def test_stray_tracks_in_the_pc_table_and_filter():
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtCore import Qt
+    from PySide6.QtWidgets import QApplication
+    from myeasymp3toiphone.gui.main_window import PC_CHIPS, MainWindow
+    from myeasymp3toiphone.gui.track_model import COL_FOLDER, STRAY_COLOR
+    _app = QApplication.instance() or QApplication([])
+    window = MainWindow()
+    try:
+        main = [_album_track(f"C:/m/Raccolta Finta/{n:02d}.mp3", f"Brano {n}") for n in range(1, 4)]
+        stray = _album_track("C:/m/Altro Gruppo/Raccolta Finta (2012)/09.mp3", "Brano lontano")
+        window.tracks = main + [stray]
+        window._rebuild_views()
+        assert "stray" in window._categories(stray) and "stray" not in window._categories(main[0])
+        keys = [key for key, _text, _tip in PC_CHIPS]
+        window._chips.setCurrentIndex(keys.index("stray"))
+        window._fill_table()
+        model = window._model
+        assert model.rows == [stray]
+        index = model.index(0, COL_FOLDER)
+        assert model.data(index, Qt.ForegroundRole).color() == STRAY_COLOR
+        assert "Raccolta Finta" in model.data(index, Qt.ToolTipRole)
+    finally:
+        window.close()

@@ -407,6 +407,60 @@ def group_by_album(tracks: list) -> dict:
     return groups
 
 
+def _main_folder(folders: dict) -> str:
+    """La cartella con più brani dell'album ({chiave della cartella: [brani]}); a parità, la prima in ordine."""
+    result = ""
+    best = -1
+    for key in sorted(folders):
+        if len(folders[key]) > best:
+            best = len(folders[key])
+            result = key
+    return result
+
+
+def _part_of_album(folder: str, main: str, count: int, main_count: int) -> bool:
+    """Una cartella dell'album diversa dalla principale è una sua parte, o una copia, e non un brano finito altrove:
+    accanto alla principale (la stessa cartella sopra: "Vol.1" e "Vol.2", "Classical1002"), dentro o sopra di lei
+    ("Album\\MP3"), oppure con almeno metà dei brani della principale (un'altra edizione, un altro disco)."""
+    folder_path = Path(folder)
+    main_path = Path(main)
+    result = (folder_path.parent == main_path.parent or folder_path.is_relative_to(main_path)
+              or main_path.is_relative_to(folder_path) or count * 2 >= main_count)
+    return result
+
+
+def album_strays(tracks: list) -> dict:
+    """{id(brano): cartella principale del suo album} per i brani di un album (Track.album_key, da assign_groups) che
+    stanno fuori dalla cartella con la maggior parte dell'album, in pochi e lontano da lei (_part_of_album): sull'iPhone
+    finiscono nello stesso album, sul PC sembrano un'altra cosa. La cartella è library.album_folder: "CD1", "Disc 2"…
+    dello stesso album sono una cartella sola. Non conta un brano con lo stesso titolo di uno della cartella principale
+    (una seconda copia, magari in un altro formato), né un brano senza album nei tag."""
+    by_album = {}
+    for track in tracks:
+        if track.tags.album and not track.error:
+            by_album.setdefault(track.album_key, []).append(track)
+    result = {}
+    for album_tracks in by_album.values():
+        folders = {}
+        shown = {}
+        for track in album_tracks:
+            folder = album_folder(track.path)
+            key = os.path.normcase(folder)
+            folders.setdefault(key, []).append(track)
+            shown.setdefault(key, folder)
+        if len(folders) > 1:
+            main = _main_folder(folders)
+            main_titles = set()
+            for track in folders[main]:
+                main_titles.add(group_name(track.title))
+            for key, members in folders.items():
+                if key != main and not _part_of_album(key, main, len(members), len(folders[main])):
+                    for track in members:
+                        if group_name(track.title) not in main_titles:
+                            result[id(track)] = shown[main]
+    return result
+
+
 def _tags_sort_key(item) -> tuple:
     tags = item.tags
     result = (tags.disc_number or 1, tags.track_number or 9999, (tags.title or "").lower())
