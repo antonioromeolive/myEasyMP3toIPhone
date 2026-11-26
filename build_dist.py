@@ -14,6 +14,9 @@ THIRD_PARTY_NOTICES.md e i
 file di dist_files: READ ME FIRST.txt, Create shortcuts.cmd, Remove shortcuts.cmd) e
 dist/myEasyMP3toIPhone-<versione>-<sistema>-<processore>.zip, con la versione data da git (version.py): 0.1.3, oppure
 0.1.4-dev con modifiche non registrate. Degli zip precedenti in dist resta solo quello della build prima.
+PyInstaller tiene la sua analisi in build/pyinstaller e la riusa: rifà solo quello che è cambiato. La butta e
+ricomincia da zero (--clean) quando cambiano Python o le librerie installate nell'ambiente (l'elenco con le versioni
+sta in build/pyinstaller/librerie.txt), oppure se si chiede: python build_dist.py --clean.
 Prima di finire, controlla la build con myEasyMP3toIPhone-cli.exe --selftest.
 Infine vscode_deploy.py copia lo zip nella cartella myEasyMP3toIPhone di MY_VSCODE_ZIP_DIR e lo installa nella cartella
 myEasyMP3toIPhone di MY_VSCODE_INSTALL_DIR, conservando come zip la versione sostituita; ogni cartella myEasyMP3toIPhone viene
@@ -43,6 +46,9 @@ TOP_FILES         = ("README.md", "LICENSE", "THIRD_PARTY_NOTICES.md")   #copiat
 DIST_FILES_DIRECTORY = os.path.join(PROGRAM_DIRECTORY, "dist_files")   #anche questi, tranne INTERNAL_FILES
 INTERNAL_FILES    = ("shortcuts.ps1",)   #messi in _internal da myEasyMP3toIPhone.spec
 SELFTEST_PROGRAM  = "myEasyMP3toIPhone-cli.exe"
+WORK_DIRECTORY    = os.path.join(BUILD_DIRECTORY, "pyinstaller")   #la cache di PyInstaller
+LIBRARIES_FILE    = os.path.join(WORK_DIRECTORY, "librerie.txt")   #Python e le librerie dell'ultima build
+CLEAN_OPTION      = "--clean"
 SYSTEM_NAMES      = {"win32": "windows", "darwin": "macos"}
 MACHINE_NAMES     = {"amd64": "x64", "x86_64": "x64", "aarch64": "arm64"}
 
@@ -113,6 +119,41 @@ def selftest(built: str) -> None:
         raise RuntimeError(f"{SELFTEST_PROGRAM} --selftest non è riuscito: la build non viene installata")
 
 
+def installed_libraries() -> str:
+    """ Python e le librerie installate nell'ambiente, ognuna con la sua versione, in ordine """
+    from importlib import metadata
+    names = []
+    for distribution in metadata.distributions():
+        names.append(f"{distribution.metadata['Name']}=={distribution.version}")
+    names.sort(key=str.lower)
+    result: str = f"python {sys.version}\n" + "\n".join(names) + "\n"
+    return result
+
+
+def clean_reason(arguments: list, libraries: str) -> str:
+    """ perché buttare la cache di PyInstaller: chiesto, prima build, o Python e le librerie cambiati; "" per riusarla """
+    try:
+        with open(LIBRARIES_FILE, encoding="utf-8") as libraries_file:
+            previous = libraries_file.read()
+    except OSError:
+        previous = None
+    if CLEAN_OPTION in arguments:
+        result = f"chiesto con {CLEAN_OPTION}"
+    elif previous is None:
+        result = "nessuna build precedente con l'elenco delle librerie"
+    elif previous != libraries:
+        result = "Python o le librerie installate sono cambiati dall'ultima build"
+    else:
+        result = ""
+    return result
+
+
+def remember_libraries(libraries: str) -> None:
+    """ dopo una build riuscita: l'elenco con cui confrontare la prossima """
+    with open(LIBRARIES_FILE, "w", encoding="utf-8") as libraries_file:
+        libraries_file.write(libraries)
+
+
 def load_variables() -> None:
     """ MY_VSCODE_ZIP_DIR e MY_VSCODE_INSTALL_DIR anche dal file delle variabili della cartella dati """
     for warning in env_file.load(env_file.env_file_path(home_folder())):
@@ -123,8 +164,16 @@ def main() -> int:
     import PyInstaller.__main__
     load_variables()
     version = write_version()
-    PyInstaller.__main__.run([SPEC_FILE, "--noconfirm", "--clean", "--distpath", DIST_DIRECTORY,
-                              "--workpath", os.path.join(BUILD_DIRECTORY, "pyinstaller")])
+    libraries = installed_libraries()
+    reason = clean_reason(sys.argv[1:], libraries)
+    options = [SPEC_FILE, "--noconfirm", "--distpath", DIST_DIRECTORY, "--workpath", WORK_DIRECTORY]
+    if reason:
+        print(f"Build da zero ({reason})")
+        options.append(CLEAN_OPTION)
+    else:
+        print(f"Build con la cache di PyInstaller (librerie invariate; da zero: build_dist.py {CLEAN_OPTION})")
+    PyInstaller.__main__.run(options)
+    remember_libraries(libraries)
     built = os.path.join(DIST_DIRECTORY, DIST_NAME)
     add_top_files(built)
     add_version_file(built, version)

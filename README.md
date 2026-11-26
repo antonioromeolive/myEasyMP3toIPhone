@@ -1026,10 +1026,18 @@ python -m venv .venv
 .venv\Scripts\python main.py --cli --env  (la console)
 .venv\Scripts\python -m pytest            (i test: mai la cartella dati vera, mai le chiavi vere)
 .venv\Scripts\python build_dist.py        (la build; in VS Code: Ctrl+Shift+B)
+.venv\Scripts\python build_dist.py --clean   (la build da zero, senza la cache di PyInstaller)
 ```
+
+Per provare una modifica non serve la build: `avvia.bat` avvia il programma dai sorgenti, con la stessa cartella dati
+(chiudi prima la versione installata: si apre una finestra sola alla volta).
 
 **La versione** viene da git: `0.1.<numero di commit> (<data>)`, oppure `-dev` con modifiche non registrate. La build
 richiede quindi il repository git.
+
+**La cache della build.** PyInstaller tiene la sua analisi in `build\pyinstaller` e la riusa, rifacendo solo quello
+che è cambiato. Riparte da zero quando cambiano Python o le librerie installate nell'ambiente (l'elenco con le
+versioni dell'ultima build è in `build\pyinstaller\librerie.txt`), alla prima build, o con `--clean`.
 
 **La build** (`build_dist.py`, PyInstaller con `myEasyMP3toIPhone.spec`) crea `dist\myEasyMP3toIPhone\` con
 `myEasyMP3toIPhone.exe` (la finestra), `myEasyMP3toIPhone-cli.exe` (la console), `_internal\`, README.md, LICENSE e i file di

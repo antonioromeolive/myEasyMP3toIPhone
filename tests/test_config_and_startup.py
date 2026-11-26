@@ -269,3 +269,17 @@ def test_settings_show_saved_profile_unchanged(monkeypatch):
     dialog.accept()
     saved = load_profiles()[0]
     assert saved.api_key_variable == "" and saved.base_url == config.OLLAMA_LOCAL_SERVER
+
+
+def test_build_reuses_the_pyinstaller_cache_until_the_libraries_change(tmp_path, monkeypatch):
+    """build_dist.py: da zero con --clean, alla prima build e quando cambiano Python o le librerie; altrimenti con la
+    cache di PyInstaller. Nessuna build vera."""
+    import build_dist
+    monkeypatch.setattr(build_dist, "LIBRARIES_FILE", str(tmp_path / "librerie.txt"))
+    libraries = build_dist.installed_libraries()
+    assert libraries.startswith("python ") and "PySide6==" in libraries
+    assert build_dist.clean_reason([], libraries).startswith("nessuna build precedente")
+    build_dist.remember_libraries(libraries)
+    assert build_dist.clean_reason([], libraries) == ""
+    assert build_dist.clean_reason(["--clean"], libraries) == "chiesto con --clean"
+    assert build_dist.clean_reason([], libraries + "nuova==1.0\n").startswith("Python o le librerie")
