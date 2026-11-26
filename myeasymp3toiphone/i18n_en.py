@@ -2323,8 +2323,12 @@ CATALOG = {
         'Albums without artwork on the iPhone',
     'Sistema le copertine (PC → iPhone): {0} album senza immagine':
         'Fix the artwork (PC → iPhone): {0} albums without artwork',
-    '; {0} non si possono, nessun brano ha la sorgente associata':
-        '; {0} cannot be fixed, no track has a linked source',
+    '; {0} senza sorgente sul PC':
+        '; {0} without a source on the PC',
+    '; {0} senza copertina anche sul PC':
+        '; {0} without a cover on the PC too',
+    '{0} — {1}\n{2} brani: selezionali per cambiarli':
+        '{0} — {1}\n{2} tracks: select them to change them',
     "{0} album sull'iPhone non hanno l'immagine dell'album, anche se i brani hanno la copertina (succede agli album messi da altri programmi). Rimpiazzando i loro brani con i file del PC, l'iPhone la sceglie.":
         '{0} albums on the iPhone have no album artwork, even though the tracks have a cover (it happens to albums put there by other programs). Replacing their tracks with the PC files makes the iPhone choose one.',
     'Sistema le copertine':
@@ -2461,8 +2465,8 @@ CATALOG = {
         "<b>How it works.</b> Here you see the music of the iPhone's <b>Music</b> app, with the titles, artists and albums the app shows. The <b>On the PC</b> column compares it with the PC: ✔ the source, same tags; ⟳ the source, different tags; ≈ to review (a track with the same tags in the open folder, not certain); ✖ the source is gone; empty = not found. <b>Source</b>: the file the track comes from (this PC, another computer, none, phone); <b>Link sources</b> finds it again, <b>Show</b> filters.<br>Right click on one or more tracks: <b>Copy from iPhone to PC</b>, <b>Copy again from PC to iPhone</b> and <b>Use the tags from PC to iPhone</b> (for the ⟳), <b>Use the tags from iPhone to PC</b>, <b>Change the tags</b>, <b>Link to the file on the PC</b>, <b>Delete from the iPhone</b>. What changes the iPhone goes pending (the blue bar at the top) and runs with <b>Apply</b>. To copy new tracks: PC tab → <b>Copy from PC to iPhone</b>. PC and iPhone don't align by themselves (the PC files change only after your confirmation).<br><b>Warning:</b> {0}",
     '{0} brani. Artista e artista dell\'album non si cambiano qui: sull\'iPhone rinominerebbero l\'artista per tutti i suoi brani. Cambiali nella scheda PC, poi usa <i>Ricopia da PC a iPhone</i>. Anno o numero 0: lo svuota.<br>Una compilation vuole anche l\'artista dell\'album <i>Artisti vari</i>: se nell\'app Musica i brani non si raccolgono in un solo album, metti la spunta e "Artisti vari" nella scheda PC e usa <i>Ricopia da PC a iPhone</i>.':
         '{0} tracks. Artist and album artist are not changed here: on the iPhone they would rename the artist for all their tracks. Change them in the PC tab, then use <i>Copy again from PC to iPhone</i>. Year or number 0: clears it.<br>A compilation also needs the album artist <i>Various Artists</i>: if in the Music app the tracks don\'t gather in a single album, tick it and "Various Artists" in the PC tab and use <i>Copy again from PC to iPhone</i>.',
-    'Anche sul PC: gli stessi tag per i {0} brani con il file su questo PC, come modifiche in sospeso (i file non cambiano)':
-        "Also on the PC: the same tags for the {0} tracks with the file on this PC, as pending changes (the files don't change)",
+    'Gli stessi tag per i {0} brani con il file su questo PC, come modifiche in sospeso (i file non cambiano)':
+        "The same tags for the {0} tracks with the file on this PC, as pending changes (the files don't change)",
     "Spenta, il PC resta com'è e la differenza si vede (⟳). Per scrivere i tag nei file del PC c'è Usa i tag da iPhone a PC.":
         'Off, the PC stays as it is and the difference shows (⟳). To write the tags into the PC files there is Use the tags from iPhone to PC.',
     'Metti in attesa':
@@ -2591,8 +2595,8 @@ CATALOG = {
         'The ticked tracks go pending for Delete from the iPhone (they run with Apply); nothing changes on the PC',
     'Li ritrovi quando vuoi nella scheda iPhone con il filtro "File del PC non trovato" e il tasto destro.':
         'You find them whenever you want in the iPhone tab with the "PC file not found" filter and the right click.',
-    "Anche sull'iPhone: usa questi tag da PC a iPhone (va in attesa)":
-        'Also on the iPhone: use these tags from PC to iPhone (goes pending)',
+    "Anche sull'iPhone (va in attesa)":
+        'Also on the iPhone (goes pending)',
     "Per i brani che sull'iPhone hanno la sorgente certa (registro): dopo il salvataggio i tag nuovi vanno in attesa per l'iPhone e partono con Applica. Spenta, l'iPhone resta com'è e la differenza si vede (⟳).":
         'For the tracks that have a certain source on the iPhone (registry): after saving, the new tags go pending for the iPhone and run with Apply. Off, the iPhone stays as it is and the difference shows (⟳).',
     "{0}\nSull'iPhone questo brano ha tag diversi: Usa i tag da PC a iPhone o da iPhone a PC (tasto destro) sceglie quali tenere":
@@ -2909,8 +2913,8 @@ CATALOG = {
         "No linked file on the PC: the iPhone's own image can't be read from here",
     'Brani di album diversi':
         'Tracks of different albums',
-    "\nSull'iPhone l'album non ha l'immagine: Ricopia le copertine da PC a iPhone (tasto destro)":
-        '\nOn the iPhone the album has no image: Copy the covers again from PC to iPhone (right click)',
+    "\nSull'iPhone l'album non ha l'immagine: il pulsante Ricopia le copertine da PC a iPhone, nella barra sopra i brani":
+        '\nOn the iPhone the album has no image: the Copy the covers again from PC to iPhone button, in the bar above the tracks',
     "Non si cambia qui: sull'iPhone l'artista si rinominerebbe per tutti i suoi brani. Cambialo nella scheda PC, poi usa Ricopia da PC a iPhone.":
         'Not changed here: on the iPhone the artist would be renamed for all their tracks. Change it in the PC tab, then use Copy again from PC to iPhone.',
     "Non si cambia sull'iPhone: cambialo nella scheda PC, poi usa Ricopia da PC a iPhone.":

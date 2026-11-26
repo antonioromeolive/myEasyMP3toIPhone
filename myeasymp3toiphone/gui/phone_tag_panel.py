@@ -95,6 +95,11 @@ class PhoneTagPanel(QWidget):
         self._also_pc = QCheckBox("Anche sul PC")
         self._also_pc.setToolTip("Spenta, il PC resta com'è e la differenza si vede (⟳). Per scrivere i tag nei file "
                                  "del PC c'è Usa i tag da iPhone a PC.")
+        # la spiegazione va a capo in una riga a parte: una casella non va a capo, e un testo lungo allargava il
+        # riquadro oltre lo spazio della scheda (se ne vedeva solo un pezzo)
+        self._also_pc_note = QLabel()
+        self._also_pc_note.setWordWrap(True)
+        self._also_pc_note.setStyleSheet("color: gray")
         note = QLabel("Si cambiano titolo (un brano alla volta), album, numeri, anno, genere e Compilation: vanno in "
                       "attesa e l'iPhone cambia con Applica. Un campo vuoto non cambia; anno o numero 0 lo svuota. "
                       "Artista e artista dell'album si cambiano nella scheda PC, poi Ricopia da PC a iPhone.")
@@ -109,6 +114,7 @@ class PhoneTagPanel(QWidget):
         layout.addWidget(self._kinds)
         layout.addWidget(tags_box)
         layout.addWidget(self._also_pc)
+        layout.addWidget(self._also_pc_note)
         layout.addLayout(buttons)
         layout.addWidget(note)
         layout.addWidget(cover_box)
@@ -127,8 +133,8 @@ class PhoneTagPanel(QWidget):
             if item.from_computer:
                 editable.append(item)
         self._editable = editable
-        self._also_pc.setText(f"Anche sul PC: gli stessi tag per i {linked} brani con il file su questo PC, come "
-                              "modifiche in sospeso (i file non cambiano)")
+        self._also_pc_note.setText(f"Gli stessi tag per i {linked} brani con il file su questo PC, come modifiche in "
+                                   "sospeso (i file non cambiano)")
         self._also_pc.setEnabled(linked > 0 and bool(editable))
         if not self._also_pc.isEnabled():
             self._also_pc.setChecked(False)
@@ -136,6 +142,15 @@ class PhoneTagPanel(QWidget):
         self._cover_note.setText(cover_note)
         self._cover_note.setVisible(bool(cover_note))
         self._reload()
+
+    def show_album(self, phone_tracks: list, cover: Optional[bytes] = None, cover_note: str = "") -> None:
+        """Nessun brano selezionato, ma un album scelto negli elenchi: la sua copertina (dal file associato sul PC) e
+        il suo nome, senza niente da cambiare (come nella scheda PC)."""
+        self.set_tracks([], 0, cover, cover_note)
+        if phone_tracks:
+            tags = phone_tracks[0].tags
+            artist = tags.album_artist or tags.artist
+            self._header.setText(f"{artist} — {tags.album}\n{len(phone_tracks)} brani: selezionali per cambiarli")
 
     def _reload(self) -> None:
         count = len(self._tracks)

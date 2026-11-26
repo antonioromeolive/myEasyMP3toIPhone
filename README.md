@@ -254,7 +254,7 @@ Musica dell'iPhone tiene insieme l'album solo con tutte e tre le cose; senza la 
 artista. La scansione, quando propone "Artisti vari", propone anche la spunta. *Numera in ordine* assegna 1, 2, 3… nell'ordine della tabella. *Salva modifiche* **non
 scrive nel file**: salva le modifiche in sospeso (`modifiche_tag.json` e `copertine\` nella cartella dati). In tabella
 i brani modificati hanno il titolo in corsivo blu, e il suggerimento elenca le modifiche (*campo: prima → dopo*).
-*Torna ai tag del file* le annulla. La casella **Anche sull'iPhone: usa questi tag da PC a iPhone** (sopra *Salva
+*Torna ai tag del file* le annulla. La casella **Anche sull'iPhone** (usa questi tag da PC a iPhone; sopra *Salva
 modifiche*, spenta di serie e di nuovo spenta dopo ogni salvataggio) mette in attesa anche l'iPhone, per i brani che
 lì hanno la sorgente certa: *Usa i tag da PC a iPhone*, o *Ricopia* se hai cambiato la copertina.
 

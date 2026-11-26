@@ -12,6 +12,40 @@ Oggi si inviano MP3, FLAC e AAC. ALAC vuole il suo formato di inserimento (rustu
 l'altro `gapless_heuristic_info`, `analysis_inhibit_flags`). Per ora non serve: i 20 M4A della musica dell'utente
 sono tutti AAC.
 
+## Trovati nelle prove del 26/11/2026
+
+- **Ricerca vuota per una scelta dimenticata** (schede PC e iPhone): un artista scelto prima negli elenchi resta
+  attivo e la ricerca dice "0 di N brani" senza dire perché. Dire "0 brani di <artista>: cerca in
+  tutti" con un clic che toglie la scelta (o una ricerca nuova la toglie da sola: da decidere). Proposta
+  dell'utente: dopo Applica, o tornando sulla scheda, mostrare "(Tutti)" o selezionare i brani appena toccati.
+- **Compilation dalla scheda iPhone non riunisce un album diviso**: "PROVA Raccolta Due" (3 artisti, senza artista
+  dell'album) inviata così diventa 3 album sull'iPhone (un album e un artista dell'album per cantante); *Cambia i tag →
+  Compilation* mette `compilation` vero ma gli album restano 3, anche riaprendo l'app. Per riunirli serve lo stesso
+  artista dell'album, cioè Ricopia. Correggere il suggerimento della casella (oggi fa credere che la spunta riunisca)
+  e, se i brani scelti sono in album diversi dell'iPhone, proporre Ricopia con "Artisti Vari".
+- **"Anche sull'iPhone" che non fa niente in silenzio** (editor della scheda PC): con la sola spunta Compilation, già
+  presente sull'iPhone, `queue_files(…, UPDATE)` non trova differenze e non mette niente in attesa senza dirlo.
+  Dire "Anche sull'iPhone: niente da fare, sull'iPhone hanno già questi tag" (o quanti sono andati in attesa e
+  perché gli altri no). Nella finestra di Applica, un *Usa i tag* che cambia artista o artista dell'album diventa
+  Ricopia (`plan_updates`): dirlo già nella riga, non solo al momento di applicare.
+- **Album doppio "AA.VV." / "Artisti Vari"** (letto nel database dell'iPhone il 26/11/2026): "100 Greatest Male
+  Voices" ha **due righe `album` con lo stesso `sync_id` 3526**: una con artista dell'album "Artisti Vari" (93 brani),
+  una con "AA.VV." (7 brani). I 7 brani hanno come artista dell'album del brano "Artisti Vari": solo la riga dell'album
+  dice "AA.VV.". Il programma legge l'artista dal brano e raggruppa per `sync_id`, quindi vede un album da 100; l'app
+  Musica usa la riga dell'album e ne mostra due. Brani vecchi (pid bassi), origine non chiara. Da fare: un controllo
+  (in *Controlla la musica* dell'iPhone) per album con lo stesso `sync_id` in più righe, o con l'artista della riga
+  diverso da quello dei suoi brani, che proponga Ricopia di quei brani; provare la Ricopia sui 7.
+- **L'elenco Compilation dell'app Musica** segue `album.all_compilations`, non la spunta dei brani: *Cambia i tag →
+  Compilation* (`update_track`) cambia `item.is_compilation` ma non l'album ("PROVA Album Uno": brani 1, album 0, non
+  compare tra le Compilation). Un invio o una Ricopia con Compilation e artista dell'album lo fa ricalcolare
+  ("PROVA Raccolta Due" riunita: `all_compilations` 1). Quindi Compilation dalla scheda iPhone dovrebbe diventare
+  una Ricopia (o dirlo).
+- Prova 3 del 26/11/2026: "PROVA Raccolta Due" (3 album, uno per cantante) con artista dell'album e Compilation
+  cambiati nella scheda PC, *Anche sull'iPhone* → Applica (Usa i tag diventato Ricopia): un album solo. Restano 3 righe
+  `album` vuote (una per cantante), invisibili nell'app.
+- **Riquadro dei tag tagliato** (scheda iPhone): la casella "Anche sul PC: …" su una riga sola allargava il riquadro;
+  corretto (casella corta, spiegazione in una riga che va a capo; lo stesso per "Anche sull'iPhone" nella scheda PC).
+
 ## Suonerie verso l'iPhone — per ora non interessa
 
 Oggi un `.m4a` è sempre musica; le suonerie dell'utente stanno in `…\Suonerie` (cartelle escluse). Se servirà:
@@ -19,6 +53,30 @@ le suonerie dell'iPhone sono `.m4r` (AAC, al massimo ~40 s) in `/iTunes_Control/
 `/iTunes_Control/iTunes/Ringtones.plist` (come iTunes/Finder, iMazing). Prima provare a mano con pymobiledevice3 (AFC)
 se le versioni recenti di iOS le accettano ancora così; poi un'azione "Invia come suoneria (PC → iPhone)" che va in
 attesa e parte con **Applica**, come tutte le scritture sull'iPhone.
+
+**Crea una suoneria da un brano** (idea dell'utente):
+- **Da dove parte:** tasto destro su un brano nella scheda PC o nella scheda iPhone → *Crea una suoneria…* (dall'iPhone
+  il brano si legge, in sola lettura).
+- **La finestra:** forma d'onda o cursore, inizio e fine (al massimo ~40 s), ascolto del pezzo (QtMultimedia),
+  dissolvenza facoltativa. Il risultato è un `.m4r` (AAC) nuovo nella cartella delle suonerie: il brano non cambia.
+- **Scheda Suonerie** (nuova, accanto a PC e iPhone): le suonerie della **cartella delle suonerie** (quelle create
+  qui e quelle già presenti), e quelle sull'iPhone. Da qui *Invia come suoneria (PC → iPhone)*, in attesa fino ad
+  **Applica**.
+- **Impostazioni → Suonerie:** la cartella delle suonerie (dove si salvano i nuovi `.m4r`) e il **percorso di
+  ffmpeg**, che l'utente installa da sé: **ffmpeg non si distribuisce con il programma**. Senza ffmpeg la voce del
+  menu spiega cosa manca. Una cartella delle suonerie dentro una cartella della musica va esclusa dalla scheda PC.
+- Regole del progetto: nuova impostazione → "Quale valore vince" del README.
+
+## `$NOME` in tutti i campi di percorso (Impostazioni)
+
+Il campo del percorso di ffmpeg accetta `$NOME` (una variabile d'ambiente), espanso all'avvio; lo stesso per **tutti** i
+percorsi delle Impostazioni: cartelle della musica, Libreria, cartelle escluse, cartella delle suonerie. Oggi
+`config._expanded` espande già `%NOME%`, `$NOME` e `~` per Libreria e cartelle della musica, ma solo se scritti a mano
+in `settings.json`: le Impostazioni le scelgono con la finestra delle cartelle e non lasciano scrivere; le cartelle
+escluse (`hidden_folders`) non si espandono. Serve: un campo di testo accanto a ogni scelta, si salva il `$NOME`, le
+Impostazioni e *Informazioni* mostrano anche il valore espanso; una variabile che manca lo dice. Un nome nuovo (per
+esempio per ffmpeg) si chiede all'utente e va nella tabella delle variabili, `environment.VARIABLES` e il
+`.TEMPLATE.env`; README "Quale valore vince".
 
 ## Da provare con l'iPhone attaccato (solo brani PROVA, poi tolti)
 
@@ -58,6 +116,12 @@ Fatto e provato senza telefono (test e finestre di prova); da confermare sul tel
     tutto; la sessione ha cancellato anche le altre righe vuote. L'utente ha visto il nome nuovo nell'app. Restano
     da provare dalla finestra (build nuova) e su un album vero. Sull'iPhone restano vuoti (invisibili) "PROVA
     Raccolta 01" e "PROVA ARTISTA".
+- **Prove del 26/11/2026** (brani finti in `C:\temp\PROVA-myEasyMP3toIPhone`, album "PROVA Album Uno" di "PROVA
+  Artista"): *Copia da PC a iPhone* di 3 brani + **Applica**: ok; con l'app Musica aperta l'album nuovo è comparso da
+  solo, senza chiuderla. *Cambia i tag* con Compilation sui 3 brani: ok (nel database dell'iPhone `compilation`
+  vero, colonna Sul PC ⟳, 3 azioni applicate); nell'app Musica nessun cambiamento visibile, nemmeno riaprendola: con un
+  solo artista e l'artista dell'album scritto l'album resta sotto quell'artista. Da provare con "PROVA Raccolta Due"
+  (artisti diversi, senza artista dell'album).
 - **App Musica che non si aggiorna da sola**: dopo ogni scrittura il programma manda l'avviso di fine
   sincronizzazione di iTunes (`com.apple.itunes-mobdev.syncDidFinish`, `iphone.post_sync_finished`). Con l'app
   Musica aperta: se si aggiorna da sola, togliere dal messaggio finale l'invito a chiuderla e riaprirla; se no,
@@ -140,3 +204,39 @@ Windows. Le parti scritte solo per Windows sono poche:
 - Prove con l'iPhone su Mac: 1 giorno, di più se il Finder dà problemi.
 - Spese: nessuna se c'è già un Mac e il programma serve solo a te; altrimenti il Mac e i 99 $ all'anno per la firma.
 - Da decidere prima: per chi è la versione Mac (solo tu o anche altri) e se c'è un Mac per le prove.
+
+## Cartella dati su OneDrive, più PC uno alla volta (bassa probabilità)
+
+Analisi del 26/11/2026, solo leggendo il codice. Programma installato su ogni PC; cartella dati con
+`MYEASYMP3TOIPHONE_HOME=%OneDrive%\myEasyMP3toIPhone` (variabile di Windows su ogni PC: `%OneDrive%` si espande).
+
+**Va già.** Il registro della provenienza ha una copia sull'iPhone e si unisce a ogni connessione (ripara anche una
+copia OneDrive vecchia); cartelle della musica per computer; elenco e impronte dell'iPhone, Cartelle preferite (nomi),
+profili AI e le azioni in attesa per brano dell'iPhone valgono ovunque. Le chiavi sono nella Gestione credenziali di
+ogni PC: da riscrivere su ognuno, o `$NOME`.
+
+**Il nodo: un brano ha una sola sorgente** (`provenance.Link`: un PC, un file). Su PC-B un brano di PC-A è "PC-A":
+niente ✔/⟳, Ricopia, Usa i tag; *Associa sorgenti* non lo propone; associarlo a mano toglie la sorgente a PC-A (vince
+la riga più recente). Strade: con gli stessi percorsi sui due PC basta "PC-B ha la stessa musica di PC-A"; con percorsi
+diversi servono collegamenti per computer, quello di PC-B ricavato con l'impronta (solo se è la stessa copia del file;
+per rip diversi restano le regole, confermate). Cambia il formato del registro anche sull'iPhone: oggi una versione
+vecchia ignora un registro di altro formato e riscrive il suo sull'iPhone, perdendo le righe nuove.
+
+**Dati legati ai percorsi di un PC.** `modifiche_tag.json` e le voci per file di `iphone_in_attesa.json` (una Ricopia
+in attesa con un file di PC-A fallirebbe da PC-B): serve il nome del PC. `hidden_folders`, `last_*`, posizione della
+finestra: da dividere per computer. `library_dir`: un PC senza le sue cartelle userebbe la Libreria dell'altro.
+`cache_tag.json` (15 MB, mai pulita, riscritta tutta a ogni salvataggio): meglio una per PC fuori da OneDrive.
+
+**OneDrive.** Il lucchetto `myEasyMP3toIPhone.instance.lock` (`setStaleLockTime(0)`): un lucchetto rimasto da un altro
+PC non si riconosce come vecchio, PC-B non parte (da provare); può invece dire "aperto su PC-A". Ritardo e copie in
+conflitto (`settings-PCB.json`) se si cambia PC troppo in fretta. `os.replace` può fallire mentre OneDrive tiene il file
+(il registro non lo gestisce): riprovare. Cartella dati "Sempre su questo dispositivo"; log a rotazione e `Backup\`
+meglio sul PC; il `.env` con chiavi in chiaro viaggerebbe.
+
+**Versioni diverse.** Nessun controllo per dati di formato più nuovo: una versione vecchia potrebbe riscrivere vuoti i
+file che non sa leggere. Serve "dati di una versione più nuova: aggiorna il programma".
+
+**Ordine.** 1) controllo delle versioni, avviso "aperto su PC-A", salvataggi che riprovano; 2) cache, log e backup
+fuori da OneDrive, impostazioni dei percorsi per computer; 3) azioni in attesa e modifiche dei tag con il PC;
+4) collegamenti per computer nel registro (il pezzo grosso). Da sapere prima: stessi percorsi sui due PC? Copie
+identiche dei file o rip diversi?

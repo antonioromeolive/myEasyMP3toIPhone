@@ -78,6 +78,7 @@ SHOW_FILTERS = [
     ("Con una sorgente proposta (in rosso)", lambda origin, pc, proposed, coverless: bool(proposed)),
     ("Album senza immagine sull'iPhone", lambda origin, pc, proposed, coverless: coverless),
 ]
+COVERLESS_FILTER = len(SHOW_FILTERS) - 1     # con questo filtro la barra mostra Ricopia le copertine
 PC_TIP = {PC_SAME: "Sul PC c'è la sorgente di questo brano, con gli stessi tag",
           PC_STALE: "Sul PC c'è la sorgente di questo brano, ma con tag diversi",
           PC_PROBABLE: "Da rivedere: sul PC c'è un brano con lo stesso titolo, album e artista, ma non è certo che "
@@ -418,6 +419,8 @@ class IPhonePanel(QWidget):
         self._pc_states = {}          # pid -> (PC_*, Track del PC o None): la colonna Sul PC
         self._spelling = {}           # pid -> ["album", "album_artist"]: scritti diversamente dal PC (sorgente certa)
         self._proposed = {}           # pid -> adoption.Proposal: la sorgente proposta, in rosso
+        self._cover_known = {}        # sync_id dell'album -> i suoi file del PC hanno la copertina (cover_plan)
+        self._tag_shown = None        # cosa mostra il riquadro dei tag: si rifà solo quando cambia
         self._pc_dirty = True
 
         self._manual_off = False      # disconnesso a mano: niente riconnessione automatica fino al cavo staccato
@@ -529,7 +532,7 @@ class IPhonePanel(QWidget):
         # la barra delle azioni sopra i brani: le stesse voci del tasto destro, per i brani scelti; Strumenti per le
         # azioni su tutti i brani (Associa, Playlist…)
         self._actions = ActionBar([("save", ""), ("replace", ""), ("tags", ""), ("edit", ""), ("link", ""),
-                                   ("delete", "danger")])
+                                   ("cover", ""), ("delete", "danger")])
         self._tools = QMenu(self)
         self._tools.aboutToShow.connect(self._fill_tools)
         self._actions.set_menu(self._tools)
@@ -590,9 +593,27 @@ class IPhonePanel(QWidget):
         return self._tag_box
 
     def _update_tag_panel(self) -> None:
-        """I brani selezionati nel riquadro dei tag (se è aperto)."""
+        """Il riquadro dei tag (se è aperto) segue quello che si vede: i brani selezionati ancora visibili; senza, con
+        un album scelto negli elenchi, la sua copertina e il suo nome (come nella scheda PC); altrimenti vuoto. Si rifà
+        solo quando cambia, così una ricerca non cancella quello che si sta scrivendo."""
         if hasattr(self, "_tag_panel") and not self._tag_box.isHidden():
-            self._show_in_tag_panel(self._selected_phone_tracks())
+            items = self._selected_phone_tracks()
+            albums = self._browser.selected_albums()
+            album = None
+            if not items and len(albums) == 1:
+                album = next(iter(albums))
+            pids = []
+            for item in items:
+                pids.append(item.pid)
+            shown = (tuple(pids), album)
+            if shown != self._tag_shown:
+                self._tag_shown = shown
+                if album is not None:
+                    members = self._browser.album_tracks(album)
+                    cover, note = self._cover_for(members)
+                    self._tag_panel.show_album(members, cover, note)
+                else:
+                    self._show_in_tag_panel(items)
 
     def _show_in_tag_panel(self, items: list) -> None:
         """Il riquadro dei tag con items: quanti hanno il file associato su questo PC e la copertina di quel file."""
@@ -636,7 +657,8 @@ class IPhonePanel(QWidget):
         elif albums:
             note = "Brani di album diversi"
         if coverless:
-            note += "\nSull'iPhone l'album non ha l'immagine: Ricopia le copertine da PC a iPhone (tasto destro)"
+            note += ("\nSull'iPhone l'album non ha l'immagine: il pulsante Ricopia le copertine da PC a iPhone, nella "
+                     "barra sopra i brani")
         result = (cover, note.strip())
         return result
 
@@ -663,6 +685,9 @@ class IPhonePanel(QWidget):
                     bar[key] = entries[key]
                 else:
                     bar[key] = (tr(BAR_LABELS[key]), False, None)
+            cover = self._cover_bar_entry(items)
+            if cover is not None:                      # senza voce il pulsante si nasconde
+                bar["cover"] = cover
             if not items:
                 who = "Scegli dei brani, o un artista o un album:"
             elif len(items) == 1:
@@ -752,6 +777,8 @@ class IPhonePanel(QWidget):
         self._matches = pc_matches(self._phone_tracks, self._window.tracks, self._links())
         self._pc_states = {}
         self._spelling = {}
+        self._cover_known = {}
+        self._tag_shown = None
         for item in self._phone_tracks:
             self._pc_states[item.pid] = self._pc_state(item)
             state, track = self._pc_states[item.pid]
@@ -1048,6 +1075,7 @@ class IPhonePanel(QWidget):
             else:
                 self._count.setText(f"{total} brani")
             self._update_action_bar()
+            self._update_tag_panel()     # un brano selezionato ora nascosto non resta nel riquadro dei tag
 
     def _update_bands(self) -> None:
         """Le tinte degli album, per le righe che si vedono nell'ordine in cui si vedono."""
@@ -1143,38 +1171,81 @@ class IPhonePanel(QWidget):
         result = (text, bool(sends), lambda: self._window.queue_files(sends, SEND))
         return result
 
+    def _pc_has_cover(self, album_sync_id: int, tracks: list) -> bool:
+        """Almeno uno dei primi COVER_TRIES file associati dell'album ha la copertina (anche nuova, in sospeso): solo
+        allora una Ricopia dà l'immagine all'album sull'iPhone. Si ricorda fino al prossimo confronto con il PC."""
+        if album_sync_id not in self._cover_known:
+            found = False
+            index = 0
+            while not found and index < len(tracks) and index < COVER_TRIES:
+                found = self._window.cover_of(tracks[index]) is not None
+                index += 1
+            self._cover_known[album_sync_id] = found
+        result = self._cover_known[album_sync_id]
+        return result
+
     def cover_plan(self, items: list) -> tuple:
-        """Sistema le copertine per i brani scelti: (coppie (PhoneTrack, Track) da rimpiazzare dal PC, album che non
-        si possono). Gli album senza immagine sull'iPhone, interi: tutti i loro brani con la sorgente certa su questo
-        PC; un rimpiazzo dal PC fa scegliere all'iPhone l'immagine dell'album (provato il 24/11/2026). Un album senza
-        nessun brano con la sorgente non si può."""
+        """Sistema le copertine per i brani scelti: (coppie (PhoneTrack, Track) da rimpiazzare dal PC, album senza
+        sorgente, album senza copertina neanche sul PC). Gli album senza immagine sull'iPhone, interi: tutti i loro
+        brani con la sorgente certa su questo PC; un rimpiazzo dal PC fa scegliere all'iPhone l'immagine dell'album
+        (provato il 24/11/2026). Non si può per un album senza nessun brano con la sorgente, né per uno i cui file del
+        PC non hanno la copertina (la Ricopia non gliela darebbe)."""
         albums = set()
         for item in items:
             if item.album_without_cover and item.album_sync_id:
                 albums.add(item.album_sync_id)
-        pairs = []
-        linked_albums = set()
+        linked = {}
         for item in self._phone_tracks:
             if item.album_sync_id in albums and item.from_computer:
                 state, track = self._pc_states.get(item.pid, (PC_NONE, None))
                 if state in (PC_SAME, PC_STALE):
-                    pairs.append((item, track))
-                    linked_albums.add(item.album_sync_id)
-        result = (pairs, len(albums) - len(linked_albums))
+                    linked.setdefault(item.album_sync_id, []).append((item, track))
+        pairs = []
+        no_cover = 0
+        for album_sync_id, album_pairs in linked.items():
+            tracks = []
+            for _item, track in album_pairs:
+                tracks.append(track)
+            if self._pc_has_cover(album_sync_id, tracks):
+                pairs.extend(album_pairs)
+            else:
+                no_cover += 1
+        result = (pairs, len(albums) - len(linked), no_cover)
         return result
 
     def _cover_entry(self, items: list) -> tuple:
         """La voce Ricopia le copertine (ex Sistema le copertine) per i brani scelti: (testo, attiva, funzione). Gli
         album sull'iPhone senza immagine, anche se i brani hanno la copertina (album messi da altri programmi):
         ricopiando i loro brani dal PC l'iPhone la sceglie. Va in attesa come Ricopia."""
-        pairs, blocked = self.cover_plan(items)
+        pairs, no_source, no_cover = self.cover_plan(items)
         albums = set()
         for item, _track in pairs:
             albums.add(item.album_sync_id)
         text = f"Ricopia le copertine da PC a iPhone: {len(albums)} album senza immagine"
-        if blocked:
-            text += f"; {blocked} non si possono, nessun brano ha la sorgente associata"
+        if no_source:
+            text += f"; {no_source} senza sorgente sul PC"
+        if no_cover:
+            text += f"; {no_cover} senza copertina anche sul PC"
         result = (text, bool(pairs), lambda: self._window.queue_pairs(pairs, REPLACE))
+        return result
+
+    def _cover_bar_entry(self, items: list):
+        """Il pulsante Ricopia le copertine nella barra: con il filtro "Album senza immagine sull'iPhone" (per i brani
+        scelti o, senza scelta, per tutti quelli che si vedono) o quando tra i brani scelti c'è un album senza
+        immagine. None quando non serve (il pulsante si nasconde)."""
+        coverless_filter = self._show.currentIndex() == COVERLESS_FILTER
+        targets = list(items)
+        if coverless_filter and not targets:
+            for index in range(self._music_view.topLevelItemCount()):
+                row = self._music_view.topLevelItem(index)
+                item = self._by_pid.get(row.data(COL_TITLE, PID_ROLE))
+                if item is not None and not row.isHidden():
+                    targets.append(item)
+        coverless = False
+        for item in targets:
+            if item.album_without_cover:
+                coverless = True
+        result = self._cover_entry(targets) if coverless else None
         return result
 
     def _service_leftovers(self) -> list:

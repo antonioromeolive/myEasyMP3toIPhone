@@ -1025,11 +1025,22 @@ def test_albums_without_cover_read_saved_and_planned(tmp_path):
         window.registry = registry
         window.set_phone_tracks(phone, "iPhone di prova")
         panel = window.iphone_panel
-        pairs, blocked = panel.cover_plan([phone[0], phone[2]])
-        assert sorted(item.pid for item, _track in pairs) == [1, 2]    # l'album intero
-        assert blocked == 1                                            # "Altro": nessun brano con la sorgente
+        # i file del PC senza copertina: la Ricopia non darebbe l'immagine all'album, non si propone
+        pairs, no_source, no_cover = panel.cover_plan([phone[0], phone[2]])
+        assert pairs == [] and no_source == 1 and no_cover == 1       # "Altro": nessun brano con la sorgente
+        window.cover_of = lambda track: b"immagine" if track.path == files[1] else None
+        panel._compare_with_pc()                                       # si dimentica cosa sapeva delle copertine
+        pairs, no_source, no_cover = panel.cover_plan([phone[0], phone[2]])
+        assert sorted(item.pid for item, _track in pairs) == [1, 2]    # l'album intero (una copertina basta)
+        assert no_source == 1 and no_cover == 0
+        assert panel._actions.button("cover").isHidden()               # nessun album senza immagine scelto
         panel._show.setCurrentIndex(panel._show.count() - 1)          # Mostra: album senza immagine
         assert panel._count.text() == "3 di 3 brani"
+        button = panel._actions.button("cover")                        # il pulsante per sistemarli, nella barra
+        assert not button.isHidden() and button.isEnabled()
+        assert button.text().startswith("Ricopia le copertine da PC a iPhone: 1 album senza immagine; 1 senza")
+        button.click()
+        assert window.pending.get_phone(1) == "ricopia" and window.pending.get_phone(2) == "ricopia"
     finally:
         window._exit_checked = True
         window.close()
@@ -1071,6 +1082,50 @@ def test_choosing_an_album_shows_its_cover_without_selected_tracks():
         window._table.selectRow(0)
         app.processEvents()
         assert editor._header.text() == "Uno.mp3"                    # un brano selezionato: l'editor normale
+    finally:
+        window._exit_checked = True
+        window.close()
+        app.processEvents()
+
+
+def test_iphone_tag_panel_follows_the_chosen_artist_or_album():
+    """Scheda iPhone: un brano selezionato e poi un altro artista o album scelti negli elenchi; il riquadro dei tag
+    non resta sul brano di prima, ormai nascosto: mostra l'album scelto (nome, brani) o niente."""
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtWidgets import QApplication
+    from myeasymp3toiphone.gui.main_window import MainWindow
+    app = QApplication.instance() or QApplication([])
+    window = MainWindow()
+    try:
+        phone = [_phone(1, "Uno", "Gruppo Finto", "Disco Uno"), _phone(2, "Due", "Gruppo Finto", "Disco Uno"),
+                 _phone(3, "Tre", "Altro Finto", "Disco Tre")]
+        window.set_phone_tracks(phone, "iPhone di prova")
+        app.processEvents()                       # l'elenco si rifà dopo, con il confronto con il PC
+        panel = window.iphone_panel
+        tags = panel._tag_panel
+        view = panel._music_view
+        for index in range(view.topLevelItemCount()):
+            row = view.topLevelItem(index)
+            row.setSelected(row.text(3) == "Uno")
+        app.processEvents()
+        assert tags._header.text() == "Uno"
+        browser = panel._browser
+        for index in range(browser.albums.topLevelItemCount()):
+            item = browser.albums.topLevelItem(index)
+            item.setSelected(item.text(0) == "Disco Tre")
+        app.processEvents()
+        assert "Disco Tre" in tags._header.text() and "1 brani" in tags._header.text()
+        assert not tags._save_button.isEnabled()
+        for index in range(browser.artists.topLevelItemCount()):
+            item = browser.artists.topLevelItem(index)
+            item.setSelected(item.text(0) == "Altro Finto")
+        app.processEvents()
+        assert tags._header.text() == "Seleziona uno o più brani"   # un artista, nessun album: niente di vecchio
+        for index in range(browser.artists.topLevelItemCount()):
+            item = browser.artists.topLevelItem(index)
+            item.setSelected(item.text(0) == "Gruppo Finto")
+        app.processEvents()
+        assert tags._header.text() == "Uno"            # il brano selezionato si vede di nuovo: torna nel riquadro
     finally:
         window._exit_checked = True
         window.close()

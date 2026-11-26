@@ -97,7 +97,8 @@ class TagEditor(QWidget):
         note.setWordWrap(True)
         note.setStyleSheet("color: gray")
         # spenta di serie, e di nuovo spenta dopo ogni salvataggio: l'iPhone cambia solo se lo chiedi
-        self.also_phone = QCheckBox("Anche sull'iPhone: usa questi tag da PC a iPhone (va in attesa)")
+        # una casella non va a capo: il testo resta corto, la spiegazione è nel suggerimento e nella nota sotto
+        self.also_phone = QCheckBox("Anche sull'iPhone (va in attesa)")
         self.also_phone.setToolTip("Per i brani che sull'iPhone hanno la sorgente certa (registro): dopo il "
                                    "salvataggio i tag nuovi vanno in attesa per l'iPhone e partono con Applica. Spenta, "
                                    "l'iPhone resta com'è e la differenza si vede (⟳).")
