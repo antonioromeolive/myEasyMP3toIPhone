@@ -210,6 +210,14 @@ def _tracks_text(count: int) -> str:
     return result
 
 
+def _numbers_count(count: int) -> str:
+    if count == 1:
+        result = "1 numero"
+    else:
+        result = f"{count} numeri"
+    return result
+
+
 def _short(path) -> str:
     parts = Path(path).parts
     result = str(Path(*parts[-3:])) if len(parts) >= 3 else str(path)
@@ -427,24 +435,68 @@ def _numbers_by_disc(album_tracks: list) -> dict:
     return numbers
 
 
-def detect_few_tracks(tracks: list) -> list:
+def track_gaps(album_tracks: list) -> list:
+    """I numeri di traccia che mancano ("5", o "2-3" per il disco 2), fino al più alto o alle tracce totali
+    dichiarate. Di solito ogni disco riparte da 1; se invece i numeri dei dischi non si ripetono mai (disco 1: 1-16,
+    disco 2: 17-30…) la numerazione è unica per tutto l'album e i buchi si cercano sull'insieme."""
+    by_disc = _numbers_by_disc(album_tracks)
+    totals = {}
+    for track in album_tracks:
+        disc = track.tags.disc_number or 1
+        totals[disc] = max(totals.get(disc, 0), track.tags.track_total or 0)
+    union = set()
+    counted = 0
+    for numbers in by_disc.values():
+        union |= numbers
+        counted += len(numbers)
+    gaps = []
+    if len(by_disc) > 1 and counted == len(union):          # numerazione unica su tutti i dischi
+        highest = max(max(union), max(totals.values()))
+        for position in range(1, highest + 1):
+            if position not in union:
+                gaps.append(str(position))
+    else:
+        for disc, numbers in sorted(by_disc.items()):
+            highest = max(max(numbers), totals.get(disc, 0))
+            for position in range(1, highest + 1):
+                if position not in numbers:
+                    gaps.append(f"{disc}-{position}" if disc > 1 else str(position))
+    result = gaps
+    return result
+
+
+def _with_context(album_tracks: list, context: dict) -> list:
+    """I brani dell'album controllati e quelli dello stesso album fuori dalla scelta (context: {(artista, album) in
+    minuscolo: [brani]}), una volta sola."""
+    result = list(album_tracks)
+    seen = set()
+    for track in album_tracks:
+        seen.add(os.path.normcase(str(track.path)))
+    key = album_tracks[0].album_key
+    for track in context.get((key[0].casefold(), key[1].casefold()), []):
+        path = os.path.normcase(str(track.path))
+        if path not in seen:
+            seen.add(path)
+            result.append(track)
+    return result
+
+
+def detect_few_tracks(tracks: list, context: Optional[list] = None) -> list:
+    """Album con numeri di traccia mancanti (R9) o con 1-2 brani (R10). context: tutti i brani della musica, quando si
+    controlla solo una parte: un album va giudicato intero, anche con i brani che non sono stati scelti."""
     issues = []
     number = 0
     groups = group_by_album(tracks)
+    by_key = {}
+    for track in context or []:
+        key = track.album_key
+        by_key.setdefault((key[0].casefold(), key[1].casefold()), []).append(track)
     for key in sorted(groups, key=lambda k: (k[0].lower(), k[1].lower())):
         artist, album = key
-        album_tracks = groups[key]
+        album_tracks = _with_context(groups[key], by_key) if by_key else groups[key]
         if album != UNKNOWN_ALBUM:
             number += 1
-            declared = 0
-            for track in album_tracks:
-                declared = max(declared, track.tags.track_total or 0)
-            gaps = []
-            for disc, numbers in sorted(_numbers_by_disc(album_tracks).items()):
-                highest = max(max(numbers), declared if disc == 1 else 0)
-                for position in range(1, highest + 1):
-                    if position not in numbers:
-                        gaps.append(f"{disc}-{position}" if disc > 1 else str(position))
+            gaps = track_gaps(album_tracks)
             count = len(album_tracks)
             files = [track.path for track in album_tracks]
             # FLAC + CUE: un file solo con tutte le tracce, i numeri "mancanti" sono dentro (cue.py)
@@ -454,7 +506,8 @@ def detect_few_tracks(tracks: list) -> list:
                 severity = SEVERITY_HIGH if count * 2 <= expected else SEVERITY_MEDIUM
                 shown = ", ".join(gaps[:15]) + ("…" if len(gaps) > 15 else "")
                 issues.append(Issue(
-                    KIND_FEW_TRACKS, severity, f"{artist} — {album}: {_tracks_text(count)} su almeno {expected}",
+                    KIND_FEW_TRACKS, severity, f"{artist} — {album}: mancano {_numbers_count(len(gaps))} di traccia "
+                    f"({_tracks_text(count)} qui, l'album ne ha almeno {expected})",
                     f"Mancano i numeri di traccia {shown}. \"Verifica album online\" controlla l'elenco completo "
                     "nei cataloghi online.", files, rule_id=f"R9.{number}"))
             elif count <= 2 and not whole_disc:
@@ -786,7 +839,8 @@ def drop_repeated(ai_issues: list, found_by_rules: list) -> list:
 
 
 def rule_issues(tracks: list, check_files: bool, progress: Optional[ProgressFn] = None,
-                cancel: Optional[threading.Event] = None, checks: frozenset = ALL_CHECKS) -> list:
+                cancel: Optional[threading.Event] = None, checks: frozenset = ALL_CHECKS,
+                context: Optional[list] = None) -> list:
     issues = []
     if CHECK_UNREADABLE in checks:
         issues += detect_unreadable(tracks)
@@ -797,7 +851,7 @@ def rule_issues(tracks: list, check_files: bool, progress: Optional[ProgressFn] 
     if CHECK_MISSING in checks:
         issues += detect_missing_tags(tracks)
     if CHECK_FEW in checks:
-        issues += detect_few_tracks(tracks)
+        issues += detect_few_tracks(tracks, context)
     if CHECK_SPLIT in checks:
         issues += detect_split_folders(tracks)
         issues += detect_split_names(tracks)
@@ -1083,7 +1137,9 @@ folder and the genres. The rule findings were computed by simple rules.
 
 Find the problems the owner usually has:
 - "non_aggiornato": files whose tags will not show as updated (only if the data shows it);
-- "album_incompleto": albums with few tracks or missing track numbers. An album with an "immagine CUE" column is a \
+- "album_incompleto": albums with few tracks or missing track numbers. The "mancanti" column is computed for you \
+(a box set may number its tracks across all the discs): with "mancanti: nessuno" no number is missing. An album with \
+an "immagine CUE" column is a \
 whole disc in one file (FLAC + CUE): never report it as incomplete;
 - "collezione_divisa": one collection split into several albums: the same album with different spellings, a disc \
 marker in the album name, a compilation without album artist, the same artist spelled differently. A duet name \
@@ -1162,9 +1218,10 @@ def album_lines(groups: dict, keys: list) -> list:
         declared = max([t.tags.track_total or 0 for t in album_tracks] + [0])
         artists = sorted({t.tags.artist for t in album_tracks if t.tags.artist and t.tags.artist != key[0]})
         folder = "/".join(album_tracks[0].path.parent.parts[-2:])
+        missing = ",".join(track_gaps(album_tracks)[:20]) or "nessuno"
         text = (f"A{index} | album artist: {key[0]} | album: {key[1]} | anni: {','.join(years) or '-'} | brani: "
                 f"{len(album_tracks)} | numeri: {_numbers_text(album_tracks)} | totale dichiarato: {declared or '-'} "
-                f"| cartella: {folder} | generi: {','.join(genres) or '-'}")
+                f"| mancanti: {missing} | cartella: {folder} | generi: {','.join(genres) or '-'}")
         formats = sorted({t.path.suffix.lower().lstrip(".") for t in album_tracks})
         if len(formats) > 1:
             text += f" | formati: {','.join(formats)}"
@@ -1379,7 +1436,8 @@ def scan_tracks(tracks: list, target: str, provider=None, check_files: bool = Tr
                 checks: frozenset = ALL_CHECKS, fingerprints: Optional[dict] = None,
                 musicbrainz=None, ai_flagged_only: bool = False, keep_phone_fixes: bool = False,
                 partial: Optional[Callable[[list], None]] = None,
-                ai_skip: Optional[Callable[[tuple], bool]] = None) -> ScanReport:
+                ai_skip: Optional[Callable[[tuple], bool]] = None,
+                album_context: Optional[list] = None) -> ScanReport:
     """Il controllo: le regole dei controlli scelti (checks), poi l'AI se c'è un fornitore. Con phone_tracks (la
     musica dell'app Musica, i cui brani sono anche tracks) è dell'iPhone, confrontato con library_tracks.
     fingerprints: {percorso: impronta dell'audio} per i brani duplicati (senza, solo quelli sospetti per i tag).
@@ -1389,10 +1447,11 @@ def scan_tracks(tracks: list, target: str, provider=None, check_files: bool = Tr
     keep_phone_fixes: le correzioni dei brani dell'iPhone restano (la linguetta Controlli le applica dalla parte giusta);
     senza, si tolgono e il dettaglio dice di correggere sul PC.
     partial(problemi): i risultati man mano (una copia dell'elenco): dopo le regole e dopo l'analisi AI.
-    ai_skip(album_key): gli album che l'analisi AI salta (quelli che vanno bene così per intero)."""
+    ai_skip(album_key): gli album che l'analisi AI salta (quelli che vanno bene così per intero).
+    album_context: tutti i brani della musica quando tracks è una parte: gli album incompleti si giudicano interi."""
     assign_groups(tracks)
     report = ScanReport(target=target, tracks_scanned=len(tracks), albums_scanned=len(group_by_album(tracks)))
-    issues = rule_issues(tracks, check_files, progress, cancel, checks)
+    issues = rule_issues(tracks, check_files, progress, cancel, checks, album_context)
     rules_cut = is_cancelled(cancel)
     if partial is not None:
         partial(list(issues))

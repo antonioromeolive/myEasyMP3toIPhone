@@ -1586,8 +1586,12 @@ CATALOG = {
         "{0} tracks present more than once in the same album",
     "Più file hanno lo stesso album, numero di traccia e titolo.":
         "Several files have the same album, track number and title.",
-    "{0} — {1}: {2} su almeno {3}":
-        "{0} — {1}: {2} of at least {3}",
+    "{0} — {1}: mancano {2} di traccia ({3} qui, l'album ne ha almeno {4})":
+        "{0} — {1}: {2} missing among the track numbers ({3} here, the album has at least {4})",
+    "1 numero":
+        "1 number",
+    "{0} numeri":
+        "{0} numbers",
     "Mancano i numeri di traccia {0}. \"Verifica album\" controlla l'elenco completo su MusicBrainz.":
         "Track numbers {0} are missing. \"Check albums\" checks the full list on MusicBrainz.",
     "{0} — {1}: solo {2}":
@@ -1674,8 +1678,8 @@ CATALOG = {
         "disc {0}: {1}",
     "nessuno":
         "none",
-    "A{0} | album artist: {1} | album: {2} | anni: {3} | brani: {4} | numeri: {5} | totale dichiarato: {6} | cartella: {7} | generi: {8}":
-        "A{0} | album artist: {1} | album: {2} | anni: {3} | brani: {4} | numeri: {5} | totale dichiarato: {6} | cartella: {7} | generi: {8}",
+    "A{0} | album artist: {1} | album: {2} | anni: {3} | brani: {4} | numeri: {5} | totale dichiarato: {6} | mancanti: {7} | cartella: {8} | generi: {9}":
+        "A{0} | album artist: {1} | album: {2} | anni: {3} | brani: {4} | numeri: {5} | totale dichiarato: {6} | mancanti: {7} | cartella: {8} | generi: {9}",
     " | formati: {0}":
         " | formati: {0}",
     " | immagine CUE: {0} tracce in {1} file":

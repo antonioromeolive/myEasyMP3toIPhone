@@ -89,7 +89,7 @@ def test_few_tracks_and_split_collections(tmp_path):
     tracks = scan_folder(tmp_path)
     issues = scan.rule_issues(tracks, check_files=False)
     titles = " | ".join(issue.title for issue in issues)
-    assert "su almeno 10" in titles
+    assert "mancano 9 numeri di traccia (1 brano qui, l'album ne ha almeno 10)" in titles
     folder_split = [i for i in issues if i.rule_id.startswith("R11")]
     assert folder_split and folder_split[0].fix is not None
     name_split = [i for i in issues if i.rule_id.startswith("R12")]
@@ -403,3 +403,53 @@ def test_stray_tracks_in_the_pc_table_and_filter():
         assert "Raccolta Finta" in model.data(index, Qt.ToolTipRole)
     finally:
         window.close()
+
+
+def test_track_numbers_running_across_the_discs_are_not_missing():
+    """Un cofanetto numerato di seguito su tutti i dischi (disco 1: 1-16, disco 2: 17-32…, tracce totali 40) non ha
+    numeri mancanti; se ogni disco riparte da 1, si guarda disco per disco."""
+    from pathlib import Path
+    from myeasymp3toiphone.library import Track
+
+    def album(numbers_by_disc, total):
+        result = []
+        for disc, numbers in numbers_by_disc.items():
+            for number in numbers:
+                tags = TrackTags(title=f"Brano {disc}-{number}", artist="Gruppo Finto", album="Cofanetto Finto",
+                                 track_number=number, track_total=total, disc_number=disc, disc_total=3)
+                result.append(Track(path=Path(f"C:/m/Cofanetto/{disc}-{number:02d}.flac"), tags=tags))
+        return result
+
+    running = album({1: range(1, 17), 2: range(17, 33), 3: range(33, 41)}, 40)
+    assert scan.track_gaps(running) == [] and scan.detect_few_tracks(running) == []
+    hole = album({1: range(1, 17), 2: [17, 18, 20], 3: range(21, 23)}, 22)          # manca il 19, davvero
+    assert scan.track_gaps(hole) == ["19"]
+    restarting = album({1: range(1, 11), 2: [1, 2, 4]}, 10)                         # ogni disco da 1: manca 2-3
+    assert scan.track_gaps(restarting) == ["2-3", "2-5", "2-6", "2-7", "2-8", "2-9", "2-10"]
+    per_disc_total = album({1: range(1, 11), 2: [1, 2, 3]}, 0)
+    for track in per_disc_total[10:]:
+        track.tags.track_total = 3                                                  # il disco 2 ne ha 3: completo
+    assert scan.track_gaps(per_disc_total) == []
+
+
+def test_an_album_chosen_in_part_is_judged_whole():
+    """Scelto un brano solo ("traccia 2 di 4"), con gli altri tre dello stesso album in un'altra cartella: l'album non
+    è incompleto. Senza i brani di contesto sembrerebbe "1 brano, mancano 1, 3, 4"."""
+    from pathlib import Path
+    from myeasymp3toiphone.library import Track, assign_groups
+
+    def track(folder, number):
+        tags = TrackTags(title=f"Brano {number}", artist="Cantante Finto", album="Modi Finti", track_number=number,
+                         track_total=4)
+        return Track(path=Path(f"C:/m/Cantante Finto/{folder}/{number:02d}.mp3"), tags=tags)
+
+    chosen = [track("Modi Finti (1991)", 2)]
+    everything = chosen + [track("Modi Finti", 1), track("Modi Finti", 3), track("Modi Finti", 4)]
+    assign_groups(everything)
+    alone = scan.detect_few_tracks(chosen)
+    assert [issue.rule_id for issue in alone] == ["R9.1"]
+    assert alone[0].title == "Cantante Finto — Modi Finti: mancano 3 numeri di traccia (1 brano qui, l'album ne ha " \
+                             "almeno 4)"
+    assert scan.detect_few_tracks(chosen, everything) == []
+    report = scan.scan_tracks(chosen, "prova", check_files=False, album_context=everything)
+    assert [issue.rule_id for issue in report.issues if issue.kind == scan.KIND_FEW_TRACKS] == []

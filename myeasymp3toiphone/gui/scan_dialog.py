@@ -178,6 +178,7 @@ class ScanLauncher:
         checks = choices["checks"]
         target = f"PC, {len(tracks)} brani"
         self.library_tracks = tracks
+        context = list(window.tracks) if len(tracks) < len(window.tracks) else None   # una parte: album interi
         tag_cache = window.tag_cache
         musicbrainz = choices["musicbrainz"] if CHECK_VARIANTS in checks else None
 
@@ -190,7 +191,7 @@ class ScanLauncher:
                 prints = pc_fingerprints(tracks, tag_cache, progress, cancel)
             report = scan_tracks(tracks, target, None, check_files=CHECK_FILES in checks, progress=progress,
                                  cancel=cancel, checks=checks, fingerprints=prints, musicbrainz=musicbrainz,
-                                 partial=lambda issues: emit((LIVE_ISSUES, issues)))
+                                 partial=lambda issues: emit((LIVE_ISSUES, issues)), album_context=context)
             emit((LIVE_ISSUES, list(report.issues)))
             results = self._online(tracks, report, choices, progress, cancel, emit)
             value = (report, results)
