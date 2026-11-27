@@ -226,6 +226,12 @@ class AlbumCheckDialog(QDialog):
                 item.setText(3, "presente")
                 item.setForeground(3, QBrush(GREEN))
             self._tracks_view.addTopLevelItem(item)
+        for match in result.copies:
+            item = QTreeWidgetItem([match.expected.position_label(), match.expected.title, match.local.path.name,
+                                    "presente (copia)"])
+            item.setForeground(3, QBrush(GREEN))
+            item.setToolTip(3, "La stessa traccia in un altro formato (lo stesso album in FLAC e in MP3): va bene")
+            self._tracks_view.addTopLevelItem(item)
         for track in result.extra:
             item = QTreeWidgetItem(["", "", track.path.name, "non riconosciuta"])
             item.setForeground(3, QBrush(GREY))
@@ -283,7 +289,10 @@ class AlbumCheckDialog(QDialog):
     def _fix_tags(self) -> None:
         result = self._current_result()
         if result is not None and result.release is not None:
-            matched = [match for match in result.matches if match.local is not None]
+            matched = []
+            for match in list(result.matches) + list(result.copies):     # anche le copie in un altro formato
+                if match.local is not None:
+                    matched.append(match)
             where = ask_where(self, "Correggi tag", f"Aggiornare i tag di {len(matched)} brani con i dati di "
                               f"{result.service_label}?\n\n{result.release.label()}")
             if where:

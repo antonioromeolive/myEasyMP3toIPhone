@@ -111,6 +111,8 @@ class AlbumCheckResult:
     service_label: str = "MusicBrainz"
     tried: list = field(default_factory=list)     # [(servizio, esito)] dei servizi provati, in ordine
     ai_reason: str = ""                           # se l'edizione l'ha scelta l'AI: il suo motivo
+    copies: list = field(default_factory=list)    # TrackMatch delle copie in un altro formato (lo stesso album in FLAC
+                                                  # e in MP3): abbinate alle stesse tracce, non contano per lo stato
 
     @property
     def missing(self) -> list:
@@ -142,6 +144,8 @@ class AlbumCheckResult:
             result = f"Incompleto: mancano {len(self.missing)} di {len(self.matches)} tracce"
         else:
             result = f"Completo ({len(self.matches)} tracce)"
+        if status in (STATUS_COMPLETE, STATUS_INCOMPLETE) and self.copies:
+            result += f", {len(self.copies)} copie in un altro formato"
         if status in (STATUS_COMPLETE, STATUS_INCOMPLETE) and self.extra:
             result += f", {len(self.extra)} tracce non riconosciute"
         return result
@@ -610,14 +614,49 @@ def match_tracks(expected: list, local_tracks: list) -> tuple:
     return result
 
 
+def split_formats(local_tracks: list) -> tuple:
+    """(brani del formato principale, [brani di ogni altro formato che ne è una copia]). Lo stesso album in FLAC e in
+    MP3: il principale è il formato con più brani; un altro formato è una copia se almeno metà dei suoi titoli ci
+    sono anche nel principale. Un album con formati diversi per brani diversi resta intero."""
+    by_format = {}
+    order = []
+    for track in local_tracks:
+        suffix = track.path.suffix.lower()
+        if suffix not in by_format:
+            by_format[suffix] = []
+            order.append(suffix)
+        by_format[suffix].append(track)
+    order.sort(key=lambda suffix: -len(by_format[suffix]))
+    primary = list(by_format[order[0]]) if order else []
+    titles = set()
+    for track in primary:
+        titles.add(normalize(track.title))
+    copies = []
+    for suffix in order[1:]:
+        group = by_format[suffix]
+        shared = 0
+        for track in group:
+            if normalize(track.title) in titles:
+                shared += 1
+        if shared * 2 >= len(group):
+            copies.append(group)
+        else:
+            primary.extend(group)
+    result = (primary, copies)
+    return result
+
+
 def check_album(client, local_tracks: list,
                 candidates: Optional[list] = None,
                 chosen: Optional[ReleaseCandidate] = None, chooser=None) -> AlbumCheckResult:
     """Verifica un album su un catalogo. candidates/chosen permettono di ricalcolare con un'altra edizione.
-    chooser(album, artista, brani, candidati) -> (candidato, motivo) o None: sceglie tra edizioni dubbie (l'AI)."""
+    chooser(album, artista, brani, candidati) -> (candidato, motivo) o None: sceglie tra edizioni dubbie (l'AI).
+    Lo stesso album in più formati (split_formats): edizione e abbinamento con il formato principale, gli altri come
+    copie delle stesse tracce (copies), non come tracce in più."""
     artist, album = local_tracks[0].album_key
     result = AlbumCheckResult(artist=artist, album=album, local_tracks=list(local_tracks), service=client.service,
                               service_label=client.label)
+    primary, copy_groups = split_formats(local_tracks)
     if album == UNKNOWN_ALBUM:
         result.error = "l'album non ha un nome: compila il tag Album"
     else:
@@ -626,15 +665,21 @@ def check_album(client, local_tracks: list,
                 candidates = client.search_releases(artist, album)
             result.candidates = candidates
             if chosen is None:
-                chosen = choose_release(candidates, album, local_tracks)
-                if chosen is not None and chooser is not None and _doubtful(candidates, album, local_tracks):
-                    picked = chooser(album, artist, local_tracks, candidates)
+                chosen = choose_release(candidates, album, primary)
+                if chosen is not None and chooser is not None and _doubtful(candidates, album, primary):
+                    picked = chooser(album, artist, primary, candidates)
                     if picked is not None:
                         chosen, result.ai_reason = picked
             if chosen is not None:
                 expected = client.get_expected_tracks(chosen)
                 result.release = chosen
-                result.matches, result.extra = match_tracks(expected, local_tracks)
+                result.matches, result.extra = match_tracks(expected, primary)
+                for group in copy_groups:
+                    matched, extra = match_tracks(expected, group)
+                    for match in matched:
+                        if match.local is not None:
+                            result.copies.append(match)
+                    result.extra.extend(extra)
         except AlbumCheckError as exc:
             result.error = str(exc)
     return result

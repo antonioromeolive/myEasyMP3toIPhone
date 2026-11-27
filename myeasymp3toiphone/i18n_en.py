@@ -131,6 +131,12 @@ CATALOG = {
         "Incomplete: {0} of {1} tracks missing",
     "Completo ({0} tracce)":
         "Complete ({0} tracks)",
+    ", {0} copie in un altro formato":
+        ", {0} copies in another format",
+    "presente (copia)":
+        "present (copy)",
+    "La stessa traccia in un altro formato (lo stesso album in FLAC e in MP3): va bene":
+        "The same track in another format (the same album in FLAC and in MP3): that is fine",
     ", {0} tracce non riconosciute":
         ", {0} tracks not recognised",
     "NFKD":

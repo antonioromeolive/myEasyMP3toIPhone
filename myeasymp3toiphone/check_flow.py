@@ -123,7 +123,7 @@ def online_issues(result, number: int) -> list:
                                 rule_id=f"W1.{number}"))
         changes = []
         changed = []
-        for match in result.matches:
+        for match in list(result.matches) + list(result.copies):      # anche le copie in un altro formato
             if match.local is not None:
                 wanted = corrected_tags(match, result.release)
                 values = {}

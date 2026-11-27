@@ -418,7 +418,9 @@ Sotto la casella si scelgono i **cataloghi** (le scelte si ricordano):
 Con più cataloghi scelti **si provano in quest'ordine** (dal più veloce), album per album, **finché uno dà l'album
 completo**; se nessuno lo dà, vale il risultato migliore (quello con meno brani mancanti) e il dettaglio dice quali
 cataloghi sono stati provati e con che esito. Con l'*Analisi AI* accesa, l'AI sceglie tra due edizioni ugualmente
-probabili. CDDB/freedb ha chiuso nel 2020; il suo erede gnudb vuole la struttura del CD (TOC), che dei file non hanno.
+probabili. Lo stesso album in più formati (FLAC e MP3): l'edizione si sceglie e si abbina con il formato con più
+brani, e gli altri formati sono **copie** delle stesse tracce (*presente (copia)* nei dettagli; ricevono le stesse
+correzioni), non tracce in più; un album con formati diversi per brani diversi resta intero. CDDB/freedb ha chiuso nel 2020; il suo erede gnudb vuole la struttura del CD (TOC), che dei file non hanno.
 
 I risultati stanno con gli altri, per album: *mancano N di M brani* (con i titoli), *tag diversi dal catalogo* (con le
 correzioni, da applicare come le altre), *non trovato*. Per un album del PC, **Dettagli della verifica online** mostra

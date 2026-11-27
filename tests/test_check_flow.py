@@ -532,3 +532,25 @@ def test_the_same_album_in_flac_and_mp3_is_not_a_duplicate(tmp_path):
     assert [issue.rule_id for issue in scan.detect_duplicates([flac, mp3, again])] == ["R8"]   # due MP3: doppione
     lines = scan.album_lines({mp3.album_key: [flac, mp3]}, [mp3.album_key])
     assert "formati: flac,mp3" in lines[0][1]                                          # l'AI vede i formati
+
+
+def test_online_check_of_an_album_in_flac_and_mp3():
+    from myeasymp3toiphone.library import Track
+    tracks = []
+    for suffix in (".flac", ".mp3"):
+        for number, title in enumerate(["Uno", "Due", "Tre"], start=1):
+            tracks.append(Track(path=Path(f"C:/m/Disco{suffix}/{number:02d} {title}{suffix}"),
+                                tags=TrackTags(title=title, artist="Cantante Finto", album="Disco Finto",
+                                               track_number=number)))
+    assign_groups(tracks)
+    primary, copies = albumcheck.split_formats(tracks)
+    assert {track.path.suffix for track in primary} == {".flac"} and [len(group) for group in copies] == [3]
+    result = albumcheck.check_album_services([FakeService("deezer", ["Uno", "Due", "Tre"])], tracks)
+    assert result.status == albumcheck.STATUS_COMPLETE and result.extra == []     # gli MP3 non sono "in più"
+    assert len(result.copies) == 3 and "3 copie in un altro formato" in result.status_text()
+    fixes = [issue for issue in check_flow.online_issues(result, 1) if issue.fix is not None]
+    changed = {Path(path).suffix for path, _values in fixes[0].fix.changes}
+    assert changed == {".flac", ".mp3"}                                          # le correzioni anche alle copie
+    mixed = tracks[:2] + [Track(path=Path("C:/m/Disco/03 Altro.m4a"),
+                                tags=TrackTags(title="Altro", artist="Cantante Finto", album="Disco Finto"))]
+    assert albumcheck.split_formats(mixed)[1] == []                     # formati diversi per brani diversi: intero
