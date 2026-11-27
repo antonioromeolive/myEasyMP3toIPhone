@@ -126,9 +126,11 @@ class CheckResultsView(QWidget):
     """I risultati del controllo per album. launcher: il ScanLauncher (la finestra, Controlla di nuovo); entries:
     check_flow.AlbumEntry; online: {album: albumcheck.AlbumCheckResult} della Verifica online; side: SIDE_PC o SIDE_PHONE."""
 
-    def __init__(self, launcher, report, entries: list, saved, online: dict, side: str, live: bool = False) -> None:
+    def __init__(self, launcher, report, entries: list, saved, online: dict, side: str, live: bool = False,
+                 hidden: int = 0) -> None:
         super().__init__(launcher.window)
         self.live = live             # il controllo è ancora in corso: risultati parziali, Applica alla fine
+        self.hidden = hidden         # i problemi che vanno bene così (nascosti, o mostrati in grigio)
         self.launcher = launcher
         self.window = launcher.window
         self.report = report
@@ -185,8 +187,16 @@ class CheckResultsView(QWidget):
         buttons.addWidget(self.count_label)
         buttons.addWidget(self.apply_button)
 
+        self.show_accepted = QCheckBox()
+        self.show_accepted.setChecked(launcher.show_accepted)
+        self.show_accepted.setText(f"Mostra anche quelli che vanno bene così ({hidden})")
+        self.show_accepted.setVisible(hidden > 0 or launcher.show_accepted)
+        self.show_accepted.setToolTip("I problemi segnati \"va bene così\" (tasto destro): in grigio, e da lì si "
+                                      "tolgono. Anche in Impostazioni → Controlli")
+        self.show_accepted.toggled.connect(launcher.set_show_accepted)
         layout = QVBoxLayout(self)
         layout.addWidget(self.header)
+        layout.addWidget(self.show_accepted)
         layout.addWidget(splitter, 1)
         layout.addLayout(buttons)
         self._fill_header()
@@ -240,19 +250,26 @@ class CheckResultsView(QWidget):
                                        COL_SEVERITY: tr(entry.severity)})
             automatic = 0
             manual = 0
+            open_rows = 0
             for problem in entry.problems:
-                if problem.rows:
+                if not problem.accepted and problem.rows:
                     automatic += 1
-                else:
+                    open_rows += len(problem.rows)
+                elif not problem.accepted:
                     manual += 1
             if automatic and manual:
                 summary = f"{automatic} automatiche, {manual} a mano"
             elif automatic:
                 summary = f"{automatic} automatiche"
-            else:
+            elif manual:
                 summary = f"{manual} a mano"
+            else:
+                summary = "va bene così"
             top.setText(COL_FIX, summary)
             top.setForeground(COL_FIX, QBrush(GREEN if not manual else ORANGE))
+            if not automatic and not manual:
+                for column in range(len(COLUMNS)):
+                    top.setForeground(column, QBrush(GREY))
             top.setToolTip(COL_FIX, "Problemi che si correggono qui (con le caselle) e problemi da sistemare a mano "
                                     "(Cosa fare, nel dettaglio sotto)")
             font = top.font(COL_NAME)
@@ -263,7 +280,7 @@ class CheckResultsView(QWidget):
             top.setData(COL_NAME, REF_ROLE, entry_index)
             if entry.side in SIDE_COLORS:
                 top.setForeground(COL_SIDE, QBrush(SIDE_COLORS[entry.side]))
-            if entry.rows():
+            if open_rows:
                 # non AutoTristate: un problema senza correzioni (senza casella) toglierebbe la casella all'album
                 top.setFlags(top.flags() | Qt.ItemIsUserCheckable)
                 top.setCheckState(COL_NAME, Qt.Checked)
@@ -272,7 +289,11 @@ class CheckResultsView(QWidget):
                 issue = problem.issue
                 child = _item(len(COLUMNS), {COL_NAME: tr(issue.title), COL_SEVERITY: tr(issue.severity),
                                              COL_ORIGIN: tr(issue.origin)})
-                if problem.rows:
+                if problem.accepted:
+                    child.setText(COL_FIX, "va bene così")
+                    child.setToolTip(COL_FIX, "Segnato \"va bene così\": i controlli non lo mostrano più (tasto "
+                                              "destro → Togli \"va bene così\")")
+                elif problem.rows:
                     child.setText(COL_FIX, f"automatica ({len(problem.rows)})")
                     child.setForeground(COL_FIX, QBrush(GREEN))
                     child.setToolTip(COL_FIX, AUTO_TIP)
@@ -285,15 +306,18 @@ class CheckResultsView(QWidget):
                 child.setData(COL_NAME, KIND_ROLE, ROW_PROBLEM)
                 child.setData(COL_NAME, REF_ROLE, len(self._problems))
                 self._problems.append((entry_index, problem))
-                if issue.ai_note:
+                if issue.ai_note or problem.accepted:
                     for column in range(len(COLUMNS)):
                         child.setForeground(column, QBrush(GREY))
+                if issue.ai_note:
                     child.setToolTip(COL_NAME, f"L'AI ritiene che non sia un problema: {issue.ai_note}")
-                if problem.rows:
+                if problem.rows and not problem.accepted:
                     child.setFlags(child.flags() | checkable)
                     child.setCheckState(COL_NAME, Qt.Checked)
                 top.addChild(child)
-                for row in problem.rows:
+                if problem.accepted:
+                    self._add_accepted_rows(child, problem)
+                for row in ([] if problem.accepted else problem.rows):
                     leaf = _item(len(COLUMNS), {COL_NAME: row.target.name, COL_SIDE: tr(SIDE_LABELS[row.target.side]),
                                                 COL_FIELD: tr(FIELD_LABELS.get(row.name, row.name)),
                                                 COL_OLD: shown_value(row.name, row.old),
@@ -319,6 +343,56 @@ class CheckResultsView(QWidget):
                 done.append(index)
         if done:
             self._mark_applied(done)
+
+    def _accept_entries(self, menu) -> None:
+        """Le voci "va bene così" del tasto destro: per i problemi scelti (il loro tipo, nel loro album), per gli album
+        scelti (tutto l'album), e per togliere quelli già segnati."""
+        from ..accepted import WHOLE_ALBUM, problem_type, type_label
+        problems = []
+        accepted = []
+        for item in self.tree.selectedItems():
+            kind = item.data(COL_NAME, KIND_ROLE)
+            if kind == ROW_FIX:
+                item = item.parent()
+                kind = ROW_PROBLEM
+            if kind == ROW_PROBLEM:
+                entry_index, problem = self._problems[item.data(COL_NAME, REF_ROLE)]
+                key = self.entries[entry_index].key
+                pair = (key, problem_type(problem.issue))
+                if problem.accepted and self.launcher.accepted.skip_ai(key):
+                    pair = (key, WHOLE_ALBUM)            # segnato per tutto l'album: si toglie quello
+                if key != OTHER_KEY and pair not in problems and pair not in accepted:
+                    if problem.accepted:
+                        accepted.append(pair)
+                    else:
+                        problems.append(pair)
+        albums = []
+        for entry in self._selected_entries():
+            if entry.key != OTHER_KEY:
+                albums.append((entry.key, WHOLE_ALBUM))
+        launcher = self.launcher
+        if problems:
+            labels = []
+            for _key, kind in problems:
+                label = tr(type_label(kind))
+                if label not in labels:
+                    labels.append(label)
+            action = menu.addAction(f"Va bene così: {', '.join(labels)} (per questo album)")
+            action.setToolTip("I controlli non mostreranno più questo tipo di problema per questo album, qualunque "
+                              "cosa propongano; si toglie da qui (Mostra anche quelli che vanno bene così) o da "
+                              "Impostazioni → Controlli")
+            action.triggered.connect(lambda: launcher.set_accepted(problems, True))
+        if albums:
+            action = menu.addAction(f"Va bene così: tutto l'album ({len(albums)} album)")
+            action.setToolTip("Nessun problema di questi album si mostrerà più, e l'AI e la Verifica online li saltano")
+            action.triggered.connect(lambda: launcher.set_accepted(albums, True))
+        whole = []
+        for key, kind in albums:
+            if launcher.accepted.is_accepted(key, WHOLE_ALBUM) and launcher.accepted.skip_ai(key):
+                whole.append((key, kind))
+        if accepted or whole:
+            action = menu.addAction("Togli \"va bene così\"")
+            action.triggered.connect(lambda: launcher.set_accepted(accepted + whole, False))
 
     def state(self) -> dict:
         """Cosa si vede e cosa è scelto (album e problemi aperti, righe spente, selezione, scorrimento), per ritrovarlo
@@ -384,12 +458,26 @@ class CheckResultsView(QWidget):
         online.setToolTip("Di nuovo la Verifica online, con i cataloghi scelti sopra, solo su questi album")
         online.triggered.connect(lambda: launcher.recheck(STAGE_ONLINE, keys))
         menu.addSeparator()
+        self._accept_entries(menu)
+        menu.addSeparator()
         for button in (self.show_button, self.again_button, self.online_button):
             action = menu.addAction(button.text())
             action.setEnabled(button.isEnabled())
             action.triggered.connect(button.click)
         menu.setToolTipsVisible(True)
         menu.exec(self.tree.viewport().mapToGlobal(position))
+
+    @staticmethod
+    def _add_accepted_rows(child, problem) -> None:
+        """Le correzioni di un problema che va bene così: si vedono, in grigio, ma senza casella."""
+        for row in problem.rows:
+            leaf = _item(len(COLUMNS), {COL_NAME: row.target.name, COL_SIDE: tr(SIDE_LABELS[row.target.side]),
+                                        COL_FIELD: tr(FIELD_LABELS.get(row.name, row.name)),
+                                        COL_OLD: shown_value(row.name, row.old), COL_NEW: shown_value(row.name, row.new)})
+            leaf.setFlags(leaf.flags() & ~Qt.ItemIsUserCheckable)
+            for column in range(len(COLUMNS)):
+                leaf.setForeground(column, QBrush(GREY))
+            child.addChild(leaf)
 
     def _item_changed(self, item, column: int) -> None:
         """La casella di un album accende o spegne tutte le sue correzioni; quella di una correzione o di un problema
@@ -413,8 +501,13 @@ class CheckResultsView(QWidget):
         self._update_buttons()
 
     def _sync_album(self, top) -> None:
-        """La casella dell'album secondo le sue correzioni ancora da applicare (solo gli album che ne hanno)."""
-        if self.entries[top.data(COL_NAME, REF_ROLE)].rows():
+        """La casella dell'album secondo le sue correzioni ancora da applicare (solo gli album che ne hanno, senza
+        quelle che vanno bene così)."""
+        open_rows = False
+        for problem in self.entries[top.data(COL_NAME, REF_ROLE)].problems:
+            if problem.rows and not problem.accepted:
+                open_rows = True
+        if open_rows:
             on = 0
             total = 0
             for index in range(top.childCount()):

@@ -186,6 +186,7 @@ class AlbumProblem:
     issue: Issue
     rows: list = field(default_factory=list)
     files: list = field(default_factory=list)
+    accepted: bool = False         # "va bene così" per questo album (mostrato solo a richiesta)
 
 
 @dataclass
@@ -271,6 +272,29 @@ def group_by_album(issues: list, resolve: Callable[[object], Optional[Target]]) 
     for key in sorted(entries, key=lambda k: (k == OTHER_KEY, SEVERITY_ORDER.get(entries[k].severity, 3),
                                               k[0].lower(), k[1].lower())):
         result.append(entries[key])
+    return result
+
+
+def filter_accepted(entries: list, accepted, show: bool) -> tuple:
+    """(album, quanti problemi vanno bene così): i problemi che vanno bene così per il loro album (accepted:
+    accepted.Accepted) si tolgono, o con show restano segnati (AlbumProblem.accepted); un album senza altri problemi
+    si toglie."""
+    from .accepted import problem_type
+    kept = []
+    hidden = 0
+    for entry in entries:
+        problems = []
+        for problem in entry.problems:
+            ok = entry.key != OTHER_KEY and accepted.is_accepted(entry.key, problem_type(problem.issue))
+            if ok:
+                hidden += 1
+                problem.accepted = True
+            if show or not ok:
+                problems.append(problem)
+        if problems:
+            entry.problems = problems
+            kept.append(entry)
+    result = (kept, hidden)
     return result
 
 

@@ -1751,6 +1751,78 @@ CATALOG = {
         "goes on without it, without waiting for the server. 0 = it never stops.",
     "Errori di fila prima di smettere":
         "Errors in a row before stopping",
+    "tutto l'album":
+        "the whole album",
+    "differenze con il catalogo online":
+        "differences with the online catalog",
+    "vecchio tag ID3v1":
+        "old ID3v1 tag",
+    "tag APE":
+        "APE tag",
+    "file illeggibili":
+        "unreadable files",
+    "tag mancanti":
+        "missing tags",
+    "copie \"(2)\"":
+        "\"(2)\" copies",
+    "brani più volte nell'album":
+        "tracks several times in the album",
+    "numeri di traccia mancanti":
+        "missing track numbers",
+    "album con 1-2 brani":
+        "albums with 1-2 tracks",
+    "cartella divisa in più album":
+        "folder split into several albums",
+    "album scritto in modi diversi":
+        "album written in different ways",
+    "compilation divisa per artista":
+        "compilation split by artist",
+    "artista scritto in modi diversi":
+        "artist written in different ways",
+    "forse lo stesso artista":
+        "maybe the same artist",
+    "duetti":
+        "duets",
+    "tag diversi tra PC e iPhone":
+        "different tags between PC and iPhone",
+    "brani che mancano sull'iPhone":
+        "tracks missing on the iPhone",
+    "brani fantasma sull'iPhone":
+        "ghost tracks on the iPhone",
+    "Mostra anche quelli che vanno bene così ({0})":
+        "Also show the ones that are fine as they are ({0})",
+    "I problemi segnati \"va bene così\" (tasto destro): in grigio, e da lì si tolgono. Anche in Impostazioni → Controlli":
+        "The problems marked \"fine as it is\" (right click): in grey, and they can be unmarked from there. Also in "
+        "Settings → Checks",
+    "va bene così":
+        "fine as it is",
+    "Segnato \"va bene così\": i controlli non lo mostrano più (tasto destro → Togli \"va bene così\")":
+        "Marked \"fine as it is\": the checks do not show it any more (right click → Unmark \"fine as it is\")",
+    "Va bene così: {0} (per questo album)":
+        "Fine as it is: {0} (for this album)",
+    "I controlli non mostreranno più questo tipo di problema per questo album, qualunque cosa propongano; si toglie da qui (Mostra anche quelli che vanno bene così) o da Impostazioni → Controlli":
+        "The checks will no longer show this kind of problem for this album, whatever they propose; it can be "
+        "unmarked from here (Also show the ones that are fine as they are) or from Settings → Checks",
+    "Va bene così: tutto l'album ({0} album)":
+        "Fine as it is: the whole album ({0} albums)",
+    "Nessun problema di questi album si mostrerà più, e l'AI e la Verifica online li saltano":
+        "No problem of these albums will be shown any more, and the AI and the Online check skip them",
+    "Togli \"va bene così\"":
+        "Unmark \"fine as it is\"",
+    "Gli album segnati \"va bene così\" nei risultati dei Controlli (tasto destro): quel tipo di problema, o tutto l'album, non si mostra più, qualunque cosa propongano i controlli. Togli quelli che vuoi rivedere: vale con OK.":
+        "The albums marked \"fine as it is\" in the results of the Checks (right click): that kind of problem, or the "
+        "whole album, is no longer shown, whatever the checks propose. Remove the ones you want to see again: it "
+        "takes effect with OK.",
+    "Artista dell'album":
+        "Album artist",
+    "Che cosa va bene così":
+        "What is fine as it is",
+    "Da quando":
+        "Since",
+    "Togli quelli selezionati":
+        "Remove the selected ones",
+    "Nessun album segnato.":
+        "No album marked.",
     "Controlla con l'AI ({0} album)":
         "Check with the AI ({0} albums)",
     "Di nuovo l'Analisi AI, solo su questi album: i loro risultati dell'AI si sostituiscono":

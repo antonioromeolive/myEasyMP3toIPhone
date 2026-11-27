@@ -556,3 +556,93 @@ def test_online_check_of_an_album_in_flac_and_mp3():
     mixed = tracks[:2] + [Track(path=Path("C:/m/Disco/03 Altro.m4a"),
                                 tags=TrackTags(title="Altro", artist="Cantante Finto", album="Disco Finto"))]
     assert albumcheck.split_formats(mixed)[1] == []                     # formati diversi per brani diversi: intero
+
+
+def test_albums_that_are_fine_as_they_are(tmp_path):
+    from myeasymp3toiphone.accepted import ONLINE_TYPE, WHOLE_ALBUM, Accepted, problem_type, type_label
+    accepted = Accepted(tmp_path)
+    accepted.accept(("Alex Finto", "The Platinum Collection"), ONLINE_TYPE)
+    accepted.accept(("Gruppo", "Disco"), WHOLE_ALBUM)
+    accepted.save()
+    again = Accepted(tmp_path)                                               # si ritrova, anche scritto diverso
+    assert again.is_accepted(("ALEX FINTO", "the platinum collection (CD 1)"), ONLINE_TYPE)
+    assert not again.is_accepted(("Alex Finto", "The Platinum Collection"), "R9")
+    assert again.is_accepted(("Gruppo", "Disco"), "R9") and again.skip_ai(("Gruppo", "Disco"))
+    assert again.skip_online(("Alex Finto", "The Platinum Collection")) and not again.skip_ai(("Alex Finto",
+                                                                                                "The Platinum Collection"))
+    assert [type_label(kind) for _key, kind, _when in again.rows()] == ["differenze con il catalogo online",
+                                                                        "tutto l'album"]
+    issue = scan.Issue(scan.KIND_ONLINE, scan.SEVERITY_LOW, "t", "d", rule_id="W2.4")
+    assert problem_type(issue) == ONLINE_TYPE
+    assert problem_type(scan.Issue(scan.KIND_SPLIT, scan.SEVERITY_LOW, "t", "d", origin=scan.ORIGIN_AI)) == \
+        "AI_collezione_divisa"
+    again.remove(("Gruppo", "Disco"), WHOLE_ALBUM)
+    assert not again.is_accepted(("Gruppo", "Disco"), "R9") and len(again.rows()) == 1
+
+    first = _album(["Uno"], album="Primo")
+    second = _album(["Due"], album="Secondo")
+    targets = {}
+    for track in first + second:
+        targets[str(track.path)] = check_flow.Target(track, pc=track)
+    issues = [scan.Issue(scan.KIND_FEW_TRACKS, scan.SEVERITY_LOW, "Primo: solo 1 brano", "d", [first[0].path],
+                         rule_id="R10.1"),
+              scan.Issue(scan.KIND_FEW_TRACKS, scan.SEVERITY_LOW, "Secondo: solo 1 brano", "d", [second[0].path],
+                         rule_id="R10.2")]
+    marks = Accepted(tmp_path / "altro")
+    marks.accept(first[0].album_key, "R10")
+    entries, hidden = check_flow.filter_accepted(check_flow.group_by_album(issues, lambda p: targets.get(str(p))),
+                                                 marks, False)
+    assert hidden == 1 and [entry.key[1] for entry in entries] == ["Secondo"]
+    shown, hidden = check_flow.filter_accepted(check_flow.group_by_album(issues, lambda p: targets.get(str(p))),
+                                               marks, True)
+    assert hidden == 1 and len(shown) == 2 and [p.accepted for e in shown for p in e.problems].count(True) == 1
+
+
+def test_fine_as_they_are_in_the_results_and_skipped_online(monkeypatch):
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtWidgets import QApplication
+    from myeasymp3toiphone.accepted import ONLINE_TYPE, WHOLE_ALBUM
+    from myeasymp3toiphone.gui.main_window import MainWindow
+    app = QApplication.instance() or QApplication([])
+    window = MainWindow()
+    try:
+        window.tracks = _album(["Uno", "Due"], album="Primo") + _album(["Tre"], album="Secondo")
+        window._rebuild_views()
+        window._scan()
+        options = window.checks_panel.options
+        for check_id, box in options.boxes.items():
+            box.setChecked(check_id == scan.CHECK_FEW)
+        options.ai_box.setChecked(False)
+        options.online_box.setChecked(False)
+        options.start_button.click()
+        _wait(window, app)
+        launcher = window.scan_launcher
+        view = window.checks_panel.results
+        primo = [entry.key for entry in view.entries if entry.key[1] == "Primo"][0]
+        launcher.set_accepted([(primo, "R10")], True)                     # va bene così: un tipo, un album
+        view = window.checks_panel.results
+        assert [entry.key[1] for entry in view.entries] == ["Secondo"] and view.hidden == 1
+        assert not view.show_accepted.isHidden()
+        view.show_accepted.setChecked(True)                               # mostrati in grigio
+        view = window.checks_panel.results
+        shown = [entry for entry in view.entries if entry.key == primo][0]
+        assert shown.problems[0].accepted
+        launcher.set_accepted([(primo, "R10")], False)                    # Togli "va bene così"
+        launcher.set_show_accepted(False)
+        assert len(window.checks_panel.results.entries) == 2
+
+        launcher.set_accepted([(primo, ONLINE_TYPE)], True)                # la Verifica online lo salta
+        options.online_box.setChecked(True)
+        options.online_flagged.setChecked(False)
+        service = FakeService("deezer", ["Tre"])
+        window.album_clients["deezer"] = service
+        for name, box in options.service_boxes.items():
+            box.setChecked(name == "deezer")
+        options.start_button.click()
+        _wait(window, app)
+        assert service.calls == 1                                          # solo "Secondo"
+        launcher.set_accepted([(primo, ONLINE_TYPE), (primo, WHOLE_ALBUM)], False)
+    finally:
+        window._exit_checked = True
+        window.close()
+        app.processEvents()

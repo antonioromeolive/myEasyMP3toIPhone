@@ -66,7 +66,7 @@ Quattro linguette: **PC** (i brani delle cartelle aperte), **iPhone** (la musica
 | **Apri cartella…** | mostra i brani di una cartella qualsiasi, in sola lettura (da riga di comando: `myEasyMP3toIPhone --open <cartella>`) |
 | **Importa nella Libreria…** | copia una cartella nella Libreria in `Artista / Album (Anno) / NN - Titolo.ext`, con le modifiche in sospeso applicate alle copie |
 | **Esporta…** | copia i brani selezionati (o quelli dell'artista o dell'album scelti negli elenchi) in una cartella, con la stessa struttura e le modifiche in sospeso |
-| **Impostazioni** | **cartelle della musica** di questo PC (e quale è la Libreria), AI della scansione, **lingua dell'interfaccia** (italiano o inglese), profili AI |
+| **Impostazioni** | **cartelle della musica** di questo PC (e quale è la Libreria), AI della scansione, **lingua dell'interfaccia** (italiano o inglese), profili AI, gli album che vanno bene così (*Controlli*) |
 | **Informazioni** | versione, cartella dati, variabili d'ambiente e da dove viene ciascuna, dove sono le chiavi |
 
 **Le cartelle della musica.** La musica non deve stare tutta in una cartella: in *Impostazioni → Cartelle della
@@ -360,6 +360,16 @@ tracce dell'edizione e i tuoi file, un'altra edizione, la copertina), **Apri il 
 o la Verifica online solo su quegli album (anche se erano già state fatte, o annullate, o non scelte): i loro risultati
 di prima si sostituiscono, quelli degli altri album restano, e le correzioni già applicate restano segnate. *Annulla*
 lascia i risultati di prima. La Verifica online usa i cataloghi scelti sotto la sua casella, anche se è spenta.
+
+**Va bene così.** Un problema che vuoi tenere com'è (per esempio le differenze con il catalogo online: tieni i tuoi
+tag) si segna dal tasto destro: **Va bene così: *tipo di problema* (per questo album)**, oppure **Va bene così: tutto
+l'album**. Da lì in poi i controlli non mostrano più quel tipo di problema per quell'album, **qualunque cosa
+propongano** (anche correzioni nuove); tutto l'album: nessun suo problema, e l'AI e la Verifica online lo saltano
+(anche le sole differenze con il catalogo: la Verifica online lo salta). Le differenze con il catalogo (brani mancanti,
+tag diversi, non trovato) contano come un tipo solo. L'album si riconosce da artista dell'album e nome, senza
+maiuscole, accenti e "CD 1": se lo rinomini, la scelta non vale più. Nei risultati, **Mostra anche quelli che vanno bene
+così (N)** li fa vedere in grigio, senza caselle, e il tasto destro **Togli "va bene così"**; l'elenco completo, con
+*Togli quelli selezionati*, è in *Impostazioni → Controlli*. Si salva in `controlli_va_bene.json` (cartella dati).
 
 | Sintomo | Cosa cerca | Correzione |
 |---|---|---|
@@ -978,6 +988,7 @@ programma. La musica invece sta nella Libreria.
 | `iphone_files.json`, `iphone_inviati.json` | delle versioni precedenti (invio alle app come VLC): non più usati, si possono cancellare |
 | `cache_tag.json` | i tag già letti di ogni file (con dimensione e data), per riaprire in fretta le cartelle grandi; si può cancellare |
 | `modifiche_tag.json`, `copertine\` | le modifiche dei tag in sospeso, per percorso del file, e le copertine nuove: i file sul PC non cambiano |
+| `controlli_va_bene.json` | gli album segnati "va bene così" nei Controlli (per tipo di problema o tutto l'album; le versioni precedenti del programma lo ignorano) |
 | `crash.log`, `myEasyMP3toIPhone.output.log` | solo se qualcosa va storto: la traccia di un arresto improvviso e quello che il programma avrebbe scritto su una console (la finestra non ne ha) |
 | `myEasyMP3toIPhone.log` | cosa è successo, comprese le richieste all'AI (a rotazione: 5 MB, 3 file vecchi) |
 | `blocchi.log` | se la finestra resta ferma più di 15 secondi, dove si trovava ogni parte del programma (per capire un blocco) |

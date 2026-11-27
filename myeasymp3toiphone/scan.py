@@ -1395,7 +1395,8 @@ def scan_tracks(tracks: list, target: str, provider=None, check_files: bool = Tr
                 progress: Optional[ProgressFn] = None, cancel: Optional[threading.Event] = None,
                 checks: frozenset = ALL_CHECKS, fingerprints: Optional[dict] = None,
                 musicbrainz=None, ai_flagged_only: bool = False, keep_phone_fixes: bool = False,
-                partial: Optional[Callable[[list], None]] = None) -> ScanReport:
+                partial: Optional[Callable[[list], None]] = None,
+                ai_skip: Optional[Callable[[tuple], bool]] = None) -> ScanReport:
     """Il controllo: le regole dei controlli scelti (checks), poi l'AI se c'è un fornitore. Con phone_tracks (la
     musica dell'app Musica, i cui brani sono anche tracks) è dell'iPhone, confrontato con library_tracks.
     fingerprints: {percorso: impronta dell'audio} per i brani duplicati (senza, solo quelli sospetti per i tag).
@@ -1404,7 +1405,8 @@ def scan_tracks(tracks: list, target: str, provider=None, check_files: bool = Tr
     controlli scelti (Solo AI) l'AI guarda tutti gli album e ogni suo problema si tiene.
     keep_phone_fixes: le correzioni dei brani dell'iPhone restano (la linguetta Controlli le applica dalla parte giusta);
     senza, si tolgono e il dettaglio dice di correggere sul PC.
-    partial(problemi): i risultati man mano (una copia dell'elenco): dopo le regole e dopo l'analisi AI."""
+    partial(problemi): i risultati man mano (una copia dell'elenco): dopo le regole e dopo l'analisi AI.
+    ai_skip(album_key): gli album che l'analisi AI salta (quelli che vanno bene così per intero)."""
     assign_groups(tracks)
     report = ScanReport(target=target, tracks_scanned=len(tracks), albums_scanned=len(group_by_album(tracks)))
     issues = rule_issues(tracks, check_files, progress, cancel, checks)
@@ -1416,6 +1418,12 @@ def scan_tracks(tracks: list, target: str, provider=None, check_files: bool = Tr
         reviewed = tracks
         if ai_flagged_only and not only_ai:
             reviewed = tracks_of_albums(tracks, albums_of_issues(issues, tracks))
+        if ai_skip is not None:
+            wanted = []
+            for track in reviewed:
+                if not ai_skip(track.album_key):
+                    wanted.append(track)
+            reviewed = wanted
         if reviewed:
             def found_so_far(found: list) -> None:
                 shown = list(issues)

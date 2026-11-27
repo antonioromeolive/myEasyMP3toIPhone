@@ -13,9 +13,10 @@ import copy
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QMessageBox
 
+from ..accepted import Accepted
 from ..ai import make_provider
 from ..albumcheck import ai_chooser, check_album_services
-from ..check_flow import Target, group_by_album as entries_by_album, online_issues
+from ..check_flow import Target, filter_accepted, group_by_album as entries_by_album, online_issues
 from ..config import config_dir, load_profiles
 from ..library import UNKNOWN_ALBUM, group_by_album, scan_folder
 from ..phone_library import tracks_for_scan
@@ -36,15 +37,15 @@ REPORTS_FOLDER = "scansioni"
 
 
 def online_check(scanned: list, issues: list, clients: list, flagged_only: bool, chooser, progress, cancel,
-                 on_result=None) -> list:
+                 on_result=None, skip=None) -> list:
     """Verifica online gli album dei brani controllati (con flagged_only solo quelli toccati dai problemi): i
     risultati (albumcheck.AlbumCheckResult), uno per album, anche man mano con on_result(risultato). Gli album senza
-    nome si saltano."""
+    nome si saltano, e quelli per cui skip(album_key) (vanno bene così)."""
     groups = group_by_album(scanned)
     wanted = albums_of_issues(issues, scanned) if flagged_only else None
     keys = []
     for key in sorted(groups, key=lambda k: (k[0].lower(), k[1].lower())):
-        if key[1] != UNKNOWN_ALBUM and (wanted is None or key in wanted):
+        if key[1] != UNKNOWN_ALBUM and (wanted is None or key in wanted) and (skip is None or not skip(key)):
             keys.append(key)
     results = []
     index = 0
@@ -67,6 +68,8 @@ class ScanLauncher:
         self._last = {}                # l'ultimo controllo: rapporto, brani, risultati online (_show)
         self.applied = set()           # le correzioni già applicate dei suoi risultati (check_results)
         self._online_count = 0         # per i rule_id W*.N della Verifica online
+        self.accepted = Accepted(config_dir())   # gli album che vanno bene così (accepted.py)
+        self.show_accepted = False     # nei risultati anche i problemi che vanno bene così
 
     def _profile(self):
         result = None
@@ -112,6 +115,7 @@ class ScanLauncher:
                 side, items, _sentence, _names = options.scope()
             profile = self._profile()
             provider = make_provider(profile) if options.ai_on() and profile is not None else None
+            self.accepted = Accepted(config_dir())     # anche dopo un cambio in Impostazioni
             clients = []
             for service in options.online_services():
                 clients.append(window.album_clients[service])
@@ -123,6 +127,8 @@ class ScanLauncher:
                 "online_flagged": options.online_flagged_only(),
                 "chooser": ai_chooser(provider) if provider is not None and clients else None,
                 "musicbrainz": window.mb_client if options.musicbrainz.isChecked() else None,
+                "ai_skip": self.accepted.skip_ai,
+                "online_skip": self.accepted.skip_online,
             }
             if not items:
                 QMessageBox.information(window, TITLE, "Non c'è niente da controllare.")
@@ -163,7 +169,7 @@ class ScanLauncher:
             report = scan_tracks(tracks, target, choices["provider"], check_files=CHECK_FILES in checks,
                                  progress=progress, cancel=cancel, checks=checks, fingerprints=prints,
                                  musicbrainz=musicbrainz, ai_flagged_only=choices["ai_flagged"],
-                                 partial=lambda issues: emit((LIVE_ISSUES, issues)))
+                                 partial=lambda issues: emit((LIVE_ISSUES, issues)), ai_skip=choices["ai_skip"])
             emit((LIVE_ISSUES, list(report.issues)))
             results = self._online(tracks, report, choices, progress, cancel, emit)
             value = (report, results)
@@ -204,7 +210,8 @@ class ScanLauncher:
             report = scan_tracks(scanned, target, choices["provider"], check_files=False, phone_tracks=items,
                                  library_tracks=library_tracks, progress=progress, cancel=cancel, checks=checks,
                                  fingerprints=prints, musicbrainz=musicbrainz, ai_flagged_only=choices["ai_flagged"],
-                                 keep_phone_fixes=True, partial=lambda issues: emit((LIVE_ISSUES, issues)))
+                                 keep_phone_fixes=True, partial=lambda issues: emit((LIVE_ISSUES, issues)),
+                                 ai_skip=choices["ai_skip"])
             emit((LIVE_ISSUES, list(report.issues)))
             results = self._online(scanned, report, choices, progress, cancel, emit)
             value = (report, results, scanned, library_tracks)
@@ -228,7 +235,7 @@ class ScanLauncher:
             if not is_cancelled(cancel):
                 on_result = (lambda result: emit((LIVE_ONLINE, result))) if emit is not None else None
                 results = online_check(scanned, report.issues, choices["clients"], choices["online_flagged"],
-                                       choices["chooser"], progress, cancel, on_result)
+                                       choices["chooser"], progress, cancel, on_result, choices["online_skip"])
             if is_cancelled(cancel):
                 results = []
                 if "Verifica online" not in report.stopped:
@@ -298,10 +305,11 @@ class ScanLauncher:
                     online[result.local_tracks[0].album_key] = result
             issues.sort(key=lambda issue: issue.sort_key())
             report.issues = issues
-            entries = entries_by_album(issues, live["resolve"])
+            entries, hidden = filter_accepted(entries_by_album(issues, live["resolve"]), self.accepted,
+                                              self.show_accepted)
             panel = self.window.checks_panel
             state = panel.results.state() if isinstance(panel.results, CheckResultsView) else None
-            view = CheckResultsView(self, report, entries, None, online, live["side"], live=True)
+            view = CheckResultsView(self, report, entries, None, online, live["side"], live=True, hidden=hidden)
             view.restore(state)
             panel.show_results(view, switch=False)
 
@@ -443,6 +451,32 @@ class ScanLauncher:
             if self._last["side"] == SIDE_PC:
                 self.window.store_check_result(result)           # l'icona accanto all'album negli elenchi
 
+    # ------------------------------------------------------------------ va bene così
+
+    def set_accepted(self, pairs: list, accepted: bool) -> None:
+        """Segna (o toglie) "va bene così" per [(album_key, tipo)] e rifà i risultati."""
+        for key, kind in pairs:
+            if accepted:
+                self.accepted.accept(key, kind)
+            else:
+                self.accepted.remove(key, kind)
+        try:
+            self.accepted.save()
+        except OSError as exc:
+            QMessageBox.warning(self.window, TITLE, f"Non salvato nella cartella dati: {exc}")
+        self._redraw()
+
+    def set_show_accepted(self, show: bool) -> None:
+        self.show_accepted = show
+        self._redraw()
+
+    def _redraw(self) -> None:
+        """I risultati rifatti con la lista "va bene così" (anche durante un controllo)."""
+        if getattr(self, "_live", None) is not None:
+            self._show_live()
+        elif self._last:
+            self._refresh(save=False)
+
     # ------------------------------------------------------------------ i risultati
 
     def _resolver(self, side: str, scanned: list, phone_pairs: list):
@@ -517,9 +551,10 @@ class ScanLauncher:
                 QMessageBox.warning(window, TITLE, f"Rapporto non salvato: {exc}")
         if last["online"] and last["side"] == SIDE_PC:
             window.browser.refresh_check_icons(window.check_results)
-        entries = entries_by_album(report.issues, last["resolve"])
+        entries, hidden = filter_accepted(entries_by_album(report.issues, last["resolve"]), self.accepted,
+                                          self.show_accepted)
         panel = window.checks_panel
         state = panel.results.state() if isinstance(panel.results, CheckResultsView) else None
-        view = CheckResultsView(self, report, entries, last["saved"], last["online"], last["side"])
+        view = CheckResultsView(self, report, entries, last["saved"], last["online"], last["side"], hidden=hidden)
         view.restore(state)
         panel.show_results(view)

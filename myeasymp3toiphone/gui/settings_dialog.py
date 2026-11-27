@@ -15,7 +15,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QDoubleSpinBox, QFileDialog, QFormLayout,
     QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem, QMessageBox, QPushButton, QSpinBox, QTabWidget,
-    QVBoxLayout, QWidget,
+    QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget,
 )
 
 from .. import environment, ringtones
@@ -24,7 +24,7 @@ from ..ai import AIError, connection_test, make_provider
 from ..config import (
     ANTHROPIC, ANTHROPIC_SERVER, AZURE, DEFAULT_MODELS, KINDS, OLLAMA, OLLAMA_LOCAL_SERVER, OPENAI, OPENAI_SERVER,
     PROFILE_VARIABLES, AppSettings, as_written, calibre_tools_folder, calibre_tools_profiles, computer_name,
-    default_variables,
+    config_dir, default_variables,
     get_secret, import_calibre_tools_key, literal_text, load_profiles, new_profile, save_profiles, set_secret,
     variable_in,
 )
@@ -56,6 +56,7 @@ class SettingsDialog(QDialog):
         tabs.addTab(self._build_folders_tab(), "Cartelle della musica")
         tabs.addTab(self._build_profiles_tab(), "Profili AI")
         tabs.addTab(self._build_ringtones_tab(), "Suonerie")
+        tabs.addTab(self._build_checks_tab(), "Controlli")
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
@@ -66,6 +67,59 @@ class SettingsDialog(QDialog):
         if self.profiles:
             self.list.setCurrentRow(0)
         self._fill_scan_profiles()
+
+    # ------------------------------------------------------------------ controlli
+
+    def _build_checks_tab(self) -> QWidget:
+        """Gli album che vanno bene così (accepted.py): l'elenco, e Togli per quelli scelti (vale con OK)."""
+        from ..accepted import Accepted, type_label
+        self._accepted = Accepted(config_dir())
+        self._accepted_removed = []
+        intro = QLabel("Gli album segnati \"va bene così\" nei risultati dei Controlli (tasto destro): quel tipo di "
+                       "problema, o tutto l'album, non si mostra più, qualunque cosa propongano i controlli. Togli "
+                       "quelli che vuoi rivedere: vale con OK.")
+        intro.setWordWrap(True)
+        self.c_accepted = QTreeWidget()
+        self.c_accepted.setHeaderLabels(["Album", "Artista dell'album", "Che cosa va bene così", "Da quando"])
+        self.c_accepted.setRootIsDecorated(False)
+        self.c_accepted.setSelectionMode(QTreeWidget.ExtendedSelection)
+        for column, width in ((0, 260), (1, 180), (2, 240)):
+            self.c_accepted.setColumnWidth(column, width)
+        for key, kind, when in self._accepted.rows():
+            item = QTreeWidgetItem([key[1], key[0], tr(type_label(kind)), when])
+            item.setData(0, Qt.UserRole, (key, kind))
+            self.c_accepted.addTopLevelItem(item)
+        remove = QPushButton("Togli quelli selezionati")
+        remove.clicked.connect(self._remove_accepted)
+        self.c_empty = QLabel("Nessun album segnato.")
+        self.c_empty.setStyleSheet("color: gray")
+        self.c_empty.setVisible(self.c_accepted.topLevelItemCount() == 0)
+        row = QHBoxLayout()
+        row.addWidget(remove)
+        row.addWidget(self.c_empty)
+        row.addStretch(1)
+        layout = QVBoxLayout()
+        layout.addWidget(intro)
+        layout.addWidget(self.c_accepted, 1)
+        layout.addLayout(row)
+        widget = QWidget()
+        widget.setLayout(layout)
+        return widget
+
+    def _remove_accepted(self) -> None:
+        for item in self.c_accepted.selectedItems():
+            self._accepted_removed.append(item.data(0, Qt.UserRole))
+            self.c_accepted.takeTopLevelItem(self.c_accepted.indexOfTopLevelItem(item))
+        self.c_empty.setVisible(self.c_accepted.topLevelItemCount() == 0)
+
+    def _save_accepted(self) -> None:
+        if self._accepted_removed:
+            for key, kind in self._accepted_removed:
+                self._accepted.remove(key, kind)
+            try:
+                self._accepted.save()
+            except OSError as exc:
+                QMessageBox.warning(self, "Impostazioni", f"Controlli: non salvato nella cartella dati: {exc}")
 
     # ------------------------------------------------------------------ generale
 
@@ -783,4 +837,5 @@ class SettingsDialog(QDialog):
         else:
             self.settings.scan_profile = chosen
         self.settings.save()
+        self._save_accepted()
         super().accept()
