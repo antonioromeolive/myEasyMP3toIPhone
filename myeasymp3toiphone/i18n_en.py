@@ -1601,12 +1601,6 @@ CATALOG = {
         "The variants split the artist's collection in the lists and on the iPhone.",
     "Scrivi ovunque \"{0}\"":
         "Write \"{0}\" everywhere",
-    "{0}: {1} in duetto":
-        "{0}: {1} in duets",
-    "L'app Musica non gestisce più artisti per brano: i duetti dividono la collezione dell'artista. Artista (e artista dell'album) diventano \"{0}\", gli ospiti vanno nel titolo (feat. …).\n":
-        "The Music app does not handle several artists per track: duets split the artist's collection. Artist (and album artist) become \"{0}\", the guests go in the title (feat. …).\n",
-    "Artista \"{0}\", ospiti nel titolo":
-        "Artist \"{0}\", guests in the title",
     "MusicBrainz: nomi d'artista dubbi ({0} di {1})":
         "MusicBrainz: doubtful artist names ({0} of {1})",
     "nomi degli artisti su MusicBrainz: {0}":
@@ -2156,9 +2150,6 @@ CATALOG = {
     "Se è davvero lo stesso artista: Applica la correzione (vince la forma più usata). Se non sei sicuro, accendi MusicBrainz o l'AI e ripeti il controllo. Se sono artisti diversi, ignora.":
         "If it really is the same artist: Apply the fix (the most used form wins). If you are not sure, turn on "
         "MusicBrainz or the AI and run the check again. If they are different artists, ignore it.",
-    "Applica la correzione lascia l'artista principale e porta gli ospiti nel titolo (feat. …). Se il nome è quello di un gruppo (\"Simon & Garfunkel\"), ignora.":
-        "Apply the fix keeps the main artist and moves the guests into the title (feat. …). If the name is that of a "
-        "group (\"Simon & Garfunkel\"), ignore it.",
     "Mostra i brani, poi nella scheda PC Usa i tag da PC a iPhone e Applica. Se sono giusti quelli dell'iPhone: scheda iPhone, Usa i tag da iPhone a PC.":
         "Show the tracks, then in the PC tab Use the tags from PC to iPhone and Apply. If the iPhone ones are right: "
         "iPhone tab, Use the tags from iPhone to PC.",

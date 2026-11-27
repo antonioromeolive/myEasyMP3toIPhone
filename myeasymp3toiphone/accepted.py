@@ -41,7 +41,7 @@ TYPE_LABELS = {
     "R14": "artista scritto in modi diversi",
     "R15": "brani duplicati",
     "R16": "forse lo stesso artista",
-    "R17": "duetti",
+    "R17": "duetti",            # regola tolta: resta per i "va bene così" già salvati
     "I1": "tag diversi tra PC e iPhone",
     "I2": "brani che mancano sull'iPhone",
     "I4": "brani fantasma sull'iPhone",

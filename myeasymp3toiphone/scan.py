@@ -35,7 +35,7 @@ from .library import (
     UNKNOWN_ALBUM, UNKNOWN_ARTIST, Track, assign_groups, best_spelling, group_by_album, is_cancelled,
 )
 from .artist_names import (
-    candidate_pairs, clusters, duet_parts, duet_proposal, musicbrainz_keys, variant_key, with_guests,
+    candidate_pairs, clusters, duet_parts, musicbrainz_keys, variant_key,
 )
 from .artist_names import ask_ai as ask_ai_names
 from .i18n import tr
@@ -467,6 +467,23 @@ def _unify_changes(tracks: list, values: dict) -> list:
     return changes
 
 
+def _duet_principal(tracks: list) -> str:
+    """L'artista principale quando gli artisti dei brani sono lui da solo e i suoi duetti ("A", "A & B", "A feat.
+    C"): la sua grafia più usata tra i brani in cui è da solo. "" se gli artisti sono davvero diversi."""
+    firsts = set()
+    solos = []
+    for track in tracks:
+        if track.tags.artist:
+            parts = duet_parts(track.tags.artist)
+            firsts.add(variant_key(parts[0]))
+            if len(parts) == 1:
+                solos.append(track.tags.artist)
+    result = ""
+    if len(firsts) == 1 and solos:
+        result = _most_common(solos)
+    return result
+
+
 def detect_split_folders(tracks: list) -> list:
     """Una cartella i cui brani stanno in album diversi: quasi sempre un album diviso da tag non uniformi."""
     by_folder = {}
@@ -483,8 +500,11 @@ def detect_split_folders(tracks: list) -> list:
             album = _most_common([split_disc_marker(t.tags.album)[0] for t in folder_tracks])
             artists = {artist_norm(t.tags.artist) for t in folder_tracks if t.tags.artist}
             album_artist = _most_common([t.tags.album_artist for t in folder_tracks])
+            principal = _duet_principal(folder_tracks)
             if not album_artist:
-                if len(artists) > 1:
+                if principal:
+                    album_artist = principal         # "A" e "A & B": l'album è di A, non una compilation
+                elif len(artists) > 1:
                     album_artist = VARIOUS_ARTISTS
                 else:
                     album_artist = _most_common([t.tags.artist for t in folder_tracks])
@@ -590,61 +610,6 @@ def detect_artist_variants(tracks: list) -> list:
                 "Le varianti dividono la collezione dell'artista negli elenchi e sull'iPhone.",
                 [t.path for t in artist_tracks],
                 Fix(FIX_TAGS, f"Scrivi ovunque \"{chosen}\"", changes=changes), rule_id=f"R14.{number}"))
-    return issues
-
-
-def _solo_names(tracks: list) -> dict:
-    """{variant_key: grafia più usata} degli artisti che non sono duetti."""
-    by_key = {}
-    for track in tracks:
-        name = track.display_artist
-        if name != UNKNOWN_ARTIST and len(duet_parts(name)) == 1:
-            by_key.setdefault(variant_key(name), []).append(name)
-    result = {}
-    for key, written in by_key.items():
-        result[key] = _most_common(written)
-    return result
-
-
-def detect_duets(tracks: list) -> list:
-    """I duetti ("A & B", "A feat. B", "A, B"): l'app Musica non gestisce più artisti, quindi artista e artista
-    dell'album diventano l'artista principale (il primo nome, se c'è anche da solo) e gli ospiti vanno nel titolo,
-    "Titolo (feat. B)". Un nome come "Simon & Garfunkel" (nessuno dei due da solo) resta com'è."""
-    solos = _solo_names(tracks)
-    by_principal = {}
-    for track in tracks:
-        wanted = {}
-        principal = ""
-        proposal = duet_proposal(track.tags.artist, solos) if track.tags.artist else None
-        if proposal is not None:
-            principal, guests = proposal
-            wanted["artist"] = principal
-            title = with_guests(track.tags.title, guests)
-            if title != track.tags.title:
-                wanted["title"] = title
-        album_proposal = duet_proposal(track.tags.album_artist, solos) if track.tags.album_artist else None
-        if album_proposal is not None:
-            wanted["album_artist"] = album_proposal[0]
-            principal = principal or album_proposal[0]
-        if wanted:
-            by_principal.setdefault(principal, []).append((track, wanted))
-    issues = []
-    number = 0
-    for principal in sorted(by_principal, key=str.lower):
-        found = by_principal[principal]
-        number += 1
-        changes = []
-        examples = []
-        for track, wanted in found:
-            changes.append((track.path, wanted))
-            if len(examples) < 6:
-                examples.append(f"{track.tags.artist or track.tags.album_artist} — {track.tags.title}")
-        issues.append(Issue(
-            KIND_SPLIT, SEVERITY_LOW, f"{principal}: {_tracks_text(len(found))} in duetto",
-            "L'app Musica non gestisce più artisti per brano: i duetti dividono la collezione dell'artista. "
-            f"Artista (e artista dell'album) diventano \"{principal}\", gli ospiti vanno nel titolo (feat. …).\n"
-            + "\n".join(examples), [track.path for track, _wanted in found],
-            Fix(FIX_TAGS, f"Artista \"{principal}\", ospiti nel titolo", changes=changes), rule_id=f"R17.{number}"))
     return issues
 
 
@@ -823,7 +788,6 @@ def rule_issues(tracks: list, check_files: bool, progress: Optional[ProgressFn] 
         issues += detect_split_names(tracks)
     if CHECK_VARIANTS in checks:
         issues += detect_artist_variants(tracks)
-        issues += detect_duets(tracks)
     result = merge_overlapping(issues)
     return result
 
@@ -1549,8 +1513,6 @@ ADVICE = {
     "R15": _MANUAL_DUPLICATE,
     "R16": "Se è davvero lo stesso artista: Applica la correzione (vince la forma più usata). Se non sei sicuro, accendi "
            "MusicBrainz o l'AI e ripeti il controllo. Se sono artisti diversi, ignora.",
-    "R17": "Applica la correzione lascia l'artista principale e porta gli ospiti nel titolo (feat. …). Se il nome è "
-           "quello di un gruppo (\"Simon & Garfunkel\"), ignora.",
     "I1": "Mostra i brani, poi nella scheda PC Usa i tag da PC a iPhone e Applica. Se sono giusti quelli dell'iPhone: "
           "scheda iPhone, Usa i tag da iPhone a PC.",
     "I2": "Mostra i brani, poi Copia da PC a iPhone e Applica. Se sull'iPhone non li vuoi, ignora.",

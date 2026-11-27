@@ -38,15 +38,31 @@ def test_keys_duets_and_pairs():
     assert len(groups) == 1 and len(groups[0][0]) == 4
 
 
-def test_word_order_is_a_certain_variant_and_duets_get_guests_in_title():
+def test_word_order_is_a_certain_variant_and_duets_stay_as_they_are():
+    """Un duetto ("A & B", anche come artista dell'album) è un nome come un altro: non si segnala e non si cambia."""
     tracks = [_track(1, "Mario Rossi"), _track(2, "Mario Rossi"), _track(3, "Rossi Mario"),
-              _track(4, "Mario Rossi & Anna Verdi", album="Insieme", album_artist="Mario Rossi & Anna Verdi")]
+              _track(4, "Mario Rossi & Anna Verdi", album="Insieme", album_artist="Mario Rossi & Anna Verdi"),
+              _track(5, "Mario Rossi & Anna Verdi", album="Altro", album_artist="Mario Rossi")]
     variants = scan.detect_artist_variants(tracks)
     assert len(variants) == 1 and dict(variants[0].fix.changes)[tracks[2].path] == {"artist": "Mario Rossi"}
-    duets = scan.detect_duets(tracks)
-    assert len(duets) == 1
-    assert dict(duets[0].fix.changes)[tracks[3].path] == {"artist": "Mario Rossi", "album_artist": "Mario Rossi",
-                                                          "title": "Brano 4 (feat. Anna Verdi)"}
+    issues = scan.rule_issues(tracks, False, checks=frozenset({scan.CHECK_VARIANTS, scan.CHECK_SPLIT}))
+    for issue in issues:
+        changed = dict(issue.fix.changes) if issue.fix is not None else {}
+        assert tracks[3].path not in changed and tracks[4].path not in changed, issue.title
+
+
+def test_a_duet_without_album_artist_splitting_the_album_is_still_found():
+    """Quello che divide l'album in Musica sì: nella stessa cartella un brano "A & B" senza artista dell'album."""
+    tracks = []
+    for number, artist in enumerate(["Mario Rossi", "Mario Rossi", "Mario Rossi & Anna Verdi"], start=1):
+        tracks.append(Track(path=Path(f"C:/musica/Insieme/{number}.mp3"),
+                            tags=TrackTags(title=f"Brano {number}", artist=artist, album="Insieme", year="1990")))
+    issues = scan.rule_issues(tracks, False, checks=frozenset({scan.CHECK_VARIANTS, scan.CHECK_SPLIT}))
+    [split] = [issue for issue in issues if issue.rule_id.startswith("R11")]
+    changes = dict(split.fix.changes)
+    # non una compilation: l'artista dell'album è quello principale, il duetto resta l'artista del brano
+    assert changes[tracks[2].path] == {"album_artist": "Mario Rossi"} and changes[tracks[0].path] == \
+        {"album_artist": "Mario Rossi"}
 
 
 class NamesProvider:

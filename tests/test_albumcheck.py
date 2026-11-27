@@ -167,7 +167,7 @@ def test_services_in_order_until_one_is_complete():
 
 def test_every_rule_says_what_to_do():
     from myeasymp3toiphone import scan
-    for rule in ("R2", "R3", "R5", "R6", "R7", "R8", "R9", "R10", "R11", "R12", "R13", "R14", "R15", "R16", "R17",
+    for rule in ("R2", "R3", "R5", "R6", "R7", "R8", "R9", "R10", "R11", "R12", "R13", "R14", "R15", "R16",
                  "I1", "I2", "I3", "I4"):
         assert scan.advice(scan.Issue(scan.KIND_SPLIT, scan.SEVERITY_LOW, "t", "d", rule_id=f"{rule}.1")), rule
     for kind in scan.AI_KINDS:
