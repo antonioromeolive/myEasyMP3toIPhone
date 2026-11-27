@@ -53,6 +53,7 @@ class ChecksPanel(QWidget):
     def showEvent(self, event) -> None:
         super().showEvent(event)
         self.refresh()
+        self._window.scan_launcher.show_live_if_waiting()
 
     def show_results(self, widget: QWidget, switch: bool = True) -> None:
         """I risultati nuovi al posto di quelli di prima; switch: e la linguetta Controlli davanti (non per i

@@ -419,6 +419,7 @@ def test_results_arrive_while_the_check_runs_and_the_button_stops_it(monkeypatch
         window.album_clients["deezer"] = SlowService("deezer", ["Uno", "Due", "Tre"])
         for service, box in options.service_boxes.items():
             box.setChecked(service == "deezer")
+        window.show()                                                     # i risultati man mano: con la linguetta visibile
         options.start_button.click()
         assert options.start_button.text() == "Ferma il controllo"
         live = None
@@ -431,6 +432,8 @@ def test_results_arrive_while_the_check_runs_and_the_button_stops_it(monkeypatch
             time.sleep(0.01)
         assert live is not None and not live.apply_button.isEnabled()      # risultati man mano, Applica alla fine
         assert "Controllo in corso" in live.header.text()
+        assert not options.phase_label.isHidden() and "Regole" in options.phase_label.text()
+        assert "Verifica online" in options.phase_label.text()
         live.tree.topLevelItem(0).setCheckState(0, Qt.Unchecked)           # spento durante il controllo
         off = len(live.chosen_rows())
         _wait(window, app)
@@ -642,6 +645,63 @@ def test_fine_as_they_are_in_the_results_and_skipped_online(monkeypatch):
         _wait(window, app)
         assert service.calls == 1                                          # solo "Secondo"
         launcher.set_accepted([(primo, ONLINE_TYPE), (primo, WHOLE_ALBUM)], False)
+    finally:
+        window._exit_checked = True
+        window.close()
+        app.processEvents()
+
+
+def test_the_ai_runs_after_the_online_check_in_background(monkeypatch):
+    """Regole e Verifica online, poi i risultati sono già usabili e l'Analisi AI va in un lavoro a parte: il programma
+    resta libero (runner non occupato), il pulsante è Ferma l'AI, alla fine i problemi dell'AI entrano nel rapporto."""
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtWidgets import QApplication
+    from myeasymp3toiphone.gui import scan_dialog
+    from myeasymp3toiphone.gui.main_window import MainWindow
+    app = QApplication.instance() or QApplication([])
+
+    class SlowProvider(SeeingProvider):
+        def ask_json(self, system, user, schema):
+            time.sleep(0.3)
+            return super().ask_json(system, user, schema)
+
+    provider = SlowProvider()
+    from PySide6.QtWidgets import QMessageBox
+    warnings = []
+    monkeypatch.setattr(QMessageBox, "warning", staticmethod(lambda *args, **kwargs: warnings.append(args[2])))
+    window = MainWindow()
+    try:
+        window.tracks = _album(["Uno"], album="Primo") + _album(["Due"], artist="Altro Cantante", album="Secondo")
+        window._rebuild_views()
+        window._scan()
+        options = window.checks_panel.options
+        for check_id, box in options.boxes.items():
+            box.setChecked(check_id in (scan.CHECK_FEW, scan.CHECK_MISSING))
+        launcher = window.scan_launcher
+        monkeypatch.setattr(launcher, "_profile", lambda: object())
+        monkeypatch.setattr(scan_dialog, "make_provider", lambda profile: provider)
+        options.ai_box.setEnabled(True)
+        options.ai_box.setChecked(True)
+        options.ai_flagged.setChecked(False)
+        options.online_box.setChecked(False)
+        options.start_button.click()
+        deadline = time.monotonic() + 10
+        while window.runner.is_busy and time.monotonic() < deadline:
+            app.processEvents()
+            time.sleep(0.01)
+        assert launcher.ai_running() and not window.runner.is_busy                  # l'AI non occupa il programma
+        assert options.start_button.text() == "Ferma l'AI"
+        assert window.checks_panel.results.apply_button is not None                 # i risultati ci sono già
+        deadline = time.monotonic() + 60                                             # macchina lenta: con calma
+        while launcher.ai_running() and time.monotonic() < deadline:
+            app.processEvents()
+            time.sleep(0.01)
+        app.processEvents()
+        report = window.checks_panel.results.report
+        assert warnings == []
+        assert len(provider.seen) == 2                                              # un artista per richiesta
+        assert any(issue.origin == scan.ORIGIN_AI for issue in report.issues) and report.ai_profile == "finto"
+        assert options.start_button.text() == "Avvia il controllo"
     finally:
         window._exit_checked = True
         window.close()

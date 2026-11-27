@@ -9,6 +9,7 @@ online (anche solo sugli album con problemi), il rapporto nella cartella dati e 
 from __future__ import annotations
 
 import copy
+import time
 
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QMessageBox
@@ -20,8 +21,10 @@ from ..check_flow import Target, filter_accepted, group_by_album as entries_by_a
 from ..config import config_dir, load_profiles
 from ..library import UNKNOWN_ALBUM, group_by_album, scan_folder
 from ..phone_library import tracks_for_scan
+from ..i18n import tr
 from ..scan import (
     CHECK_DUPLICATES, CHECK_FILES, CHECK_VARIANTS, ORIGIN_AI, ORIGIN_ONLINE, ai_review, albums_of_issues,
+    detect_artist_doubts, tracks_of_albums,
     ScanReport, drop_repeated, enabled, is_cancelled, report_text, save_report, scan_tracks,
 )
 from .check_options import SIDE_PC, SIDE_PHONE
@@ -30,6 +33,12 @@ TITLE = "Controlla la musica"
 LIVE_SCANNED = "brani_controllati"     # i risultati man mano: i brani, i problemi, un album verificato online
 LIVE_ISSUES = "problemi_finora"
 LIVE_ONLINE = "album_verificato"
+LIVE_PHASE = "fase_del_controllo"
+PHASE_RULES = "fase_regole"            # le fasi del controllo, in ordine
+PHASE_AI = "fase_ai"
+PHASE_ONLINE = "fase_online"
+AI_FOUND = "ai_trovati"                # dall'Analisi AI in background: i problemi finora, poi la fine
+AI_END = "ai_finita"
 LIVE_DELAY_MS = 1500                   # i risultati man mano si ridisegnano al più una volta ogni tanto
 STAGE_AI = "di_nuovo_ai"
 STAGE_ONLINE = "di_nuovo_online"
@@ -70,6 +79,10 @@ class ScanLauncher:
         self._online_count = 0         # per i rule_id W*.N della Verifica online
         self.accepted = Accepted(config_dir())   # gli album che vanno bene così (accepted.py)
         self.show_accepted = False     # nei risultati anche i problemi che vanno bene così
+        self._phases = []              # le fasi scelte del controllo in corso, in ordine
+        self._phase = ""               # quella in corso
+        self._phase_detail = ""        # a che punto è (dalla barra di stato)
+        window.runner.progressed.connect(self._progressed)
 
     def _profile(self):
         result = None
@@ -93,8 +106,8 @@ class ScanLauncher:
         posto di quello che dice il riquadro "Si controlla" (Controlla di nuovo questi album)."""
         window = self.window
         options = self._options()
-        if window.runner.is_busy:
-            QMessageBox.information(window, TITLE, "Aspetta la fine dell'operazione in corso.")
+        if window.runner.is_busy or self.ai_running():
+            QMessageBox.information(window, TITLE, "Aspetta la fine dell'operazione in corso (o fermala).")
         else:
             settings = window.app_settings
             settings.scan_use_ai = options.ai_box.isChecked()
@@ -130,6 +143,14 @@ class ScanLauncher:
                 "ai_skip": self.accepted.skip_ai,
                 "online_skip": self.accepted.skip_online,
             }
+            phases = []
+            if choices["checks"]:
+                phases.append(PHASE_RULES)
+            if clients:
+                phases.append(PHASE_ONLINE)
+            if provider is not None:
+                phases.append(PHASE_AI)
+            self._phases = phases or [PHASE_RULES]
             if not items:
                 QMessageBox.information(window, TITLE, "Non c'è niente da controllare.")
             elif side == SIDE_PHONE:
@@ -162,23 +183,25 @@ class ScanLauncher:
 
         def work(progress, cancel, emit):
             emit((LIVE_SCANNED, tracks, [], None))
+            emit((LIVE_PHASE, PHASE_RULES))
             prints = {}
             if CHECK_DUPLICATES in checks:
                 progress(0, 0, "impronte dell'audio")
                 prints = pc_fingerprints(tracks, tag_cache, progress, cancel)
-            report = scan_tracks(tracks, target, choices["provider"], check_files=CHECK_FILES in checks,
-                                 progress=progress, cancel=cancel, checks=checks, fingerprints=prints,
-                                 musicbrainz=musicbrainz, ai_flagged_only=choices["ai_flagged"],
-                                 partial=lambda issues: emit((LIVE_ISSUES, issues)), ai_skip=choices["ai_skip"])
+            report = scan_tracks(tracks, target, None, check_files=CHECK_FILES in checks, progress=progress,
+                                 cancel=cancel, checks=checks, fingerprints=prints, musicbrainz=musicbrainz,
+                                 partial=lambda issues: emit((LIVE_ISSUES, issues)))
             emit((LIVE_ISSUES, list(report.issues)))
             results = self._online(tracks, report, choices, progress, cancel, emit)
             value = (report, results)
             return value
 
         self._begin(SIDE_PC, target)
-        started = window.runner.run(TITLE, work,
-                                    lambda value: self._show(value[0], value[1], SIDE_PC, tracks, [], checks),
-                                    on_error=self._failed, on_item=self._live_item)
+        def done(value):
+            self._show(value[0], value[1], SIDE_PC, tracks, [], checks)
+            self._start_ai(choices, value[0])
+
+        started = window.runner.run(TITLE, work, done, on_error=self._failed, on_item=self._live_item)
         self._started(started)
 
     def _start_device(self, items: list, choices: dict) -> None:
@@ -200,6 +223,7 @@ class ScanLauncher:
                 library_tracks = window.without_hidden(library_tracks)   # non le cartelle escluse
             window.overlay.apply(library_tracks)
             emit((LIVE_SCANNED, scanned, list(zip(scanned, items)), library_tracks))
+            emit((LIVE_PHASE, PHASE_RULES))
             known = PhoneFingerprints(config_dir())
             prints = {}
             for track, item in zip(scanned, items):
@@ -207,11 +231,10 @@ class ScanLauncher:
                 if value:
                     prints[str(track.path)] = value
             # il confronto con il PC vale per i brani controllati; i fantasmi e i brani senza sorgente pure
-            report = scan_tracks(scanned, target, choices["provider"], check_files=False, phone_tracks=items,
+            report = scan_tracks(scanned, target, None, check_files=False, phone_tracks=items,
                                  library_tracks=library_tracks, progress=progress, cancel=cancel, checks=checks,
-                                 fingerprints=prints, musicbrainz=musicbrainz, ai_flagged_only=choices["ai_flagged"],
-                                 keep_phone_fixes=True, partial=lambda issues: emit((LIVE_ISSUES, issues)),
-                                 ai_skip=choices["ai_skip"])
+                                 fingerprints=prints, musicbrainz=musicbrainz, keep_phone_fixes=True,
+                                 partial=lambda issues: emit((LIVE_ISSUES, issues)))
             emit((LIVE_ISSUES, list(report.issues)))
             results = self._online(scanned, report, choices, progress, cancel, emit)
             value = (report, results, scanned, library_tracks)
@@ -221,6 +244,7 @@ class ScanLauncher:
             report, results, scanned, library_tracks = value
             self.library_tracks = library_tracks
             self._show(report, results, SIDE_PHONE, scanned, list(zip(scanned, items)), checks)
+            self._start_ai(choices, report)
 
         self._begin(SIDE_PHONE, target)
         started = window.runner.run(f"{TITLE} (iPhone)", work, done, on_error=self._failed, on_item=self._live_item)
@@ -229,23 +253,179 @@ class ScanLauncher:
     @staticmethod
     def _online(scanned: list, report, choices: dict, progress, cancel, emit=None) -> list:
         """La Verifica online, se è scelta: i suoi problemi entrano nel rapporto; restituisce i risultati. Annullata
-        (anche prima di cominciare, durante l'AI) è come non scelta: niente risultati, e il rapporto lo dice."""
+        è come non scelta: niente risultati, e il rapporto lo dice (e l'Analisi AI che verrebbe dopo non parte)."""
         results = []
         if choices["clients"]:
             if not is_cancelled(cancel):
                 on_result = (lambda result: emit((LIVE_ONLINE, result))) if emit is not None else None
+                if emit is not None:
+                    emit((LIVE_PHASE, PHASE_ONLINE))
                 results = online_check(scanned, report.issues, choices["clients"], choices["online_flagged"],
                                        choices["chooser"], progress, cancel, on_result, choices["online_skip"])
             if is_cancelled(cancel):
                 results = []
                 if "Verifica online" not in report.stopped:
                     report.stopped.append("Verifica online")
+        if choices["provider"] is not None and is_cancelled(cancel) and "Analisi AI" not in report.stopped:
+            report.stopped.append("Analisi AI")
+        if choices["clients"]:
             number = 0
             for result in results:
                 number += 1
                 report.issues.extend(online_issues(result, number))
             report.issues.sort(key=lambda issue: issue.sort_key())
         return results
+
+    # ------------------------------------------------------------------ l'Analisi AI in background
+
+    def ai_running(self) -> bool:
+        job = getattr(self, "_ai_job", None)
+        result = job is not None and job.running
+        return result
+
+    def stop_background(self) -> None:
+        """Ferma l'Analisi AI in background (pulsante Ferma l'AI, chiusura del programma)."""
+        if self.ai_running():
+            self._ai_job.cancel()
+
+    def _start_ai(self, choices: dict, report) -> None:
+        """Dopo le regole e la Verifica online, con i risultati già usabili: l'Analisi AI in un lavoro a parte, che non
+        occupa il programma (si può applicare, scrivere nei file, mettere in coda). I suoi problemi si aggiungono man
+        mano; alla fine entrano nel rapporto. Fermata: i risultati restano quelli senza AI."""
+        from .worker import BackgroundJob
+        provider = choices["provider"]
+        last = self._last
+        if provider is not None and last and not report.stopped and not report.cancelled:
+            checks = last["checks"]
+            scanned = last["scanned"]
+            base = list(report.issues)
+            reviewed = scanned
+            if choices["ai_flagged"] and checks:
+                reviewed = tracks_of_albums(scanned, albums_of_issues(base, scanned))
+            kept = []
+            for track in reviewed:
+                if not choices["ai_skip"](track.album_key):
+                    kept.append(track)
+            pairs = []
+            for issue in base:
+                if issue.rule_id and issue.origin != ORIGIN_AI:
+                    copied = copy.copy(issue)
+                    copied.ai_note = ""
+                    pairs.append((issue, copied))
+            copies = []
+            for _original, copied in pairs:
+                copies.append(copied)
+            doubts = CHECK_VARIANTS in checks
+
+            def work(progress, cancel, emit):
+                found, errors = ai_review(provider, kept, copies, progress, cancel,
+                                          lambda so_far: emit((AI_FOUND, so_far)))
+                names = None
+                if doubts and not is_cancelled(cancel) and not getattr(provider, "gave_up", False):
+                    progress(0, 0, "nomi d'artista dubbi")
+                    names, more = detect_artist_doubts(scanned, provider, None, progress, cancel)
+                    errors = errors + more
+                emit((AI_END, found, errors, names, is_cancelled(cancel)))
+
+            self._ai = {"base": base, "pairs": pairs, "found": [], "checks": checks, "provider": provider,
+                        "report": report}
+            job = BackgroundJob(work)
+            job.item.connect(self._ai_item)
+            job.progress.connect(lambda _index, _total, text: self._progressed(tr(text)))
+            job.failed.connect(self._ai_failed)
+            self._ai_job = job
+            self._phase = PHASE_AI
+            self._phase_detail = ""
+            self._options().set_running(True, stop=self.stop_background)
+            self._show_phases()
+            self._ai_delay = LIVE_DELAY_MS
+            self._ai_pending = False
+            job.start()
+
+    def _ai_issues(self, found: list) -> list:
+        """I problemi di base (regole, Verifica online) con quelli dell'AI trovati finora."""
+        ai = self._ai
+        result = list(ai["base"])
+        checks = ai["checks"]
+        for issue in drop_repeated(found, ai["base"]):
+            if not checks or enabled(issue, checks):
+                result.append(issue)
+        result.sort(key=lambda issue: issue.sort_key())
+        return result
+
+    def _ai_item(self, item) -> None:
+        if item[0] == AI_FOUND:
+            self._ai["found"] = item[1]
+            if not self._ai_pending:
+                self._ai_pending = True
+                QTimer.singleShot(self._ai_delay, self._ai_redraw)
+        else:
+            self._ai_done(*item[1:])
+
+    def _ai_redraw(self) -> None:
+        """I risultati con quelli dell'AI finora, al più ogni tanto, e non mentre una finestra aspetta (Applica, l'elenco
+        dei file): i risultati restano quelli su cui si sta lavorando."""
+        from PySide6.QtWidgets import QApplication
+        self._ai_pending = False
+        if getattr(self, "_ai", None) is not None and self.ai_running():
+            if QApplication.activeModalWidget() is not None or not self.window.checks_panel.isVisible():
+                self._ai_pending = True
+                QTimer.singleShot(LIVE_DELAY_MS, self._ai_redraw)
+            else:
+                began = time.monotonic()
+                report = self._last["report"]
+                saved_issues = report.issues
+                report.issues = self._ai_issues(self._ai["found"])
+                self._refresh(save=False, ai_running=True)
+                report.issues = saved_issues
+                self._ai_delay = max(LIVE_DELAY_MS, int((time.monotonic() - began) * 1000) * 4)
+
+    def _ai_done(self, found: list, errors: list, names, cancelled: bool) -> None:
+        """La fine dell'Analisi AI: i suoi problemi (e i giudizi sulle regole) entrano nel rapporto; fermata, no."""
+        ai = self._ai
+        report = ai["report"]
+        self._ai_job = None
+        self._phase = ""
+        self._options().set_running(False)
+        if cancelled:
+            if "Analisi AI" not in report.stopped:
+                report.stopped.append("Analisi AI")
+            self.window.statusBar().showMessage("Analisi AI fermata: i risultati sono quelli delle regole e della "
+                                                "Verifica online", 8000)
+        else:
+            for original, copied in ai["pairs"]:
+                original.ai_note = copied.ai_note
+            issues = self._ai_issues(found)
+            if names is not None:
+                kept = []
+                for issue in issues:
+                    if not issue.rule_id.startswith("R16."):
+                        kept.append(issue)
+                issues = kept + names
+                issues.sort(key=lambda issue: issue.sort_key())
+            report.issues = issues
+            report.ai_profile = ai["provider"].profile.name
+            unique = []
+            for error in errors:
+                if error not in unique:
+                    unique.append(error)
+            report.ai_errors = unique
+        self._ai = None
+        self._refresh(save=True)
+        if report.ai_errors and not cancelled:
+            shown = []
+            for error in report.ai_errors[:3]:
+                shown.append(f"• {error[:300]}")
+            joined = "\n".join(shown)
+            QMessageBox.warning(self.window, TITLE, f"L'AI non ha risposto come doveva ({len(report.ai_errors)} errori): "
+                                f"dove è mancata, i risultati sono solo quelli delle regole.\n\n{joined}")
+
+    def _ai_failed(self, message: str) -> None:
+        self._ai_job = None
+        self._ai = None
+        self._phase = ""
+        self._options().set_running(False)
+        QMessageBox.warning(self.window, TITLE, f"L'Analisi AI non è riuscita: {message}")
 
     # ------------------------------------------------------------------ man mano
 
@@ -254,6 +434,9 @@ class ScanLauncher:
         self._live = {"side": side, "target": target, "scanned": [], "pairs": [], "issues": [], "online": [],
                       "resolve": None}
         self._live_pending = False
+        self._live_dirty = False
+        self._live_delay = LIVE_DELAY_MS
+        self._phase = ""
         self._options().set_running(True)
 
     def _started(self, started: bool) -> None:
@@ -279,17 +462,51 @@ class ScanLauncher:
                 live["resolve"] = None
             elif kind == LIVE_ISSUES:
                 live["issues"] = item[1]
-            else:
+            elif kind == LIVE_ONLINE:
                 live["online"].append(item[1])
-            if not self._live_pending and kind != LIVE_SCANNED:
+            if kind == LIVE_PHASE:
+                self._set_phase(item[1])
+            elif not self._live_pending and kind != LIVE_SCANNED:
                 self._live_pending = True
-                QTimer.singleShot(LIVE_DELAY_MS, self._show_live)
+                QTimer.singleShot(self._live_delay, self._show_live)
+
+    def _set_phase(self, phase: str) -> None:
+        if phase in self._phases:
+            self._phase = phase
+            self._phase_detail = ""
+            self._show_phases()
+
+    def _progressed(self, text: str) -> None:
+        if self._phase:
+            self._phase_detail = text
+            self._show_phases()
+
+    def _show_phases(self) -> None:
+        self._options().show_phases(self._phases, self._phase, self._phase_detail)
+
+    def _start_phases(self, phases: list) -> None:
+        """Controlla con l'AI / online: una fase sola."""
+        self._phases = list(phases)
+        self._phase = phases[0]
+        self._phase_detail = ""
+        self._show_phases()
+
+    def show_live_if_waiting(self) -> None:
+        """La linguetta Controlli torna visibile: i risultati man mano rimasti indietro si ridisegnano ora."""
+        if getattr(self, "_live", None) is not None and self._live_dirty and not self._live_pending:
+            self._show_live()
 
     def _show_live(self) -> None:
+        """I risultati man mano. Non mentre la linguetta Controlli non si vede (si rifanno quando torna visibile); e il
+        prossimo ridisegno aspetta almeno quattro volte quanto è durato questo: con migliaia di righe la finestra deve
+        restare libera la maggior parte del tempo."""
         from .check_results import CheckResultsView
         self._live_pending = False
         live = getattr(self, "_live", None)
-        if live is not None and live["scanned"]:
+        visible = self.window.checks_panel.isVisible()
+        self._live_dirty = live is not None and not visible
+        if live is not None and live["scanned"] and visible:
+            began = time.monotonic()
             scanned = live["scanned"]
             if live["resolve"] is None:
                 live["resolve"] = self._resolver(live["side"], scanned, live["pairs"])
@@ -312,6 +529,8 @@ class ScanLauncher:
             view = CheckResultsView(self, report, entries, None, online, live["side"], live=True, hidden=hidden)
             view.restore(state)
             panel.show_results(view, switch=False)
+            spent = int((time.monotonic() - began) * 1000)
+            self._live_delay = max(LIVE_DELAY_MS, spent * 4)
 
     # ------------------------------------------------------------------ di nuovo, solo l'AI o solo online
 
@@ -348,6 +567,8 @@ class ScanLauncher:
             QMessageBox.information(window, TITLE, "Aspetta la fine dell'operazione in corso.")
         elif not scanned:
             QMessageBox.information(window, TITLE, "Questi album non sono tra quelli controllati.")
+        elif self.ai_running():
+            QMessageBox.information(window, TITLE, "Aspetta la fine dell'Analisi AI in corso (o fermala).")
         elif stage == STAGE_AI and profile is None:
             QMessageBox.information(window, TITLE, "Scegli l'AI della scansione in Impostazioni → Generale.")
         elif stage == STAGE_AI:
@@ -397,6 +618,7 @@ class ScanLauncher:
                 self._refresh()
 
         self._options().set_running(True)
+        self._start_phases([PHASE_AI])
         self._started(self.window.runner.run(f"Analisi AI di {len(keys)} album", work, done, on_error=self._failed))
 
     def _recheck_online(self, scanned: list, keys: set) -> None:
@@ -433,6 +655,7 @@ class ScanLauncher:
                 self._refresh()
 
         self._options().set_running(True)
+        self._start_phases([PHASE_ONLINE])
         self._started(self.window.runner.run(f"Verifica online di {len(keys)} album", work, done,
                                              on_error=self._failed))
 
@@ -533,12 +756,8 @@ class ScanLauncher:
         for result in results:
             self._remember_online(result)
         self._refresh(save=False)
-        if report.ai_errors:
-            shown = "\n".join(f"• {error[:300]}" for error in report.ai_errors[:3])
-            QMessageBox.warning(window, TITLE, f"L'AI non ha risposto come doveva ({len(report.ai_errors)} errori): "
-                                f"dove è mancata, i risultati sono solo quelli delle regole.\n\n{shown}")
 
-    def _refresh(self, save: bool = True) -> None:
+    def _refresh(self, save: bool = True, ai_running: bool = False) -> None:
         """I risultati per album rifatti dal rapporto (dopo un controllo, o dopo Controlla con l'AI / online)."""
         from .check_results import CheckResultsView
         window = self.window
@@ -555,6 +774,7 @@ class ScanLauncher:
                                           self.show_accepted)
         panel = window.checks_panel
         state = panel.results.state() if isinstance(panel.results, CheckResultsView) else None
-        view = CheckResultsView(self, report, entries, last["saved"], last["online"], last["side"], hidden=hidden)
+        view = CheckResultsView(self, report, entries, last["saved"], last["online"], last["side"], hidden=hidden,
+                                ai_running=ai_running)
         view.restore(state)
         panel.show_results(view)

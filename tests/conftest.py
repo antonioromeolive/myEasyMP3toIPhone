@@ -67,6 +67,10 @@ def isolated(tmp_path, monkeypatch):
         return 0
 
     monkeypatch.setattr(QMessageBox, "exec", answer)
+    # e nessun'altra finestra che aspetta un clic (per esempio l'avviso delle sorgenti sparite, che parte da solo con
+    # un timer): si chiude subito, come con Annulla; i test che ne vogliono una la sostituiscono per conto loro
+    from PySide6.QtWidgets import QDialog
+    monkeypatch.setattr(QDialog, "exec", lambda dialog: 0)
     yield memory
     keyring.set_keyring(previous)
     env_file._from_file.clear()

@@ -1734,6 +1734,39 @@ CATALOG = {
     "AI disattivata dopo {0} errori di fila (si può cambiare nel profilo AI: Errori di fila prima di smettere)":
         "AI turned off after {0} errors in a row (it can be changed in the AI profile: Errors in a row before "
         "stopping)",
+    "Premuto: si controlla tutto, la selezione della scheda {0} non conta (e non cambia). Alzato: si controlla la selezione della scheda.":
+        "Pressed: everything is checked, the selection of the {0} tab does not count (and does not change). Raised: "
+        "the selection of the tab is checked.",
+    "Ferma l'invio all'iPhone: quello che è già sull'iPhone resta, il resto resta in attesa per il prossimo Applica":
+        "Stops sending to the iPhone: what is already on the iPhone stays, the rest stays waiting for the next Apply",
+    "Ferma: finisco l'album già cominciato":
+        "Stop: finishing the album already started",
+    "Regole":
+        "Rules",
+    "Ferma l'AI":
+        "Stop the AI",
+    "Ferma l'Analisi AI che va in background: i risultati restano quelli delle regole e della Verifica online (e quelli già applicati)":
+        "Stops the AI analysis running in the background: the results stay those of the rules and of the Online "
+        "check (and the ones already applied)",
+    "Ferma la Verifica online (e l'Analisi AI che verrebbe dopo): le regole vanno comunque fino in fondo":
+        "Stops the Online check (and the AI analysis that would come after): the rules still run to the end",
+    "<b style='color:#d28200'>Analisi AI in corso, in background:</b> i suoi risultati si aggiungono man mano. Intanto puoi già applicare le correzioni.<br>":
+        "<b style='color:#d28200'>AI analysis running in the background:</b> its results are added as they arrive. "
+        "Meanwhile you can already apply the fixes.<br>",
+    "Aspetta la fine dell'operazione in corso (o fermala).":
+        "Wait for the end of the operation in progress (or stop it).",
+    "Analisi AI fermata: i risultati sono quelli delle regole e della Verifica online":
+        "AI analysis stopped: the results are those of the rules and of the Online check",
+    "Aspetta la fine dell'Analisi AI in corso (o fermala).":
+        "Wait for the end of the AI analysis in progress (or stop it).",
+    "<b>▶ {0}</b>":
+        "<b>▶ {0}</b>",
+    " <span style='color: gray'>({0})</span>":
+        " <span style='color: gray'>({0})</span>",
+    "<span style='color: #1e8c3c'>✔ {0}</span>":
+        "<span style='color: #1e8c3c'>✔ {0}</span>",
+    "<span style='color: gray'>{0}</span>":
+        "<span style='color: gray'>{0}</span>",
     "Ferma il controllo":
         "Stop the check",
     "Ferma l'Analisi AI e la Verifica online: le regole vanno comunque fino in fondo, e i risultati sono come se AI e Verifica online non fossero scelte":

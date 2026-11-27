@@ -219,6 +219,11 @@ per artista*.
   azioni non sono riuscite e perché. Le azioni riuscite escono subito dalla coda; quelle non riuscite restano in
   attesa per riprovarle. Poi il programma rilegge la musica dell'iPhone; se l'elenco non mostra ancora quello che è
   stato fatto (l'iPhone aggiorna il suo database poco dopo), lo rilegge da solo dopo 5 secondi, al più 3 volte.
+- **Durante Applica** il pulsante diventa rosso, **Ferma**. Si ferma solo dove tutto resta a posto: un brano non resta
+  mai a metà (ogni gruppo di brani entra sull'iPhone tutto o niente) e nemmeno un album (si finisce quello già
+  cominciato, poi ci si ferma; i brani si inviano in ordine di album). *Ricopia* toglie la copia vecchia solo dei brani
+  già arrivati; *Cambia i tag*, *Elimina* e la grafia degli album (album interi) vanno fino in fondo. Quello che è
+  fatto esce dalla coda, il resto resta in attesa per il prossimo *Applica*.
 - Prima di copiare, l'avviso per i brani che sull'iPhone ci sono già in un altro formato (vedi sotto); un brano che
   sull'iPhone c'è già nello stesso album sostituisce la copia vecchia invece di aggiungersi (vedi sotto).
 - Un brano ha un'azione sola: una nuova (per esempio *Ricopia* dopo *Usa i tag*) prende il posto della vecchia.
@@ -306,8 +311,9 @@ musica del PC; anche a iPhone disconnesso, con l'ultimo elenco letto). F6 dalla 
 scheda PC il PC. Si controlla **quello che è scelto in quella scheda**, con la regola della barra delle azioni: i brani
 selezionati nella lista; se non ce ne sono, gli artisti o gli album scelti negli elenchi; se non c'è niente, tutto. Il
 riquadro azzurro dice cosa si controlla (per esempio *l'album X scelto nella scheda PC (12 brani)*), con
-**Modifica la selezione nella scheda PC/iPhone** (porta alla scheda) e **Tutto il PC / Tutto l'iPhone** (ignora la
-selezione senza toccarla).
+**Modifica la selezione nella scheda PC/iPhone** (porta alla scheda) e **Tutto il PC / Tutto l'iPhone**, un pulsante a
+due stati: premuto (blu, in grassetto) si controlla tutto e la selezione della scheda non conta (senza toccarla);
+alzato, la selezione.
 
 **Cosa controllare** (le scelte si ricordano):
 
@@ -319,15 +325,22 @@ selezione senza toccarla).
 - **Solo AI** spegne le regole e la Verifica online e fa partire l'AI su tutto quello che si controlla (senza regole
   nessun album ha "problemi", quindi la casella *solo sugli album con problemi* non vale).
 
-**Avvia il controllo** lo fa partire (l'avanzamento è nella barra di stato) e diventa rosso, **Ferma il controllo**. I
-**risultati arrivano man mano**: prima quelli delle regole, poi l'AI, poi un album alla volta della Verifica online;
-si possono guardare, aprire e spegnere mentre il controllo va avanti (lo stato resta quando si aggiungono i nuovi),
-ma *Applica le correzioni scelte* si usa alla fine. Se l'AI era scelta e non ha risposto, alla fine un messaggio lo
-dice, con i primi errori. **Ferma il controllo** (o **Annulla** nella barra di stato) durante l'AI o la Verifica
-online ferma solo quelle: le regole vanno comunque fino in fondo e i risultati sono come se AI e Verifica online non
-fossero state scelte (l'intestazione dice cosa è stato annullato; le risposte già arrivate si scartano). *Annulla*
-durante le regole (o le impronte dell'audio) ferma tutto: risultati parziali. Il rapporto resta in
-`.myEasyMP3toIPhone\scansioni\`.
+**Avvia il controllo** lo fa partire e diventa rosso, **Ferma il controllo**; accanto, le **fasi**: *✔ Regole →
+▶ Verifica online (a che punto è) → Analisi AI*. L'ordine è **regole, Verifica online, Analisi AI**:
+1. regole e Verifica online occupano il programma (avanzamento nella barra di stato); i **risultati arrivano man
+   mano** (prima quelli delle regole, poi un album alla volta della Verifica online) e si possono guardare, aprire e
+   spegnere, ma *Applica le correzioni scelte* si usa alla fine di queste due;
+2. poi l'**Analisi AI va in background**: il programma resta libero (si applicano le correzioni, si scrive nei file,
+   si mettono azioni in coda), i suoi problemi si aggiungono ai risultati man mano senza perdere quello che hai aperto,
+   spento o applicato, e il pulsante è **Ferma l'AI**. Alla fine entra nel rapporto; se non ha risposto, un messaggio
+   lo dice con i primi errori.
+
+Durante un controllo grande i risultati si ridisegnano al più ogni tanto (più spesso se l'elenco è piccolo) e non
+mentre la linguetta Controlli non si vede: la finestra resta libera. **Ferma il controllo** (o **Annulla** nella barra
+di stato) durante la Verifica online la ferma (e l'AI non parte); **Ferma l'AI** ferma l'AI. Le regole vanno sempre
+fino in fondo e i risultati sono come se ciò che è stato fermato non fosse stato scelto (l'intestazione lo dice; le
+risposte già arrivate si scartano). *Annulla* durante le regole (o le impronte dell'audio) ferma tutto: risultati
+parziali. Il rapporto resta in `.myEasyMP3toIPhone\scansioni\`.
 
 **I risultati sono per album**, dal più grave: sotto ogni album i suoi problemi (con la gravità e l'origine: regola, AI,
 online) e, sotto ogni problema, le **correzioni proposte**, una riga per brano e campo (*Ora* → *Diventa*), ognuna con

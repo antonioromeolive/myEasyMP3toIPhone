@@ -1821,3 +1821,25 @@ def test_after_apply_reread_if_the_iphone_does_not_show_the_changes_yet(monkeypa
         window._exit_checked = True
         window.close()
         app.processEvents()
+
+
+def test_stop_never_leaves_an_album_half_sent():
+    """Ferma durante l'invio: si finisce l'album già cominciato (anche oltre un gruppo), poi ci si ferma; un brano non
+    resta mai a metà (ogni gruppo è una sessione intera)."""
+    from types import SimpleNamespace
+    from myeasymp3toiphone import phone_actions
+
+    def item(album, number):
+        tags = TrackTags(title=f"Brano {number}", artist="Gruppo Finto", album=album, track_number=number)
+        return SimpleNamespace(track=SimpleNamespace(tags=tags))
+
+    mixed = [item("Primo", 1), item("Secondo", 1), item("Primo", 2), item("Secondo", 2)]
+    ordered = phone_actions.by_album(mixed)
+    assert [(i.track.tags.album, i.track.tags.track_number) for i in ordered] == [
+        ("Primo", 1), ("Primo", 2), ("Secondo", 1), ("Secondo", 2)]
+    big = [item("Lungo", number) for number in range(1, 31)] + [item("Corto", number) for number in range(1, 4)]
+    assert phone_actions.batch_end(big, 0, False) == 25                  # di solito: gruppi di 25
+    assert phone_actions.batch_end(big, 0, True) == 0                    # Ferma prima di cominciare: niente
+    assert phone_actions.batch_end(big, 25, True) == 30                  # Ferma a metà di "Lungo": lo si finisce
+    assert phone_actions.batch_end(big, 30, True) == 30                  # finito "Lungo": "Corto" non comincia
+    assert phone_actions.batch_end(big, 30, False) == 33

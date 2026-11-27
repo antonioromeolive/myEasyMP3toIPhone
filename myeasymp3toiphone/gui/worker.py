@@ -67,6 +67,7 @@ class TaskRunner(QObject):
 
     busy_changed = Signal(bool)
     error = Signal(str, str)  # titolo, messaggio
+    progressed = Signal(str)  # il passo in corso, com'è scritto nella barra di stato (per chi lo mostra altrove)
 
     def __init__(self, status_bar: QStatusBar) -> None:
         super().__init__()
@@ -136,6 +137,7 @@ class TaskRunner(QObject):
             self._bar.setRange(0, total)
             self._bar.setValue(index)
         self._label.setText(self._step_text(text))
+        self.progressed.emit(tr(text))
 
     def _done(self) -> None:
         self._task = None

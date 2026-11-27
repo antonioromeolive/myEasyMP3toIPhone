@@ -62,7 +62,8 @@ class CheckOptions(QWidget):
         self.edit_button = QPushButton()
         self.edit_button.clicked.connect(self._go_to_tab)
         self.all_button = QPushButton()
-        self.all_button.clicked.connect(self._toggle_selection)
+        self.all_button.setCheckable(True)          # premuto: tutto, la selezione della scheda non conta
+        self.all_button.toggled.connect(self._toggle_selection)
         self.rule_label = _note("")
         buttons = QHBoxLayout()
         buttons.addWidget(self.edit_button)
@@ -147,6 +148,7 @@ class CheckOptions(QWidget):
                                        "controlla e parte")
         self.solo_ai_button.clicked.connect(self._solo_ai)
         self._running = False
+        self._background_stop = None
         self.start_button = QPushButton()
         self.start_button.clicked.connect(self._start_clicked)
         window.runner.busy_changed.connect(self._busy_changed)
@@ -157,6 +159,10 @@ class CheckOptions(QWidget):
         bottom.addWidget(none_button)
         bottom.addWidget(self.solo_ai_button)
         bottom.addStretch(1)
+        self.phase_label = QLabel()
+        self.phase_label.setTextFormat(Qt.RichText)
+        self.phase_label.setVisible(False)
+        bottom.addWidget(self.phase_label)
         bottom.addWidget(self.start_button)
 
         left = QVBoxLayout()
@@ -178,27 +184,64 @@ class CheckOptions(QWidget):
 
     # ------------------------------------------------------------------ avvia e ferma
 
-    def set_running(self, running: bool) -> None:
+    def set_running(self, running: bool, stop=None) -> None:
         """Durante un controllo il pulsante è rosso, Ferma il controllo (come Annulla nella barra di stato: le regole
-        finiscono, AI e Verifica online si fermano); fuori, verde, Avvia il controllo."""
+        finiscono, AI e Verifica online si fermano); fuori, verde, Avvia il controllo. stop: durante l'Analisi AI in
+        background (dopo regole e Verifica online) il pulsante è Ferma l'AI e chiama stop()."""
         self._running = running
-        if running:
+        self._background_stop = stop
+        if running and stop is not None:
+            self.start_button.setText("Ferma l'AI")
+            self.start_button.setProperty("role", "danger")
+            self.start_button.setIcon(icon("stop", "white"))
+            self.start_button.setEnabled(True)
+            self.start_button.setToolTip("Ferma l'Analisi AI che va in background: i risultati restano quelli delle "
+                                         "regole e della Verifica online (e quelli già applicati)")
+        elif running:
             self.start_button.setText("Ferma il controllo")
             self.start_button.setProperty("role", "danger")
             self.start_button.setIcon(icon("stop", "white"))
-            self.start_button.setToolTip("Ferma l'Analisi AI e la Verifica online: le regole vanno comunque fino in "
-                                         "fondo, e i risultati sono come se AI e Verifica online non fossero scelte")
+            self.start_button.setToolTip("Ferma la Verifica online (e l'Analisi AI che verrebbe dopo): le regole vanno "
+                                         "comunque fino in fondo")
         else:
             self.start_button.setText("Avvia il controllo")
             self.start_button.setProperty("role", "go")
             self.start_button.setIcon(icon("play", "white"))
             self.start_button.setToolTip("")
+            if hasattr(self, "phase_label"):
+                self.phase_label.setVisible(False)
         self.start_button.style().unpolish(self.start_button)
         self.start_button.style().polish(self.start_button)
         self._update()
 
+    def show_phases(self, phases: list, current: str, detail: str) -> None:
+        """Le fasi del controllo in corso: ✔ quelle finite, in grassetto quella in corso (con a che punto è), le altre
+        dopo; quelle non scelte non si mostrano."""
+        from html import escape
+        from .scan_dialog import PHASE_AI, PHASE_ONLINE, PHASE_RULES
+        names = {PHASE_RULES: tr("Regole"), PHASE_AI: tr("Analisi AI"), PHASE_ONLINE: tr("Verifica online")}
+        parts = []
+        passed = True
+        for phase in phases:
+            if phase == current:
+                passed = False
+                text = f"<b>▶ {escape(names[phase])}</b>"
+                if detail:
+                    text += f" <span style='color: gray'>({escape(detail)})</span>"
+            elif passed and current:
+                text = f"<span style='color: #1e8c3c'>✔ {escape(names[phase])}</span>"
+            else:
+                text = f"<span style='color: gray'>{escape(names[phase])}</span>"
+            parts.append(text)
+        self.phase_label.setText(" → ".join(parts))
+        self.phase_label.setVisible(self._running and bool(current))
+
     def _start_clicked(self) -> None:
-        if self._running:
+        if self._running and self._background_stop is not None:
+            self._background_stop()
+            self.start_button.setEnabled(False)
+            self.start_button.setText("Mi fermo…")
+        elif self._running:
             self._window.runner.cancel()
             self.start_button.setEnabled(False)          # finché le regole finiscono
             self.start_button.setText("Mi fermo…")
@@ -206,8 +249,9 @@ class CheckOptions(QWidget):
             self.start_requested.emit()
 
     def _busy_changed(self, busy: bool) -> None:
-        """Un'operazione finita (anche con un errore): il pulsante torna Avvia."""
-        if not busy and self._running:
+        """Un'operazione finita (anche con un errore): il pulsante torna Avvia. Non durante l'Analisi AI in background,
+        che non occupa il programma (le altre operazioni vanno e vengono)."""
+        if not busy and self._running and self._background_stop is None:
             self.set_running(False)
 
     # ------------------------------------------------------------------ su cosa
@@ -255,13 +299,17 @@ class CheckOptions(QWidget):
 
     def _side_changed(self) -> None:
         self._ignore_selection = False
+        self.all_button.blockSignals(True)
+        self.all_button.setChecked(False)
+        self.all_button.blockSignals(False)
         self.refresh()
 
     def _go_to_tab(self) -> None:
         self._window.show_side_tab(self.side)
 
-    def _toggle_selection(self) -> None:
-        self._ignore_selection = not self._ignore_selection
+    def _toggle_selection(self, checked: bool) -> None:
+        """Tutto il PC / Tutto l'iPhone: premuto, si controlla tutto; alzato, la selezione della scheda."""
+        self._ignore_selection = checked
         self.refresh()
 
     def refresh(self) -> None:
@@ -277,10 +325,9 @@ class CheckOptions(QWidget):
         self.scope_names.setText(names)
         self.scope_names.setVisible(bool(names))
         self.edit_button.setText(f"Modifica la selezione nella scheda {tab}")
-        if self._ignore_selection:
-            self.all_button.setText(f"Usa la selezione della scheda {tab}")
-        else:
-            self.all_button.setText("Tutto il PC" if tab == "PC" else "Tutto l'iPhone")
+        self.all_button.setText("Tutto il PC" if tab == "PC" else "Tutto l'iPhone")
+        self.all_button.setToolTip(f"Premuto: si controlla tutto, la selezione della scheda {tab} non conta (e non "
+                                   "cambia). Alzato: si controlla la selezione della scheda.")
         self.rule_label.setText(f"Come la barra delle azioni: i brani selezionati nella lista della scheda {tab}; se non "
                                 "ce ne sono, gli artisti o gli album scelti negli elenchi; se non c'è niente, tutto.")
         self._items = items

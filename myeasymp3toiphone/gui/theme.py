@@ -45,6 +45,7 @@ QPushButton {{
 }}
 QPushButton:hover {{ background-color: rgba(47, 111, 179, 0.14); border-color: {BLUE}; }}
 QPushButton:pressed {{ background-color: rgba(47, 111, 179, 0.28); }}
+QPushButton:checked {{ background-color: rgba(47, 111, 179, 0.45); border: 2px solid {BLUE}; font-weight: 600; }}
 QPushButton:default {{ border: 1px solid {BLUE}; }}
 QPushButton[role="go"] {{ background-color: {GREEN}; color: white; border-color: {GREEN_DARK}; font-weight: 600; }}
 QPushButton[role="go"]:hover {{ background-color: {GREEN_LIGHT}; }}

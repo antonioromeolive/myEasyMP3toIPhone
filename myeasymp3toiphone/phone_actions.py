@@ -243,17 +243,55 @@ class _Pending:
     sent_as: int = 0          # il sync_id che ha preso sull'iPhone
 
 
+def _album_of(item) -> tuple:
+    """L'album di un brano da inviare, come lo raggruppa l'iPhone (artista dell'album, album)."""
+    tags = item.track.tags
+    result = (phone_group_key(tags.album_artist or tags.artist or ""), phone_group_key(tags.album or ""))
+    return result
+
+
+def by_album(pending: list) -> list:
+    """I brani da inviare in ordine di album (dentro l'album, l'ordine di prima): così Ferma si ferma tra un album e
+    l'altro."""
+    first_seen = {}
+    for position, item in enumerate(pending):
+        first_seen.setdefault(_album_of(item), position)
+    result = sorted(pending, key=lambda item: first_seen[_album_of(item)])
+    return result
+
+
+def batch_end(pending: list, start: int, stopping: bool) -> int:
+    """Dove finisce il prossimo gruppo da inviare (pending in ordine di album). Ogni gruppo è una sessione che entra
+    tutta o per niente: un brano non resta mai a metà. Con stopping (Ferma) si finisce solo l'album già cominciato:
+    il gruppo si ferma al suo ultimo brano, e se l'album è finito il gruppo è vuoto (end == start)."""
+    limit = min(start + BATCH_INSERTS, len(pending))
+    if stopping:
+        current = _album_of(pending[start - 1]) if start > 0 else None
+        end = start
+        while end < limit and current is not None and _album_of(pending[end]) == current:
+            end += 1
+    else:
+        end = limit
+    result = end
+    return result
+
+
 async def _send_batches(pending: list, progress: Optional[ProgressFn], cancel, report: ActionReport,
                         registry=None, overlay=None, home: Optional[Path] = None) -> list:
-    """Invia i brani a gruppi. Restituisce i _Pending inviati davvero; con un registro, ne registra la provenienza."""
+    """Invia i brani a gruppi, in ordine di album. Restituisce i _Pending inviati davvero; con un registro, ne registra
+    la provenienza. Ferma (cancel) non lascia un album a metà: si finisce quello già cominciato (batch_end)."""
     sent = []
+    pending = by_album(pending)
     work = Path(tempfile.mkdtemp(prefix="myEasyMP3toIPhone_invio_"))
     lockdown = await iphone._open_lockdown()
     try:
         start = 0
         failed = False
-        while start < len(pending) and not failed and not is_cancelled(cancel):
-            batch = pending[start:start + BATCH_INSERTS]
+        end = batch_end(pending, start, is_cancelled(cancel))
+        while start < len(pending) and not failed and end > start:
+            batch = pending[start:end]
+            if is_cancelled(cancel) and progress is not None:
+                progress(start, len(pending), "Ferma: finisco l'album già cominciato")
             snapshot = await _snapshot(lockdown, work)
             operations = []
             uploads = []
@@ -327,7 +365,8 @@ async def _send_batches(pending: list, progress: Optional[ProgressFn], cancel, r
             for leftover in work.iterdir():
                 if leftover.is_file() and not leftover.name.startswith("MediaLibrary"):
                     leftover.unlink()
-            start += BATCH_INSERTS
+            start = end
+            end = batch_end(pending, start, is_cancelled(cancel))
         report.cancelled = is_cancelled(cancel)
         if sent:
             await _store_registry(lockdown, home, registry)

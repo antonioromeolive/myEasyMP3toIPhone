@@ -100,6 +100,9 @@ class ApplyDestinationsDialog(QDialog):
         layout.addWidget(buttons)
 
 
+_ICON_CACHE = {}       # gravità -> QIcon
+
+
 def _item(columns: int, texts: dict) -> QTreeWidgetItem:
     """Una riga dei risultati con i testi delle colonne date (le altre vuote)."""
     values = []
@@ -127,9 +130,10 @@ class CheckResultsView(QWidget):
     check_flow.AlbumEntry; online: {album: albumcheck.AlbumCheckResult} della Verifica online; side: SIDE_PC o SIDE_PHONE."""
 
     def __init__(self, launcher, report, entries: list, saved, online: dict, side: str, live: bool = False,
-                 hidden: int = 0) -> None:
+                 hidden: int = 0, ai_running: bool = False) -> None:
         super().__init__(launcher.window)
         self.live = live             # il controllo è ancora in corso: risultati parziali, Applica alla fine
+        self.ai_running = ai_running   # l'Analisi AI va in background: i suoi risultati si aggiungono man mano
         self.hidden = hidden         # i problemi che vanno bene così (nascosti, o mostrati in grigio)
         self.launcher = launcher
         self.window = launcher.window
@@ -217,6 +221,9 @@ class CheckResultsView(QWidget):
         if self.live:
             text = ("<b style='color:#d28200'>Controllo in corso: i risultati arrivano man mano.</b> Applica le "
                     "correzioni scelte si può usare alla fine.<br>") + text
+        elif self.ai_running:
+            text = ("<b style='color:#d28200'>Analisi AI in corso, in background:</b> i suoi risultati si aggiungono "
+                    "man mano. Intanto puoi già applicare le correzioni.<br>") + text
         if report.ai_profile:
             text += f" — analisi AI con {escape(report.ai_profile)}"
         if report.cancelled:
@@ -232,13 +239,17 @@ class CheckResultsView(QWidget):
         self.header.setText(text)
 
     def _icon(self, severity: str):
-        style = self.style()
-        if severity == SEVERITY_HIGH:
-            result = style.standardIcon(QStyle.SP_MessageBoxCritical)
-        elif severity == SEVERITY_MEDIUM:
-            result = style.standardIcon(QStyle.SP_MessageBoxWarning)
-        else:
-            result = style.standardIcon(QStyle.SP_MessageBoxInformation)
+        """L'icona della gravità, presa una volta sola per tipo: chiederla al sistema per ogni riga costava secondi
+        con migliaia di righe (la finestra non rispondeva durante i risultati man mano)."""
+        if severity not in _ICON_CACHE:
+            style = self.style()
+            if severity == SEVERITY_HIGH:
+                _ICON_CACHE[severity] = style.standardIcon(QStyle.SP_MessageBoxCritical)
+            elif severity == SEVERITY_MEDIUM:
+                _ICON_CACHE[severity] = style.standardIcon(QStyle.SP_MessageBoxWarning)
+            else:
+                _ICON_CACHE[severity] = style.standardIcon(QStyle.SP_MessageBoxInformation)
+        result = _ICON_CACHE[severity]
         return result
 
     def _fill(self) -> None:

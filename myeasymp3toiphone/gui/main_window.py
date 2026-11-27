@@ -412,7 +412,9 @@ class MainWindow(QMainWindow):
         self._apply_button = QPushButton("Applica…")
         self._apply_button.setProperty("role", "go")
         self._apply_button.setIcon(icon("check", "white"))
-        self._apply_button.clicked.connect(self._apply_pending)
+        self._apply_button.clicked.connect(self._apply_clicked)
+        self._applying = False         # Applica in corso: il pulsante è rosso, Ferma
+        self._stopping = False
         row = QHBoxLayout(self._pending_bar)
         row.setContentsMargins(10, 6, 10, 6)
         row.addLayout(texts, 1)
@@ -1328,10 +1330,19 @@ class MainWindow(QMainWindow):
             self._pending_last.setText(self._last_pending)
             self._pending_last.setVisible(bool(self._last_pending))
             ready = self.iphone_panel.connected and not self.runner.is_busy
-            self._apply_button.setText(f"Applica {len(jobs)} azioni…" if len(jobs) != 1 else "Applica 1 azione…")
-            self._apply_button.setEnabled(bool(jobs))
-            self._apply_button.setToolTip("" if ready else "L'elenco si vede anche così; per applicarle connetti "
-                                                           "l'iPhone")
+            if self._applying and self.runner.is_busy:
+                # durante Applica: rosso, Ferma (quello già fatto resta fatto, il resto resta in attesa)
+                self._apply_button.setText("Mi fermo…" if self._stopping else "Ferma")
+                self._apply_button.setEnabled(not self._stopping)
+                self._apply_button.setToolTip("Ferma l'invio all'iPhone: quello che è già sull'iPhone resta, il resto "
+                                              "resta in attesa per il prossimo Applica")
+                self._set_apply_look("danger")
+            else:
+                self._apply_button.setText(f"Applica {len(jobs)} azioni…" if len(jobs) != 1 else "Applica 1 azione…")
+                self._apply_button.setEnabled(bool(jobs))
+                self._apply_button.setToolTip("" if ready else "L'elenco si vede anche così; per applicarle connetti "
+                                                               "l'iPhone")
+                self._set_apply_look("go")
             self._undo_button.setEnabled(total > 0)
             self._update_tab_text()
             self._update_action_bar()
@@ -1375,6 +1386,22 @@ class MainWindow(QMainWindow):
         result = self.pending_jobs()
         return result
 
+    def _set_apply_look(self, role: str) -> None:
+        if self._apply_button.property("role") != role:
+            self._apply_button.setProperty("role", role)
+            self._apply_button.setIcon(icon(APPLY_ICONS[role], "white"))
+            self._apply_button.style().unpolish(self._apply_button)
+            self._apply_button.style().polish(self._apply_button)
+
+    def _apply_clicked(self) -> None:
+        """Il pulsante della barra blu: Applica, o durante Applica Ferma."""
+        if self._applying and self.runner.is_busy:
+            self._stopping = True
+            self.runner.cancel()
+            self._update_pending_bar()
+        else:
+            self._apply_pending()
+
     def _apply_pending(self) -> None:
         """Applica: la finestra con tutte le azioni (ognuna si toglie), poi le fa tutte insieme."""
         jobs = self.pending_jobs()
@@ -1388,6 +1415,9 @@ class MainWindow(QMainWindow):
                                  panel.device_name)
             if dialog.exec() and dialog.jobs:
                 panel.apply_jobs(dialog.jobs)
+                self._applying = self.runner.is_busy       # partito: il pulsante diventa Ferma
+                self._stopping = False
+                self._update_pending_bar()
 
     def _track_at_row(self, row: int):
         result = self._model.track(row)
@@ -1698,6 +1728,9 @@ class MainWindow(QMainWindow):
         self._update_action_bar()
 
     def _busy_changed(self, busy: bool) -> None:
+        if not busy:
+            self._applying = False                       # Applica finito (o fermato): il pulsante torna verde
+            self._stopping = False
         for action in self._task_actions:
             action.setEnabled(not busy)
         self._reload_button.setEnabled(not busy)
@@ -1873,6 +1906,7 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event) -> None:
         self._stop_fingerprints()
+        self.scan_launcher.stop_background()          # l'Analisi AI in background
         self.app_settings.window_geometry = bytes(self.saveGeometry().toBase64()).decode("ascii")
         self.save_settings()
         if self.runner.is_busy:
