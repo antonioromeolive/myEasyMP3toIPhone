@@ -716,3 +716,44 @@ def test_the_ai_runs_after_the_online_check_in_background(monkeypatch):
         window._exit_checked = True
         window.close()
         app.processEvents()
+
+
+def test_a_problem_fixed_in_the_other_album_is_not_manual_here():
+    """ "Ultime Parole" e "…Ultime Parole": la correzione è tutta nell'album scritto male; sotto quello giusto il
+    problema dice "nell'altro album", non "a mano", e non ne alza la gravità."""
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtWidgets import QApplication
+    from myeasymp3toiphone.gui.check_results import COL_FIX, CheckResultsView
+    from myeasymp3toiphone.gui.main_window import MainWindow
+    app = QApplication.instance() or QApplication([])
+    right = _album(["Uno", "Due"], album="Ultime Parole")
+    wrong = _album(["Tre"], album="…Ultime Parole")
+    targets = {}
+    for track in right + wrong:
+        targets[str(track.path)] = check_flow.Target(track, pc=track)
+    issue = scan.Issue(scan.KIND_SPLIT, scan.SEVERITY_HIGH, '"Ultime Parole" anche come "…Ultime Parole"', "d",
+                       [track.path for track in right + wrong],
+                       scan.Fix(scan.FIX_TAGS, "Album", changes=[(wrong[0].path, {"album": "Ultime Parole"})]),
+                       rule_id="R12.1")
+    entries = check_flow.group_by_album([issue], lambda path: targets.get(str(path)))
+    by_album = {entry.key[1]: entry for entry in entries}
+    assert by_album["…Ultime Parole"].problems[0].rows and not by_album["…Ultime Parole"].problems[0].elsewhere
+    assert by_album["Ultime Parole"].problems[0].elsewhere == [("Cantante Finto", "…Ultime Parole")]
+    assert by_album["Ultime Parole"].severity == scan.SEVERITY_LOW and by_album["…Ultime Parole"].severity == \
+        scan.SEVERITY_HIGH
+    assert [entry.key[1] for entry in entries] == ["…Ultime Parole", "Ultime Parole"]   # quello da correggere prima
+    window = MainWindow()
+    try:
+        report = scan.ScanReport(target="prova", issues=[issue], tracks_scanned=3, albums_scanned=2)
+        view = CheckResultsView(window.scan_launcher, report, entries, None, {}, check_flow.SIDE_PC)
+        texts = {}
+        for index in range(view.tree.topLevelItemCount()):
+            top = view.tree.topLevelItem(index)
+            texts[top.text(0)] = (top.text(COL_FIX), top.child(0).text(COL_FIX))
+        assert texts["Cantante Finto — …Ultime Parole"] == ("1 automatiche", "automatica (1)")
+        assert texts["Cantante Finto — Ultime Parole"] == ("si corregge nell'altro album", "nell'altro album")
+        view.close()
+    finally:
+        window._exit_checked = True
+        window.close()
+        app.processEvents()

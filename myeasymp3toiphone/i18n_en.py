@@ -1747,6 +1747,15 @@ CATALOG = {
         "automatic ({0})",
     "a mano":
         "by hand",
+    "si corregge nell'altro album":
+        "fixed in the other album",
+    "nell'altro album":
+        "in the other album",
+    "Qui c'è già la forma giusta: si corregge con la correzione automatica di {0}. Qui non c'è niente da fare.":
+        "The right form is already here: it is fixed by the automatic fix of {0}. Nothing to do here.",
+    "<p style='color:gray'><b>Si correggono nell'altro album</b> (qui c'è già la forma giusta, niente da fare):</p><ul>{0}</ul>":
+        "<p style='color:gray'><b>Fixed in the other album</b> (the right form is already here, nothing to do):</p>"
+        "<ul>{0}</ul>",
     "<p>Seleziona un album o un problema per vederne i dettagli e cosa fare.</p><p><b>Correzione automatica</b> (in verde): il problema ha righe con la casella; lascia accese quelle che vuoi e premi <i>Applica le correzioni scelte</i>. <b>A mano</b> (in arancione): il programma non lo corregge da solo; <i>Cosa fare</i> dice come.</p>":
         "<p>Select an album or a problem to see its details and what to do.</p><p><b>Automatic fix</b> (green): "
         "the problem has rows with a box; leave on the ones you want and press <i>Apply the chosen fixes</i>. <b>By "

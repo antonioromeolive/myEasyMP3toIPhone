@@ -195,6 +195,7 @@ class AlbumProblem:
     rows: list = field(default_factory=list)
     files: list = field(default_factory=list)
     accepted: bool = False         # "va bene così" per questo album (mostrato solo a richiesta)
+    elsewhere: list = field(default_factory=list)   # gli album (chiavi) dove si corregge: qui niente da fare
 
 
 @dataclass
@@ -213,9 +214,11 @@ class AlbumEntry:
 
     @property
     def severity(self) -> str:
+        """La gravità del problema più grave, senza quelli che si correggono in un altro album."""
         result = SEVERITY_LOW
         for problem in self.problems:
-            if SEVERITY_ORDER.get(problem.issue.severity, 3) < SEVERITY_ORDER.get(result, 3):
+            if not problem.elsewhere and \
+                    SEVERITY_ORDER.get(problem.issue.severity, 3) < SEVERITY_ORDER.get(result, 3):
                 result = problem.issue.severity
         return result
 
@@ -277,7 +280,14 @@ def group_by_album(issues: list, resolve: Callable[[object], Optional[Target]]) 
                             old = getattr(target.scanned.tags, name, None)
                         if not same_value(old, value):          # solo le maiuscole: niente da correggere
                             problem.rows.append(Row(target, name, old, value, index))
+        fixed_in = []
         for key, problem in per_album.items():
+            if problem.rows:
+                fixed_in.append(key)
+        for key, problem in per_album.items():
+            # "X" e "…X": le correzioni sono tutte nell'altro album, questo ha già la forma giusta
+            if not problem.rows and fixed_in:
+                problem.elsewhere = fixed_in
             entries[key].problems.append(problem)
     result = []
     for key in sorted(entries, key=lambda k: (k == OTHER_KEY, SEVERITY_ORDER.get(entries[k].severity, 3),

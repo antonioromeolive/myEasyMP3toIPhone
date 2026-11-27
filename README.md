@@ -347,8 +347,11 @@ online) e, sotto ogni problema, le **correzioni proposte**, una riga per brano e
 la sua casella; la casella del problema e quella dell'album accendono o spengono tutte le loro righe. Un problema che
 tocca più album compare sotto ognuno, con le righe di quell'album. La colonna **Correzione** dice cosa si può fare: **automatica (N)** (in
 verde: il problema ha N righe con la casella; si applicano con *Applica le correzioni scelte*) o **a mano** (in
-arancione: nessuna correzione automatica; il suggerimento e *Cosa fare* dicono come); sull'album, quante sono le une e
-le altre. Il dettaglio di un album le divide in *Si correggono qui* e *Da fare a mano*. *Dove* dice dove c'è il brano: **PC e iPhone**
+arancione: nessuna correzione automatica; il suggerimento e *Cosa fare* dicono come) o **nell'altro album** (in grigio:
+un problema di più album, per esempio "Ultime Parole" anche come "…Ultime Parole", si corregge tutto nell'album scritto
+male; sotto quello che ha già la forma giusta non c'è niente da fare, e non ne alza la gravità); sull'album, quante sono
+le une e le altre. Il dettaglio di un album le divide in *Si correggono qui*, *Da fare a mano* e *Si correggono
+nell'altro album*. *Dove* dice dove c'è il brano: **PC e iPhone**
 (collegato: il registro della provenienza dice che il brano dell'iPhone viene da quel file), **solo PC**, **solo
 iPhone**. Selezionando un album o un problema, sotto si vedono il dettaglio e **Cosa fare** (anche quando non c'è una
 correzione automatica: quale pulsante usare, quando si può ignorare, cosa fare a mano; per esempio spostare un

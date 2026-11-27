@@ -128,6 +128,15 @@ def _row_key(row) -> tuple:
     return result
 
 
+def _albums_text(keys: list) -> str:
+    """Gli album dove si corregge un problema, per nome: «…Famous Last Words», «Altro»."""
+    names = []
+    for key in keys[:3]:
+        names.append(f"«{key[1]}»")
+    result = ", ".join(names) + (f" e altri {len(keys) - 3}" if len(keys) > 3 else "")
+    return result
+
+
 def _gray(text: str) -> QLabel:
     label = QLabel(text)
     label.setWordWrap(True)
@@ -271,19 +280,25 @@ class CheckResultsView(QWidget):
                                        COL_SEVERITY: tr(entry.severity)})
             automatic = 0
             manual = 0
+            elsewhere = 0
             open_rows = 0
             for problem in entry.problems:
                 if not problem.accepted and problem.rows:
                     automatic += 1
                     open_rows += len(problem.rows)
+                elif not problem.accepted and problem.elsewhere:
+                    elsewhere += 1
                 elif not problem.accepted:
                     manual += 1
-            if automatic and manual:
-                summary = f"{automatic} automatiche, {manual} a mano"
-            elif automatic:
-                summary = f"{automatic} automatiche"
-            elif manual:
-                summary = f"{manual} a mano"
+            parts = []
+            if automatic:
+                parts.append(f"{automatic} automatiche")
+            if manual:
+                parts.append(f"{manual} a mano")
+            if parts:
+                summary = ", ".join(parts)
+            elif elsewhere:
+                summary = "si corregge nell'altro album"
             else:
                 summary = "va bene così"
             top.setText(COL_FIX, summary)
@@ -318,6 +333,12 @@ class CheckResultsView(QWidget):
                     child.setText(COL_FIX, f"automatica ({len(problem.rows)})")
                     child.setForeground(COL_FIX, QBrush(GREEN))
                     child.setToolTip(COL_FIX, AUTO_TIP)
+                elif problem.elsewhere:
+                    child.setText(COL_FIX, "nell'altro album")
+                    child.setToolTip(COL_FIX, f"Qui c'è già la forma giusta: si corregge con la correzione automatica "
+                                              f"di {_albums_text(problem.elsewhere)}. Qui non c'è niente da fare.")
+                    for column in range(len(COLUMNS)):
+                        child.setForeground(column, QBrush(GREY))
                 else:
                     child.setText(COL_FIX, "a mano")
                     child.setForeground(COL_FIX, QBrush(ORANGE))
@@ -646,6 +667,7 @@ class CheckResultsView(QWidget):
         """Il dettaglio di un album: i problemi che si correggono qui e quelli da fare a mano, con Cosa fare."""
         automatic = ""
         manual = ""
+        elsewhere = ""
         for problem in entry.problems:
             suggestion = advice(problem.issue)
             line = f"<li><b>{escape(tr(problem.issue.title))}</b>"
@@ -654,6 +676,9 @@ class CheckResultsView(QWidget):
             line += "</li>"
             if problem.rows:
                 automatic += line
+            elif problem.elsewhere:
+                elsewhere += (f"<li><b>{escape(tr(problem.issue.title))}</b><br>"
+                              f"{escape(_albums_text(problem.elsewhere))}</li>")
             else:
                 manual += line
         html = f"<h3>{escape(entry.title)}</h3><p>{escape(tr(SIDE_LABELS.get(entry.side, '')))}</p>"
@@ -663,6 +688,9 @@ class CheckResultsView(QWidget):
         if manual:
             html += (f"<p style='color:#d28200'><b>Da fare a mano</b> (nessuna correzione automatica):</p>"
                      f"<ul>{manual}</ul>")
+        if elsewhere:
+            html += ("<p style='color:gray'><b>Si correggono nell'altro album</b> (qui c'è già la forma giusta, niente "
+                     f"da fare):</p><ul>{elsewhere}</ul>")
         return html
 
     def _problem_html(self, problem) -> str:
