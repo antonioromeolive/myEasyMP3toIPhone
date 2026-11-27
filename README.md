@@ -373,6 +373,9 @@ tracce dell'edizione e i tuoi file, un'altra edizione, la copertina), **Apri il 
 o la Verifica online solo su quegli album (anche se erano già state fatte, o annullate, o non scelte): i loro risultati
 di prima si sostituiscono, quelli degli altri album restano, e le correzioni già applicate restano segnate. *Annulla*
 lascia i risultati di prima. La Verifica online usa i cataloghi scelti sotto la sua casella, anche se è spenta.
+Per correggere a mano ci sono anche **Copia negli appunti** (nome del file, percorso completo, nome o **percorso della
+cartella**) e **Apri la cartella in Esplora risorse**, come nelle schede PC e iPhone: valgono per i file del PC dei brani
+della riga scelta (un brano, tutti quelli di un problema o di un album); i brani solo sull'iPhone non ne hanno.
 
 **Va bene così.** Un problema che vuoi tenere com'è (per esempio le differenze con il catalogo online: tieni i tuoi
 tag) si segna dal tasto destro: **Va bene così: *tipo di problema* (per questo album)**, oppure **Va bene così: tutto

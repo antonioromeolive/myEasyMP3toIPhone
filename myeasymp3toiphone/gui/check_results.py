@@ -23,6 +23,7 @@ from ..check_flow import FIELD_LABELS, OTHER_KEY, SIDE_BOTH, SIDE_LABELS, SIDE_P
 from ..i18n import tr
 from ..pending import UPDATE
 from ..scan import ORIGIN_AI, SEVERITY_HIGH, SEVERITY_MEDIUM, advice
+from .file_actions import add_file_entries
 from .pc_write import offer_pc_write, shown_value
 
 COLUMNS = ["Album, problema, brano", "Correzione", "Dove", "Campo", "Ora", "Diventa", "Gravità", "Origine"]
@@ -471,6 +472,11 @@ class CheckResultsView(QWidget):
         menu.addSeparator()
         self._accept_entries(menu)
         menu.addSeparator()
+        # i file del PC dei brani scelti (di un problema o di un album: tutti i suoi): copiare il percorso della
+        # cartella per correggere a mano, o aprirla
+        add_file_entries(menu, self._pc_paths(),
+                         lambda text: self.window.statusBar().showMessage(text, 8000))
+        menu.addSeparator()
         for button in (self.show_button, self.again_button, self.online_button):
             action = menu.addAction(button.text())
             action.setEnabled(button.isEnabled())
@@ -579,6 +585,14 @@ class CheckResultsView(QWidget):
             for target in found:
                 if target not in result:
                     result.append(target)
+        return result
+
+    def _pc_paths(self) -> list:
+        """I file del PC dei brani delle righe selezionate (quelli solo sull'iPhone non ne hanno)."""
+        result = []
+        for target in self._selected_targets():
+            if target.pc is not None and target.pc.path not in result:
+                result.append(target.pc.path)
         return result
 
     def _update_buttons(self) -> None:

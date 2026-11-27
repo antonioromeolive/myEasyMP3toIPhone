@@ -1843,3 +1843,54 @@ def test_stop_never_leaves_an_album_half_sent():
     assert phone_actions.batch_end(big, 25, True) == 30                  # Ferma a metà di "Lungo": lo si finisce
     assert phone_actions.batch_end(big, 30, True) == 30                  # finito "Lungo": "Corto" non comincia
     assert phone_actions.batch_end(big, 30, False) == 33
+
+
+def _button_color(app, button):
+    app.processEvents()
+    image = button.grab().toImage()
+    result = image.pixelColor(image.width() // 2, 3).name()
+    return result
+
+
+def test_apply_button_turns_red_while_applying(monkeypatch):
+    """Durante Applica il pulsante dice Ferma ed è rosso davvero (non solo il testo), alla fine torna verde."""
+    import threading
+    import time
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtWidgets import QApplication
+    from myeasymp3toiphone.gui import main_window as mw
+    from myeasymp3toiphone.gui import theme
+    from myeasymp3toiphone.pending import SEND
+    app = QApplication.instance() or QApplication([])
+    theme.apply_theme(app)
+    window = mw.MainWindow()
+    window.show()
+    release = threading.Event()
+    try:
+        here = [_pc("Uno", "Gruppo Finto", "Disco")]
+        window.tracks = here
+        window.set_phone_tracks([], "iPhone di prova")
+        window._rebuild_views()
+        window.queue_files(here, SEND)
+        assert _button_color(app, window._apply_button) == theme.GREEN
+
+        def fake_apply(jobs, closing=False, then=None):
+            window.runner.run("prova", lambda progress, cancel: release.wait(10), lambda value: None)
+
+        monkeypatch.setattr(window.iphone_panel, "apply_jobs", fake_apply)
+        monkeypatch.setattr(mw.ApplyDialog, "exec", lambda dialog: 1)
+        window._apply_clicked()
+        app.processEvents()
+        assert window._apply_button.text() == "Ferma" and window._apply_button.isEnabled()
+        assert _button_color(app, window._apply_button) == theme.RED
+        release.set()
+        deadline = time.time() + 5
+        while window.runner.is_busy and time.time() < deadline:
+            app.processEvents()
+        app.processEvents()
+        assert window._apply_button.text() == "Applica 1 azione…"
+        assert _button_color(app, window._apply_button) == theme.GREEN
+    finally:
+        release.set()
+        window._exit_checked = True
+        window.close()

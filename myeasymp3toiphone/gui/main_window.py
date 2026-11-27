@@ -72,6 +72,7 @@ FINGERPRINT_NOTICE = 100      # da quanti file in su lo si dice nella barra di s
 FINGERPRINTS_TO_DO, FINGERPRINTS_DONE = "impronte_da_fare", "impronte_fatte"   # i messaggi del lavoro in sottofondo
 SPACER = object()             # nella barra in alto: quello che segue va a destra
 MUSIC_MARK = "*"              # last_opened: erano aperte le cartelle della musica
+APPLY_ICONS = {"go": "check", "danger": "stop"}   # il pulsante Applica: verde con la spunta, rosso (Ferma) col quadrato
 EXIT_NOW, EXIT_AFTER_APPLY, EXIT_CANCEL ="esci_ora", "esci_dopo_applica", "resta_aperto"   # all'uscita
 PENDING_LOOK = {SEND: ("＋", QColor(40, 110, 230), QColor(40, 110, 230, 40)),
                 REMOVE: ("－", QColor(210, 50, 50), QColor(230, 60, 90, 40)),

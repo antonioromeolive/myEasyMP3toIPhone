@@ -137,7 +137,7 @@ def _wait(window, app):
 def test_checks_tab_scope_results_by_album_and_apply(tmp_path, monkeypatch):
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     from PySide6.QtCore import Qt
-    from PySide6.QtWidgets import QApplication
+    from PySide6.QtWidgets import QApplication, QMenu
     from myeasymp3toiphone.gui import check_results, pc_write
     from myeasymp3toiphone.gui.check_results import CheckResultsView
     from myeasymp3toiphone.gui.main_window import MainWindow
@@ -178,6 +178,16 @@ def test_checks_tab_scope_results_by_album_and_apply(tmp_path, monkeypatch):
         first_album.setCheckState(0, Qt.Unchecked)                    # la casella dell'album spegne le sue righe
         rows = view.chosen_rows()
         assert rows and all(row.target.scanned.album_key[1] == "Dal Vivo (CD 2)" for row in rows)
+        problem = first_album.child(0)                                  # tasto destro su un problema: i suoi file
+        problem.setSelected(True)
+        assert view._pc_paths() == [folder / "01.mp3"]
+        menu = QMenu()
+        check_results.add_file_entries(menu, view._pc_paths())
+        clipboard = menu.actions()[0].menu()
+        [folder_action] = [action for action in clipboard.actions() if action.text().startswith("Percorso della cart")]
+        folder_action.trigger()
+        assert QApplication.clipboard().text() == str(folder)
+        problem.setSelected(False)
 
         def destinations(dialog):
             dialog.pc_files.setChecked(True)
