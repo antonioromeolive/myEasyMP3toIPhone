@@ -1323,7 +1323,7 @@ def ai_review(provider, tracks: list, issues: list, progress: Optional[ProgressF
     max_tracks = getattr(provider.profile, "batch_tracks", ProviderProfile.batch_tracks)
     chunks = album_batches(keys, groups, max_albums, max_tracks)
     index = 0
-    while index < len(chunks) and not is_cancelled(cancel):
+    while index < len(chunks) and not is_cancelled(cancel) and not getattr(provider, "gave_up", False):
         chunk = chunks[index]
         if progress is not None:
             progress(index, len(chunks), f"analisi AI {index + 1} di {len(chunks)}")
@@ -1387,7 +1387,8 @@ def scan_tracks(tracks: list, target: str, provider=None, check_files: bool = Tr
                 phone_tracks: Optional[list] = None, library_tracks: Optional[list] = None,
                 progress: Optional[ProgressFn] = None, cancel: Optional[threading.Event] = None,
                 checks: frozenset = ALL_CHECKS, fingerprints: Optional[dict] = None,
-                musicbrainz=None, ai_flagged_only: bool = False, keep_phone_fixes: bool = False) -> ScanReport:
+                musicbrainz=None, ai_flagged_only: bool = False, keep_phone_fixes: bool = False,
+                partial: Optional[Callable[[list], None]] = None) -> ScanReport:
     """Il controllo: le regole dei controlli scelti (checks), poi l'AI se c'è un fornitore. Con phone_tracks (la
     musica dell'app Musica, i cui brani sono anche tracks) è dell'iPhone, confrontato con library_tracks.
     fingerprints: {percorso: impronta dell'audio} per i brani duplicati (senza, solo quelli sospetti per i tag).
@@ -1395,11 +1396,14 @@ def scan_tracks(tracks: list, target: str, provider=None, check_files: bool = Tr
     ai_flagged_only: l'AI guarda solo gli album dove le regole hanno trovato qualcosa (nessuno: niente AI). Senza
     controlli scelti (Solo AI) l'AI guarda tutti gli album e ogni suo problema si tiene.
     keep_phone_fixes: le correzioni dei brani dell'iPhone restano (la linguetta Controlli le applica dalla parte giusta);
-    senza, si tolgono e il dettaglio dice di correggere sul PC."""
+    senza, si tolgono e il dettaglio dice di correggere sul PC.
+    partial(problemi): i risultati man mano (una copia dell'elenco): dopo le regole e dopo l'analisi AI."""
     assign_groups(tracks)
     report = ScanReport(target=target, tracks_scanned=len(tracks), albums_scanned=len(group_by_album(tracks)))
     issues = rule_issues(tracks, check_files, progress, cancel, checks)
     rules_cut = is_cancelled(cancel)
+    if partial is not None:
+        partial(list(issues))
     only_ai = not checks
     if provider is not None and not rules_cut and (checks & AI_REVIEW_CHECKS or only_ai):
         reviewed = tracks
@@ -1418,6 +1422,8 @@ def scan_tracks(tracks: list, target: str, provider=None, check_files: bool = Tr
                     if only_ai or enabled(issue, checks):
                         issues.append(issue)
                 report.ai_errors = errors
+                if partial is not None:
+                    partial(list(issues))
     if CHECK_VARIANTS in checks and not rules_cut:
         if progress is not None:
             progress(0, 0, "nomi d'artista dubbi")
@@ -1464,6 +1470,11 @@ def scan_tracks(tracks: list, target: str, provider=None, check_files: bool = Tr
     report.cancelled = rules_cut
     if report.stopped:
         report.ai_errors = []          # gli errori di un passo annullato non contano
+    unique = []
+    for error in report.ai_errors:     # dopo che l'AI ha smesso, lo stesso errore per ogni richiesta
+        if error not in unique:
+            unique.append(error)
+    report.ai_errors = unique
     return report
 
 

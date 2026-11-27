@@ -337,6 +337,7 @@ class ProviderProfile:
     # si divide mai, quindi da solo può superare batch_tracks
     batch_albums: int = 25
     batch_tracks: int = 400
+    max_failures: int = 3          # errori di fila in un controllo dopo cui l'AI smette (0 = mai)
 
     def key_from_variable(self) -> str:
         result = ""

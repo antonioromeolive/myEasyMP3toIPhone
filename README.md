@@ -319,7 +319,11 @@ selezione senza toccarla).
 - **Solo AI** spegne le regole e la Verifica online e fa partire l'AI su tutto quello che si controlla (senza regole
   nessun album ha "problemi", quindi la casella *solo sugli album con problemi* non vale).
 
-**Avvia il controllo** lo fa partire (l'avanzamento è nella barra di stato). **Annulla** durante l'AI o la Verifica
+**Avvia il controllo** lo fa partire (l'avanzamento è nella barra di stato) e diventa rosso, **Ferma il controllo**. I
+**risultati arrivano man mano**: prima quelli delle regole, poi l'AI, poi un album alla volta della Verifica online;
+si possono guardare, aprire e spegnere mentre il controllo va avanti (lo stato resta quando si aggiungono i nuovi),
+ma *Applica le correzioni scelte* si usa alla fine. Se l'AI era scelta e non ha risposto, alla fine un messaggio lo
+dice, con i primi errori. **Ferma il controllo** (o **Annulla** nella barra di stato) durante l'AI o la Verifica
 online ferma solo quelle: le regole vanno comunque fino in fondo e i risultati sono come se AI e Verifica online non
 fossero state scelte (l'intestazione dice cosa è stato annullato; le risposte già arrivate si scartano). *Annulla*
 durante le regole (o le impronte dell'audio) ferma tutto: risultati parziali. Il rapporto resta in
@@ -854,6 +858,11 @@ suoi profili e le sue chiavi (dalla Gestione credenziali, senza mostrarle).
   `(nel credential store)`. Anche qui si può scrivere `$NOME`. Gli indirizzi pubblici (localhost:11434, api.openai.com,
   api.anthropic.com) restano nel file.
 - Un valore che inizia davvero con `$` si scrive `$$`.
+- **Ollama:** le richieste chiedono al modello di non ragionare prima di rispondere (`"think": false`): con i modelli
+  che ragionano (qwen3 e simili) la risposta arriva in secondi invece che in minuti. Un server che non conosce
+  l'opzione riceve di nuovo la richiesta senza.
+- **Errori di fila prima di smettere** (di base 3; 0 = mai): in un controllo, dopo tanti errori di fila (nessuna
+  risposta, risposta vuota) l'AI smette e il controllo va avanti senza.
 - **Anthropic:** modello predefinito `claude-opus-5-5`; la temperatura non si invia (i modelli attuali non la
   accettano); la risposta usa l'output strutturato dell'API; sui modelli che lo prevedono è attivo il **fallback lato
   server**: se il modello rifiuta la richiesta, l'API la ripete su un altro modello nella stessa chiamata.
@@ -1046,6 +1055,10 @@ predefinita resta su questo computer.
    [Controlla la musica](#controlla-la-musica)).
    Se cancelli tutti i profili non viene ricreato.
 3. In console `--ai "<profilo>"` vale solo per quella scansione e non si salva; senza, la console usa solo le regole.
+
+Dopo quanti errori di fila l'AI smette, in un controllo: *Impostazioni → Profili AI → Errori di fila prima di smettere*
+(`max_failures` in `ai_profiles.json`; un profilo salvato senza usa 3; 0 = mai). Dopo, ogni richiesta all'AI di quel
+controllo fallisce subito, senza aspettare il server, e il controllo va avanti con le sole regole.
 
 Quanti album e brani per richiesta all'AI: quelli del profilo usato (*Impostazioni → Profili AI → Al massimo per
 richiesta*, in `ai_profiles.json` come `batch_albums` e `batch_tracks`); un profilo salvato senza questi valori usa

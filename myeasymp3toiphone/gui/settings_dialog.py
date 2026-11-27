@@ -471,6 +471,12 @@ class SettingsDialog(QDialog):
         self.f_batch_tracks.setSingleStep(50)
         self.f_batch_tracks.setSuffix(tr(" brani"))
         self.f_batch_tracks.setToolTip(batch_tip)
+        self.f_failures = QSpinBox()
+        self.f_failures.setRange(0, 100)
+        self.f_failures.setSpecialValueText(tr("mai"))
+        self.f_failures.setToolTip("In un controllo, dopo tanti errori di fila (nessuna risposta, risposta vuota…) "
+                                   "l'AI smette: il resto del controllo va avanti senza, senza aspettare il server. "
+                                   "0 = non smette mai.")
         batch_row = QHBoxLayout()
         batch_row.addWidget(self.f_batch_albums)
         batch_row.addWidget(self.f_batch_tracks)
@@ -492,6 +498,7 @@ class SettingsDialog(QDialog):
         form.addRow("Timeout", self.f_timeout)
         form.addRow("Contesto (Ollama)", self.f_ctx)
         form.addRow("Al massimo per richiesta", batch_row)
+        form.addRow("Errori di fila prima di smettere", self.f_failures)
         self.fields = QWidget()
         self.fields.setLayout(form)
         right = QVBoxLayout()
@@ -542,6 +549,7 @@ class SettingsDialog(QDialog):
             self.f_ctx.setValue(profile.num_ctx)
             self.f_batch_albums.setValue(profile.batch_albums)
             self.f_batch_tracks.setValue(profile.batch_tracks)
+            self.f_failures.setValue(profile.max_failures)
             # ancora in caricamento: un profilo salvato si mostra com'è; i valori predefiniti del tipo (server,
             # $NOME della chiave) valgono solo quando l'utente cambia il tipo
             self._kind_changed()
@@ -575,6 +583,7 @@ class SettingsDialog(QDialog):
             profile.num_ctx = self.f_ctx.value()
             profile.batch_albums = self.f_batch_albums.value()
             profile.batch_tracks = self.f_batch_tracks.value()
+            profile.max_failures = self.f_failures.value()
             if old_name != profile.name:
                 self.keys[profile.name] = self.keys.get(old_name, "")
                 self.keys[old_name] = ""

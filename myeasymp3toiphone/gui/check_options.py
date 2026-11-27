@@ -17,7 +17,9 @@ from PySide6.QtWidgets import (
 from ..check_flow import HOW_ALL, SIDE_PC, SIDE_PHONE
 from ..albumcheck import DISCOGS_TOKEN_VAR, SERVICE_DISCOGS, SERVICE_ORDER
 from ..scan import CHECK_VARIANTS, CHECKS
+from ..i18n import tr
 from .album_check_dialog import SERVICE_LABEL
+from .icons import icon
 
 
 
@@ -144,9 +146,11 @@ class CheckOptions(QWidget):
         self.solo_ai_button.setToolTip("Spegne gli altri controlli, accende l'Analisi AI su tutto quello che si "
                                        "controlla e parte")
         self.solo_ai_button.clicked.connect(self._solo_ai)
-        self.start_button = QPushButton("Avvia il controllo")
-        self.start_button.setProperty("role", "go")
-        self.start_button.clicked.connect(self.start_requested.emit)
+        self._running = False
+        self.start_button = QPushButton()
+        self.start_button.clicked.connect(self._start_clicked)
+        window.runner.busy_changed.connect(self._busy_changed)
+        self.set_running(False)
         bottom = QHBoxLayout()
         bottom.addWidget(QLabel("<b>Cosa controllare</b>"))
         bottom.addWidget(all_button)
@@ -171,6 +175,40 @@ class CheckOptions(QWidget):
         layout.addLayout(columns, 1)
         layout.addLayout(bottom)
         self.refresh()
+
+    # ------------------------------------------------------------------ avvia e ferma
+
+    def set_running(self, running: bool) -> None:
+        """Durante un controllo il pulsante è rosso, Ferma il controllo (come Annulla nella barra di stato: le regole
+        finiscono, AI e Verifica online si fermano); fuori, verde, Avvia il controllo."""
+        self._running = running
+        if running:
+            self.start_button.setText("Ferma il controllo")
+            self.start_button.setProperty("role", "danger")
+            self.start_button.setIcon(icon("stop", "white"))
+            self.start_button.setToolTip("Ferma l'Analisi AI e la Verifica online: le regole vanno comunque fino in "
+                                         "fondo, e i risultati sono come se AI e Verifica online non fossero scelte")
+        else:
+            self.start_button.setText("Avvia il controllo")
+            self.start_button.setProperty("role", "go")
+            self.start_button.setIcon(icon("play", "white"))
+            self.start_button.setToolTip("")
+        self.start_button.style().unpolish(self.start_button)
+        self.start_button.style().polish(self.start_button)
+        self._update()
+
+    def _start_clicked(self) -> None:
+        if self._running:
+            self._window.runner.cancel()
+            self.start_button.setEnabled(False)          # finché le regole finiscono
+            self.start_button.setText("Mi fermo…")
+        else:
+            self.start_requested.emit()
+
+    def _busy_changed(self, busy: bool) -> None:
+        """Un'operazione finita (anche con un errore): il pulsante torna Avvia."""
+        if not busy and self._running:
+            self.set_running(False)
 
     # ------------------------------------------------------------------ su cosa
 
@@ -325,6 +363,10 @@ class CheckOptions(QWidget):
         for box in self.service_boxes.values():
             box.setVisible(online)
         self.solo_note.setVisible((self.ai_on() or online) and not rules)
-        self.solo_ai_button.setEnabled(self.ai_box.isEnabled())
+        running = getattr(self, "_running", False)
+        self.solo_ai_button.setEnabled(self.ai_box.isEnabled() and not running)
         something = rules or self.ai_on() or bool(self.online_services())
-        self.start_button.setEnabled(bool(getattr(self, "_items", [])) and something)
+        if running:
+            self.start_button.setEnabled(self.start_button.text() != tr("Mi fermo…"))
+        else:
+            self.start_button.setEnabled(bool(getattr(self, "_items", [])) and something)

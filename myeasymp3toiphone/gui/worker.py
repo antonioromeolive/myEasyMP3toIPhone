@@ -15,26 +15,35 @@ log = logging.getLogger(__name__)
 
 class _Signals(QObject):
     progress = Signal(int, int, str)
+    item = Signal(object)
     finished = Signal(object)
     failed = Signal(str)
 
 
 class _Task(QRunnable):
-    """Esegue fn(progress, cancel) e ne restituisce il risultato tramite segnali."""
+    """Esegue fn(progress, cancel) e ne restituisce il risultato tramite segnali; con items, fn(progress, cancel, emit)
+    consegna anche risultati parziali man mano (emit(valore) arriva nel thread dell'interfaccia)."""
 
-    def __init__(self, fn: Callable, cancel: threading.Event) -> None:
+    def __init__(self, fn: Callable, cancel: threading.Event, items: bool = False) -> None:
         super().__init__()
         self.fn = fn
         self.cancel = cancel
+        self.items = items
         self.signals = _Signals()
 
     def _progress(self, index: int, total: int, text: str) -> None:
         self.signals.progress.emit(index, total, text)
 
+    def _item(self, value) -> None:
+        self._emit(self.signals.item, value)
+
     @Slot()
     def run(self) -> None:
         try:
-            value = self.fn(self._progress, self.cancel)
+            if self.items:
+                value = self.fn(self._progress, self.cancel, self._item)
+            else:
+                value = self.fn(self._progress, self.cancel)
             self._emit(self.signals.finished, value)
         except IPhoneError as exc:
             self._emit(self.signals.failed, str(exc))
@@ -85,15 +94,18 @@ class TaskRunner(QObject):
         return result
 
     def run(self, title: str, fn: Callable, on_done: Callable,
-            on_error: Optional[Callable] = None) -> bool:
-        """Avvia fn(progress, cancel). Restituisce False se un'altra operazione è in corso."""
+            on_error: Optional[Callable] = None, on_item: Optional[Callable] = None) -> bool:
+        """Avvia fn(progress, cancel); con on_item, fn(progress, cancel, emit) e on_item(valore) per ogni risultato
+        parziale. Restituisce False se un'altra operazione è in corso."""
         if self._task is not None:
             self.error.emit("Operazione in corso", "Attendi la fine dell'operazione in corso.")
             started = False
         else:
-            task = _Task(fn, threading.Event())
+            task = _Task(fn, threading.Event(), on_item is not None)
             task.setAutoDelete(False)
             task.signals.progress.connect(self._on_progress)
+            if on_item is not None:
+                task.signals.item.connect(on_item)
             task.signals.finished.connect(lambda value: self._finish(on_done, value))
             task.signals.failed.connect(lambda message: self._fail(on_error, message))
             self._task = task

@@ -63,16 +63,34 @@ def parse_json_reply(text: str) -> dict:
 
 
 class Provider:
+    """Un fornitore per un'operazione (un controllo): dopo profile.max_failures errori di fila smette di chiedere
+    (gave_up) e ogni richiesta seguente fallisce subito, senza aspettare il server; 0 = non smette mai."""
+
     def __init__(self, profile: ProviderProfile) -> None:
         self.profile = profile
+        self.failures = 0            # gli errori di fila; una risposta buona li azzera
+
+    @property
+    def gave_up(self) -> bool:
+        limit = int(getattr(self.profile, "max_failures", 0) or 0)
+        result = limit > 0 and self.failures >= limit
+        return result
 
     def ask_json(self, system: str, user: str, schema: dict) -> dict:
+        if self.gave_up:
+            raise AIError(f"AI disattivata dopo {self.failures} errori di fila (si può cambiare nel profilo AI: "
+                          "Errori di fila prima di smettere)")
         log.info("Richiesta AI: profilo=%s tipo=%s modello=%s caratteri=%d", self.profile.name, self.profile.kind,
                  self.profile.model or "(predefinito)", len(user))
         from .i18n import prompt
-        reply = self._ask(prompt(system), user, schema)
-        log.debug("Risposta AI:\n%s", reply)
-        result = parse_json_reply(reply)
+        try:
+            reply = self._ask(prompt(system), user, schema)
+            log.debug("Risposta AI:\n%s", reply)
+            result = parse_json_reply(reply)
+        except AIError:
+            self.failures += 1
+            raise
+        self.failures = 0
         return result
 
     def _ask(self, system: str, user: str, schema: dict) -> str:
@@ -124,9 +142,16 @@ class OllamaProvider(Provider):
             "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
             "format": schema,
             "stream": False,
+            "think": False,      # i modelli che ragionano (qwen3…) rispondono subito, senza minuti di ragionamento
             "options": options,
         }
-        data = self._post("Ollama", self._url("/api/chat"), body, self._headers())
+        try:
+            data = self._post("Ollama", self._url("/api/chat"), body, self._headers())
+        except AIError as exc:
+            if "think" not in str(exc).lower():
+                raise
+            body.pop("think")    # un server che non conosce "think" (o un modello che non lo accetta): senza
+            data = self._post("Ollama", self._url("/api/chat"), body, self._headers())
         result = (data.get("message") or {}).get("content", "")
         return result
 

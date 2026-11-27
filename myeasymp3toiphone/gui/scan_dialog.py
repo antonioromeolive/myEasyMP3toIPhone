@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import copy
 
+from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QMessageBox
 
 from ..ai import make_provider
@@ -20,19 +21,25 @@ from ..library import UNKNOWN_ALBUM, group_by_album, scan_folder
 from ..phone_library import tracks_for_scan
 from ..scan import (
     CHECK_DUPLICATES, CHECK_FILES, CHECK_VARIANTS, ORIGIN_AI, ORIGIN_ONLINE, ai_review, albums_of_issues,
-    drop_repeated, enabled, is_cancelled, report_text, save_report, scan_tracks,
+    ScanReport, drop_repeated, enabled, is_cancelled, report_text, save_report, scan_tracks,
 )
 from .check_options import SIDE_PC, SIDE_PHONE
 
 TITLE = "Controlla la musica"
+LIVE_SCANNED = "brani_controllati"     # i risultati man mano: i brani, i problemi, un album verificato online
+LIVE_ISSUES = "problemi_finora"
+LIVE_ONLINE = "album_verificato"
+LIVE_DELAY_MS = 1500                   # i risultati man mano si ridisegnano al più una volta ogni tanto
 STAGE_AI = "di_nuovo_ai"
 STAGE_ONLINE = "di_nuovo_online"
 REPORTS_FOLDER = "scansioni"
 
 
-def online_check(scanned: list, issues: list, clients: list, flagged_only: bool, chooser, progress, cancel) -> list:
+def online_check(scanned: list, issues: list, clients: list, flagged_only: bool, chooser, progress, cancel,
+                 on_result=None) -> list:
     """Verifica online gli album dei brani controllati (con flagged_only solo quelli toccati dai problemi): i
-    risultati (albumcheck.AlbumCheckResult), uno per album. Gli album senza nome si saltano."""
+    risultati (albumcheck.AlbumCheckResult), uno per album, anche man mano con on_result(risultato). Gli album senza
+    nome si saltano."""
     groups = group_by_album(scanned)
     wanted = albums_of_issues(issues, scanned) if flagged_only else None
     keys = []
@@ -44,7 +51,10 @@ def online_check(scanned: list, issues: list, clients: list, flagged_only: bool,
     while index < len(keys) and not is_cancelled(cancel):
         artist, album = keys[index]
         progress(index, len(keys), f"verifica online: {artist} — {album}")
-        results.append(check_album_services(clients, groups[keys[index]], chooser))
+        result = check_album_services(clients, groups[keys[index]], chooser)
+        results.append(result)
+        if on_result is not None and not is_cancelled(cancel):
+            on_result(result)
         index += 1
     return results
 
@@ -144,19 +154,26 @@ class ScanLauncher:
         tag_cache = window.tag_cache
         musicbrainz = choices["musicbrainz"] if CHECK_VARIANTS in checks else None
 
-        def work(progress, cancel):
+        def work(progress, cancel, emit):
+            emit((LIVE_SCANNED, tracks, [], None))
             prints = {}
             if CHECK_DUPLICATES in checks:
                 progress(0, 0, "impronte dell'audio")
                 prints = pc_fingerprints(tracks, tag_cache, progress, cancel)
             report = scan_tracks(tracks, target, choices["provider"], check_files=CHECK_FILES in checks,
                                  progress=progress, cancel=cancel, checks=checks, fingerprints=prints,
-                                 musicbrainz=musicbrainz, ai_flagged_only=choices["ai_flagged"])
-            results = self._online(tracks, report, choices, progress, cancel)
+                                 musicbrainz=musicbrainz, ai_flagged_only=choices["ai_flagged"],
+                                 partial=lambda issues: emit((LIVE_ISSUES, issues)))
+            emit((LIVE_ISSUES, list(report.issues)))
+            results = self._online(tracks, report, choices, progress, cancel, emit)
             value = (report, results)
             return value
 
-        window.runner.run(TITLE, work, lambda value: self._show(value[0], value[1], SIDE_PC, tracks, [], checks))
+        self._begin(SIDE_PC, target)
+        started = window.runner.run(TITLE, work,
+                                    lambda value: self._show(value[0], value[1], SIDE_PC, tracks, [], checks),
+                                    on_error=self._failed, on_item=self._live_item)
+        self._started(started)
 
     def _start_device(self, items: list, choices: dict) -> None:
         from ..provenance import PhoneFingerprints
@@ -167,7 +184,7 @@ class ScanLauncher:
         target = f"iPhone, {len(items)} brani ({window.phone_label})"
         musicbrainz = choices["musicbrainz"] if CHECK_VARIANTS in checks else None
 
-        def work(progress, cancel):
+        def work(progress, cancel, emit):
             scanned = tracks_for_scan(items)
             library_tracks = loaded
             if library_tracks is None:
@@ -176,6 +193,7 @@ class ScanLauncher:
                     library_tracks.extend(scan_folder(folder, progress, cancel, window.tag_cache))
                 library_tracks = window.without_hidden(library_tracks)   # non le cartelle escluse
             window.overlay.apply(library_tracks)
+            emit((LIVE_SCANNED, scanned, list(zip(scanned, items)), library_tracks))
             known = PhoneFingerprints(config_dir())
             prints = {}
             for track, item in zip(scanned, items):
@@ -186,8 +204,9 @@ class ScanLauncher:
             report = scan_tracks(scanned, target, choices["provider"], check_files=False, phone_tracks=items,
                                  library_tracks=library_tracks, progress=progress, cancel=cancel, checks=checks,
                                  fingerprints=prints, musicbrainz=musicbrainz, ai_flagged_only=choices["ai_flagged"],
-                                 keep_phone_fixes=True)
-            results = self._online(scanned, report, choices, progress, cancel)
+                                 keep_phone_fixes=True, partial=lambda issues: emit((LIVE_ISSUES, issues)))
+            emit((LIVE_ISSUES, list(report.issues)))
+            results = self._online(scanned, report, choices, progress, cancel, emit)
             value = (report, results, scanned, library_tracks)
             return value
 
@@ -196,17 +215,20 @@ class ScanLauncher:
             self.library_tracks = library_tracks
             self._show(report, results, SIDE_PHONE, scanned, list(zip(scanned, items)), checks)
 
-        window.runner.run(f"{TITLE} (iPhone)", work, done)
+        self._begin(SIDE_PHONE, target)
+        started = window.runner.run(f"{TITLE} (iPhone)", work, done, on_error=self._failed, on_item=self._live_item)
+        self._started(started)
 
     @staticmethod
-    def _online(scanned: list, report, choices: dict, progress, cancel) -> list:
+    def _online(scanned: list, report, choices: dict, progress, cancel, emit=None) -> list:
         """La Verifica online, se è scelta: i suoi problemi entrano nel rapporto; restituisce i risultati. Annullata
         (anche prima di cominciare, durante l'AI) è come non scelta: niente risultati, e il rapporto lo dice."""
         results = []
         if choices["clients"]:
             if not is_cancelled(cancel):
+                on_result = (lambda result: emit((LIVE_ONLINE, result))) if emit is not None else None
                 results = online_check(scanned, report.issues, choices["clients"], choices["online_flagged"],
-                                       choices["chooser"], progress, cancel)
+                                       choices["chooser"], progress, cancel, on_result)
             if is_cancelled(cancel):
                 results = []
                 if "Verifica online" not in report.stopped:
@@ -217,6 +239,71 @@ class ScanLauncher:
                 report.issues.extend(online_issues(result, number))
             report.issues.sort(key=lambda issue: issue.sort_key())
         return results
+
+    # ------------------------------------------------------------------ man mano
+
+    def _begin(self, side: str, target: str) -> None:
+        """Un controllo comincia: il pulsante diventa Ferma, i risultati arriveranno man mano."""
+        self._live = {"side": side, "target": target, "scanned": [], "pairs": [], "issues": [], "online": [],
+                      "resolve": None}
+        self._live_pending = False
+        self._options().set_running(True)
+
+    def _started(self, started: bool) -> None:
+        if not started:
+            self._options().set_running(False)
+
+    def _failed(self, message: str) -> None:
+        self._live = None
+        self._options().set_running(False)
+        QMessageBox.warning(self.window, TITLE, f"Il controllo non è riuscito: {message}")
+
+    def _live_item(self, item) -> None:
+        """Un risultato parziale dal controllo in corso: i brani, i problemi finora, un album verificato online. Si
+        ridisegna al più ogni LIVE_DELAY_MS."""
+        live = getattr(self, "_live", None)
+        if live is not None:
+            kind = item[0]
+            if kind == LIVE_SCANNED:
+                live["scanned"] = item[1]
+                live["pairs"] = item[2]
+                if item[3] is not None:
+                    self.library_tracks = item[3]
+                live["resolve"] = None
+            elif kind == LIVE_ISSUES:
+                live["issues"] = item[1]
+            else:
+                live["online"].append(item[1])
+            if not self._live_pending and kind != LIVE_SCANNED:
+                self._live_pending = True
+                QTimer.singleShot(LIVE_DELAY_MS, self._show_live)
+
+    def _show_live(self) -> None:
+        from .check_results import CheckResultsView
+        self._live_pending = False
+        live = getattr(self, "_live", None)
+        if live is not None and live["scanned"]:
+            scanned = live["scanned"]
+            if live["resolve"] is None:
+                live["resolve"] = self._resolver(live["side"], scanned, live["pairs"])
+                live["albums"] = len(group_by_album(scanned))
+            report = ScanReport(target=live["target"], tracks_scanned=len(scanned), albums_scanned=live["albums"])
+            issues = list(live["issues"])
+            online = {}
+            number = 0
+            for result in live["online"]:
+                number += 1
+                issues.extend(online_issues(result, number))
+                if result.local_tracks:
+                    online[result.local_tracks[0].album_key] = result
+            issues.sort(key=lambda issue: issue.sort_key())
+            report.issues = issues
+            entries = entries_by_album(issues, live["resolve"])
+            panel = self.window.checks_panel
+            state = panel.results.state() if isinstance(panel.results, CheckResultsView) else None
+            view = CheckResultsView(self, report, entries, None, online, live["side"], live=True)
+            view.restore(state)
+            panel.show_results(view, switch=False)
 
     # ------------------------------------------------------------------ di nuovo, solo l'AI o solo online
 
@@ -281,6 +368,7 @@ class ScanLauncher:
 
         def done(value):
             found, errors, cancelled = value
+            self._options().set_running(False)
             if cancelled:
                 self.window.statusBar().showMessage("Analisi AI annullata: i risultati restano quelli di prima", 8000)
             else:
@@ -300,7 +388,8 @@ class ScanLauncher:
                 report.ai_errors = errors
                 self._refresh()
 
-        self.window.runner.run(f"Analisi AI di {len(keys)} album", work, done)
+        self._options().set_running(True)
+        self._started(self.window.runner.run(f"Analisi AI di {len(keys)} album", work, done, on_error=self._failed))
 
     def _recheck_online(self, scanned: list, keys: set) -> None:
         report = self._last["report"]
@@ -316,6 +405,7 @@ class ScanLauncher:
 
         def done(value):
             results, cancelled = value
+            self._options().set_running(False)
             if cancelled:
                 self.window.statusBar().showMessage("Verifica online annullata: i risultati restano quelli di prima",
                                                     8000)
@@ -334,7 +424,9 @@ class ScanLauncher:
                     report.stopped.remove("Verifica online")
                 self._refresh()
 
-        self.window.runner.run(f"Verifica online di {len(keys)} album", work, done)
+        self._options().set_running(True)
+        self._started(self.window.runner.run(f"Verifica online di {len(keys)} album", work, done,
+                                             on_error=self._failed))
 
     def _touches(self, issue, keys: set) -> bool:
         by_path = self._last["by_path"]
@@ -386,8 +478,11 @@ class ScanLauncher:
         return resolve
 
     def _show(self, report, results: list, side: str, scanned: list, phone_pairs: list, checks=frozenset()) -> None:
-        """I risultati di un controllo nuovo: si ricordano (per Controlla con l'AI / online) e si mostrano."""
+        """I risultati di un controllo nuovo: si ricordano (per Controlla con l'AI / online) e si mostrano. Se l'AI era
+        scelta e non ha risposto, lo dice un messaggio."""
         window = self.window
+        self._live = None
+        self._options().set_running(False)
         self._last_phone = phone_pairs
         by_path = {}
         for track in scanned:
@@ -404,6 +499,10 @@ class ScanLauncher:
         for result in results:
             self._remember_online(result)
         self._refresh(save=False)
+        if report.ai_errors:
+            shown = "\n".join(f"• {error[:300]}" for error in report.ai_errors[:3])
+            QMessageBox.warning(window, TITLE, f"L'AI non ha risposto come doveva ({len(report.ai_errors)} errori): "
+                                f"dove è mancata, i risultati sono solo quelli delle regole.\n\n{shown}")
 
     def _refresh(self, save: bool = True) -> None:
         """I risultati per album rifatti dal rapporto (dopo un controllo, o dopo Controlla con l'AI / online)."""
@@ -419,5 +518,8 @@ class ScanLauncher:
         if last["online"] and last["side"] == SIDE_PC:
             window.browser.refresh_check_icons(window.check_results)
         entries = entries_by_album(report.issues, last["resolve"])
-        window.checks_panel.show_results(CheckResultsView(self, report, entries, last["saved"], last["online"],
-                                                          last["side"]))
+        panel = window.checks_panel
+        state = panel.results.state() if isinstance(panel.results, CheckResultsView) else None
+        view = CheckResultsView(self, report, entries, last["saved"], last["online"], last["side"])
+        view.restore(state)
+        panel.show_results(view)

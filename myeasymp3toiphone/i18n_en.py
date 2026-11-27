@@ -1717,6 +1717,26 @@ CATALOG = {
         "chosen fixes</i>.</p><ul>{0}</ul>",
     "<p style='color:#d28200'><b>Da fare a mano</b> (nessuna correzione automatica):</p><ul>{0}</ul>":
         "<p style='color:#d28200'><b>To do by hand</b> (no automatic fix):</p><ul>{0}</ul>",
+    "AI disattivata dopo {0} errori di fila (si può cambiare nel profilo AI: Errori di fila prima di smettere)":
+        "AI turned off after {0} errors in a row (it can be changed in the AI profile: Errors in a row before "
+        "stopping)",
+    "Ferma il controllo":
+        "Stop the check",
+    "Ferma l'Analisi AI e la Verifica online: le regole vanno comunque fino in fondo, e i risultati sono come se AI e Verifica online non fossero scelte":
+        "Stops the AI analysis and the Online check: the rules still run to the end, and the results are as if AI "
+        "and Online check had not been chosen",
+    "Mi fermo…":
+        "Stopping…",
+    "<b style='color:#d28200'>Controllo in corso: i risultati arrivano man mano.</b> Applica le correzioni scelte si può usare alla fine.<br>":
+        "<b style='color:#d28200'>Check in progress: the results arrive as they are found.</b> Apply the chosen "
+        "fixes can be used at the end.<br>",
+    "mai":
+        "never",
+    "In un controllo, dopo tanti errori di fila (nessuna risposta, risposta vuota…) l'AI smette: il resto del controllo va avanti senza, senza aspettare il server. 0 = non smette mai.":
+        "In a check, after this many errors in a row (no answer, empty answer…) the AI stops: the rest of the check "
+        "goes on without it, without waiting for the server. 0 = it never stops.",
+    "Errori di fila prima di smettere":
+        "Errors in a row before stopping",
     "Controlla con l'AI ({0} album)":
         "Check with the AI ({0} albums)",
     "Di nuovo l'Analisi AI, solo su questi album: i loro risultati dell'AI si sostituiscono":

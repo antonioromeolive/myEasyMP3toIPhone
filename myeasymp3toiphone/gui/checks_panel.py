@@ -12,7 +12,6 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QFrame, QLabel, QSplitter, QVBoxLayout, QWidget
 
 from .check_options import CheckOptions
-from .icons import icon
 
 
 def _placeholder(text: str) -> QLabel:
@@ -29,7 +28,6 @@ class ChecksPanel(QWidget):
         self._window = window
         self.options = CheckOptions(window)
         self.options.start_requested.connect(lambda: window.scan_launcher.run())
-        self.options.start_button.setIcon(icon("play", "white"))
         card = QFrame()
         card.setObjectName("checkCard")
         heading = QLabel("Controlla la musica  <span style='color: gray; font-weight: normal'>F6</span>")
@@ -56,13 +54,15 @@ class ChecksPanel(QWidget):
         super().showEvent(event)
         self.refresh()
 
-    def show_results(self, widget: QWidget) -> None:
-        """I risultati nuovi al posto di quelli di prima."""
+    def show_results(self, widget: QWidget, switch: bool = True) -> None:
+        """I risultati nuovi al posto di quelli di prima; switch: e la linguetta Controlli davanti (non per i
+        risultati man mano: chi è in un'altra scheda ci resta)."""
         old = self.results
         self._splitter.replaceWidget(1, widget)
         self.results = widget
         old.deleteLater()
-        self._window.show_checks()
+        if switch:
+            self._window.show_checks()
 
     def focus_scan(self) -> None:
         self.options.start_button.setFocus()

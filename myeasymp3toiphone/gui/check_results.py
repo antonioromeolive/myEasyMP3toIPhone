@@ -126,8 +126,9 @@ class CheckResultsView(QWidget):
     """I risultati del controllo per album. launcher: il ScanLauncher (la finestra, Controlla di nuovo); entries:
     check_flow.AlbumEntry; online: {album: albumcheck.AlbumCheckResult} della Verifica online; side: SIDE_PC o SIDE_PHONE."""
 
-    def __init__(self, launcher, report, entries: list, saved, online: dict, side: str) -> None:
+    def __init__(self, launcher, report, entries: list, saved, online: dict, side: str, live: bool = False) -> None:
         super().__init__(launcher.window)
+        self.live = live             # il controllo è ancora in corso: risultati parziali, Applica alla fine
         self.launcher = launcher
         self.window = launcher.window
         self.report = report
@@ -203,6 +204,9 @@ class CheckResultsView(QWidget):
                 albums += 1
         text = (f"<b>{albums} album con problemi</b> su {report.albums_scanned} controllati ({report.tracks_scanned} "
                 f"brani, {escape(report.target)}): {len(report.issues)} problemi")
+        if self.live:
+            text = ("<b style='color:#d28200'>Controllo in corso: i risultati arrivano man mano.</b> Applica le "
+                    "correzioni scelte si può usare alla fine.<br>") + text
         if report.ai_profile:
             text += f" — analisi AI con {escape(report.ai_profile)}"
         if report.cancelled:
@@ -315,6 +319,51 @@ class CheckResultsView(QWidget):
                 done.append(index)
         if done:
             self._mark_applied(done)
+
+    def state(self) -> dict:
+        """Cosa si vede e cosa è scelto (album e problemi aperti, righe spente, selezione, scorrimento), per ritrovarlo
+        dopo che i risultati si rifanno."""
+        expanded = set()
+        selected = set()
+        for index in range(self.tree.topLevelItemCount()):
+            top = self.tree.topLevelItem(index)
+            key = self.entries[top.data(COL_NAME, REF_ROLE)].key
+            if top.isExpanded():
+                expanded.add(key)
+            if top.isSelected():
+                selected.add(key)
+            for child_index in range(top.childCount()):
+                child = top.child(child_index)
+                if child.isExpanded():
+                    expanded.add((key, child.text(COL_NAME)))
+        off = set()
+        for index, item in enumerate(self._row_items):
+            if index not in self._applied and item.checkState(COL_NAME) != Qt.Checked:
+                off.add(_row_key(self._rows[index]))
+        result = {"expanded": expanded, "selected": selected, "off": off,
+                  "scroll": self.tree.verticalScrollBar().value()}
+        return result
+
+    def restore(self, state) -> None:
+        """Ritrova lo stato di prima (state(); None: com'è)."""
+        if state is not None:
+            self.tree.blockSignals(True)
+            for index in range(self.tree.topLevelItemCount()):
+                top = self.tree.topLevelItem(index)
+                key = self.entries[top.data(COL_NAME, REF_ROLE)].key
+                top.setExpanded(key in state["expanded"])
+                top.setSelected(key in state["selected"])
+                for child_index in range(top.childCount()):
+                    child = top.child(child_index)
+                    child.setExpanded((key, child.text(COL_NAME)) in state["expanded"])
+            for index, item in enumerate(self._row_items):
+                if index not in self._applied and _row_key(self._rows[index]) in state["off"]:
+                    item.setCheckState(COL_NAME, Qt.Unchecked)
+            for index in range(self.tree.topLevelItemCount()):
+                self._sync_album(self.tree.topLevelItem(index))
+            self.tree.blockSignals(False)
+            self.tree.verticalScrollBar().setValue(state["scroll"])
+            self._show_detail()
 
     def _menu(self, position) -> None:
         """Tasto destro sui risultati: di nuovo l'AI o la Verifica online, solo sugli album scelti; e le azioni dei
@@ -430,7 +479,7 @@ class CheckResultsView(QWidget):
 
     def _update_buttons(self) -> None:
         chosen = len(self.chosen_rows())
-        self.apply_button.setEnabled(chosen > 0)
+        self.apply_button.setEnabled(chosen > 0 and not self.live)
         self.count_label.setText(f"{chosen} correzioni scelte" if chosen else "Nessuna correzione scelta")
         entries = self._selected_entries()
         real = []

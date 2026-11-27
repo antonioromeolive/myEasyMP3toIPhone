@@ -344,3 +344,135 @@ def test_cancel_during_the_online_check_and_check_again_from_the_results(monkeyp
         window._exit_checked = True
         window.close()
         app.processEvents()
+
+
+def test_the_ai_stops_after_errors_in_a_row_and_asks_ollama_not_to_think():
+    from myeasymp3toiphone import ai
+    from myeasymp3toiphone.config import ProviderProfile
+    profile = ProviderProfile(name="prova", base_url="http://localhost:11434", model="finto", max_failures=2)
+    provider = ai.OllamaProvider(profile)
+    bodies = []
+
+    def failing(label, url, body, headers):
+        bodies.append(dict(body))
+        raise ai.AIError("Ollama: richiesta non riuscita (timeout)")
+
+    provider._post = failing
+    for _attempt in range(2):
+        try:
+            provider.ask_json("s", "u", {})
+        except ai.AIError:
+            pass
+    assert provider.gave_up and len(bodies) == 2 and bodies[0]["think"] is False
+    try:
+        provider.ask_json("s", "u", {})
+    except ai.AIError as exc:
+        assert "disattivata dopo 2 errori di fila" in str(exc)
+    assert len(bodies) == 2                                   # nessuna richiesta in più: non si aspetta il server
+
+    answers = [ai.AIError('Ollama: errore 400: {"error":"think value \\"false\\" is not supported"}'),
+               {"message": {"content": "{\"ok\": true}"}}]
+    sent = []
+
+    def old_server(label, url, body, headers):
+        sent.append(dict(body))
+        answer = answers.pop(0)
+        if isinstance(answer, Exception):
+            raise answer
+        return answer
+
+    provider = ai.OllamaProvider(profile)
+    provider._post = old_server
+    assert provider.ask_json("s", "u", {}) == {"ok": True}
+    assert "think" in sent[0] and "think" not in sent[1] and provider.failures == 0
+
+
+def test_results_arrive_while_the_check_runs_and_the_button_stops_it(monkeypatch):
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtCore import Qt
+    from PySide6.QtWidgets import QApplication
+    from myeasymp3toiphone.gui import scan_dialog
+    from myeasymp3toiphone.gui.check_results import CheckResultsView
+    from myeasymp3toiphone.gui.main_window import MainWindow
+    app = QApplication.instance() or QApplication([])
+    monkeypatch.setattr(scan_dialog, "LIVE_DELAY_MS", 10)
+    window = MainWindow()
+
+    class SlowService(FakeService):
+        def search_releases(self, artist, album):
+            time.sleep(0.4)
+            return super().search_releases(artist, album)
+
+    try:
+        window.tracks = (_album(["Uno", "Due"], album="Primo") + _album(["Tre"], album="Secondo")
+                         + _album(["Quattro"], album="Terzo"))
+        window._rebuild_views()
+        window._scan()
+        options = window.checks_panel.options
+        for check_id, box in options.boxes.items():
+            box.setChecked(check_id == scan.CHECK_FEW)
+        options.ai_box.setChecked(False)
+        options.online_box.setChecked(True)
+        options.online_flagged.setChecked(False)
+        window.album_clients["deezer"] = SlowService("deezer", ["Uno", "Due", "Tre"])
+        for service, box in options.service_boxes.items():
+            box.setChecked(service == "deezer")
+        options.start_button.click()
+        assert options.start_button.text() == "Ferma il controllo"
+        live = None
+        deadline = time.monotonic() + 10
+        while live is None and window.runner.is_busy and time.monotonic() < deadline:
+            app.processEvents()
+            view = window.checks_panel.results
+            if isinstance(view, CheckResultsView) and view.live:
+                live = view
+            time.sleep(0.01)
+        assert live is not None and not live.apply_button.isEnabled()      # risultati man mano, Applica alla fine
+        assert "Controllo in corso" in live.header.text()
+        live.tree.topLevelItem(0).setCheckState(0, Qt.Unchecked)           # spento durante il controllo
+        off = len(live.chosen_rows())
+        _wait(window, app)
+        final = window.checks_panel.results
+        assert not final.live and options.start_button.text() == "Avvia il controllo"
+        assert len(final.chosen_rows()) < len(final._rows) or off == 0     # la scelta fatta durante resta
+    finally:
+        window._exit_checked = True
+        window.close()
+        app.processEvents()
+
+
+def test_stop_button_cancels_like_annulla(monkeypatch):
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtWidgets import QApplication
+    from myeasymp3toiphone.gui.main_window import MainWindow
+    app = QApplication.instance() or QApplication([])
+    window = MainWindow()
+
+    class SlowService(FakeService):
+        def search_releases(self, artist, album):
+            time.sleep(0.3)
+            return super().search_releases(artist, album)
+
+    try:
+        window.tracks = _album(["Uno", "Due"], album="Primo") + _album(["Tre"], album="Secondo")
+        window._rebuild_views()
+        window._scan()
+        options = window.checks_panel.options
+        for check_id, box in options.boxes.items():
+            box.setChecked(check_id == scan.CHECK_FEW)
+        options.ai_box.setChecked(False)
+        options.online_box.setChecked(True)
+        options.online_flagged.setChecked(False)
+        window.album_clients["deezer"] = SlowService("deezer", ["Uno", "Due", "Tre"])
+        for service, box in options.service_boxes.items():
+            box.setChecked(service == "deezer")
+        options.start_button.click()
+        options.start_button.click()                                      # Ferma il controllo
+        assert options.start_button.text() == "Mi fermo…" and not options.start_button.isEnabled()
+        _wait(window, app)
+        view = window.checks_panel.results
+        assert view.report.stopped == ["Verifica online"] and options.start_button.isEnabled()
+    finally:
+        window._exit_checked = True
+        window.close()
+        app.processEvents()
