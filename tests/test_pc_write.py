@@ -69,6 +69,7 @@ def test_fix_only_in_suspense_or_also_in_the_pc_files(tmp_path, monkeypatch):
         view.close()
 
         # anche nei file: l'elenco, con l'anno spento; si scrive solo l'artista dell'album
+        changes = [(one, {"album_artist": "Vari Artisti", "year": "1998"}), (two, {"album_artist": "Vari Artisti"})]
         shown = []
 
         def approve(pc_dialog):
@@ -82,7 +83,7 @@ def test_fix_only_in_suspense_or_also_in_the_pc_files(tmp_path, monkeypatch):
         view.apply_button.click()
         wait_idle()
         assert len(shown) == 1 and set(shown[0]._boxes) == {"album_artist", "year"}
-        assert [read_tags(path)[0].album_artist for path in (one, two)] == ["Artisti vari", "Artisti vari"]
+        assert [read_tags(path)[0].album_artist for path in (one, two)] == ["Vari Artisti", "Vari Artisti"]
         assert read_tags(one)[0].year == "2001"                     # campo spento: il file non cambia
         assert window.overlay.is_edited(one) and not window.overlay.is_edited(two)   # l'anno resta per l'iPhone
         view.close()

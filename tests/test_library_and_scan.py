@@ -172,9 +172,8 @@ def test_case_variants_are_one_group_shown_with_capitals(tmp_path):
     from myeasymp3toiphone.library import group_by_album
     groups = group_by_album(scan_folder(tmp_path))
     assert list(groups) == [("Queen", "Live at Wembley")]
-    # la scansione segnala comunque la grafia diversa nei tag
-    issues = scan.detect_artist_variants(scan_folder(tmp_path))
-    assert issues and dict((p.name, v) for p, v in issues[0].fix.changes)["2.mp3"] == {"artist": "Queen"}
+    # diversi solo per le maiuscole: per i Controlli sono uguali, niente da segnalare
+    assert scan.detect_artist_variants(scan_folder(tmp_path)) == []
 
 
 def test_same_song_on_different_albums_is_not_a_duplicate(tmp_path):
@@ -360,7 +359,7 @@ def test_same_songs_by_fingerprint_and_by_tags_with_ai():
 
 def test_only_chosen_checks_run(tmp_path):
     _tagged(tmp_path / "a" / "1.mp3", title="X", artist="Queen", album="Uno", track_number=1)
-    _tagged(tmp_path / "a" / "2.mp3", title="Y", artist="queen", album="Due", track_number=5)
+    _tagged(tmp_path / "a" / "2.mp3", title="Y", artist="The Queen", album="Due", track_number=5)
     tracks = scan_folder(tmp_path)
     everything = scan.scan_tracks(tracks, "prova", check_files=False)
     only_variants = scan.scan_tracks(tracks, "prova", check_files=False, checks=frozenset({scan.CHECK_VARIANTS}))

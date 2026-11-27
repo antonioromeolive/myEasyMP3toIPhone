@@ -98,12 +98,13 @@ CHECKS = (
     (CHECK_SPLIT, "Collezioni divise su più album",
      "una cartella con album diversi, lo stesso album scritto in modi diversi o con \"CD 1\" nel nome, "
      "compilation senza artista dell'album"),
-    (CHECK_VARIANTS, "Artisti scritti in modi diversi", "\"The Beatles\" e \"Beatles\", maiuscole, \"AC/DC\" e \"ACDC\""),
+    (CHECK_VARIANTS, "Artisti scritti in modi diversi",
+     "\"The Beatles\" e \"Beatles\", \"AC/DC\" e \"ACDC\", accenti (le maiuscole da sole non contano)"),
     (CHECK_MISSING, "Tag mancanti", "brani senza titolo, album o artista"),
     (CHECK_UNREADABLE, "File illeggibili", "file danneggiati, bloccati o disponibili solo online"),
     (CHECK_DUPLICATES, "Brani duplicati",
      "lo stesso brano in più file: stesso audio anche con tag diversi, oppure stessa durata, titolo e artista in "
-     "file diversi (un MP3 e un FLAC); l'AI guarda solo le coppie sospette"),
+     "file diversi; una copia per formato (FLAC e MP3) va bene; l'AI guarda solo le coppie sospette"),
 )
 ALL_CHECKS = frozenset(check_id for check_id, _label, _note in CHECKS)
 KIND_CHECK = {KIND_NOT_UPDATED: CHECK_FILES, KIND_FEW_TRACKS: CHECK_FEW, KIND_SPLIT: CHECK_SPLIT,
@@ -346,6 +347,16 @@ def detect_missing_tags(tracks: list) -> list:
     return issues
 
 
+def one_per_format(paths: list) -> bool:
+    """Le copie di un brano sono una per formato (un FLAC e un MP3…): tenere lo stesso album in più formati va bene,
+    non è un doppione. Due file dello stesso formato sì."""
+    suffixes = []
+    for path in paths:
+        suffixes.append(Path(path).suffix.lower())
+    result = len(suffixes) > 1 and len(set(suffixes)) == len(suffixes)
+    return result
+
+
 def detect_duplicates(tracks: list) -> list:
     """Doppioni solo DENTRO lo stesso album: una copia "Titolo (2).mp3" accanto all'originale con lo stesso album, e
     brani con lo stesso album, numero e titolo. Lo stesso brano in album diversi (l'album originale e una raccolta) è
@@ -376,7 +387,7 @@ def detect_duplicates(tracks: list) -> list:
             files, rule_id="R7"))
     groups = []
     for paths in same.values():
-        if len(paths) > 1:
+        if len(paths) > 1 and not one_per_format(paths):    # un FLAC e un MP3 dello stesso brano: va bene
             groups.append(paths)
     if groups:
         files = []
@@ -554,7 +565,10 @@ def detect_artist_variants(tracks: list) -> list:
     number = 0
     for norm, artist_tracks in sorted(by_norm.items()):
         written = {t.display_artist for t in artist_tracks}
-        if len(written) > 1 and norm:
+        folded = set()
+        for name in written:
+            folded.add(name.casefold())
+        if len(folded) > 1 and norm:              # diversi solo per le maiuscole: uguali
             number += 1
             chosen = _most_common([t.display_artist for t in artist_tracks])
             changes = []
@@ -1010,7 +1024,8 @@ def _copy_line(tracks: list, prints: dict) -> str:
 
 def detect_same_songs(tracks: list, fingerprints: dict, provider=None, progress: Optional[ProgressFn] = None,
                       cancel: Optional[threading.Event] = None, skip: frozenset = frozenset()) -> tuple:
-    """Lo stesso brano in più file, anche in album diversi: (problemi, errori dell'AI).
+    """Lo stesso brano in più file, anche in album diversi: (problemi, errori dell'AI). Una copia per formato (lo
+    stesso brano in FLAC e in MP3) non si segnala: tenere un album in più formati va bene.
       * stesso audio (impronta): certo;
       * stesso artista e titolo, durata entro 2 secondi, audio diverso (un MP3 e un FLAC, due codifiche): lo stesso
         brano, se titolo e album non nominano versioni diverse (live, remix, demo…);
@@ -1044,7 +1059,11 @@ def detect_same_songs(tracks: list, fingerprints: dict, provider=None, progress:
             clusters.join(first, second, reason)
     by_artist = {}
     for members, notes in clusters.groups():
-        by_artist.setdefault(members[0].display_artist, []).append((members, notes))
+        paths = []
+        for track in members:
+            paths.append(track.path)
+        if not one_per_format(paths):         # lo stesso brano in FLAC e in MP3 (una copia per formato): va bene
+            by_artist.setdefault(members[0].display_artist, []).append((members, notes))
     issues = []
     number = 0
     for artist in sorted(by_artist, key=str.lower):
@@ -1159,7 +1178,7 @@ Find the problems the owner usually has:
 - "collezione_divisa": one collection split into several albums: the same album with different spellings, a disc \
 marker in the album name, a compilation without album artist, the same artist spelled differently, featured artists \
 in the album artist;
-- "duplicato": the same track twice INSIDE the same album, or the same album twice. The same song on several different albums (the original album and a compilation, a live album) is legitimate: never report it;
+- "duplicato": the same track twice INSIDE the same album, or the same album twice. The same song on several different albums (the original album and a compilation, a live album) is legitimate: never report it. The same album kept in several formats (the "formati" column lists more than one, for example flac and mp3, and the tracks are about twice the numbers) is legitimate too: never report it;
 - "tag_mancanti": missing or placeholder tags.
 
 Rules:
@@ -1236,6 +1255,9 @@ def album_lines(groups: dict, keys: list) -> list:
         text = (f"A{index} | album artist: {key[0]} | album: {key[1]} | anni: {','.join(years) or '-'} | brani: "
                 f"{len(album_tracks)} | numeri: {_numbers_text(album_tracks)} | totale dichiarato: {declared or '-'} "
                 f"| cartella: {folder} | generi: {','.join(genres) or '-'}")
+        formats = sorted({t.path.suffix.lower().lstrip(".") for t in album_tracks})
+        if len(formats) > 1:
+            text += f" | formati: {','.join(formats)}"
         if artists:
             text += f" | altri artisti: {', '.join(artists[:6])}"
         lines.append((f"A{index}", text))

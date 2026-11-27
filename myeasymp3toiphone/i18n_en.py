@@ -1515,14 +1515,15 @@ CATALOG = {
         "a folder with different albums, the same album written in different ways or with \"CD 1\" in the name, compilations without album artist",
     "Artisti scritti in modi diversi":
         "Artists written in different ways",
-    "\"The Beatles\" e \"Beatles\", maiuscole, \"AC/DC\" e \"ACDC\"":
-        "\"The Beatles\" and \"Beatles\", capitals, \"AC/DC\" and \"ACDC\"",
+    "\"The Beatles\" e \"Beatles\", \"AC/DC\" e \"ACDC\", accenti (le maiuscole da sole non contano)":
+        "\"The Beatles\" and \"Beatles\", \"AC/DC\" and \"ACDC\", accents (capitals alone do not count)",
     "brani senza titolo, album o artista":
         "tracks without title, album or artist",
     "file danneggiati, bloccati o disponibili solo online":
         "damaged, locked or online-only files",
-    "lo stesso brano in più file: stesso audio anche con tag diversi, oppure stessa durata, titolo e artista in file diversi (un MP3 e un FLAC); l'AI guarda solo le coppie sospette":
-        "the same track in several files: same audio even with different tags, or same duration, title and artist in different files (an MP3 and a FLAC); the AI looks only at the suspicious pairs",
+    "lo stesso brano in più file: stesso audio anche con tag diversi, oppure stessa durata, titolo e artista in file diversi; una copia per formato (FLAC e MP3) va bene; l'AI guarda solo le coppie sospette":
+        "the same track in several files: same audio even with different tags, or same duration, title and artist in "
+        "different files; one copy per format (FLAC and MP3) is fine; the AI looks only at the suspicious pairs",
     "1 brano":
         "1 track",
     "controllo file: {0}":
@@ -1651,6 +1652,8 @@ CATALOG = {
         "none",
     "A{0} | album artist: {1} | album: {2} | anni: {3} | brani: {4} | numeri: {5} | totale dichiarato: {6} | cartella: {7} | generi: {8}":
         "A{0} | album artist: {1} | album: {2} | anni: {3} | brani: {4} | numeri: {5} | totale dichiarato: {6} | cartella: {7} | generi: {8}",
+    " | formati: {0}":
+        " | formati: {0}",
     " | altri artisti: {0}":
         " | altri artisti: {0}",
     "Imposta {0} su tutti i brani":

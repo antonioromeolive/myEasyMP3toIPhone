@@ -26,14 +26,14 @@ def _phone(pid, title, album, sync_id=None, **values):
 
 
 def test_online_check_becomes_problems_with_fixes():
-    local = _album(["uno", "Due"])                                 # "uno": minuscolo, il catalogo dice "Uno"
+    local = _album(["uno", "Due"])                     # "uno": minuscolo, il catalogo dice "Uno": è uguale
     result = albumcheck.check_album_services([FakeService("deezer", ["Uno", "Due", "Tre"])], local)
     issues = check_flow.online_issues(result, 1)
     by_rule = {issue.rule_id: issue for issue in issues}
     assert set(by_rule) == {"W1.1", "W2.1"}
     assert "mancano 1 di 3 brani" in by_rule["W1.1"].title and "03 Tre" in by_rule["W1.1"].detail
     changes = dict((Path(path).name, values) for path, values in by_rule["W2.1"].fix.changes)
-    assert changes["01 uno.mp3"]["title"] == "Uno" and changes["01 uno.mp3"]["track_total"] == 3
+    assert "title" not in changes["01 uno.mp3"] and changes["01 uno.mp3"]["track_total"] == 3   # le maiuscole no
     missing = albumcheck.check_album_services([FakeService("deezer", None)], local)
     assert [issue.rule_id for issue in check_flow.online_issues(missing, 2)] == ["W3.2"]
     assert scan.advice(by_rule["W2.1"]) and scan.advice(by_rule["W1.1"])
@@ -507,3 +507,28 @@ def test_ai_results_arrive_after_every_request(tmp_path):
                      partial=lambda issues: seen.append(len(issues)))
     # dopo le regole, dopo ognuna delle due richieste (due artisti: due richieste), alla fine dell'analisi
     assert seen[0] == 0 and seen[1] == 1 and seen[2] == 2 and len(seen) == 4
+
+
+def test_the_same_album_in_flac_and_mp3_is_not_a_duplicate(tmp_path):
+    def tagged(path, frames=40, **values):
+        write_mp3(path, frames)
+        write_tags(path, TrackTags(**values))
+
+    for folder in ("FLAC", "MP3"):
+        tagged(tmp_path / "Disco" / folder / "01.mp3", title="Uno", artist="Gruppo", album="Disco", track_number=1)
+    for path in (tmp_path / "Disco" / "FLAC").glob("*.mp3"):
+        path.rename(path.with_suffix(".flac"))          # una copia per formato (il contenuto non conta per la regola)
+    tracks = [track for track in scan_folder(tmp_path)]
+    from myeasymp3toiphone.library import Track
+    flac = Track(path=tmp_path / "Disco" / "FLAC" / "01.flac", tags=tracks[0].tags.copy(), length=tracks[0].length)
+    mp3 = [track for track in tracks if track.path.suffix == ".mp3"][0]
+    assign_groups([flac, mp3])
+    assert scan.one_per_format([flac.path, mp3.path]) and not scan.one_per_format([mp3.path, mp3.path])
+    assert scan.detect_duplicates([flac, mp3]) == []                                   # FLAC e MP3: va bene
+    issues, _errors = scan.detect_same_songs([flac, mp3], {})
+    assert issues == []
+    again = Track(path=tmp_path / "Disco" / "Altra copia" / "01.mp3", tags=mp3.tags.copy(), length=mp3.length)
+    assign_groups([flac, mp3, again])
+    assert [issue.rule_id for issue in scan.detect_duplicates([flac, mp3, again])] == ["R8"]   # due MP3: doppione
+    lines = scan.album_lines({mp3.album_key: [flac, mp3]}, [mp3.album_key])
+    assert "formati: flac,mp3" in lines[0][1]                                          # l'AI vede i formati

@@ -80,6 +80,16 @@ def scope_text(where: str, how: str, tracks: list, albums: list, opened: str = "
     return result
 
 
+def same_value(first, second) -> bool:
+    """Due valori di un tag sono uguali, anche se diversi solo per le maiuscole ("uno" e "Uno"): nei Controlli una
+    differenza così non è un problema e non si corregge."""
+    if isinstance(first, str) and isinstance(second, str):
+        result = first.casefold() == second.casefold()
+    else:
+        result = first == second
+    return result
+
+
 # --------------------------------------------------------------------------- Verifica online
 
 def online_issues(result, number: int) -> list:
@@ -118,7 +128,7 @@ def online_issues(result, number: int) -> list:
                 wanted = corrected_tags(match, result.release)
                 values = {}
                 for name in ONLINE_FIELDS:
-                    if getattr(wanted, name) != getattr(match.local.tags, name):
+                    if not same_value(getattr(wanted, name), getattr(match.local.tags, name)):
                         values[name] = getattr(wanted, name)
                 if values:
                     changes.append((match.local.path, values))
@@ -252,7 +262,9 @@ def group_by_album(issues: list, resolve: Callable[[object], Optional[Target]]) 
                     if target not in entry.targets:
                         entry.targets.append(target)
                     for name, value in values.items():
-                        problem.rows.append(Row(target, name, getattr(target.scanned.tags, name, None), value, index))
+                        old = getattr(target.scanned.tags, name, None)
+                        if not same_value(old, value):          # solo le maiuscole: niente da correggere
+                            problem.rows.append(Row(target, name, old, value, index))
         for key, problem in per_album.items():
             entries[key].problems.append(problem)
     result = []
