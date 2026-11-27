@@ -75,7 +75,8 @@ def test_file_problems_are_informational_and_files_untouched(tmp_path):
     by_rule = {issue.rule_id: issue for issue in issues}
     assert set(by_rule) == {"R2"}
     assert [p.name for p in by_rule["R2"].files] == ["v1.mp3"]
-    assert by_rule["R2"].fix is None and by_rule["R2"].severity == scan.SEVERITY_LOW
+    assert by_rule["R2"].severity == scan.SEVERITY_LOW               # la correzione c'è, ma il controllo non scrive
+    assert by_rule["R2"].fix.changes == [(stale, {"vecchio_id3v1": "tolto"})]
     assert {path.name: path.read_bytes() for path in tmp_path.glob("*.mp3")} == before
 
 

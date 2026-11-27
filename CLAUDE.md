@@ -23,8 +23,10 @@ Le eccezioni passano tutte da `gui/pc_write.py`: **Usa i tag da iPhone a PC** (s
 scelte** dei Controlli (casella *Sul PC: scrivi nei file*, per i brani collegati e per quelli solo sul PC) e *Correggi
 tag* di Dettagli della verifica online (scelta *Anche nei file del PC…*) scrivono i tag nei file originali con
 `tags.write_tags_approved`, solo dopo `PcWriteDialog`, che elenca ogni file e ogni campo che cambia (ora → diventa) e
-dice che non si può annullare. Ogni nuova scrittura nei file del PC deve passare da una finestra così: chiara e
-approvata, mai automatica.
+dice che non si può annullare. Dalla stessa finestra passano le correzioni R2/R3 dei Controlli (casella *Togli i vecchi
+tag dai file*): `tags.remove_old_tags_approved` toglie ID3v1 e APE (`tags.OLD_TAG_FIELDS`, righe "c'è → tolto") dopo
+aver scritto i valori letti nell'ID3v2. Ogni nuova scrittura nei file del PC deve passare da una finestra così: chiara
+e approvata, mai automatica.
 
 Le correzioni dei Controlli vanno dalla parte dove c'è il brano (`check_flow.plan_apply`): un brano collegato (registro)
 sul PC e sull'iPhone (*Usa i tag da PC a iPhone*, in attesa), uno solo sul PC solo sul PC, uno solo sull'iPhone solo

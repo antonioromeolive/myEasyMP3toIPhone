@@ -9,12 +9,16 @@ correzione di Controlla la musica). Ogni altra modifica dei tag resta in sospeso
 
 from __future__ import annotations
 
+from typing import Optional
+
 from PySide6.QtWidgets import (
     QCheckBox, QDialog, QDialogButtonBox, QHBoxLayout, QLabel, QMessageBox, QTreeWidget, QTreeWidgetItem, QVBoxLayout,
 )
 
 from ..i18n import tr
-from ..tags import READ_ONLY_EXTENSIONS, TAG_FIELDS
+from ..tags import (
+    OLD_TAG_FIELDS, OLD_TAG_NAMES, OLD_TAG_PRESENT, OLD_TAG_REMOVED, READ_ONLY_EXTENSIONS, TAG_FIELDS,
+)
 
 ALIGN_TITLE = "Usa i tag da iPhone a PC: modifica dei file del PC"
 ALIGN_WHAT = "si scrivono nel file i tag dell'iPhone dei campi scelti"
@@ -26,6 +30,8 @@ def shown_value(name: str, value) -> str:
     """Un valore come si mostra: "" per un tag vuoto, sì/no per la compilation."""
     if name == "compilation":
         result = "sì" if value else "no"
+    elif name in OLD_TAG_NAMES:
+        result = tr(str(value))                  # un vecchio tag: c'è / tolto
     elif value is None:
         result = ""
     else:
@@ -48,7 +54,7 @@ class PcWriteDialog(QDialog):
         self._plan = plan
         self._what = what
         self._pending = pending
-        self._labels = dict(TAG_FIELDS)
+        self._labels = dict(TAG_FIELDS + OLD_TAG_FIELDS)
         counts = {}
         for _track, _new_tags, fields in plan:
             for name in fields:
@@ -58,7 +64,7 @@ class PcWriteDialog(QDialog):
         self._boxes = {}
         choices = QHBoxLayout()
         choices.addWidget(QLabel("Campi da scrivere:"))
-        for name, _label in TAG_FIELDS:
+        for name, _label in TAG_FIELDS + OLD_TAG_FIELDS:      # anche i vecchi tag da togliere (ID3v1, APE)
             if name in counts:
                 box = QCheckBox(f"{tr(self._labels[name])} ({counts[name]} file)")
                 box.setChecked(True)
@@ -104,7 +110,8 @@ class PcWriteDialog(QDialog):
             if kept:
                 tags = self._base(track).copy()
                 for name in kept:
-                    setattr(tags, name, getattr(new_tags, name))
+                    if name not in OLD_TAG_NAMES:
+                        setattr(tags, name, getattr(new_tags, name))
                 result.append((track, tags, kept))
         return result
 
@@ -118,8 +125,12 @@ class PcWriteDialog(QDialog):
             first = True
             base = self._base(track)
             for name in fields:
-                row = QTreeWidgetItem([str(track.path) if first else "", tr(self._labels.get(name, name)),
-                                       shown_value(name, getattr(base, name)), shown_value(name, getattr(new_tags, name))])
+                if name in OLD_TAG_NAMES:
+                    now, becomes = tr(OLD_TAG_PRESENT), tr(OLD_TAG_REMOVED)
+                else:
+                    now, becomes = shown_value(name, getattr(base, name)), shown_value(name, getattr(new_tags, name))
+                row = QTreeWidgetItem([str(track.path) if first else "", tr(self._labels.get(name, name)), now,
+                                       becomes])
                 row.setToolTip(0, str(track.path))
                 rows.append(row)
                 first = False
@@ -150,52 +161,67 @@ def ask_where(parent, title: str, text: str) -> str:
     return result
 
 
-def pending_plan(tracks: list) -> list:
+def pending_plan(tracks: list, old_tags: Optional[dict] = None) -> list:
     """Le modifiche in sospeso dei brani come piano da scrivere nei file del PC: (brano, tag in sospeso, campi diversi
-    dal file). Senza i file che non si possono scrivere (WMA, WAV, AIFF): restano in sospeso."""
+    dal file). Senza i file che non si possono scrivere (WMA, WAV, AIFF): restano in sospeso. old_tags: {id(brano):
+    [tags.OLD_ID3V1, OLD_APE]}, i vecchi tag da togliere (anche dai brani senza modifiche in sospeso)."""
     result = []
     seen = set()
     for track in tracks:
         original = track.original_tags
         fresh = id(track) not in seen
         seen.add(id(track))
-        if fresh and original is not None and track.path.suffix.lower() not in READ_ONLY_EXTENSIONS:
-            fields = []
+        fields = []
+        if original is not None:
             for name, _label in TAG_FIELDS:
                 if getattr(track.tags, name) != getattr(original, name):
                     fields.append(name)
-            if fields:
-                result.append((track, track.tags.copy(), fields))
+        if old_tags is not None:
+            fields += old_tags.get(id(track), [])
+        if fresh and fields and track.path.suffix.lower() not in READ_ONLY_EXTENSIONS:
+            result.append((track, track.tags.copy(), fields))
     return result
 
 
-def offer_pc_write(window, parent, tracks: list, title: str, what: str) -> None:
+def offer_pc_write(window, parent, tracks: list, title: str, what: str, old_tags: Optional[dict] = None) -> list:
     """Dopo una correzione salvata in sospeso: l'elenco delle modifiche da scrivere anche nei file del PC; con Modifica
-    i file si scrivono, con Annulla restano solo per l'iPhone."""
-    plan = pending_plan(tracks)
+    i file si scrivono, con Annulla restano solo per l'iPhone. old_tags: i vecchi tag da togliere (pending_plan).
+    Restituisce il piano approvato, [(brano, tag, campi)], vuoto con Annulla."""
+    plan = pending_plan(tracks, old_tags)
+    chosen = []
     if not plan:
         QMessageBox.information(parent, title, "Nei file del PC non c'è niente da cambiare.")
     else:
         dialog = PcWriteDialog(parent, plan, title=f"{title}: modifica dei file del PC", what=what, pending=True)
         if dialog.exec():
-            write_pc_tags(window, parent, dialog.chosen_plan(), title)
+            chosen = dialog.chosen_plan()
+            write_pc_tags(window, parent, chosen, title)
         else:
             window.statusBar().showMessage("File del PC non modificati: le correzioni valgono solo per l'iPhone", 8000)
+    result = chosen
+    return result
 
 
 def write_pc_tags(window, parent, plan: list, title: str) -> None:
     """Scrive i tag approvati nei file del PC (tags.write_tags_approved) e li rilegge. I campi scritti non sono più in
     sospeso; quelli non scelti restano in sospeso (solo per le copie)."""
     from ..library import load_track
-    from ..tags import TagError, write_tags_approved
+    from ..tags import TagError, remove_old_tags_approved, write_tags_approved
 
     def work(progress, _cancel):
         done = []
         errors = []
-        for index, (track, new_tags, _fields) in enumerate(plan):
+        for index, (track, new_tags, fields) in enumerate(plan):
             progress(index, len(plan), track.path.name)
+            old = []
+            for name in fields:
+                if name in OLD_TAG_NAMES:
+                    old.append(name)
             try:
-                write_tags_approved(track.path, new_tags)
+                if old:
+                    remove_old_tags_approved(track.path, new_tags, old)      # prima i valori nell'ID3v2
+                else:
+                    write_tags_approved(track.path, new_tags)
                 done.append((track, new_tags, load_track(track.path)))
             except (TagError, OSError) as exc:
                 errors.append(f"{track.path.name}: {exc}")

@@ -16,13 +16,14 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Callable, Optional
 
+from . import cue
 from .albumcheck import STATUS_ERROR, STATUS_NOT_FOUND, corrected_tags
 from .pending import EDIT_FIELDS
 from .scan import (
     FIX_TAGS, KIND_FEW_TRACKS, KIND_ONLINE, ORIGIN_ONLINE, SEVERITY_LOW, SEVERITY_MEDIUM, SEVERITY_ORDER, Fix, Issue,
     tag_changes_of,
 )
-from .tags import TAG_FIELDS
+from .tags import OLD_TAG_FIELDS, OLD_TAG_NAMES, OLD_TAG_PRESENT, TAG_FIELDS
 
 SIDE_BOTH = "lato_pc_iphone"
 SIDE_PC = "lato_pc"
@@ -37,7 +38,8 @@ SIDE_LABELS = {SIDE_BOTH: "PC e iPhone", SIDE_PC: "solo PC", SIDE_PHONE: "solo i
 OTHER_KEY = ("", "")              # i problemi senza un album (per esempio i brani solo sull'iPhone elencati per nome)
 ONLINE_FIELDS = ("title", "artist", "album_artist", "album", "year", "track_number", "track_total", "disc_number",
                  "disc_total")
-FIELD_LABELS = dict(TAG_FIELDS)
+CUE_FIELDS = ("album_artist", "album", "year")     # per un'immagine CUE (tutto il disco in un file): solo l'album
+FIELD_LABELS = dict(TAG_FIELDS + OLD_TAG_FIELDS)
 
 
 # --------------------------------------------------------------------------- cosa si controlla
@@ -111,7 +113,13 @@ def online_issues(result, number: int) -> list:
         edition = f"Edizione di {result.service_label}: {result.release.label()}."
         if result.ai_reason:
             edition += f" Scelta dall'AI ({result.ai_reason})."
-        missing = result.missing
+        # FLAC + CUE: un file solo con tutte le tracce. Nessun brano "manca" e i campi della traccia (titolo,
+        # numero) non si danno al file intero: solo quelli dell'album
+        whole_disc = cue.all_images(result.local_tracks)
+        fields = CUE_FIELDS if whole_disc else ONLINE_FIELDS
+        if whole_disc:
+            edition += " Il CUE ha tutte le tracce in un file solo: dal catalogo solo album, artista dell'album e anno."
+        missing = [] if whole_disc else result.missing
         if missing:
             names = []
             for expected in missing[:15]:
@@ -127,7 +135,7 @@ def online_issues(result, number: int) -> list:
             if match.local is not None:
                 wanted = corrected_tags(match, result.release)
                 values = {}
-                for name in ONLINE_FIELDS:
+                for name in fields:
                     if not same_value(getattr(wanted, name), getattr(match.local.tags, name)):
                         values[name] = getattr(wanted, name)
                 if values:
@@ -263,7 +271,10 @@ def group_by_album(issues: list, resolve: Callable[[object], Optional[Target]]) 
                     if target not in entry.targets:
                         entry.targets.append(target)
                     for name, value in values.items():
-                        old = getattr(target.scanned.tags, name, None)
+                        if name in OLD_TAG_NAMES:                # un vecchio tag (ID3v1, APE): c'è → tolto
+                            old = OLD_TAG_PRESENT
+                        else:
+                            old = getattr(target.scanned.tags, name, None)
                         if not same_value(old, value):          # solo le maiuscole: niente da correggere
                             problem.rows.append(Row(target, name, old, value, index))
         for key, problem in per_album.items():
@@ -306,6 +317,8 @@ class ApplyPlan:
     linked: list = field(default_factory=list)    # [(PhoneTrack, Track)]: Usa i tag da PC a iPhone (collegati)
     phone: list = field(default_factory=list)     # [(PhoneTrack, {campo: valore})]: Cambia i tag (solo iPhone)
     blocked: list = field(default_factory=list)   # [(brano, motivo)]: correzioni che sull'iPhone non si possono fare
+    old_tags: list = field(default_factory=list)  # [(Track del PC, [OLD_ID3V1, OLD_APE])]: vecchi tag da togliere
+    #                                               dai file del PC (le copie per l'iPhone ne sono già senza)
 
     def count(self, side: str) -> int:
         if side == SIDE_PHONE:
@@ -334,16 +347,26 @@ def plan_apply(rows: list) -> ApplyPlan:
     l'ultima."""
     merged = []
     values_of = {}
+    old_of = {}
     for row in rows:
         key = id(row.target)
         if key not in values_of:
             values_of[key] = {}
+            old_of[key] = []
             merged.append(row.target)
-        values_of[key][row.name] = row.new
+        if row.name in OLD_TAG_NAMES:
+            if row.name not in old_of[key]:
+                old_of[key].append(row.name)
+        else:
+            values_of[key][row.name] = row.new
     plan = ApplyPlan()
     for target in merged:
         values = values_of[id(target)]
         side = target.side
+        if old_of[id(target)] and target.pc is not None:        # solo i file del PC: sull'iPhone non c'è da fare
+            plan.old_tags.append((target.pc, old_of[id(target)]))
+        if not values:
+            side = ""                                             # solo vecchi tag: nient'altro per questo brano
         if side in (SIDE_BOTH, SIDE_PC):
             plan.pc.append((target.pc, values))
         if side == SIDE_BOTH:

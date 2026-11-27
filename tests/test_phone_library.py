@@ -1078,6 +1078,7 @@ def test_tracks_in_the_wrong_album_read_saved_and_refiled(tmp_path):
 
     app = QApplication.instance() or QApplication([])
     window = MainWindow()
+    _settle(window, app)                 # prima l'avvio della finestra (_startup): poi non sostituisce i brani messi qui
     try:
         file = tmp_path / "d.mp3"
         write_mp3(file)
@@ -1894,3 +1895,14 @@ def test_apply_button_turns_red_while_applying(monkeypatch):
         release.set()
         window._exit_checked = True
         window.close()
+
+
+def _settle(window, app) -> None:
+    """Lascia finire l'avvio della finestra (il primo giro di eventi e l'eventuale lettura delle cartelle)."""
+    import time
+    app.processEvents()
+    deadline = time.monotonic() + 10
+    while window.runner.is_busy and time.monotonic() < deadline:
+        app.processEvents()
+        time.sleep(0.01)
+    app.processEvents()

@@ -1539,8 +1539,27 @@ CATALOG = {
         "1 track",
     "controllo file: {0}":
         "checking files: {0}",
-    " Sul PC il file resta com'è (sola lettura); le copie inviate all'iPhone ne sono ripulite automaticamente.":
-        " On the PC the file stays as it is (read-only); the copies sent to the iPhone are cleaned automatically.",
+    " Le copie inviate all'iPhone ne sono già ripulite. Applica la correzione lo toglie anche dai file del PC, dopo l'elenco dei file da approvare (i suoi valori passano prima nel tag ID3v2).":
+        " The copies sent to the iPhone are already cleaned. Apply the fix removes it from the files on the PC too, "
+        "after the list of files to approve (its values first go into the ID3v2 tag).",
+    "Togli il tag ID3v1 dai file del PC":
+        "Remove the ID3v1 tag from the files on the PC",
+    "Togli il tag APE dai file del PC":
+        "Remove the APE tag from the files on the PC",
+    "Tag ID3v1":
+        "ID3v1 tag",
+    "Tag APE":
+        "APE tag",
+    "c'è":
+        "present",
+    "tolto":
+        "removed",
+    "Togli i vecchi tag dai file (prima vedi l'elenco da approvare; i loro valori passano nel tag ID3v2)":
+        "Remove the old tags from the files (first you see the list to approve; their values go into the ID3v2 tag)",
+    "{0} MP3 del PC con vecchi tag (ID3v1, APE)":
+        "{0} MP3s on the PC with old tags (ID3v1, APE)",
+    "Spenta: i file restano così. Le copie per l'iPhone ne sono comunque senza.":
+        "Off: the files stay as they are. The copies for the iPhone are without them anyway.",
     "{0} MP3 con un vecchio tag ID3v1 diverso":
         "{0} MP3s with an old different ID3v1 tag",
     "Oltre al tag moderno (ID3v2) questi file hanno un vecchio tag ID3v1 con valori diversi: alcuni lettori, autoradio e app leggono quello e mostrano i valori vecchi.":
@@ -1659,6 +1678,10 @@ CATALOG = {
         "A{0} | album artist: {1} | album: {2} | anni: {3} | brani: {4} | numeri: {5} | totale dichiarato: {6} | cartella: {7} | generi: {8}",
     " | formati: {0}":
         " | formati: {0}",
+    " | immagine CUE: {0} tracce in {1} file":
+        " | immagine CUE: {0} tracce in {1} file",
+    " Il CUE ha tutte le tracce in un file solo: dal catalogo solo album, artista dell'album e anno.":
+        " The CUE has all the tracks in a single file: from the catalog only album, album artist and year.",
     " | altri artisti: {0}":
         " | altri artisti: {0}",
     "Imposta {0} su tutti i brani":
@@ -2113,12 +2136,12 @@ CATALOG = {
     "Per tenerli: scheda iPhone, tasto destro → Copia da iPhone a PC. Se non servono: Elimina dall'iPhone, poi Applica. Se sul PC ci sono ma scritti in modo diverso, correggi i tag sul PC.":
         "To keep them: iPhone tab, right click → Copy from iPhone to PC. If you don't need them: Delete from the "
         "iPhone, then Apply. If they are on the PC but written differently, fix the tags on the PC.",
-    "Niente di urgente: le copie inviate all'iPhone sono già senza il vecchio tag. Per pulire anche i file del PC togli il tag ID3v1 con un programma di tag (per esempio Mp3tag): questo programma non li cambia.":
+    "Niente di urgente: le copie inviate all'iPhone sono già senza il vecchio tag. Per pulire anche i file del PC: Applica la correzione, poi approva l'elenco dei file (il tag ID3v1 si toglie, i valori restano nell'ID3v2).":
         "Nothing urgent: the copies sent to the iPhone are already without the old tag. To clean the files on the PC "
-        "too, remove the ID3v1 tag with a tag program (for example Mp3tag): this program does not change them.",
-    "Niente di urgente: le copie inviate all'iPhone sono già senza il tag APE. Per pulire anche i file del PC toglilo con un programma di tag (per esempio Mp3tag): questo programma non li cambia.":
+        "too: Apply the fix, then approve the list of files (the ID3v1 tag is removed, the values stay in the ID3v2).",
+    "Niente di urgente: le copie inviate all'iPhone sono già senza il tag APE. Per pulire anche i file del PC: Applica la correzione, poi approva l'elenco dei file (il tag APE si toglie, i valori restano nell'ID3v2).":
         "Nothing urgent: the copies sent to the iPhone are already without the APE tag. To clean the files on the PC "
-        "too, remove it with a tag program (for example Mp3tag): this program does not change them.",
+        "too: Apply the fix, then approve the list of files (the APE tag is removed, the values stay in the ID3v2).",
     "Applica la correzione (se c'è) ricava i tag dai nomi di file e cartelle. Altrimenti Mostra i brani, poi Cambia i tag (tasto E) e scrivi titolo, album e artista.":
         "Apply the fix (if there is one) takes the tags from the file and folder names. Otherwise Show the tracks, "
         "then Change the tags (E key) and write title, album and artist.",

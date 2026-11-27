@@ -23,6 +23,7 @@ from ..check_flow import FIELD_LABELS, OTHER_KEY, SIDE_BOTH, SIDE_LABELS, SIDE_P
 from ..i18n import tr
 from ..pending import UPDATE
 from ..scan import ORIGIN_AI, SEVERITY_HIGH, SEVERITY_MEDIUM, advice
+from ..tags import OLD_TAG_NAMES
 from .file_actions import add_file_entries
 from .pc_write import offer_pc_write, shown_value
 
@@ -55,7 +56,9 @@ class ApplyDestinationsDialog(QDialog):
         self.both_files = QCheckBox("Sul PC: scrivi nei file (prima vedi l'elenco di ogni file e campo, da approvare)")
         self.both_phone = QCheckBox("Sull'iPhone: Usa i tag da PC a iPhone, in attesa (parte con Applica)")
         self.pc_files = QCheckBox("Sul PC: scrivi nei file (prima vedi l'elenco di ogni file e campo, da approvare)")
-        for box in (self.both_files, self.both_phone, self.pc_files):
+        self.old_files = QCheckBox("Togli i vecchi tag dai file (prima vedi l'elenco da approvare; i loro valori "
+                                   "passano nel tag ID3v2)")
+        for box in (self.both_files, self.both_phone, self.pc_files, self.old_files):
             box.setChecked(True)
         unchecked = "Spenta: sul PC le correzioni restano in sospeso, solo per le copie (i file non cambiano)."
         linked = plan.count(SIDE_BOTH)
@@ -72,6 +75,12 @@ class ApplyDestinationsDialog(QDialog):
             box_layout = QVBoxLayout(group)
             box_layout.addWidget(self.pc_files)
             box_layout.addWidget(_gray(unchecked))
+            layout.addWidget(group)
+        if plan.old_tags:
+            group = QGroupBox(f"{len(plan.old_tags)} MP3 del PC con vecchi tag (ID3v1, APE)")
+            box_layout = QVBoxLayout(group)
+            box_layout.addWidget(self.old_files)
+            box_layout.addWidget(_gray("Spenta: i file restano così. Le copie per l'iPhone ne sono comunque senza."))
             layout.addWidget(group)
         if plan.phone:
             group = QGroupBox(f"{len(plan.phone)} brani solo sull'iPhone")
@@ -718,12 +727,20 @@ class CheckResultsView(QWidget):
         plan = plan_apply(chosen)
         dialog = ApplyDestinationsDialog(self, plan)
         if chosen and dialog.exec():
-            self._run_plan(plan, dialog)
-            self._mark_applied(indexes)
+            removed = self._run_plan(plan, dialog)
+            done = []
+            for index in indexes:
+                row = self._rows[index]
+                # un vecchio tag è fatto solo se è stato tolto davvero (l'elenco approvato con la sua casella)
+                if row.name not in OLD_TAG_NAMES or (id(row.target.pc), row.name) in removed:
+                    done.append(index)
+            self._mark_applied(done)
 
-    def _run_plan(self, plan, dialog) -> None:
+    def _run_plan(self, plan, dialog) -> set:
         """Le correzioni dalla parte giusta: sul PC in sospeso (e nei file, dopo l'elenco da approvare), sull'iPhone
-        in attesa (Usa i tag da PC a iPhone per i collegati, Cambia i tag per quelli solo sull'iPhone)."""
+        in attesa (Usa i tag da PC a iPhone per i collegati, Cambia i tag per quelli solo sull'iPhone). Restituisce
+        i vecchi tag tolti dai file, {(id del brano del PC, tags.OLD_ID3V1 / OLD_APE)}."""
+        removed = set()
         window = self.window
         pairs = []
         for track, values in plan.pc:
@@ -745,12 +762,26 @@ class CheckResultsView(QWidget):
             linked = id(track) in linked_ids
             if (linked and dialog.both_files.isChecked()) or (not linked and dialog.pc_files.isChecked()):
                 to_write.append(track)
+        old_tags = {}
+        written = {id(track) for track in to_write}
+        if dialog.old_files.isChecked():
+            for track, names in plan.old_tags:
+                old_tags[id(track)] = names
+                if id(track) not in written:
+                    written.add(id(track))
+                    to_write.append(track)
         if to_write:
-            offer_pc_write(window, self, to_write, "Applica le correzioni",
-                           "si scrivono nel file le correzioni dei campi scelti")
+            approved = offer_pc_write(window, self, to_write, "Applica le correzioni",
+                                      "si scrivono nel file le correzioni dei campi scelti", old_tags)
+            for track, _tags, fields in approved:
+                for name in fields:
+                    if name in OLD_TAG_NAMES:
+                        removed.add((id(track), name))
         elif pairs:
             window.statusBar().showMessage(f"Correzioni salvate in sospeso su {len(pairs)} brani del PC: i file non "
                                            "cambiano", 8000)
+        result = removed
+        return result
 
     def _mark_applied(self, indexes: list) -> None:
         self.tree.blockSignals(True)

@@ -40,6 +40,14 @@ TAG_FIELDS = [
     ("genre", "Genere"),
     ("compilation", "Compilation"),
 ]
+# I vecchi tag di un MP3 (ID3v1 in fondo al file, APEv2): non sono campi ma "togli questo tag" nelle correzioni dei
+# Controlli (R2, R3) e nell'elenco da approvare di gui.pc_write. Prima di toglierli i loro valori passano nell'ID3v2
+OLD_ID3V1 = "vecchio_id3v1"
+OLD_APE = "vecchio_ape"
+OLD_TAG_FIELDS = [(OLD_ID3V1, "Tag ID3v1"), (OLD_APE, "Tag APE")]
+OLD_TAG_NAMES = {OLD_ID3V1, OLD_APE}
+OLD_TAG_PRESENT = "c'è"
+OLD_TAG_REMOVED = "tolto"
 INT_FIELDS = {"track_number", "track_total", "disc_number", "disc_total"}
 # sì/no: un album di più artisti (l'artista dell'album è "Artisti vari", quello del brano è il suo); l'app Musica
 # tiene insieme l'album solo con questa spunta
@@ -602,6 +610,23 @@ def write_tags_approved(path: Path, tags: TrackTags) -> None:
     e "Anche nei file del PC" delle correzioni (Correggi tag, Applica la correzione). Ogni altra modifica dei tag resta
     in sospeso e va solo sulle copie."""
     write_tags(path, tags, new_copy=True)
+
+
+def remove_old_tags_approved(path: Path, tags: TrackTags, names: list) -> None:
+    """Toglie dal file ORIGINALE del PC i vecchi tag scelti (OLD_ID3V1, OLD_APE). Solo da gui.pc_write, dopo
+    l'elenco approvato. Prima scrive tags (i valori letti, che comprendono quelli presi dall'APE o dall'ID3v1 per i
+    campi vuoti dell'ID3v2) nel tag ID3v2: così niente si perde."""
+    if path.suffix.lower() == ".mp3" and names:
+        write_tags(path, tags, new_copy=True)
+        if OLD_APE in names:
+            from mutagen.apev2 import delete as delete_ape
+            try:
+                delete_ape(str(path))
+            except mutagen.MutagenError:
+                pass  # nessun tag APE
+        if OLD_ID3V1 in names:
+            from mutagen.id3 import delete as delete_id3
+            delete_id3(str(path), delete_v1=True, delete_v2=False)
 
 
 def save_as_id3v23(path: Path, new_copy: bool = False) -> None:

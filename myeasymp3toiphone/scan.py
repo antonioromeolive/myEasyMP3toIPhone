@@ -38,9 +38,10 @@ from .artist_names import (
     candidate_pairs, clusters, duet_parts, musicbrainz_keys, variant_key,
 )
 from .artist_names import ask_ai as ask_ai_names
+from . import cue
 from .i18n import tr
 from .phone_library import DEVICE_ABSENT, DEVICE_STALE, PhoneIndex, device_status
-from .tags import TrackTags
+from .tags import OLD_APE, OLD_ID3V1, OLD_TAG_REMOVED, TrackTags
 
 log = logging.getLogger(__name__)
 
@@ -250,10 +251,18 @@ def _has_ape(path: Path) -> bool:
     return result
 
 
+def _old_tag_changes(paths: list, name: str) -> list:
+    """Le correzioni "togli questo vecchio tag" (tags.OLD_ID3V1, OLD_APE): una per file."""
+    result = []
+    for path in paths:
+        result.append((path, {name: OLD_TAG_REMOVED}))
+    return result
+
+
 def detect_file_problems(tracks: list, progress: Optional[ProgressFn] = None,
                          cancel: Optional[threading.Event] = None) -> list:
-    """MP3 con un vecchio ID3v1 diverso o con un tag APE: sul PC restano così (sola lettura), le copie inviate
-    all'iPhone ne sono ripulite (tags.prepare_copy). Solo un'informazione, nessuna correzione."""
+    """MP3 con un vecchio ID3v1 diverso o con un tag APE: le copie inviate all'iPhone ne sono ripulite
+    (tags.prepare_copy); la correzione li toglie anche dai file del PC, solo dopo l'elenco approvato (gui.pc_write)."""
     v1_stale = []
     with_ape = []
     index = 0
@@ -268,19 +277,23 @@ def detect_file_problems(tracks: list, progress: Optional[ProgressFn] = None,
             if _has_ape(track.path):
                 with_ape.append(track.path)
         index += 1
-    cleaned = (" Sul PC il file resta com'è (sola lettura); le copie inviate all'iPhone ne sono ripulite "
-               "automaticamente.")
+    cleaned = (" Le copie inviate all'iPhone ne sono già ripulite. Applica la correzione lo toglie anche dai file "
+               "del PC, dopo l'elenco dei file da approvare (i suoi valori passano prima nel tag ID3v2).")
     issues = []
     if v1_stale:
         issues.append(Issue(
             KIND_NOT_UPDATED, SEVERITY_LOW, f"{len(v1_stale)} MP3 con un vecchio tag ID3v1 diverso",
             "Oltre al tag moderno (ID3v2) questi file hanno un vecchio tag ID3v1 con valori diversi: alcuni lettori, "
-            "autoradio e app leggono quello e mostrano i valori vecchi." + cleaned, v1_stale, rule_id="R2"))
+            "autoradio e app leggono quello e mostrano i valori vecchi." + cleaned, v1_stale,
+            Fix(FIX_TAGS, "Togli il tag ID3v1 dai file del PC", changes=_old_tag_changes(v1_stale, OLD_ID3V1)),
+            rule_id="R2"))
     if with_ape:
         issues.append(Issue(
             KIND_NOT_UPDATED, SEVERITY_LOW, f"{len(with_ape)} MP3 con un tag APE",
             "Questi file hanno anche un tag APE (di solito lasciato da programmi di normalizzazione del volume): "
-            "alcuni lettori lo leggono al posto dell'ID3." + cleaned, with_ape, rule_id="R3"))
+            "alcuni lettori lo leggono al posto dell'ID3." + cleaned, with_ape,
+            Fix(FIX_TAGS, "Togli il tag APE dai file del PC", changes=_old_tag_changes(with_ape, OLD_APE)),
+            rule_id="R3"))
     return issues
 
 
@@ -434,7 +447,9 @@ def detect_few_tracks(tracks: list) -> list:
                         gaps.append(f"{disc}-{position}" if disc > 1 else str(position))
             count = len(album_tracks)
             files = [track.path for track in album_tracks]
-            if gaps:
+            # FLAC + CUE: un file solo con tutte le tracce, i numeri "mancanti" sono dentro (cue.py)
+            whole_disc = bool(gaps or count <= 2) and cue.all_images(album_tracks)
+            if gaps and not whole_disc:
                 expected = count + len(gaps)
                 severity = SEVERITY_HIGH if count * 2 <= expected else SEVERITY_MEDIUM
                 shown = ", ".join(gaps[:15]) + ("…" if len(gaps) > 15 else "")
@@ -442,7 +457,7 @@ def detect_few_tracks(tracks: list) -> list:
                     KIND_FEW_TRACKS, severity, f"{artist} — {album}: {_tracks_text(count)} su almeno {expected}",
                     f"Mancano i numeri di traccia {shown}. \"Verifica album online\" controlla l'elenco completo "
                     "nei cataloghi online.", files, rule_id=f"R9.{number}"))
-            elif count <= 2:
+            elif count <= 2 and not whole_disc:
                 issues.append(Issue(
                     KIND_FEW_TRACKS, SEVERITY_LOW, f"{artist} — {album}: solo {_tracks_text(count)}",
                     "Può essere un singolo, oppure un album di cui hai solo pochi brani, oppure brani di un album "
@@ -1068,10 +1083,11 @@ folder and the genres. The rule findings were computed by simple rules.
 
 Find the problems the owner usually has:
 - "non_aggiornato": files whose tags will not show as updated (only if the data shows it);
-- "album_incompleto": albums with few tracks or missing track numbers;
+- "album_incompleto": albums with few tracks or missing track numbers. An album with an "immagine CUE" column is a \
+whole disc in one file (FLAC + CUE): never report it as incomplete;
 - "collezione_divisa": one collection split into several albums: the same album with different spellings, a disc \
-marker in the album name, a compilation without album artist, the same artist spelled differently, featured artists \
-in the album artist;
+marker in the album name, a compilation without album artist, the same artist spelled differently. A duet name \
+("A & B") is a name like any other: report it only if it splits one album in several;
 - "duplicato": the same track twice INSIDE the same album, or the same album twice. The same song on several different albums (the original album and a compilation, a live album) is legitimate: never report it. The same album kept in several formats (the "formati" column lists more than one, for example flac and mp3, and the tracks are about twice the numbers) is legitimate too: never report it;
 - "tag_mancanti": missing or placeholder tags.
 
@@ -1152,6 +1168,9 @@ def album_lines(groups: dict, keys: list) -> list:
         formats = sorted({t.path.suffix.lower().lstrip(".") for t in album_tracks})
         if len(formats) > 1:
             text += f" | formati: {','.join(formats)}"
+        images = cue.cue_images(album_tracks) if len(album_tracks) <= 2 else {}
+        if images and len(images) == len(album_tracks):
+            text += f" | immagine CUE: {sum(images.values())} tracce in {len(images)} file"
         if artists:
             text += f" | altri artisti: {', '.join(artists[:6])}"
         lines.append((f"A{index}", text))
@@ -1486,10 +1505,10 @@ _ONLY_ON_DEVICE = ("Per tenerli: scheda iPhone, tasto destro → Copia da iPhone
                    "dall'iPhone, poi Applica. Se sul PC ci sono ma scritti in modo diverso, correggi i tag sul PC.")
 # il suggerimento di ogni regola (rule_id senza il numero), anche quando non c'è una correzione automatica
 ADVICE = {
-    "R2": "Niente di urgente: le copie inviate all'iPhone sono già senza il vecchio tag. Per pulire anche i file del PC "
-          "togli il tag ID3v1 con un programma di tag (per esempio Mp3tag): questo programma non li cambia.",
-    "R3": "Niente di urgente: le copie inviate all'iPhone sono già senza il tag APE. Per pulire anche i file del PC "
-          "toglilo con un programma di tag (per esempio Mp3tag): questo programma non li cambia.",
+    "R2": "Niente di urgente: le copie inviate all'iPhone sono già senza il vecchio tag. Per pulire anche i file del PC: "
+          "Applica la correzione, poi approva l'elenco dei file (il tag ID3v1 si toglie, i valori restano nell'ID3v2).",
+    "R3": "Niente di urgente: le copie inviate all'iPhone sono già senza il tag APE. Per pulire anche i file del PC: "
+          "Applica la correzione, poi approva l'elenco dei file (il tag APE si toglie, i valori restano nell'ID3v2).",
     "R5": _MANUAL_UNREADABLE,
     "R6": "Applica la correzione (se c'è) ricava i tag dai nomi di file e cartelle. Altrimenti Mostra i brani, poi "
           "Cambia i tag (tasto E) e scrivi titolo, album e artista.",
