@@ -209,7 +209,8 @@ def test_device_status_by_artist_album_and_title():
     same = _pc("canzone  a", "ARTISTA UNO", "Album Primo", year="1991-05-01", track_number=1)
     status, item, found = device_status(same, index)
     assert item.pid == 1 and status == DEVICE_STALE and [label for label, _pc_value, _value in found] == \
-        ["Titolo", "Artista"]   # ritrovato senza badare a maiuscole e spazi; la grafia diversa è una differenza
+        ["Titolo"]   # ritrovato senza badare a maiuscole e spazi; gli spazi diversi sono una differenza, le sole
+    # maiuscole no (l'artista)
     exact = _pc("Canzone A", "Artista Uno", "Album Primo", year="1991", track_number=1, disc_number=1)
     assert device_status(exact, index)[0] == DEVICE_SAME   # anno e disco 1 / nessun disco sono uguali
     other_artist = _pc("Intro", "Artista Due", "Album Primo")
@@ -349,7 +350,7 @@ def test_comparison_table_tooltips(tmp_path):
     from myeasymp3toiphone.gui.main_window import MainWindow
     rows = phone_library.comparison(TrackTags(title="T", artist="A", album="B", year="1991", compilation=True),
                                     TrackTags(title="T", artist="a", album="B", year="1990"))
-    assert ("Anno", "1991", "1990", True) in rows and ("Artista", "A", "a", True) in rows   # anche la grafia
+    assert ("Anno", "1991", "1990", True) in rows and ("Artista", "A", "a", False) in rows   # le maiuscole no
     assert ("Compilation", "sì", "no", True) in rows
     app = QApplication.instance() or QApplication([])
     window = MainWindow()
@@ -643,8 +644,8 @@ def test_comparison_like_the_iphone_groups_albums_and_artists():
     pc = TrackTags(title="Uno", artist="Anna", album="Raccolta 01 - Estate", album_artist="AA.VV.", compilation=True)
     phone = TrackTags(title="Uno", artist="Anna", album="Raccolta 1 - Estate", album_artist="aa.vv.",
                       compilation=True)
-    assert [label for label, _a, _b in differences(pc, phone)] == ["Artista album", "Album"]
-    assert spelling_differences(pc, phone) == ["album", "album_artist"]       # solo grafia: album intero da reinviare
+    assert [label for label, _a, _b in differences(pc, phone)] == ["Album"]   # "aa.vv.": solo le maiuscole
+    assert spelling_differences(pc, phone) == ["album"]       # solo grafia: album intero da reinviare
     phone.album_artist = "Artisti Vari"                   # un altro artista per l'iPhone: si rimpiazza e basta
     assert spelling_differences(pc, phone) == ["album"]
 
@@ -866,7 +867,7 @@ def test_spelling_differences_and_alignment_plan(tmp_path):
     from myeasymp3toiphone.gui.main_window import MainWindow
     from myeasymp3toiphone.phone_library import spelling_differences
     pc = TrackTags(title="Uno", artist="Gruppo Finto", album="Raccolta 1")
-    assert spelling_differences(pc, TrackTags(title="Uno", artist="GRUPPO FINTO", album="Raccolta 01")) ==         ["album", "album_artist"]
+    assert spelling_differences(pc, TrackTags(title="Uno", artist="GRUPPO FINTO", album="Raccolta 01")) == ["album"]
     assert spelling_differences(pc, TrackTags(title="Uno", artist="Gruppo Finto", album="Raccolta 1")) == []
     assert spelling_differences(pc, TrackTags(title="Uno", artist="Altro", album="Altra raccolta")) == []
     assert phone_actions.service_padding(3) == 97

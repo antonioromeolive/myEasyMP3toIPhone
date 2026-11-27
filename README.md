@@ -340,8 +340,8 @@ le altre. Il dettaglio di un album le divide in *Si correggono qui* e *Da fare a
 iPhone**. Selezionando un album o un problema, sotto si vedono il dettaglio e **Cosa fare** (anche quando non c'è una
 correzione automatica: quale pulsante usare, quando si può ignorare, cosa fare a mano; per esempio spostare un
 doppione fuori dalle cartelle della musica: il programma non cancella i file del PC). Le correzioni dell'AI su un
-problema che l'AI stessa ritiene falso partono spente. Due valori diversi solo per le maiuscole ("uno" e "Uno") per
-i Controlli sono uguali: nessuna correzione li cambia (il confronto tra PC e iPhone, il ⟳, invece le conta).
+problema che l'AI stessa ritiene falso partono spente. Due valori diversi solo per le maiuscole ("uno" e "Uno") sono
+uguali, nei Controlli come nel confronto tra PC e iPhone: nessuna correzione li cambia.
 
 **Applica le correzioni scelte…** manda ogni correzione dalla parte giusta:
 
@@ -547,8 +547,9 @@ Tutte vanno **in attesa** e partono con **Applica** (vedi [Le azioni in attesa](
   nome "uguale" e il gruppo tiene la sua grafia, finché esiste (anche vuoto). Per l'iPhone sono uguali i nomi che
   differiscono per maiuscole, accenti, spazi o zeri davanti ai numeri ("Raccolta 01" = "Raccolta 1"); "AA.VV.",
   "Artisti vari" e "Various Artists" invece sono tre artisti diversi. Il confronto (colonna *iPhone*, giallo della
-  scheda iPhone) guarda i nomi come sono scritti: anche una grafia diversa è una differenza (⟳), e ogni
-  aggiornamento dal PC la corregge da solo (vedi *La grafia* sotto).
+  scheda iPhone) guarda i nomi come sono scritti, **a parte le maiuscole**: una differenza solo di maiuscole non è
+  una differenza (niente ⟳, l'album non si ricopia; se non ti piace, *Ricopia da PC a iPhone* a mano), un'altra
+  grafia (accenti, spazi, zeri) sì (⟳), e ogni aggiornamento dal PC la corregge da solo (vedi *La grafia* sotto).
 - **Compilation:** si invia la spunta, con l'artista dell'album ("Artisti vari" se manca): l'album resta intero
   nell'app Musica.
 - **Ricopia** prima copia la versione del PC, poi toglie quella vecchia, solo se la copia è riuscita. Il brano
@@ -657,8 +658,9 @@ nell'album giusto (Ricopia da PC a iPhone)**: una Ricopia, anche per i brani ✔
 
 **La grafia.** Quando un aggiornamento dal PC (*Ricopia da PC a iPhone*, *Usa i tag da PC a iPhone*, *Ricopia le
 copertine*, tutti con *Applica*) tocca un brano associato che sull'iPhone ha l'album o l'artista
-dell'album scritto in modo diverso dal PC ("Raccolta 1" invece di "Raccolta 01", "ARTISTA" invece di "Artista"),
-il programma ne prende l'album intero e lo reinvia, nella stessa operazione. L'iPhone infatti tiene il nome che
+dell'album scritto in modo diverso dal PC ("Raccolta 1" invece di "Raccolta 01", "Mosè" invece di "Mose"),
+il programma ne prende l'album intero e lo reinvia, nella stessa operazione. Le sole maiuscole ("ARTISTA" invece
+di "Artista") non contano: per quelle l'album non si reinvia (a mano: *Ricopia da PC a iPhone* sull'album). L'iPhone infatti tiene il nome che
 ha già per un album o un artista finché la sua riga esiste, anche vuota (provato il 24/11/2026: né un nuovo invio,
 né *Cambia tag*, né il riavvio lo cambiano), e cancella le righe vuote solo in certe sessioni di eliminazione (con
 100 brani tolti insieme sì). Quindi, prima del resto dell'aggiornamento:
