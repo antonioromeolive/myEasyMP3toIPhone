@@ -1692,6 +1692,31 @@ CATALOG = {
     "<br><b>Annullati: {0}</b> — i risultati sono quelli senza (tasto destro sugli album: Controlla con l'AI, Controlla online)":
         "<br><b>Cancelled: {0}</b> — the results are those without (right click on the albums: Check with the AI, "
         "Check online)",
+    "Si corregge qui: lascia accese le caselle delle righe che vuoi e premi Applica le correzioni scelte":
+        "It is fixed here: leave on the boxes of the rows you want and press Apply the chosen fixes",
+    "Nessuna correzione automatica: leggi Cosa fare (sotto, o qui)":
+        "No automatic fix: read What to do (below, or here)",
+    "{0} automatiche, {1} a mano":
+        "{0} automatic, {1} by hand",
+    "{0} automatiche":
+        "{0} automatic",
+    "{0} a mano":
+        "{0} by hand",
+    "Problemi che si correggono qui (con le caselle) e problemi da sistemare a mano (Cosa fare, nel dettaglio sotto)":
+        "Problems fixed here (with the boxes) and problems to sort out by hand (What to do, in the details below)",
+    "automatica ({0})":
+        "automatic ({0})",
+    "a mano":
+        "by hand",
+    "<p>Seleziona un album o un problema per vederne i dettagli e cosa fare.</p><p><b>Correzione automatica</b> (in verde): il problema ha righe con la casella; lascia accese quelle che vuoi e premi <i>Applica le correzioni scelte</i>. <b>A mano</b> (in arancione): il programma non lo corregge da solo; <i>Cosa fare</i> dice come.</p>":
+        "<p>Select an album or a problem to see its details and what to do.</p><p><b>Automatic fix</b> (green): "
+        "the problem has rows with a box; leave on the ones you want and press <i>Apply the chosen fixes</i>. <b>By "
+        "hand</b> (orange): the program does not fix it by itself; <i>What to do</i> says how.</p>",
+    "<p style='color:#1e8c3c'><b>Si correggono qui</b>: lascia accese le caselle delle righe che vuoi e premi <i>Applica le correzioni scelte</i>.</p><ul>{0}</ul>":
+        "<p style='color:#1e8c3c'><b>Fixed here</b>: leave on the boxes of the rows you want and press <i>Apply the "
+        "chosen fixes</i>.</p><ul>{0}</ul>",
+    "<p style='color:#d28200'><b>Da fare a mano</b> (nessuna correzione automatica):</p><ul>{0}</ul>":
+        "<p style='color:#d28200'><b>To do by hand</b> (no automatic fix):</p><ul>{0}</ul>",
     "Controlla con l'AI ({0} album)":
         "Check with the AI ({0} albums)",
     "Di nuovo l'Analisi AI, solo su questi album: i loro risultati dell'AI si sostituiscono":

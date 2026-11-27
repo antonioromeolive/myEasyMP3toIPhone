@@ -25,8 +25,11 @@ from ..pending import UPDATE
 from ..scan import ORIGIN_AI, SEVERITY_HIGH, SEVERITY_MEDIUM, advice
 from .pc_write import offer_pc_write, shown_value
 
-COLUMNS = ["Album, problema, brano", "Dove", "Campo", "Ora", "Diventa", "Gravità", "Origine"]
-COL_NAME, COL_SIDE, COL_FIELD, COL_OLD, COL_NEW, COL_SEVERITY, COL_ORIGIN = range(len(COLUMNS))
+COLUMNS = ["Album, problema, brano", "Correzione", "Dove", "Campo", "Ora", "Diventa", "Gravità", "Origine"]
+COL_NAME, COL_FIX, COL_SIDE, COL_FIELD, COL_OLD, COL_NEW, COL_SEVERITY, COL_ORIGIN = range(len(COLUMNS))
+ORANGE = QColor(210, 130, 0)
+AUTO_TIP = "Si corregge qui: lascia accese le caselle delle righe che vuoi e premi Applica le correzioni scelte"
+MANUAL_TIP = "Nessuna correzione automatica: leggi Cosa fare (sotto, o qui)"
 KIND_ROLE = Qt.UserRole           # ROW_ALBUM, ROW_PROBLEM, ROW_FIX
 ROW_ALBUM = "riga_album"
 ROW_PROBLEM = "riga_problema"
@@ -97,6 +100,15 @@ class ApplyDestinationsDialog(QDialog):
         layout.addWidget(buttons)
 
 
+def _item(columns: int, texts: dict) -> QTreeWidgetItem:
+    """Una riga dei risultati con i testi delle colonne date (le altre vuote)."""
+    values = []
+    for column in range(columns):
+        values.append(texts.get(column, ""))
+    result = QTreeWidgetItem(values)
+    return result
+
+
 def _row_key(row) -> tuple:
     """Una correzione, riconoscibile anche nei risultati rifatti: il file, il campo, il valore nuovo."""
     result = (str(row.target.scanned.path), row.name, repr(row.new))
@@ -134,7 +146,7 @@ class CheckResultsView(QWidget):
         self.tree.setHeaderLabels(COLUMNS)
         self.tree.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.tree.header().setSectionResizeMode(QHeaderView.Interactive)
-        for column, width in ((COL_NAME, 420), (COL_SIDE, 100), (COL_FIELD, 110), (COL_OLD, 170), (COL_NEW, 170),
+        for column, width in ((COL_NAME, 420), (COL_FIX, 150), (COL_SIDE, 100), (COL_FIELD, 110), (COL_OLD, 170), (COL_NEW, 170),
                               (COL_SEVERITY, 60), (COL_ORIGIN, 60)):
             self.tree.setColumnWidth(column, width)
         self.tree.itemSelectionChanged.connect(self._show_detail)
@@ -220,7 +232,25 @@ class CheckResultsView(QWidget):
         checkable = Qt.ItemIsUserCheckable | Qt.ItemIsAutoTristate
         for entry_index, entry in enumerate(self.entries):
             title = entry.title + (f" ({entry.year})" if entry.year else "")
-            top = QTreeWidgetItem([title, tr(SIDE_LABELS.get(entry.side, "")), "", "", "", tr(entry.severity), ""])
+            top = _item(len(COLUMNS), {COL_NAME: title, COL_SIDE: tr(SIDE_LABELS.get(entry.side, "")),
+                                       COL_SEVERITY: tr(entry.severity)})
+            automatic = 0
+            manual = 0
+            for problem in entry.problems:
+                if problem.rows:
+                    automatic += 1
+                else:
+                    manual += 1
+            if automatic and manual:
+                summary = f"{automatic} automatiche, {manual} a mano"
+            elif automatic:
+                summary = f"{automatic} automatiche"
+            else:
+                summary = f"{manual} a mano"
+            top.setText(COL_FIX, summary)
+            top.setForeground(COL_FIX, QBrush(GREEN if not manual else ORANGE))
+            top.setToolTip(COL_FIX, "Problemi che si correggono qui (con le caselle) e problemi da sistemare a mano "
+                                    "(Cosa fare, nel dettaglio sotto)")
             font = top.font(COL_NAME)
             font.setBold(True)
             top.setFont(COL_NAME, font)
@@ -236,7 +266,17 @@ class CheckResultsView(QWidget):
             self.tree.addTopLevelItem(top)
             for problem in entry.problems:
                 issue = problem.issue
-                child = QTreeWidgetItem([tr(issue.title), "", "", "", "", tr(issue.severity), tr(issue.origin)])
+                child = _item(len(COLUMNS), {COL_NAME: tr(issue.title), COL_SEVERITY: tr(issue.severity),
+                                             COL_ORIGIN: tr(issue.origin)})
+                if problem.rows:
+                    child.setText(COL_FIX, f"automatica ({len(problem.rows)})")
+                    child.setForeground(COL_FIX, QBrush(GREEN))
+                    child.setToolTip(COL_FIX, AUTO_TIP)
+                else:
+                    child.setText(COL_FIX, "a mano")
+                    child.setForeground(COL_FIX, QBrush(ORANGE))
+                    suggestion = advice(issue)
+                    child.setToolTip(COL_FIX, f"{tr(MANUAL_TIP)}\n\n{tr(suggestion)}" if suggestion else MANUAL_TIP)
                 child.setIcon(COL_NAME, self._icon(issue.severity))
                 child.setData(COL_NAME, KIND_ROLE, ROW_PROBLEM)
                 child.setData(COL_NAME, REF_ROLE, len(self._problems))
@@ -250,9 +290,10 @@ class CheckResultsView(QWidget):
                     child.setCheckState(COL_NAME, Qt.Checked)
                 top.addChild(child)
                 for row in problem.rows:
-                    leaf = QTreeWidgetItem([row.target.name, tr(SIDE_LABELS[row.target.side]),
-                                            tr(FIELD_LABELS.get(row.name, row.name)), shown_value(row.name, row.old),
-                                            shown_value(row.name, row.new), "", ""])
+                    leaf = _item(len(COLUMNS), {COL_NAME: row.target.name, COL_SIDE: tr(SIDE_LABELS[row.target.side]),
+                                                COL_FIELD: tr(FIELD_LABELS.get(row.name, row.name)),
+                                                COL_OLD: shown_value(row.name, row.old),
+                                                COL_NEW: shown_value(row.name, row.new)})
                     leaf.setForeground(COL_SIDE, QBrush(SIDE_COLORS[row.target.side]))
                     leaf.setForeground(COL_OLD, QBrush(QColor(200, 80, 70)))
                     leaf.setForeground(COL_NEW, QBrush(GREEN))
@@ -415,18 +456,38 @@ class CheckResultsView(QWidget):
                 html = self._problem_html(problem)
             else:
                 entry = self.entries[item.data(COL_NAME, REF_ROLE)]
-                html = f"<h3>{escape(entry.title)}</h3><p>{escape(tr(SIDE_LABELS.get(entry.side, '')))}</p>"
-                for problem in entry.problems:
-                    suggestion = advice(problem.issue)
-                    html += f"<p><b>{escape(tr(problem.issue.title))}</b>"
-                    if suggestion:
-                        html += f"<br><i>Cosa fare:</i> {escape(tr(suggestion))}"
-                    html += "</p>"
+                html = self._album_html(entry)
         else:
-            html = ("<p>Seleziona un album o un problema per vederne i dettagli e cosa fare. Le caselle scelgono le "
-                    "correzioni da applicare.</p>")
+            html = ("<p>Seleziona un album o un problema per vederne i dettagli e cosa fare.</p><p><b>Correzione "
+                    "automatica</b> (in verde): il problema ha righe con la casella; lascia accese quelle che vuoi e "
+                    "premi <i>Applica le correzioni scelte</i>. <b>A mano</b> (in arancione): il programma non lo "
+                    "corregge da solo; <i>Cosa fare</i> dice come.</p>")
         self.detail.setHtml(html)
         self._update_buttons()
+
+    @staticmethod
+    def _album_html(entry) -> str:
+        """Il dettaglio di un album: i problemi che si correggono qui e quelli da fare a mano, con Cosa fare."""
+        automatic = ""
+        manual = ""
+        for problem in entry.problems:
+            suggestion = advice(problem.issue)
+            line = f"<li><b>{escape(tr(problem.issue.title))}</b>"
+            if suggestion:
+                line += f"<br>{escape(tr(suggestion))}"
+            line += "</li>"
+            if problem.rows:
+                automatic += line
+            else:
+                manual += line
+        html = f"<h3>{escape(entry.title)}</h3><p>{escape(tr(SIDE_LABELS.get(entry.side, '')))}</p>"
+        if automatic:
+            html += ("<p style='color:#1e8c3c'><b>Si correggono qui</b>: lascia accese le caselle delle righe che vuoi "
+                     f"e premi <i>Applica le correzioni scelte</i>.</p><ul>{automatic}</ul>")
+        if manual:
+            html += (f"<p style='color:#d28200'><b>Da fare a mano</b> (nessuna correzione automatica):</p>"
+                     f"<ul>{manual}</ul>")
+        return html
 
     def _problem_html(self, problem) -> str:
         issue = problem.issue
