@@ -11,7 +11,7 @@ from pathlib import Path
 from PySide6.QtCore import QRect, Qt, QTimer
 from PySide6.QtGui import QBrush, QColor, QFont, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
-    QAbstractItemView, QCheckBox, QDialog, QDialogButtonBox, QFileDialog, QFrame, QHBoxLayout,
+    QAbstractItemView, QFileDialog, QFrame, QHBoxLayout,
     QHeaderView, QLabel, QLineEdit, QMenu, QMessageBox, QPushButton, QScrollArea, QSplitter, QToolButton, QTreeWidget,
     QTreeWidgetItem, QVBoxLayout, QWidget,
 )
@@ -30,6 +30,7 @@ from .icons import icon
 from .widgets import ICON_COLOR, ActionBar, ChipBar
 from .compare_tip import comparison_html, show_on_tooltip
 from .file_actions import add_file_entries
+from .pc_write import PcWriteDialog as AlignToPcDialog, write_pc_tags
 from .phone_tag_panel import PhoneTagPanel
 from .tag_editor import ALBUM_COVER_TRIES as COVER_TRIES
 from .theme import album_band, album_bands, set_role
@@ -311,92 +312,6 @@ def _playlist_note(phone_tracks: list) -> str:
                   "cambiare: rimettili a mano (app Musica, playlist, Modifica, Aggiungi musica). Quelle messe da un "
                   "computer (anche le ♪ di Playlist per artista) si rifanno da sole:\n" + reminder)
     return result
-
-
-class AlignToPcDialog(QDialog):
-    """Usa i tag da iPhone a PC: l'elenco dei file che verranno modificati, con ogni campo (ora → diventa). Una
-    casella per campo, con quanti file cambia: si scrivono solo i campi scelti (chosen_plan), così una correzione fatta
-    sul PC in un altro campo non torna indietro. Si scrive solo con Modifica i file."""
-
-    def __init__(self, parent, plan: list) -> None:
-        super().__init__(parent)
-        from ..phone_library import COMPARED_FIELDS
-        self.setWindowTitle("Usa i tag da iPhone a PC: modifica dei file del PC")
-        self.resize(1000, 520)
-        self._plan = plan
-        self._labels = {}
-        for name, label in COMPARED_FIELDS:
-            self._labels[name] = label
-        counts = {}
-        for _track, _new_tags, fields in plan:
-            for name in fields:
-                counts[name] = counts.get(name, 0) + 1
-        self._header = QLabel()
-        self._header.setWordWrap(True)
-        self._boxes = {}
-        choices = QHBoxLayout()
-        choices.addWidget(QLabel("Campi da scrivere:"))
-        for name, _label in COMPARED_FIELDS:
-            if name in counts:
-                box = QCheckBox(f"{tr(self._labels[name])} ({counts[name]} file)")
-                box.setChecked(True)
-                box.toggled.connect(lambda _checked: self._refresh())
-                self._boxes[name] = box
-                choices.addWidget(box)
-        choices.addStretch(1)
-        self._tree = QTreeWidget()
-        self._tree.setHeaderLabels(["File", "Campo", "Ora sul PC", "Diventa"])
-        self._tree.setRootIsDecorated(False)
-        self._tree.setAlternatingRowColors(True)
-        for column, width in enumerate((420, 110, 200)):
-            self._tree.setColumnWidth(column, width)
-        self._buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        self._buttons.button(QDialogButtonBox.Ok).setProperty("role", "danger")
-        self._buttons.button(QDialogButtonBox.Cancel).setText("Annulla")
-        self._buttons.button(QDialogButtonBox.Cancel).setDefault(True)
-        self._buttons.accepted.connect(self.accept)
-        self._buttons.rejected.connect(self.reject)
-        layout = QVBoxLayout(self)
-        layout.addWidget(self._header)
-        layout.addLayout(choices)
-        layout.addWidget(self._tree, 1)
-        layout.addWidget(self._buttons)
-        self._refresh()
-
-    def chosen_plan(self) -> list:
-        """Il piano con i soli campi scelti: (brano, tag nuovi, campi); i file senza campi scelti non ci sono."""
-        result = []
-        for track, new_tags, fields in self._plan:
-            kept = []
-            for name in fields:
-                if self._boxes[name].isChecked():
-                    kept.append(name)
-            if kept:
-                tags = track.tags.copy()
-                for name in kept:
-                    setattr(tags, name, getattr(new_tags, name))
-                result.append((track, tags, kept))
-        return result
-
-    def _refresh(self) -> None:
-        from ..phone_library import _shown
-        plan = self.chosen_plan()
-        self._header.setText(f"<b>Questi {len(plan)} file del PC verranno modificati</b>: si scrivono nel file i tag "
-                             "dell'iPhone dei campi scelti. Non si può annullare.")
-        self._tree.clear()
-        rows = []
-        for track, new_tags, fields in plan:
-            first = True
-            for name in fields:
-                row = QTreeWidgetItem([str(track.path) if first else "", tr(self._labels.get(name, name)),
-                                       _shown(name, getattr(track.tags, name)), _shown(name, getattr(new_tags, name))])
-                row.setToolTip(0, str(track.path))
-                rows.append(row)
-                first = False
-        self._tree.addTopLevelItems(rows)
-        accept = self._buttons.button(QDialogButtonBox.Ok)
-        accept.setText(f"Modifica {len(plan)} file")
-        accept.setEnabled(bool(plan))
 
 
 def show_entries_menu(parent, entries: list, where, connected: bool) -> None:
@@ -1584,47 +1499,7 @@ class IPhonePanel(QWidget):
         else:
             dialog = AlignToPcDialog(self, plan)
             if dialog.exec():
-                self._write_pc_tags(dialog.chosen_plan())
-
-    def _write_pc_tags(self, plan: list) -> None:
-        """Scrive i tag approvati nei file del PC (tags.write_tags_approved) e li rilegge."""
-        from ..library import load_track
-        from ..tags import TagError, write_tags_approved
-        window = self._window
-
-        def work(progress, _cancel):
-            done = []
-            errors = []
-            for index, (track, new_tags, _fields) in enumerate(plan):
-                progress(index, len(plan), track.path.name)
-                try:
-                    write_tags_approved(track.path, new_tags)
-                    done.append((track, load_track(track.path)))
-                except (TagError, OSError) as exc:
-                    errors.append(f"{track.path.name}: {exc}")
-            value = (done, errors)
-            return value
-
-        def finished(value):
-            done, errors = value
-            for track, fresh in done:
-                track.original_tags = fresh.tags.copy()
-                track.length = fresh.length or track.length
-                window.overlay.set_tags(track, fresh.tags)     # i campi ora nel file non sono più in sospeso
-                window.tag_cache.store(track)
-            try:
-                window.overlay.save()
-            except OSError:
-                pass  # resta come prima: al prossimo avvio le modifiche in sospeso coincidono con il file
-            window.tag_cache.save()
-            window.refresh_after_tag_change()
-            message = f"Tag scritti in {len(done)} file del PC"
-            if errors:
-                QMessageBox.warning(self, "Usa i tag da iPhone a PC", message + ". Non riusciti:\n" + "\n".join(errors[:10]))
-            else:
-                window.statusBar().showMessage(message, 8000)
-
-        window.runner.run("Usa i tag da iPhone a PC", work, finished)
+                write_pc_tags(self._window, self, dialog.chosen_plan(), "Usa i tag da iPhone a PC")
 
     def _align_to_phone(self, pairs: list) -> None:
         """Usa i tag da PC a iPhone: in attesa (Applica). Dove basta si cambiano i tag (restano ascolti e playlist),

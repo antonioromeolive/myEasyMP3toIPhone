@@ -1687,6 +1687,32 @@ CATALOG = {
         "Check interrupted: the results are partial",
     "    Correzione proposta: {0}":
         "    Proposed fix: {0}",
+    "Nessuna copertina disponibile per questa edizione":
+        "No cover available for this edition",
+    "si scrivono nel file i tag di {0} dei campi scelti (la copertina va solo sulle copie per l'iPhone)":
+        "the tags of {0} for the chosen fields are written into the file (the cover goes only on the copies for the "
+        "iPhone)",
+    "si scrivono nel file i tag dell'iPhone dei campi scelti":
+        "the iPhone tags of the chosen fields are written into the file",
+    "<b>Questi {0} file del PC verranno modificati</b>: {1}. Non si può annullare.":
+        "<b>These {0} files on the PC will be changed</b>: {1}. This cannot be undone.",
+    "Solo per l'iPhone: i file del PC non cambiano e la differenza resta da allineare. Anche nei file del PC: prima vedi l'elenco di ogni file e campo che cambia, e decidi.":
+        "Only for the iPhone: the files on the PC do not change and the difference is left to align. Also in the PC "
+        "files: first you see the list of every file and field that changes, and you decide.",
+    "Solo per l'iPhone":
+        "Only for the iPhone",
+    "Anche nei file del PC…":
+        "Also in the PC files…",
+    "Nei file del PC non c'è niente da cambiare.":
+        "There is nothing to change in the PC files.",
+    "{0}: modifica dei file del PC":
+        "{0}: changing the PC files",
+    "File del PC non modificati: le correzioni valgono solo per l'iPhone":
+        "PC files not changed: the fixes are only for the iPhone",
+    "Applicare queste correzioni?\n\n{0}":
+        "Apply these fixes?\n\n{0}",
+    "si scrivono nel file le correzioni dei campi scelti":
+        "the fixes of the chosen fields are written into the file",
     "    Cosa fare: {0}":
         "    What to do: {0}",
     "<p><b>Cosa fare:</b> {0}</p>":

@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QTreeWidgetItem, QVBoxLayout, QWidget,
 )
 
+from .pc_write import ALSO_PC, ask_where, offer_pc_write
 from ..albumcheck import (
     DISCOGS_TOKEN_VAR, SERVICE_APPLE, SERVICE_DEEZER, SERVICE_DISCOGS, SERVICE_MUSICBRAINZ, SERVICE_ORDER,
     STATUS_COMPLETE, STATUS_ERROR, STATUS_INCOMPLETE, check_album, corrected_tags,
@@ -438,16 +439,15 @@ class AlbumCheckDialog(QDialog):
         result = self._current_result()
         if result is not None and result.release is not None:
             matched = [match for match in result.matches if match.local is not None]
-            answer = QMessageBox.question(
-                self, "Correggi tag",
-                f"Aggiornare i tag di {len(matched)} brani con i dati di {result.service_label}?\n\n"
-                f"{result.release.label()}")
-            if answer == QMessageBox.Yes:
-                self._run_fix(result, matched)
+            where = ask_where(self, "Correggi tag", f"Aggiornare i tag di {len(matched)} brani con i dati di "
+                              f"{result.service_label}?\n\n{result.release.label()}")
+            if where:
+                self._run_fix(result, matched, where == ALSO_PC)
 
-    def _run_fix(self, result, matched: list) -> None:
-        """I tag corretti (e la copertina) restano in sospeso per le copie dell'iPhone: i file sul PC non cambiano.
-        In background solo lo scaricamento della copertina."""
+    def _run_fix(self, result, matched: list, also_pc: bool = False) -> None:
+        """I tag corretti (e la copertina) restano in sospeso per le copie dell'iPhone; con also_pc poi l'elenco dei
+        file del PC da modificare (pc_write), che si scrivono solo se l'utente lo approva. La copertina resta solo per
+        le copie. In background solo lo scaricamento della copertina."""
         client = self._client(result)
         release = result.release
         with_cover = self._with_cover.isChecked()
@@ -464,10 +464,17 @@ class AlbumCheckDialog(QDialog):
             for match in matched:
                 pairs.append((match.local, corrected_tags(match, release)))
             self._window.apply_tag_changes(pairs, cover)
-            message = (f"Tag corretti su {len(pairs)} brani, salvati per l'iPhone: i file sul PC non cambiano. "
-                       "Inviali all'iPhone per applicarli.")
-            if with_cover and cover is None:
-                message += "\nNessuna copertina disponibile per questa edizione."
-            QMessageBox.information(self, "Correggi tag", message)
+            if also_pc:
+                if with_cover and cover is None:
+                    self._window.statusBar().showMessage("Nessuna copertina disponibile per questa edizione", 8000)
+                offer_pc_write(self._window, self, [match.local for match in matched], "Correggi tag",
+                               f"si scrivono nel file i tag di {result.service_label} dei campi scelti (la copertina "
+                               "va solo sulle copie per l'iPhone)")
+            else:
+                message = (f"Tag corretti su {len(pairs)} brani, salvati per l'iPhone: i file sul PC non cambiano. "
+                           "Inviali all'iPhone per applicarli.")
+                if with_cover and cover is None:
+                    message += "\nNessuna copertina disponibile per questa edizione."
+                QMessageBox.information(self, "Correggi tag", message)
 
         self._window.runner.run("Correzione tag", work, done)

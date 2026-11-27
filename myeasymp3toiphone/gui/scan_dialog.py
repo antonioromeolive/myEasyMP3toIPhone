@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
 from ..ai import make_provider
 from ..config import config_dir, load_profiles
 from ..i18n import tr
+from .pc_write import ALSO_PC, ask_where, offer_pc_write
 from ..library import group_by_album, scan_folder
 from ..phone_library import tracks_for_scan
 from ..scan import (
@@ -473,13 +474,11 @@ class ScanDialog(QDialog):
             self._apply_local(local)
 
     def _apply_local(self, items: list) -> None:
-        """Le correzioni dei tag restano in sospeso per le copie dell'iPhone: i file sul PC non cambiano."""
+        """Le correzioni dei tag restano in sospeso per le copie dell'iPhone; se l'utente sceglie "Anche nei file del
+        PC", poi l'elenco dei file e dei campi (pc_write), che si scrivono solo se lo approva."""
         descriptions = "\n".join(f"• {issue.fix.description}" for _index, issue in items)
-        answer = QMessageBox.question(
-            self, "Applica la correzione",
-            f"Salvare queste modifiche per l'iPhone?\n\n{descriptions}\n\nI file sul PC non cambiano: le modifiche "
-            "vanno sulle copie che invierai all'iPhone.")
-        if answer == QMessageBox.Yes:
+        where = ask_where(self, "Applica la correzione", f"Applicare queste correzioni?\n\n{descriptions}")
+        if where:
             by_path = {}
             for track in self.window.tracks:
                 by_path[str(track.path)] = track
@@ -497,7 +496,12 @@ class ScanDialog(QDialog):
                         pairs.append((track, new_tags))
             self.window.apply_tag_changes(pairs)
             self._mark_fixed([index for index, _issue in items])
-            message = f"Modifiche salvate per l'iPhone su {len(pairs)} brani. Inviali all'iPhone per applicarle."
-            if missing:
-                message += f"\n{missing} brani non sono più nella cartella aperta: ripeti la scansione."
-            QMessageBox.information(self, "Applica la correzione", message)
+            gone = f"\n{missing} brani non sono più nella cartella aperta: ripeti la scansione." if missing else ""
+            if where == ALSO_PC:
+                if gone:
+                    QMessageBox.information(self, "Applica la correzione", gone.strip())
+                offer_pc_write(self.window, self, [track for track, _tags in pairs], "Applica la correzione",
+                               "si scrivono nel file le correzioni dei campi scelti")
+            else:
+                message = f"Modifiche salvate per l'iPhone su {len(pairs)} brani. Inviali all'iPhone per applicarle."
+                QMessageBox.information(self, "Applica la correzione", message + gone)

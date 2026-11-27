@@ -19,10 +19,11 @@ vanno in `overlay.TagOverlay` (cartella dati) e si applicano solo alle copie: in
 `tags.prepare_copy` / `write_tags(..., new_copy=True)`. `tags.protect_folder` blocca le scritture dentro le cartelle
 aperte: non aggirarlo.
 
-L'unica eccezione: **Usa i tag da iPhone a PC** (scheda iPhone) scrive i tag nei file originali con
-`tags.write_tags_approved`, solo dopo `AlignToPcDialog`, che elenca ogni file e ogni campo che cambia (ora → diventa) e
-dice che non si può annullare. Ogni nuova scrittura nei file del PC deve passare da una finestra così: chiara e
-approvata, mai automatica.
+Le eccezioni passano tutte da `gui/pc_write.py`: **Usa i tag da iPhone a PC** (scheda iPhone) e la scelta **Anche nei
+file del PC…** delle correzioni (*Correggi tag* di Verifica album online, *Applica la correzione* di Controlla la
+musica; di serie *Solo per l'iPhone*) scrivono i tag nei file originali con `tags.write_tags_approved`, solo dopo
+`PcWriteDialog`, che elenca ogni file e ogni campo che cambia (ora → diventa) e dice che non si può annullare. Ogni
+nuova scrittura nei file del PC deve passare da una finestra così: chiara e approvata, mai automatica.
 
 Le suonerie hanno la loro cartella (`settings.ringtone_folder`, esclusa dalla scheda PC): **Crea una suoneria** vi
 scrive solo file nuovi (ffmpeg `-n`, `ringtones.unique_target`) e il brano di partenza non cambia; **Rinomina** e

@@ -35,10 +35,13 @@ Per l'iPhone serve l'app gratuita **Dispositivi Apple** dal Microsoft Store (opp
 > **I file sul PC cambiano solo se lo approvi.** Il programma non sposta e non cancella mai i file delle cartelle che
 > apri (compresa la Libreria). Le modifiche dei tag, fatte a mano, dalla scansione o da *Verifica album online*, restano
 > **in sospeso** nella cartella dati e valgono per le **copie**: quelle inviate all'iPhone, esportate o importate.
-> L'unica scrittura in un file del PC è **Usa i tag da iPhone a PC** (scheda iPhone), dopo una finestra
-> che elenca ogni file e ogni campo che cambia (*Modifica N file*; non si può annullare). In cima, una casella per
-> campo con quanti file cambia: si scrivono solo i campi lasciati accesi (per esempio solo *Artista album*, perché
-> una correzione fatta sul PC in un altro campo non torni al valore vecchio dell'iPhone).
+> Si scrive in un file del PC solo con **Usa i tag da iPhone a PC** (scheda iPhone) e con la scelta **Anche nei
+> file del PC…** delle correzioni (*Applica la correzione* di Controlla la musica, *Correggi tag* di Verifica album
+> online; di serie è *Solo per l'iPhone*), sempre dopo una finestra che elenca ogni file e ogni campo che cambia
+> (*Modifica N file*; non si può annullare). In cima, una casella per campo con quanti file cambia: si scrivono solo
+> i campi lasciati accesi (per esempio solo *Artista album*, perché una correzione fatta sul PC in un altro campo non
+> torni al valore vecchio dell'iPhone). I campi spenti, o *Annulla*, restano in sospeso solo per l'iPhone; la
+> copertina nuova va solo sulle copie.
 > Le suonerie hanno la loro cartella: *Crea una suoneria* vi scrive solo file nuovi (il brano non cambia), e i suoi
 > `.m4r` si rinominano o vanno nel Cestino solo dalla scheda Suonerie, dopo una conferma.
 >
@@ -302,7 +305,9 @@ fare** (le caselle della tabella qui sotto, ognuna con una riga di spiegazione; 
 applica delle regole locali, veloci e gratuite; poi, se scegli di usarla, l'AI. Il rapporto resta in
 `.myEasyMP3toIPhone\scansioni\`; **Avvia il controllo** lo fa partire e i risultati compaiono sotto, in *Risultati del
 controllo*. Ogni problema può avere una **correzione**: si applica dai risultati, dopo
-una conferma, come **modifiche in sospeso** (i file sul PC non cambiano; vanno sulle copie inviate all'iPhone); *Mostra
+una conferma, come **modifiche in sospeso** (vanno sulle copie inviate all'iPhone). La conferma chiede dove: **Solo
+per l'iPhone** (i file sul PC non cambiano) o **Anche nei file del PC…**, che mostra prima l'elenco dei file e dei
+campi da approvare, così PC e iPhone restano allineati. Lo stesso vale per *Correggi tag* di Verifica album online; *Mostra
 i brani* li seleziona nella scheda PC. I problemi trovati sull'iPhone non hanno correzioni automatiche: si correggono i
 brani sul PC e poi si usa *Usa i tag da PC a iPhone* o *Ricopia da PC a iPhone*, o si cambiano dalla scheda iPhone
 (tasto destro → *Cambia i tag*).
