@@ -476,3 +476,34 @@ def test_stop_button_cancels_like_annulla(monkeypatch):
         window._exit_checked = True
         window.close()
         app.processEvents()
+
+
+def test_ai_requests_group_albums_by_album_artist_and_split_compilations():
+    groups = {("Queen", "Greatest Hits"): [1] * 17, ("ABBA", "Greatest Hits"): [1] * 19,
+              ("Cantante Uno", "Estate 2020"): [1], ("Cantante Due", "Estate 2020"): [1, 1],
+              ("The Beatles", "Help"): [1] * 14, ("Beatles", "Abbey Road"): [1] * 17,
+              ("Artisti vari", "Festival"): [1] * 20, ("Solista", "Primo"): [1] * 10}
+    requests = scan.ai_requests(groups, 10, 200)
+    together = {frozenset(request) for request in requests}
+    assert frozenset({("Queen", "Greatest Hits")}) in together and frozenset({("ABBA", "Greatest Hits")}) in together
+    assert frozenset({("Cantante Uno", "Estate 2020"), ("Cantante Due", "Estate 2020")}) in together   # una compilation
+    assert frozenset({("The Beatles", "Help"), ("Beatles", "Abbey Road")}) in together                # stesso artista
+    assert frozenset({("Artisti vari", "Festival")}) in together and frozenset({("Solista", "Primo")}) in together
+    assert len(requests) == 6
+    big = {("Gruppo", f"Album {number}"): [1] * 12 for number in range(5)}
+    assert [len(request) for request in scan.ai_requests(big, 2, 200)] == [2, 2, 1]          # i limiti dentro il gruppo
+
+
+def test_ai_results_arrive_after_every_request(tmp_path):
+    def tagged(path, **values):
+        write_mp3(path)
+        write_tags(path, TrackTags(**values))
+
+    for artist in ("Gruppo", "Altro Gruppo"):
+        tagged(tmp_path / artist / "1.mp3", title="X", artist=artist, album=f"Disco di {artist}", track_number=1)
+    tracks = scan_folder(tmp_path)
+    seen = []
+    scan.scan_tracks(tracks, "prova", SeeingProvider(), check_files=False, checks=frozenset({scan.CHECK_MISSING}),
+                     partial=lambda issues: seen.append(len(issues)))
+    # dopo le regole, dopo ognuna delle due richieste (due artisti: due richieste), alla fine dell'analisi
+    assert seen[0] == 0 and seen[1] == 1 and seen[2] == 2 and len(seen) == 4

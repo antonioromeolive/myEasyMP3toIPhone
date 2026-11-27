@@ -1303,15 +1303,68 @@ def album_batches(keys: list, groups: dict, max_albums: int, max_tracks: int) ->
     return result
 
 
+SPLIT_FRAGMENT_TRACKS = 3     # un album di al massimo tanti brani può essere un pezzo di una compilation divisa
+
+
+def ai_requests(groups: dict, max_albums: int, max_tracks: int) -> list:
+    """Gli album divisi nelle richieste all'AI. Insieme solo gli album che hanno qualcosa in comune: lo stesso
+    artista dell'album (anche scritto in modi diversi: artist_names.variant_key), oppure lo stesso nome d'album
+    quando almeno uno dei due ha al massimo SPLIT_FRAGMENT_TRACKS brani (i pezzi di una compilation senza artista
+    dell'album; due album veri con lo stesso nome, "Greatest Hits" di due artisti, no). L'artista dei brani non
+    conta: una compilation con artista dell'album è un gruppo solo. Ogni gruppo si divide secondo i limiti
+    (album_batches); gruppi diversi non stanno mai nella stessa richiesta."""
+    keys = sorted(groups, key=lambda k: (artist_norm(k[0]), album_norm(k[1])))
+    parent = {}
+    for key in keys:
+        parent[key] = key
+
+    def root(key):
+        top = key
+        while parent[top] != top:
+            top = parent[top]
+        return top
+
+    def join(first, second):
+        parent[root(second)] = root(first)
+
+    by_artist = {}
+    by_album = {}
+    for key in keys:
+        by_artist.setdefault(variant_key(key[0]) or artist_norm(key[0]), []).append(key)
+        if key[1] != UNKNOWN_ALBUM:
+            by_album.setdefault(album_norm(key[1]), []).append(key)
+    for same in by_artist.values():
+        for other in same[1:]:
+            join(same[0], other)
+    for same in by_album.values():
+        for position, first in enumerate(same):
+            for second in same[position + 1:]:
+                if min(len(groups[first]), len(groups[second])) <= SPLIT_FRAGMENT_TRACKS:
+                    join(first, second)
+    clusters = {}
+    order = []
+    for key in keys:
+        top = root(key)
+        if top not in clusters:
+            clusters[top] = []
+            order.append(top)
+        clusters[top].append(key)
+    result = []
+    for top in order:
+        members = sorted(clusters[top], key=lambda k: (album_norm(k[1]), artist_norm(k[0])))
+        result.extend(album_batches(members, groups, max_albums, max_tracks))
+    return result
+
+
 def ai_review(provider, tracks: list, issues: list, progress: Optional[ProgressFn] = None,
-              cancel: Optional[threading.Event] = None) -> tuple:
+              cancel: Optional[threading.Event] = None, on_found: Optional[Callable[[list], None]] = None) -> tuple:
     """(nuovi problemi dell'AI, errori). Segna sulle regole che l'AI scarta il suo motivo (Issue.ai_note). Le
-    richieste rispettano i limiti del profilo (batch_albums, batch_tracks)."""
+    richieste raggruppano gli album che hanno qualcosa in comune (ai_requests) e rispettano i limiti del profilo
+    (batch_albums, batch_tracks). on_found(problemi finora): dopo ogni richiesta, per mostrarli man mano."""
     from .ai import AIError
     from .config import ProviderProfile
 
     groups = group_by_album(tracks)
-    keys = sorted(groups, key=lambda k: (album_norm(k[1]), artist_norm(k[0])))
     path_to_key = {}
     for key, album_tracks in groups.items():
         for track in album_tracks:
@@ -1321,7 +1374,7 @@ def ai_review(provider, tracks: list, issues: list, progress: Optional[ProgressF
     errors = []
     max_albums = getattr(provider.profile, "batch_albums", ProviderProfile.batch_albums)
     max_tracks = getattr(provider.profile, "batch_tracks", ProviderProfile.batch_tracks)
-    chunks = album_batches(keys, groups, max_albums, max_tracks)
+    chunks = ai_requests(groups, max_albums, max_tracks)
     index = 0
     while index < len(chunks) and not is_cancelled(cancel) and not getattr(provider, "gave_up", False):
         chunk = chunks[index]
@@ -1354,6 +1407,8 @@ def ai_review(provider, tracks: list, issues: list, progress: Optional[ProgressF
         except AIError as exc:
             errors.append(str(exc))
             log.warning("Analisi AI non riuscita: %s", exc)
+        if on_found is not None and not is_cancelled(cancel):
+            on_found(list(found))
         index += 1
     result = (found, errors)
     return result
@@ -1410,7 +1465,15 @@ def scan_tracks(tracks: list, target: str, provider=None, check_files: bool = Tr
         if ai_flagged_only and not only_ai:
             reviewed = tracks_of_albums(tracks, albums_of_issues(issues, tracks))
         if reviewed:
-            found, errors = ai_review(provider, reviewed, issues, progress, cancel)
+            def found_so_far(found: list) -> None:
+                shown = list(issues)
+                for issue in drop_repeated(found, issues):
+                    if only_ai or enabled(issue, checks):
+                        shown.append(issue)
+                partial(shown)
+
+            on_found = found_so_far if partial is not None else None
+            found, errors = ai_review(provider, reviewed, issues, progress, cancel, on_found)
             if is_cancelled(cancel):
                 # Annulla durante l'AI: come se non fosse stata scelta (anche i suoi giudizi sulle regole)
                 _stopped(report, "Analisi AI")

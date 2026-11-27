@@ -378,9 +378,14 @@ Verifica online sceglie anche tra due edizioni ugualmente probabili di un album 
 edizioni trovate; il motivo si vede nei risultati). Non riceve né i file né i percorsi completi. Con un'AI nel cloud
 questi dati escono dal computer; con Ollama no.
 
-La tabella va all'AI a pezzi: il profilo AI dice quanti album e quanti brani al massimo per richiesta (*Al massimo per
-richiesta*, di base **25 album e 400 brani**); ci si ferma al primo dei due limiti. Un album non si divide mai: se da
-solo supera i brani va in una richiesta sua, intero. Con un modello piccolo, o un contesto corto (*Contesto* dei
+La tabella va all'AI a pezzi, e in ogni richiesta solo **album che hanno qualcosa in comune**: lo stesso **artista
+dell'album** (anche scritto in modi diversi: "The Beatles" e "Beatles"; l'artista dei brani non conta, quindi una
+compilation con *Artisti vari* è un gruppo solo), oppure lo stesso nome d'album quando uno dei due ha al massimo 3
+brani (i pezzi di una compilation senza artista dell'album, che l'app Musica divide per artista: non si manda una
+richiesta per ogni artista con un brano). Due album veri con lo stesso nome ("Greatest Hits" di due artisti) restano
+separati; un album senza niente in comune va da solo. Ogni gruppo si divide secondo il profilo AI (*Al massimo per
+richiesta*, di base **10 album e 200 brani**): ci si ferma al primo dei due limiti, e un album non si divide mai (se
+da solo supera i brani va in una richiesta sua, intero). I risultati dell'AI compaiono dopo ogni richiesta. Con un modello piccolo, o un contesto corto (*Contesto* dei
 profili Ollama), tienili bassi: una richiesta che non ci sta viene tagliata da Ollama senza errori e l'AI non vede
 una parte degli album. Ogni brano conta circa 7 token, la tabella di un album circa 150.
 
@@ -1062,7 +1067,9 @@ controllo fallisce subito, senza aspettare il server, e il controllo va avanti c
 
 Quanti album e brani per richiesta all'AI: quelli del profilo usato (*Impostazioni → Profili AI → Al massimo per
 richiesta*, in `ai_profiles.json` come `batch_albums` e `batch_tracks`); un profilo salvato senza questi valori usa
-25 album e 400 brani. Vince il primo limite raggiunto, ma un album intero va sempre in una richiesta sola.
+10 album e 200 brani (un profilo salvato con i valori di prima, 25 e 400, li tiene). Vince il primo limite raggiunto,
+ma un album intero va sempre in una richiesta sola, e album senza niente in comune (artista dell'album, o nome di una
+compilation divisa) non vanno mai nella stessa richiesta.
 
 ### I controlli di "Controlla la musica"
 
