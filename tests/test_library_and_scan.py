@@ -481,3 +481,16 @@ def test_the_same_box_set_in_two_formats_numbered_differently():
                                                                            album="Singolo Finto", track_number=1))
               for suffix in (".flac", ".mp3")]
     assert [issue.title for issue in scan.detect_few_tracks(single)] == ["Cantante Finto — Singolo Finto: solo 1 brano"]
+
+
+def test_the_title_of_an_album_written_in_several_ways_names_the_forms():
+    """Con la forma giusta già presente il titolo dice le altre ("X" anche come "X - CD1", "X - CD2"), così si
+    capisce perché le forme sono tre e se ne vedono due da correggere."""
+    keys = [("Artisti Vari", "Estate Finta - CD1"), ("Artisti Vari", "Estate Finta - CD2"),
+            ("Artisti Vari", "Estate Finta")]
+    assert scan._spellings_title("Estate Finta", keys) == '"Estate Finta" anche come "Estate Finta - CD1", ' \
+                                                          '"Estate Finta - CD2"'
+    assert scan._spellings_title("Estate Finta", keys[:2]) == '"Estate Finta" scritto in 2 modi diversi: ' \
+                                                              '"Estate Finta - CD1", "Estate Finta - CD2"'
+    same_name = [("ABBA", "Oro Finto"), ("Abba", "Oro Finto")]
+    assert scan._spellings_title("Oro Finto", same_name) == '"Oro Finto" scritto in 2 modi diversi'

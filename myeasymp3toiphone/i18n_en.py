@@ -1606,6 +1606,10 @@ CATALOG = {
         ". Usually the \"Album artist\" is missing or written differently: for a compilation set \"Various artists\" on all the tracks.",
     "Album \"{0}\", artista album \"{1}\" su tutti i brani":
         "Album \"{0}\", album artist \"{1}\" on all the tracks",
+    "\"{0}\" anche come {1}":
+        "\"{0}\" also as {1}",
+    "\"{0}\" scritto in {1} modi diversi: {2}":
+        "\"{0}\" written in {1} different ways: {2}",
     "\"{0}\" scritto in {1} modi diversi":
         "\"{0}\" written in {1} different ways",
     "Lo stesso album compare come: {0}. Maiuscole, punteggiatura o un \"CD 1\"/\"Disc 2\" nel nome lo dividono; il numero del disco va nel campo N. disco.":

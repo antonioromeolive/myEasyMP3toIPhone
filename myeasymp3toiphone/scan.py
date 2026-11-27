@@ -610,6 +610,23 @@ def detect_split_folders(tracks: list) -> list:
     return issues
 
 
+def _spellings_title(album: str, keys: list) -> str:
+    """Il titolo di "lo stesso album scritto in modi diversi": le forme da correggere per nome. Se tra le forme c'è
+    già quella giusta, "X" anche come "X - CD1", "X - CD2"; altrimenti "X" scritto in N modi diversi: …"""
+    others = []
+    for key in sorted(keys, key=lambda k: k[1].casefold()):
+        if key[1] != album and f"\"{key[1]}\"" not in others:
+            others.append(f"\"{key[1]}\"")
+    shown = ", ".join(others[:3]) + (f" e altri {len(others) - 3}" if len(others) > 3 else "")
+    if not others:                                   # stesso nome, artista scritto diverso
+        result = f"\"{album}\" scritto in {len(keys)} modi diversi"
+    elif len(others) < len(keys):
+        result = f"\"{album}\" anche come {shown}"
+    else:
+        result = f"\"{album}\" scritto in {len(keys)} modi diversi: {shown}"
+    return result
+
+
 def detect_split_names(tracks: list) -> list:
     """Lo stesso album scritto in modi diversi (maiuscole, "CD 2", punteggiatura) o diviso per artista."""
     groups = group_by_album(tracks)
@@ -643,7 +660,7 @@ def detect_split_names(tracks: list) -> list:
                     if wanted:
                         changes.append((track.path, wanted))
                 issues.append(Issue(
-                    KIND_SPLIT, SEVERITY_HIGH, f"\"{album}\" scritto in {len(keys)} modi diversi",
+                    KIND_SPLIT, SEVERITY_HIGH, _spellings_title(album, keys),
                     f"Lo stesso album compare come: {names}. Maiuscole, punteggiatura o un \"CD 1\"/\"Disc 2\" nel "
                     "nome lo dividono; il numero del disco va nel campo N. disco.",
                     [t.path for t in all_tracks],
