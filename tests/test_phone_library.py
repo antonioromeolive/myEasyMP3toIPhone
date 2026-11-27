@@ -1567,6 +1567,23 @@ def test_everything_for_the_iphone_waits_for_apply(tmp_path, monkeypatch):
         dialog = ApplyDialog(window, jobs, window._remove_pending, panel.jobs_seconds, panel.jobs_notes, False,
                              "iPhone di prova")
         assert not dialog._apply.isEnabled()                         # iPhone non connesso: si guarda soltanto
+        assert "Applica è spento" in dialog._why.text()               # e lo dice accanto al pulsante
+        from PySide6.QtCore import QObject, Signal
+
+        class Busy(QObject):
+            changed = Signal(bool)
+
+        busy = Busy()
+        state = {"ready": (False, "Aspetta la fine di \"Controlla la musica\".")}
+        watched = ApplyDialog(window, jobs, window._remove_pending, panel.jobs_seconds, panel.jobs_notes, False,
+                              "iPhone di prova", lambda: state["ready"], busy.changed)
+        assert not watched._apply.isEnabled() and "Controlla la musica" in watched._why.text()
+        state["ready"] = (True, "")
+        busy.changed.emit(False)                                     # l'operazione è finita: si accende da solo
+        watched._update_ready()       # come dopo il segnale (che lo chiama con un QTimer: qui senza il giro di eventi,
+        #                               che farebbe partire altro della finestra di prova)
+        assert watched._apply.isEnabled() and not watched._why.isVisibleTo(watched)
+        watched.close()
         delete_key = [job.key for job in jobs if job.action == DELETE]
         dialog._drop(delete_key)                                     # la ✕ di "Elimina"
         assert len(dialog.jobs) == 3 and window.pending.total() == 3

@@ -1633,10 +1633,13 @@ def scan_tracks(tracks: list, target: str, provider=None, check_files: bool = Tr
                 musicbrainz=None, ai_flagged_only: bool = False, keep_phone_fixes: bool = False,
                 partial: Optional[Callable[[list], None]] = None,
                 ai_skip: Optional[Callable[[tuple], bool]] = None,
-                album_context: Optional[list] = None) -> ScanReport:
+                album_context: Optional[list] = None,
+                fingerprint_fn: Optional[Callable[[], dict]] = None) -> ScanReport:
     """Il controllo: le regole dei controlli scelti (checks), poi l'AI se c'è un fornitore. Con phone_tracks (la
     musica dell'app Musica, i cui brani sono anche tracks) è dell'iPhone, confrontato con library_tracks.
     fingerprints: {percorso: impronta dell'audio} per i brani duplicati (senza, solo quelli sospetti per i tag).
+    fingerprint_fn() -> fingerprints: calcolate solo quando servono, per R15 dopo tutte le altre regole: i risultati
+    delle regole (partial) arrivano prima del calcolo delle impronte, che è lento.
     musicbrainz: un albumcheck.MusicBrainzClient per controllare anche lì i nomi d'artista dubbi (lento).
     ai_flagged_only: l'AI guarda solo gli album dove le regole hanno trovato qualcosa (nessuno: niente AI). Senza
     controlli scelti (Solo AI) l'AI guarda tutti gli album e ogni suo problema si tiene.
@@ -1702,6 +1705,8 @@ def scan_tracks(tracks: list, target: str, provider=None, check_files: bool = Tr
             if issue.kind == KIND_DUPLICATE:
                 for path in issue.files:
                     skip.add(str(path))
+        if fingerprints is None and fingerprint_fn is not None and not is_cancelled(cancel):
+            fingerprints = fingerprint_fn()
         if progress is not None:
             progress(0, 0, "brani duplicati")
         helper = provider if not is_cancelled(cancel) else None

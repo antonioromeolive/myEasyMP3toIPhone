@@ -386,6 +386,11 @@ REQ-9, REQ-11 e, per lo stesso motivo, REQ-26 (anno non valido).
 2. FLAC;
 3. gli altri MP3.
 
+**D-10 (28/11/2026) — Le parole corte in minuscolo.** Tra grafie che differiscono solo nelle maiuscole delle parole
+corte (sotto le 4 lettere, dopo la prima parola: "to", "for", "of", "di", "e", "le"…) vince quella con le parole corte
+in minuscolo, anche se è meno usata: "Tears for Fears", non "Tears For Fears"; "Frankie Goes to Hollywood". Viene
+prima della "più usata" della D-9 (`names._short_words_lowercase`).
+
 **D-9 — Risposte alle domande del 27/11/2026.**
 - D-1, "tutti i brani hanno lo stesso artista": vale quando l'artista dell'album è vuoto, oppure è "Artisti vari"
   ma i brani sono tutti dello stesso artista (compilation segnata per sbaglio: si toglie anche la spunta compilation).
@@ -431,6 +436,10 @@ Fatto, solo sul PC (sull'iPhone girano le regole di prima, fino a R16, e il conf
 | D5, D6 | tipi nuovi `KIND_NAMES`, `KIND_FORMAT`; docstring e testi delle caselle riscritti | — |
 
 Tolti per decisione: REQ-9, REQ-11, REQ-26 (D-4), REQ-12 (D-5).
+
+Aggiunto il 28/11/2026: D-10 (parole corte in minuscolo); i caratteri che cambiano evidenziati nelle colonne Ora e
+Diventa; i risultati delle regole prima delle impronte dell'audio (`scan_tracks(fingerprint_fn=…)`); la finestra di
+Applica dice perché il pulsante è spento e si riaccende da sola.
 
 Restano:
 - R15 (stesso brano, con l'impronta) e R16 girano dopo i livelli, sui tag di partenza: non vedono le correzioni dei

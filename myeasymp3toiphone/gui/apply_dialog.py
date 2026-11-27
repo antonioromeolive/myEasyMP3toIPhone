@@ -8,7 +8,7 @@ com'è e si possono rimettere dalle schede. "Applica N azioni" fa partire quelle
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QTimer, Qt
 from PySide6.QtGui import QBrush, QColor
 from PySide6.QtWidgets import (
     QAbstractItemView, QDialog, QDialogButtonBox, QLabel, QPushButton, QTreeWidget, QTreeWidgetItem, QVBoxLayout,
@@ -112,9 +112,12 @@ def _describe_track(job, compared_fields, changed_fields) -> tuple:
 
 class ApplyDialog(QDialog):
     """jobs: le azioni (pending.Job); remove(chiavi) -> azioni rimaste, dopo averle tolte dalla coda; seconds(jobs) ->
-    il tempo stimato; notes(jobs) -> righe in più (grafia, playlist); ready: l'iPhone è connesso e libero."""
+    il tempo stimato; notes(jobs) -> righe in più (grafia, playlist); ready: l'iPhone è connesso e libero.
+    status() -> (pronto, motivo): se c'è, decide al posto di ready e si richiede a ogni changed (un segnale, per
+    esempio la fine di un'operazione): il pulsante si accende da solo, e quando è spento il motivo si legge accanto."""
 
-    def __init__(self, parent, jobs: list, remove, seconds, notes, ready: bool, device: str) -> None:
+    def __init__(self, parent, jobs: list, remove, seconds, notes, ready: bool, device: str, status=None,
+                 changed=None) -> None:
         super().__init__(parent)
         self.setWindowTitle(tr("Applica le azioni in attesa sull'iPhone"))
         self.resize(900, 600)
@@ -123,6 +126,8 @@ class ApplyDialog(QDialog):
         self._seconds = seconds
         self._notes = notes
         self._ready = ready
+        self._reason = ""
+        self._status = status
         self._device = device
         self._header = QLabel()
         self._header.setWordWrap(True)
@@ -139,6 +144,9 @@ class ApplyDialog(QDialog):
         self._footer = QLabel()
         self._footer.setWordWrap(True)
         self._footer.setStyleSheet("color: gray")
+        self._why = QLabel()
+        self._why.setWordWrap(True)
+        self._why.setStyleSheet("color: rgb(210, 130, 0); font-weight: bold")
         self._buttons = QDialogButtonBox()
         self._apply = self._buttons.addButton(tr("Applica"), QDialogButtonBox.AcceptRole)
         self._apply.setProperty("role", "go")
@@ -154,7 +162,13 @@ class ApplyDialog(QDialog):
         layout.addWidget(self._header)
         layout.addWidget(self._tree, 1)
         layout.addWidget(self._footer)
+        layout.addWidget(self._why)
         layout.addWidget(self._buttons)
+        if changed is not None:
+            # dopo il segnale: chi lo manda finisce prima il suo lavoro (la connessione segna l'iPhone connesso)
+            slot = lambda *_args: QTimer.singleShot(0, self._update_ready)    # noqa: E731
+            changed.connect(slot)
+            self.finished.connect(lambda _result: changed.disconnect(slot))
         self._fill()
 
     def _fill(self) -> None:
@@ -206,12 +220,27 @@ class ApplyDialog(QDialog):
         footer = estimate.summary(count, self._seconds(self.jobs)) if count else ""
         notes = self._notes(self.jobs) if count else ""
         footer += notes + "\n\n" + SYNC_WARNING
-        if not self._ready:
-            footer += "\n\nPer applicarle connetti l'iPhone (e aspetta la fine dell'operazione in corso)."
         self._footer.setText(footer.strip())
         self._apply.setText(f"Applica {count} azioni" if count != 1 else "Applica 1 azione")
-        self._apply.setEnabled(bool(count) and self._ready)
         self._remove_selected.setEnabled(False)
+        self._update_ready()
+
+    def _update_ready(self) -> None:
+        """Il pulsante Applica e, quando è spento, il perché (con cosa fare)."""
+        if self._status is not None:
+            self._ready, self._reason = self._status()
+        elif not self._ready:
+            self._reason = "Per applicarle connetti l'iPhone (e aspetta la fine dell'operazione in corso)."
+        count = len(self.jobs)
+        self._apply.setEnabled(bool(count) and self._ready)
+        if not count:
+            why = "Non c'è niente da applicare: le azioni sono state tolte tutte."
+        elif not self._ready:
+            why = f"Applica è spento. {self._reason}"
+        else:
+            why = ""
+        self._why.setText(why)
+        self._why.setVisible(bool(why))
 
     def _clicked(self, item, column: int) -> None:
         keys = item.data(2, Qt.UserRole)

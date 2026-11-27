@@ -9,14 +9,16 @@ problema accendono o spengono tutte le loro righe. Applica le correzioni scelte 
 
 from __future__ import annotations
 
+from difflib import SequenceMatcher
 from html import escape
 
-from PySide6.QtCore import QUrl, Qt
-from PySide6.QtGui import QBrush, QColor, QDesktopServices
+from PySide6.QtCore import QPointF, QUrl, Qt
+from PySide6.QtGui import QBrush, QColor, QDesktopServices, QTextDocument
 from PySide6.QtWidgets import (
     QAbstractItemView, QCheckBox, QDialog, QDialogButtonBox, QGroupBox, QHBoxLayout, QHeaderView, QLabel, QMenu,
     QMessageBox,
-    QPushButton, QSplitter, QStyle, QTextBrowser, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget,
+    QPushButton, QSplitter, QStyle, QStyledItemDelegate, QStyleOptionViewItem, QTextBrowser, QTreeWidget,
+    QTreeWidgetItem, QVBoxLayout, QWidget,
 )
 
 from ..check_flow import FIELD_LABELS, OTHER_KEY, SIDE_BOTH, SIDE_LABELS, SIDE_PC, SIDE_PHONE, plan_apply
@@ -40,6 +42,70 @@ REF_ROLE = Qt.UserRole + 1        # l'indice nell'elenco degli album, dei proble
 GREEN = QColor(30, 140, 60)
 GREY = QColor(130, 130, 130)
 SIDE_COLORS = {SIDE_BOTH: QColor(70, 160, 100), SIDE_PC: QColor(70, 140, 210), SIDE_PHONE: QColor(170, 110, 210)}
+DIFF_ROLE = Qt.UserRole + 2       # (testo, pezzi) delle colonne Ora e Diventa: i caratteri che cambiano, evidenziati
+
+
+def diff_pieces(old: str, new: str) -> tuple:
+    """([(pezzo, cambia)] di old, [(pezzo, cambia)] di new): i caratteri diversi tra i due testi, per vedere subito
+    una differenza piccola ("to" → "To", uno spazio in più)."""
+    old_pieces = []
+    new_pieces = []
+    matcher = SequenceMatcher(None, old, new, autojunk=False)
+    for tag, old_start, old_end, new_start, new_end in matcher.get_opcodes():
+        changed = tag != "equal"
+        if old_end > old_start:
+            old_pieces.append((old[old_start:old_end], changed))
+        if new_end > new_start:
+            new_pieces.append((new[new_start:new_end], changed))
+    result = (old_pieces, new_pieces)
+    return result
+
+
+def _pieces_html(pieces: list) -> str:
+    """I pezzi in HTML: quelli che cambiano in grassetto, sottolineati e su fondo giallo chiaro; gli spazi visibili."""
+    parts = []
+    for text, changed in pieces:
+        shown = escape(text).replace(" ", "&nbsp;")
+        if changed:
+            if not text.strip():
+                shown = "␣" * len(text)                 # uno spazio che cambia: si vede
+            parts.append(f"<b><u style='background-color: rgba(255, 210, 0, 90)'>{shown}</u></b>")
+        else:
+            parts.append(shown)
+    result = "".join(parts)
+    return result
+
+
+class DiffDelegate(QStyledItemDelegate):
+    """Le colonne Ora e Diventa: i caratteri che cambiano evidenziati (DIFF_ROLE). Quando il testo della cella non è
+    più quello (la ✔ di una correzione applicata), la cella si disegna come le altre."""
+
+    def paint(self, painter, option, index) -> None:
+        data = index.data(DIFF_ROLE)
+        text = index.data(Qt.DisplayRole)
+        if data is not None and data[0] == text:
+            options = QStyleOptionViewItem(option)
+            self.initStyleOption(options, index)
+            options.text = ""
+            widget = options.widget
+            style = widget.style() if widget is not None else None
+            if style is not None:
+                style.drawControl(QStyle.CE_ItemViewItem, options, painter, widget)
+            selected = bool(option.state & QStyle.State_Selected)
+            brush = index.data(Qt.ForegroundRole)
+            color = option.palette.highlightedText().color() if selected or brush is None else brush.color()
+            document = QTextDocument()
+            document.setDefaultFont(options.font)
+            document.setDocumentMargin(0)
+            document.setHtml(f"<span style='color: {color.name()}; white-space: pre'>{_pieces_html(data[1])}</span>")
+            painter.save()
+            painter.setClipRect(option.rect)
+            top = option.rect.top() + max(0, (option.rect.height() - document.size().height()) / 2)
+            painter.translate(QPointF(option.rect.left() + 4, top))
+            document.drawContents(painter)
+            painter.restore()
+        else:
+            super().paint(painter, option, index)
 
 
 class ApplyDestinationsDialog(QDialog):
@@ -189,6 +255,9 @@ class CheckResultsView(QWidget):
         for column, width in ((COL_NAME, 420), (COL_FIX, 150), (COL_SIDE, 100), (COL_FIELD, 110), (COL_OLD, 170), (COL_NEW, 170),
                               (COL_SEVERITY, 60), (COL_ORIGIN, 60)):
             self.tree.setColumnWidth(column, width)
+        self._diff_delegate = DiffDelegate(self.tree)
+        self.tree.setItemDelegateForColumn(COL_OLD, self._diff_delegate)
+        self.tree.setItemDelegateForColumn(COL_NEW, self._diff_delegate)
         self.tree.itemSelectionChanged.connect(self._show_detail)
         self.tree.itemChanged.connect(self._item_changed)
         self.tree.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -381,6 +450,12 @@ class CheckResultsView(QWidget):
                     leaf.setForeground(COL_SIDE, QBrush(SIDE_COLORS[row.target.side]))
                     leaf.setForeground(COL_OLD, QBrush(QColor(200, 80, 70)))
                     leaf.setForeground(COL_NEW, QBrush(GREEN))
+                    old_text = leaf.text(COL_OLD)
+                    new_text = leaf.text(COL_NEW)
+                    if isinstance(row.old, str) and isinstance(row.new, str) and old_text and new_text:
+                        old_pieces, new_pieces = diff_pieces(old_text, new_text)
+                        leaf.setData(COL_OLD, DIFF_ROLE, (old_text, old_pieces))
+                        leaf.setData(COL_NEW, DIFF_ROLE, (new_text, new_pieces))
                     leaf.setData(COL_NAME, KIND_ROLE, ROW_FIX)
                     leaf.setData(COL_NAME, REF_ROLE, len(self._rows))
                     leaf.setFlags(leaf.flags() | Qt.ItemIsUserCheckable)

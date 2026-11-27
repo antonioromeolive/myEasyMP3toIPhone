@@ -94,6 +94,12 @@ class TaskRunner(QObject):
         result = self._task is not None
         return result
 
+    @property
+    def title(self) -> str:
+        """Il nome dell'operazione in corso ("" se non ce n'è)."""
+        result = self._title if self._task is not None else ""
+        return result
+
     def run(self, title: str, fn: Callable, on_done: Callable,
             on_error: Optional[Callable] = None, on_item: Optional[Callable] = None) -> bool:
         """Avvia fn(progress, cancel); con on_item, fn(progress, cancel, emit) e on_item(valore) per ogni risultato

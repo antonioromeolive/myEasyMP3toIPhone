@@ -4063,4 +4063,18 @@ CATALOG = {
         "{0}: {1} track numbers used by different tracks",
     "Nello stesso album lo stesso numero di traccia (e disco) ha titoli diversi: {0}.{1} Sull'iPhone diventano un album solo con i brani mescolati.":
         "In the same album the same track (and disc) number has different titles: {0}.{1} On the iPhone they become a single album with the tracks mixed.",
+    "Per applicarle connetti l'iPhone (e aspetta la fine dell'operazione in corso).":
+        "To apply them connect the iPhone (and wait for the end of the running operation).",
+    "Non c'è niente da applicare: le azioni sono state tolte tutte.":
+        "There is nothing to apply: all the actions have been removed.",
+    "Applica è spento. {0}":
+        "Apply is off. {0}",
+    "<b><u style='background-color: rgba(255, 210, 0, 90)'>{0}</u></b>":
+        "<b><u style='background-color: rgba(255, 210, 0, 90)'>{0}</u></b>",
+    "<span style='color: {0}; white-space: pre'>{1}</span>":
+        "<span style='color: {0}; white-space: pre'>{1}</span>",
+    "Aspetta la fine di \"{0}\" (barra di stato, in basso): il pulsante si accende da solo.":
+        "Wait for the end of \"{0}\" (status bar, at the bottom): the button turns on by itself.",
+    "Connetti l'iPhone (scheda iPhone, pulsante Connetti iPhone): il pulsante si accende da solo.":
+        "Connect the iPhone (iPhone tab, Connect iPhone button): the button turns on by itself.",
 }

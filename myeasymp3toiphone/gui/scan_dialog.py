@@ -23,7 +23,7 @@ from ..library import UNKNOWN_ALBUM, group_by_album, scan_folder
 from ..phone_library import tracks_for_scan
 from ..i18n import tr
 from ..scan import (
-    CHECK_DUPLICATES, CHECK_FILES, CHECK_VARIANTS, ORIGIN_AI, ORIGIN_ONLINE, ai_review, albums_of_issues,
+    CHECK_FILES, CHECK_VARIANTS, ORIGIN_AI, ORIGIN_ONLINE, ai_review, albums_of_issues,
     detect_artist_doubts, tracks_of_albums,
     ScanReport, drop_repeated, enabled, is_cancelled, report_text, save_report, scan_tracks,
 )
@@ -185,13 +185,17 @@ class ScanLauncher:
         def work(progress, cancel, emit):
             emit((LIVE_SCANNED, tracks, [], None))
             emit((LIVE_PHASE, PHASE_RULES))
-            prints = {}
-            if CHECK_DUPLICATES in checks:
+
+            def prints():
+                # dopo le altre regole, i cui risultati si vedono già: le impronte servono solo ai brani duplicati
                 progress(0, 0, "impronte dell'audio")
-                prints = pc_fingerprints(tracks, tag_cache, progress, cancel)
+                result = pc_fingerprints(tracks, tag_cache, progress, cancel)
+                return result
+
             report = scan_tracks(tracks, target, None, check_files=CHECK_FILES in checks, progress=progress,
-                                 cancel=cancel, checks=checks, fingerprints=prints, musicbrainz=musicbrainz,
-                                 partial=lambda issues: emit((LIVE_ISSUES, issues)), album_context=context)
+                                 cancel=cancel, checks=checks, musicbrainz=musicbrainz,
+                                 partial=lambda issues: emit((LIVE_ISSUES, issues)), album_context=context,
+                                 fingerprint_fn=prints)
             emit((LIVE_ISSUES, list(report.issues)))
             results = self._online(tracks, report, choices, progress, cancel, emit)
             value = (report, results)

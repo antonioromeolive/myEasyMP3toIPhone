@@ -368,10 +368,15 @@ sugli album guardano **tutta la musica** anche quando se ne controlla una parte,
 controllata: la correzione vale anche per gli album fuori dalla selezione, che compaiono nei risultati. In *Applica*,
 se due correzioni scelte toccano lo stesso campo dello stesso brano vince quella del livello dopo; se sono dello
 stesso livello la finestra lo dice e spiega come scegliere l'altra. Le regole nuove (R18-R31) girano solo sul PC.
+Nelle colonne *Ora* e *Diventa* i caratteri che cambiano sono **evidenziati** (grassetto, sottolineati, su fondo
+giallo; uno spazio che cambia si vede come ␣): una differenza di una lettera ("to" → "To") non sfugge. I risultati
+delle regole arrivano **prima** delle impronte dell'audio, che servono solo ai brani duplicati e si calcolano dopo.
 
 **Quale grafia vince** (nomi d'artista e artista dell'album): quella con le **iniziali maiuscole** (ogni parola di
 almeno 4 lettere con la maiuscola, "Elio e le Storie Tese" va bene; tutto maiuscolo, "AC/DC", solo se non ce n'è
-un'altra), la più usata in tutta la musica; con gli accenti vince la forma accentata ("Pérez" e non "Perez"), e con
+un'altra), la più usata in tutta la musica; tra grafie che differiscono solo nelle maiuscole delle parole corte vince
+quella con le parole corte in minuscolo ("Tears for Fears", "Frankie Goes to Hollywood"), anche se è meno usata; con
+gli accenti vince la forma accentata ("Pérez" e non "Perez"), e con
 accenti diversi ("Perché"/"Perchè") il problema dice di controllare. Dentro un album l'**artista dell'album è identico
 su tutti i brani** (anche tra "AA.VV." e "Artisti Vari": vince la prima con le iniziali maiuscole nell'ordine dei
 brani), e se tutti i brani hanno lo stesso artista l'album lo prende come artista dell'album (anche al posto di

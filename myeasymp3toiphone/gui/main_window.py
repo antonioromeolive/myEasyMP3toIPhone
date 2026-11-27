@@ -1403,6 +1403,18 @@ class MainWindow(QMainWindow):
         else:
             self._apply_pending()
 
+    def _apply_status(self) -> tuple:
+        """(si può applicare, perché no e cosa fare): l'iPhone connesso e nessuna operazione in corso."""
+        if self.runner.is_busy:
+            result = (False, f"Aspetta la fine di \"{tr(self.runner.title)}\" (barra di stato, in basso): il pulsante "
+                             "si accende da solo.")
+        elif not self.iphone_panel.connected:
+            result = (False, "Connetti l'iPhone (scheda iPhone, pulsante Connetti iPhone): il pulsante si accende "
+                             "da solo.")
+        else:
+            result = (True, "")
+        return result
+
     def _apply_pending(self) -> None:
         """Applica: la finestra con tutte le azioni (ognuna si toglie), poi le fa tutte insieme."""
         jobs = self.pending_jobs()
@@ -1411,9 +1423,9 @@ class MainWindow(QMainWindow):
                                     "aperti o l'iPhone non è ancora stato letto.")
         else:
             panel = self.iphone_panel
-            ready = panel.connected and not self.runner.is_busy
+            ready, _reason = self._apply_status()
             dialog = ApplyDialog(self, jobs, self._remove_pending, panel.jobs_seconds, panel.jobs_notes, ready,
-                                 panel.device_name)
+                                 panel.device_name, self._apply_status, self.runner.busy_changed)
             if dialog.exec() and dialog.jobs:
                 panel.apply_jobs(dialog.jobs)
                 self._applying = self.runner.is_busy       # partito: il pulsante diventa Ferma

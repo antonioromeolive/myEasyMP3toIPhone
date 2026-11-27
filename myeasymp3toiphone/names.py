@@ -123,6 +123,51 @@ def _uppercase_count(text: str) -> int:
     return count
 
 
+def _long_words_key(text: str) -> str:
+    """Il testo con le parole corte (dopo la prima) in minuscolo: due grafie con la stessa chiave differiscono solo
+    nelle maiuscole delle parole corte ("Frankie Goes To Hollywood" e "Frankie Goes to Hollywood")."""
+    parts = []
+    position = 0
+    first = True
+    for match in _WORD.finditer(text):
+        word = match.group(0)
+        parts.append(text[position:match.start()])
+        if not first and len(word) < MIN_CAPITAL_WORD:
+            parts.append(word.lower())
+        else:
+            parts.append(word)
+        first = False
+        position = match.end()
+    parts.append(text[position:])
+    result = "".join(parts)
+    return result
+
+
+def _lowercase_short_words(text: str) -> int:
+    """Quante parole corte (dopo la prima) sono in minuscolo."""
+    count = 0
+    words = _WORD.findall(text)
+    for word in words[1:]:
+        if len(word) < MIN_CAPITAL_WORD and word.islower():
+            count += 1
+    return count
+
+
+def _short_words_lowercase(candidates: list) -> list:
+    """D-10: tra grafie che differiscono solo nelle maiuscole delle parole corte ("to", "for", "of", "di", "e"…), restano
+    quelle con le parole corte in minuscolo, come si scrivono i nomi ("Tears for Fears"), anche se sono meno usate.
+    Le grafie che differiscono in altro restano tutte."""
+    best = {}
+    for spelling in candidates:
+        key = _long_words_key(spelling)
+        best[key] = max(best.get(key, 0), _lowercase_short_words(spelling))
+    result = []
+    for spelling in candidates:
+        if _lowercase_short_words(spelling) == best[_long_words_key(spelling)]:
+            result.append(spelling)
+    return result
+
+
 @dataclass
 class Choice:
     spelling: str
@@ -132,8 +177,9 @@ class Choice:
 def choose_spelling(spellings: list, counts: dict = None, policy: str = POLICY_MOST, capitals: bool = True) -> Choice:
     """La grafia che vince tra quelle dello stesso nome (spellings: in ordine, senza ripetizioni; counts: {grafia:
     brani}). Prima gli accenti (D-3): una grafia con l'accento vince su quella senza; con accenti diversi tra loro la
-    scelta resta segnata come da controllare. Poi, con capitals, le iniziali maiuscole (D-1: capital_rank). Infine
-    policy: POLICY_MOST la più usata (a parità, più maiuscole, poi la prima), POLICY_FIRST la prima."""
+    scelta resta segnata come da controllare. Poi, con capitals, le iniziali maiuscole (D-1: capital_rank) e le
+    parole corte in minuscolo (D-10: "Tears for Fears", non "Tears For Fears"). Infine policy: POLICY_MOST la più
+    usata (a parità, più maiuscole, poi la prima), POLICY_FIRST la prima."""
     counts = counts or {}
     candidates = []
     for spelling in spellings:
@@ -158,6 +204,7 @@ def choose_spelling(spellings: list, counts: dict = None, policy: str = POLICY_M
             if capital_rank(spelling) == best_rank:
                 ranked.append(spelling)
         candidates = ranked
+        candidates = _short_words_lowercase(candidates)
     chosen = candidates[0] if candidates else ""
     if policy == POLICY_MOST:
         best = None

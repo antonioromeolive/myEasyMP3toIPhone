@@ -269,3 +269,39 @@ def test_new_rules_only_on_the_pc():
         rules.add(issue.rule_id.split(".")[0])
     assert not rules & {"R21", "R23", "R25", "R26", "R27"}
     assert scan_rules.SUPPORTED_MUSIC == (".mp3", ".flac", ".m4a")
+
+
+def test_short_words_in_lowercase_win_d10():
+    counts = {"Frankie Goes To Hollywood": 5, "Frankie Goes to Hollywood": 2}
+    assert names.choose_spelling(list(counts), counts).spelling == "Frankie Goes to Hollywood"
+    counts = {"Tears For Fears": 9, "Tears for Fears": 1, "TEARS FOR FEARS": 3}
+    assert names.choose_spelling(list(counts), counts).spelling == "Tears for Fears"
+    counts = {"Elio E Le Storie Tese": 4, "Elio e le Storie Tese": 1}
+    assert names.choose_spelling(list(counts), counts).spelling == "Elio e le Storie Tese"
+    counts = {"The Who": 3, "the Who": 1}                    # la prima parola resta com'è
+    assert names.choose_spelling(list(counts), counts).spelling == "The Who"
+
+
+def test_rule_results_arrive_before_the_fingerprints():
+    order = []
+    tracks = [_track("q/1.mp3", title="Uno", artist="queen", album="Live", track_number=1),
+              _track("q/2.mp3", title="Due", artist="Queen", album="Live", track_number=2)]
+
+    def prints():
+        order.append("impronte")
+        return {}
+
+    scan.scan_tracks(tracks, "PC", partial=lambda issues: order.append(f"risultati {len(issues)}"),
+                     fingerprint_fn=prints)
+    assert order[0].startswith("risultati") and order[0] != "risultati 0" and "impronte" in order
+    order.clear()
+    scan.scan_tracks(tracks, "PC", checks=frozenset({scan.CHECK_SPLIT}), fingerprint_fn=prints)
+    assert order == []                                       # senza Brani duplicati le impronte non servono
+
+
+def test_the_characters_that_change_are_highlighted():
+    from myeasymp3toiphone.gui.check_results import diff_pieces
+    old, new = diff_pieces("Frankie Goes to Hollywood", "Frankie Goes To Hollywood")
+    assert [text for text, changed in old if changed] == ["t"]
+    assert [text for text, changed in new if changed] == ["T"]
+    assert "".join(text for text, _changed in new) == "Frankie Goes To Hollywood"
