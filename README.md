@@ -307,6 +307,12 @@ i brani* li seleziona nella scheda PC. I problemi trovati sull'iPhone non hanno 
 brani sul PC e poi si usa *Usa i tag da PC a iPhone* o *Ricopia da PC a iPhone*, o si cambiano dalla scheda iPhone
 (tasto destro → *Cambia i tag*).
 
+Ogni problema dice **Cosa fare** (nel dettaglio sotto l'elenco e nel rapporto), anche quando non c'è una correzione
+automatica: quale pulsante usare, quando si può ignorare, cosa fare a mano (per esempio spostare un doppione fuori
+dalle cartelle della musica: il programma non cancella i file del PC). **Verifica online questi album** fa partire
+*Verifica album online*, con le scelte del suo riquadro, sugli album interi dei problemi selezionati: utile per gli
+album con pochi brani, per sapere quali mancano.
+
 | Sintomo | Cosa cerca | Correzione |
 |---|---|---|
 | **File che non si aggiornano** | sull'iPhone, brani con tag diversi da quelli del PC (o delle modifiche in sospeso); MP3 con un vecchio tag ID3v1 diverso o con un tag APE (solo informazione: le copie inviate ne sono ripulite) | sull'iPhone nessuna (la colonna *iPhone* della scheda PC mostra le differenze) |
@@ -322,6 +328,12 @@ totale dichiarato, nome della cartella, generi) e i problemi trovati dalle regol
 (per esempio album diversi con lo stesso nome, "Greatest Hits"), ne aggiunge altri e propone le correzioni. Non riceve
 né i file né i percorsi completi. Con un'AI nel cloud questi dati escono dal computer; con Ollama no.
 
+La tabella va all'AI a pezzi: il profilo AI dice quanti album e quanti brani al massimo per richiesta (*Al massimo per
+richiesta*, di base **25 album e 400 brani**); ci si ferma al primo dei due limiti. Un album non si divide mai: se da
+solo supera i brani va in una richiesta sua, intero. Con un modello piccolo, o un contesto corto (*Contesto* dei
+profili Ollama), tienili bassi: una richiesta che non ci sta viene tagliata da Ollama senza errori e l'AI non vede
+una parte degli album. Ogni brano conta circa 7 token, la tabella di un album circa 150.
+
 **L'AI predefinita è Ollama sul tuo computer.** Al primo avvio, se non hai profili AI, il programma crea il profilo
 **"Ollama locale"** (`http://localhost:11434`) con un modello già installato: il primo tra le famiglie gemma4, qwen3,
 gemma3, llama3, mistral, gpt-oss, escludendo i modelli `:cloud` (girano su ollama.com) e quelli di embedding; senza
@@ -334,7 +346,9 @@ In console: `myEasyMP3toIPhone-cli --scan <cartella> [--ai "<profilo>"]`.
 ## Verifica album online
 
 *Verifica album online* (linguetta **Controlli**, riquadro a destra; **F7** la apre) confronta gli album scelti negli
-elenchi della scheda PC (o tutti) con un **catalogo su internet**: dice
+elenchi della scheda PC (o tutti; il riquadro dice quanti, o il nome se è uno solo) con un **catalogo su internet**,
+oppure, con **Verifica online questi album** nei risultati di *Controlla la musica*, gli album dei problemi
+selezionati: dice
 se manca qualche brano e propone i tag giusti e la copertina. È diverso da *Controlla la musica*, che confronta i tuoi
 brani tra loro (e con l'iPhone), senza cataloghi.
 
@@ -990,6 +1004,10 @@ predefinita resta su questo computer.
    [Controlla la musica](#controlla-la-musica)).
    Se cancelli tutti i profili non viene ricreato.
 3. In console `--ai "<profilo>"` vale solo per quella scansione e non si salva; senza, la console usa solo le regole.
+
+Quanti album e brani per richiesta all'AI: quelli del profilo usato (*Impostazioni → Profili AI → Al massimo per
+richiesta*, in `ai_profiles.json` come `batch_albums` e `batch_tracks`); un profilo salvato senza questi valori usa
+25 album e 400 brani. Vince il primo limite raggiunto, ma un album intero va sempre in una richiesta sola.
 
 ### I controlli di "Controlla la musica"
 

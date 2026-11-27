@@ -144,6 +144,28 @@ def test_ai_review_maps_albums_and_marks_false_positives(tmp_path):
     assert "A1 | album artist:" in provider.seen
 
 
+def test_album_batches_stop_at_the_first_limit_and_never_split_an_album():
+    groups = {"a": [1] * 3, "b": [1] * 3, "c": [1] * 10, "d": [1] * 2, "e": [1]}
+    keys = ["a", "b", "c", "d", "e"]
+    assert scan.album_batches(keys, groups, 5, 8) == [["a", "b"], ["c"], ["d", "e"]]    # "c" da solo, intero
+    assert scan.album_batches(keys, groups, 2, 100) == [["a", "b"], ["c", "d"], ["e"]]
+    assert scan.album_batches(keys, groups, 1, 2) == [["a"], ["b"], ["c"], ["d"], ["e"]]
+    assert scan.album_batches([], groups, 5, 8) == []
+
+
+def test_ai_review_follows_the_profile_limits(tmp_path):
+    for name in ("Uno", "Due", "Tre"):
+        _tagged(tmp_path / name / "1.mp3", title="X", artist="Gruppo", album=name, track_number=1)
+    tracks = scan_folder(tmp_path)
+    provider = FakeProvider({"issues": [], "false_positives": []})
+    calls = []
+    provider.ask_json = lambda system, user, schema: calls.append(user) or {"issues": [], "false_positives": []}
+    provider.profile.batch_albums = 2
+    provider.profile.batch_tracks = 400
+    scan.ai_review(provider, tracks, [])
+    assert len(calls) == 2 and "A2 |" in calls[0] and "A2 |" not in calls[1]
+
+
 def test_case_variants_are_one_group_shown_with_capitals(tmp_path):
     _tagged(tmp_path / "a" / "1.mp3", title="X", artist="Queen", album="Live at Wembley", track_number=1)
     _tagged(tmp_path / "b" / "2.mp3", title="Y", artist="queen", album="live at  wembley", track_number=2)

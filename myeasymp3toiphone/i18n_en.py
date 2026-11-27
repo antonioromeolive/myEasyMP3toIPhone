@@ -1017,6 +1017,16 @@ CATALOG = {
         "Timeout",
     "Contesto (Ollama)":
         "Context (Ollama)",
+    "Al massimo per richiesta":
+        "At most per request",
+    " album":
+        " albums",
+    " brani":
+        " tracks",
+    "Controlla la musica con l'AI: quanti album e quanti brani mandare all'AI in ogni richiesta. Ci si ferma al primo dei due limiti; un album non si divide mai, quindi da solo può superare i brani. Con un modello piccolo, o un contesto corto, tienili bassi.":
+        "Check the music with AI: how many albums and how many tracks to send to the AI in each request. It stops at "
+        "the first of the two limits; an album is never split, so on its own it can exceed the tracks. With a small "
+        "model, or a short context, keep them low.",
     "Endpoint":
         "Endpoint",
     "Server":
@@ -1677,6 +1687,88 @@ CATALOG = {
         "Check interrupted: the results are partial",
     "    Correzione proposta: {0}":
         "    Proposed fix: {0}",
+    "    Cosa fare: {0}":
+        "    What to do: {0}",
+    "<p><b>Cosa fare:</b> {0}</p>":
+        "<p><b>What to do:</b> {0}</p>",
+    "Verifica online questi album":
+        "Check these albums online",
+    "Verifica album online, con le scelte del suo riquadro, sugli album interi dei problemi selezionati (non su quelli scelti nella scheda PC)":
+        "Check albums online, with the choices of its box, on the whole albums of the selected problems (not on the "
+        "ones chosen in the PC tab)",
+    "<b>Verificare l'album {0}</b> (scelto negli elenchi della scheda PC).":
+        "<b>Check the album {0}</b> (chosen in the lists of the PC tab).",
+    "<br>Per gli album dei problemi trovati da Controlla la musica: selezionali nei risultati e premi <i>Verifica online questi album</i>.":
+        "<br>For the albums of the problems found by Check the music: select them in the results and press <i>Check "
+        "these albums online</i>.",
+    "Mostra i brani e decidi tu: l'album originale e una raccolta, o un MP3 e un FLAC tenuti apposta, vanno bene così. Un doppione vero spostalo fuori dalle cartelle della musica con Esplora file (il programma non cancella i file del PC). Per i doppioni sull'iPhone: scheda iPhone, Mostra → \"Doppioni: stessa canzone nello stesso album\".":
+        "Show the tracks and decide: the original album and a compilation, or an MP3 and a FLAC kept on purpose, are "
+        "fine. Move a real duplicate out of the music folders with File Explorer (the program never deletes files on "
+        "the PC). For the duplicates on the iPhone: iPhone tab, Show → \"Duplicates: same song in the same album\".",
+    "Mostra i brani e prova ad aprirli in Esplora file. Se sono su OneDrive: tasto destro → Mantieni sempre su questo dispositivo. Se sono danneggiati, ricopiali dall'originale o riscaricali, poi Rileggi (F5).":
+        "Show the tracks and try to open them in File Explorer. If they are on OneDrive: right click → Always keep on "
+        "this device. If they are damaged, copy them again from the original or download them again, then Reload "
+        "(F5).",
+    "Mostra i brani, poi Cambia i tag (tasto E) e scrivi titolo, album e artista.":
+        "Show the tracks, then Change the tags (E key) and write title, album and artist.",
+    "Per tenerli: scheda iPhone, tasto destro → Copia da iPhone a PC. Se non servono: Elimina dall'iPhone, poi Applica. Se sul PC ci sono ma scritti in modo diverso, correggi i tag sul PC.":
+        "To keep them: iPhone tab, right click → Copy from iPhone to PC. If you don't need them: Delete from the "
+        "iPhone, then Apply. If they are on the PC but written differently, fix the tags on the PC.",
+    "Niente di urgente: le copie inviate all'iPhone sono già senza il vecchio tag. Per pulire anche i file del PC togli il tag ID3v1 con un programma di tag (per esempio Mp3tag): questo programma non li cambia.":
+        "Nothing urgent: the copies sent to the iPhone are already without the old tag. To clean the files on the PC "
+        "too, remove the ID3v1 tag with a tag program (for example Mp3tag): this program does not change them.",
+    "Niente di urgente: le copie inviate all'iPhone sono già senza il tag APE. Per pulire anche i file del PC toglilo con un programma di tag (per esempio Mp3tag): questo programma non li cambia.":
+        "Nothing urgent: the copies sent to the iPhone are already without the APE tag. To clean the files on the PC "
+        "too, remove it with a tag program (for example Mp3tag): this program does not change them.",
+    "Applica la correzione (se c'è) ricava i tag dai nomi di file e cartelle. Altrimenti Mostra i brani, poi Cambia i tag (tasto E) e scrivi titolo, album e artista.":
+        "Apply the fix (if there is one) takes the tags from the file and folder names. Otherwise Show the tracks, "
+        "then Change the tags (E key) and write title, album and artist.",
+    "Mostra i brani e confronta le due copie (tag, durata, qualità nell'editor dei tag). Tieni la migliore e sposta l'altra fuori dalle cartelle della musica con Esplora file (il programma non cancella i file del PC).":
+        "Show the tracks and compare the two copies (tags, length, quality in the tag editor). Keep the best one and "
+        "move the other out of the music folders with File Explorer (the program never deletes files on the PC).",
+    "Mostra i brani. Se sono lo stesso brano, tieni una copia e sposta l'altra fuori dalle cartelle della musica con Esplora file. Se sono brani diversi, titolo o numero di traccia sono sbagliati: correggili con Cambia i tag (tasto E).":
+        "Show the tracks. If they are the same track, keep one copy and move the other out of the music folders with "
+        "File Explorer. If they are different tracks, the title or track number is wrong: fix it with Change the tags "
+        "(E key).",
+    "Premi Verifica online questi album: i cataloghi dicono quali brani mancano e quali sono i tag giusti. Se i brani mancano davvero, aggiungili alla cartella; se è sbagliato il numero di traccia, correggilo con Cambia i tag.":
+        "Press Check these albums online: the catalogs tell which tracks are missing and which tags are right. If "
+        "the tracks are really missing, add them to the folder; if the track number is wrong, fix it with Change the "
+        "tags.",
+    "Se è un singolo, o vuoi solo questi brani, va bene così. Se sono brani di un album più grande, rendi album e artista dell'album uguali a quelli degli altri brani (Cambia i tag), oppure premi Verifica online questi album.":
+        "If it is a single, or you only want these tracks, it is fine. If they are tracks of a bigger album, make "
+        "album and album artist the same as the other tracks (Change the tags), or press Check these albums online.",
+    "Applica la correzione mette lo stesso album e lo stesso artista dell'album su tutti i brani della cartella. Se la cartella contiene davvero album diversi, ignora.":
+        "Apply the fix puts the same album and album artist on all the tracks of the folder. If the folder really "
+        "holds different albums, ignore it.",
+    "Applica la correzione unifica il nome dell'album e sposta \"CD 1\" / \"Disc 2\" nel numero del disco.":
+        "Apply the fix makes the album name the same and moves \"CD 1\" / \"Disc 2\" into the disc number.",
+    "Se è una compilation: Applica la correzione (se c'è), oppure Mostra i brani e Cambia i tag con artista dell'album \"Artisti vari\" su tutti. Se sono album diversi che si chiamano allo stesso modo, ignora.":
+        "If it is a compilation: Apply the fix (if there is one), or Show the tracks and Change the tags with album "
+        "artist \"Various artists\" on all of them. If they are different albums with the same name, ignore it.",
+    "Applica la correzione scrive ovunque la forma più usata. Per sceglierne un'altra: Mostra i brani e Cambia i tag.":
+        "Apply the fix writes the most used form everywhere. To choose another one: Show the tracks and Change the "
+        "tags.",
+    "Se è davvero lo stesso artista: Applica la correzione (vince la forma più usata). Se non sei sicuro, accendi MusicBrainz o l'AI e ripeti il controllo. Se sono artisti diversi, ignora.":
+        "If it really is the same artist: Apply the fix (the most used form wins). If you are not sure, turn on "
+        "MusicBrainz or the AI and run the check again. If they are different artists, ignore it.",
+    "Applica la correzione lascia l'artista principale e porta gli ospiti nel titolo (feat. …). Se il nome è quello di un gruppo (\"Simon & Garfunkel\"), ignora.":
+        "Apply the fix keeps the main artist and moves the guests into the title (feat. …). If the name is that of a "
+        "group (\"Simon & Garfunkel\"), ignore it.",
+    "Mostra i brani, poi nella scheda PC Usa i tag da PC a iPhone e Applica. Se sono giusti quelli dell'iPhone: scheda iPhone, Usa i tag da iPhone a PC.":
+        "Show the tracks, then in the PC tab Use the tags from PC to iPhone and Apply. If the iPhone ones are right: "
+        "iPhone tab, Use the tags from iPhone to PC.",
+    "Mostra i brani, poi Copia da PC a iPhone e Applica. Se sull'iPhone non li vuoi, ignora.":
+        "Show the tracks, then Copy from PC to iPhone and Apply. If you don't want them on the iPhone, ignore it.",
+    "Scheda iPhone: Mostra → \"Senza file sull'iPhone (fantasmi)\", seleziona i brani, Elimina dall'iPhone e Applica.":
+        "iPhone tab: Show → \"Without a file on the iPhone (ghosts)\", select the tracks, Delete from the iPhone and "
+        "Apply.",
+    "Mostra i brani e confronta i tag con Cambia i tag (tasto E).":
+        "Show the tracks and compare the tags with Change the tags (E key).",
+    "Premi Verifica online questi album: i cataloghi dicono quali brani mancano.":
+        "Press Check these albums online: the catalogs tell which tracks are missing.",
+    "Applica la correzione (se c'è); altrimenti Mostra i brani e rendi uguali album e artista dell'album con Cambia i tag. Se l'AI si sbaglia, ignora.":
+        "Apply the fix (if there is one); otherwise Show the tracks and make album and album artist the same with "
+        "Change the tags. If the AI is wrong, ignore it.",
     "    … e altri {0}":
         "    … and {0} more",
     "File delle variabili rinominato in {0} (MYCOPIASTIMP3_… -> MYEASYMP3TOIPHONE_…)":

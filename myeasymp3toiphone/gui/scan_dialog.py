@@ -20,11 +20,11 @@ from PySide6.QtWidgets import (
 from ..ai import make_provider
 from ..config import config_dir, load_profiles
 from ..i18n import tr
-from ..library import scan_folder
+from ..library import group_by_album, scan_folder
 from ..phone_library import tracks_for_scan
 from ..scan import (
-    CHECK_DUPLICATES, CHECK_FILES, CHECK_VARIANTS, CHECKS, KIND_LABELS, ORIGIN_AI, SEVERITY_HIGH, SEVERITY_MEDIUM, save_report,
-    scan_tracks, tag_changes_of,
+    CHECK_DUPLICATES, CHECK_FILES, CHECK_ONLINE, CHECK_VARIANTS, CHECKS, KIND_LABELS, ORIGIN_AI, SEVERITY_HIGH,
+    SEVERITY_MEDIUM, advice, save_report, scan_tracks, tag_changes_of,
 )
 
 TITLE = "Controlla la musica"
@@ -322,12 +322,17 @@ class ScanDialog(QDialog):
         self.show_button = QPushButton("Mostra i brani")
         self.show_button.setToolTip("Seleziona questi brani nella scheda PC")
         self.show_button.clicked.connect(self._show_tracks)
+        self.online_button = QPushButton(CHECK_ONLINE)
+        self.online_button.setToolTip("Verifica album online, con le scelte del suo riquadro, sugli album interi dei "
+                                      "problemi selezionati (non su quelli scelti nella scheda PC)")
+        self.online_button.clicked.connect(self._check_online)
         open_button = QPushButton("Apri il rapporto")
         open_button.setEnabled(saved is not None)
         open_button.clicked.connect(lambda: QDesktopServices.openUrl(QUrl.fromLocalFile(str(saved))))
         buttons = QHBoxLayout()
         buttons.addWidget(self.fix_button)
         buttons.addWidget(self.show_button)
+        buttons.addWidget(self.online_button)
         buttons.addStretch(1)
         buttons.addWidget(open_button)
         if not embedded:
@@ -399,7 +404,10 @@ class ScanDialog(QDialog):
                 html += "<p style='color:#1e8c3c'><b>Correzione applicata.</b></p>"
             elif issue.fix is not None:
                 html += f"<p><b>Correzione proposta:</b> {escape(tr(issue.fix.description))}</p>"
-            files = "".join(f"<li>{escape(str(path))}</li>" for path in issue.files[:200])
+            suggestion = advice(issue)
+            if suggestion:
+                html += f"<p><b>Cosa fare:</b> {escape(tr(suggestion))}</p>"
+            files ="".join(f"<li>{escape(str(path))}</li>" for path in issue.files[:200])
             more = f"<p>… e altri {len(issue.files) - 200}</p>" if len(issue.files) > 200 else ""
             html += f"<p><b>{len(issue.files)} file:</b></p><ul>{files}</ul>{more}"
             self.detail.setHtml(html)
@@ -410,6 +418,30 @@ class ScanDialog(QDialog):
             fixable = fixable or (issue.fix is not None and index not in self.fixed)
         self.fix_button.setEnabled(fixable)
         self.show_button.setEnabled(bool(selected))
+        self.online_button.setEnabled(bool(self._albums_of_selection()))
+
+    def _albums_of_selection(self) -> list:
+        """Gli album del PC (interi, come group_by_album) dei brani dei problemi selezionati."""
+        paths = set()
+        for _index, issue in self._selected_issues():
+            for path in issue.files:
+                paths.add(str(path))
+        tracks = self.launcher.library_tracks or list(self.window.tracks)
+        keys = set()
+        for track in tracks:
+            if str(track.path) in paths:
+                keys.add(track.album_key)
+        groups = group_by_album(tracks)
+        result = []
+        for key in sorted(keys, key=lambda k: (k[0].lower(), k[1].lower())):
+            if key in groups:
+                result.append(groups[key])
+        return result
+
+    def _check_online(self) -> None:
+        albums = self._albums_of_selection()
+        if albums:
+            self.window.start_album_check_from_panel(albums)
 
     def _show_tracks(self) -> None:
         paths = set()

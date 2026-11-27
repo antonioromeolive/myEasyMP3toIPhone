@@ -333,6 +333,10 @@ class ProviderProfile:
     timeout: int = 300
     num_ctx: int = 16384              # solo Ollama
     api_key_variable: str = ""        # il nome della variabile con la chiave, quando il campo è $NOME
+    # analisi AI degli album (Controlla la musica): al massimo tanti album e tanti brani per richiesta; un album non
+    # si divide mai, quindi da solo può superare batch_tracks
+    batch_albums: int = 25
+    batch_tracks: int = 400
 
     def key_from_variable(self) -> str:
         result = ""

@@ -224,7 +224,8 @@ def test_checks_tab_runs_the_album_check_and_shows_results(monkeypatch):
         assert window._tabs.currentWidget() is panel
         panel.refresh()
         options = panel.album_options
-        assert "Verificare 1 album" in options._header.text() and options.start_button.isEnabled()
+        assert "Verificare l'album Cantante Finto — Disco Finto" in options._header.text()
+        assert options.start_button.isEnabled()
         window.album_clients["deezer"] = FakeService("deezer", ["Uno", "Due"])
         options.boxes["apple"].setChecked(False)
         options.boxes["deezer"].setChecked(True)
@@ -242,3 +243,50 @@ def test_checks_tab_runs_the_album_check_and_shows_results(monkeypatch):
     finally:
         window.close()
         app.processEvents()
+
+
+def test_scan_results_check_the_albums_of_the_selected_problems_and_say_what_to_do():
+    """Nei risultati di Controlla la musica: Verifica online questi album prende gli album interi dei problemi
+    selezionati, non quelli scelti nella scheda PC; ogni problema dice cosa fare."""
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtWidgets import QApplication
+    from myeasymp3toiphone import scan
+    from myeasymp3toiphone.gui.main_window import MainWindow
+    from myeasymp3toiphone.gui.scan_dialog import ScanDialog
+    app = QApplication.instance() or QApplication([])
+    window = MainWindow()
+    try:
+        first = _album(["Uno", "Due", "Tre"])
+        other = _album(["Quattro"], album="Altro Disco")
+        window.tracks = first + other
+        assign_groups(window.tracks)
+        window._rebuild_views()
+        launcher = window.scan_launcher
+        launcher.library_tracks = list(window.tracks)
+        issue = scan.Issue(scan.KIND_FEW_TRACKS, scan.SEVERITY_HIGH, "Disco Finto: 1 brano su almeno 3", "d",
+                           [first[0].path], rule_id="R9.1")
+        report = scan.ScanReport(target="prova", issues=[issue], tracks_scanned=4, albums_scanned=2)
+        dialog = ScanDialog(report, None, launcher, embedded=True)
+        assert not dialog.online_button.isEnabled()                  # niente selezionato
+        top = dialog.tree.topLevelItem(0)
+        top.child(0).setSelected(True)
+        assert dialog.online_button.isEnabled()
+        assert "Cosa fare:" in dialog.detail.toHtml()
+        started = []
+        window.start_album_check_from_panel = lambda albums=None: started.append(albums)
+        dialog.online_button.click()
+        assert len(started) == 1 and len(started[0]) == 1           # l'album del problema, intero
+        assert sorted(track.tags.title for track in started[0][0]) == ["Due", "Tre", "Uno"]
+        dialog.close()
+    finally:
+        window.close()
+        app.processEvents()
+
+
+def test_every_rule_says_what_to_do():
+    from myeasymp3toiphone import scan
+    for rule in ("R2", "R3", "R5", "R6", "R7", "R8", "R9", "R10", "R11", "R12", "R13", "R14", "R15", "R16", "R17",
+                 "I1", "I2", "I3", "I4"):
+        assert scan.advice(scan.Issue(scan.KIND_SPLIT, scan.SEVERITY_LOW, "t", "d", rule_id=f"{rule}.1")), rule
+    for kind in scan.AI_KINDS:
+        assert scan.advice(scan.Issue(kind, scan.SEVERITY_LOW, "t", "d", origin=scan.ORIGIN_AI)), kind

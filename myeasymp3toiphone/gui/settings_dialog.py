@@ -459,6 +459,22 @@ class SettingsDialog(QDialog):
         self.f_ctx = QSpinBox()
         self.f_ctx.setRange(2048, 1_048_576)
         self.f_ctx.setSingleStep(2048)
+        batch_tip = ("Controlla la musica con l'AI: quanti album e quanti brani mandare all'AI in ogni richiesta. Ci si "
+                     "ferma al primo dei due limiti; un album non si divide mai, quindi da solo può superare i brani. "
+                     "Con un modello piccolo, o un contesto corto, tienili bassi.")
+        self.f_batch_albums = QSpinBox()
+        self.f_batch_albums.setRange(1, 1000)
+        self.f_batch_albums.setSuffix(tr(" album"))
+        self.f_batch_albums.setToolTip(batch_tip)
+        self.f_batch_tracks = QSpinBox()
+        self.f_batch_tracks.setRange(1, 100_000)
+        self.f_batch_tracks.setSingleStep(50)
+        self.f_batch_tracks.setSuffix(tr(" brani"))
+        self.f_batch_tracks.setToolTip(batch_tip)
+        batch_row = QHBoxLayout()
+        batch_row.addWidget(self.f_batch_albums)
+        batch_row.addWidget(self.f_batch_tracks)
+        batch_row.addStretch(1)
         self.test_button = QPushButton("Prova la connessione")
         self.test_button.clicked.connect(self._test)
         self.hint = QLabel()
@@ -475,6 +491,7 @@ class SettingsDialog(QDialog):
         form.addRow("Temperatura", temp_row)
         form.addRow("Timeout", self.f_timeout)
         form.addRow("Contesto (Ollama)", self.f_ctx)
+        form.addRow("Al massimo per richiesta", batch_row)
         self.fields = QWidget()
         self.fields.setLayout(form)
         right = QVBoxLayout()
@@ -523,6 +540,8 @@ class SettingsDialog(QDialog):
             self.f_temp.setEnabled(profile.temperature is not None)
             self.f_timeout.setValue(profile.timeout)
             self.f_ctx.setValue(profile.num_ctx)
+            self.f_batch_albums.setValue(profile.batch_albums)
+            self.f_batch_tracks.setValue(profile.batch_tracks)
             # ancora in caricamento: un profilo salvato si mostra com'è; i valori predefiniti del tipo (server,
             # $NOME della chiave) valgono solo quando l'utente cambia il tipo
             self._kind_changed()
@@ -554,6 +573,8 @@ class SettingsDialog(QDialog):
                 profile.temperature = None
             profile.timeout = self.f_timeout.value()
             profile.num_ctx = self.f_ctx.value()
+            profile.batch_albums = self.f_batch_albums.value()
+            profile.batch_tracks = self.f_batch_tracks.value()
             if old_name != profile.name:
                 self.keys[profile.name] = self.keys.get(old_name, "")
                 self.keys[old_name] = ""

@@ -2,6 +2,8 @@
 dell'edizione scelta e i file del PC; un'altra edizione, i tag corretti, la copertina). Stanno nella linguetta
 Controlli (embedded=True: dentro la linguetta, con Avvia la verifica e Ferma, senza "Chiudi")."""
 
+from html import escape
+
 from PySide6.QtCore import QUrl, Qt, Signal
 from PySide6.QtGui import QBrush, QColor, QDesktopServices
 from PySide6.QtWidgets import (
@@ -115,11 +117,18 @@ class AlbumCheckOptionsDialog(QDialog):
             layout.addWidget(self.buttons)
         self.refresh(album_count, ai_name, use_ai)
 
-    def refresh(self, album_count: int, ai_name: str, use_ai: bool) -> None:
-        """Quanti album (quelli scelti negli elenchi, o tutti) e il profilo AI: cambiano con quello che è aperto."""
+    def refresh(self, album_count: int, ai_name: str, use_ai: bool, single: str = "") -> None:
+        """Quanti album (quelli scelti negli elenchi, o tutti; single: il nome, se è uno solo) e il profilo AI:
+        cambiano con quello che è aperto."""
         self._albums = album_count
-        header = f"<b>Verificare {album_count} album</b> (quelli scelti negli elenchi della scheda PC, o tutti)."
-        if not self._embedded:                     # nella linguetta Controlli la spiegazione sta nel riquadro
+        if single:
+            header = f"<b>Verificare l'album {escape(single)}</b> (scelto negli elenchi della scheda PC)."
+        else:
+            header = f"<b>Verificare {album_count} album</b> (quelli scelti negli elenchi della scheda PC, o tutti)."
+        if self._embedded:
+            header += ("<br>Per gli album dei problemi trovati da Controlla la musica: selezionali nei risultati e "
+                       "premi <i>Verifica online questi album</i>.")
+        else:                                      # nella linguetta Controlli la spiegazione sta nel riquadro
             header += "<br>" + DIFFERENCE_TEXT
         self._header.setText(header)
         self.ai_box.setText(f"AI per scegliere tra edizioni dubbie ({ai_name})" if ai_name else

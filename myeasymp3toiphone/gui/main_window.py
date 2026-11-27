@@ -1850,9 +1850,10 @@ class MainWindow(QMainWindow):
         self.show_checks(album=True)
         self.checks_panel.focus_album()
 
-    def start_album_check_from_panel(self) -> None:
-        """Avvia la verifica della linguetta Controlli, con le sue scelte (ricordate)."""
-        albums = self._albums_to_check()
+    def start_album_check_from_panel(self, chosen: Optional[list] = None) -> None:
+        """Avvia la verifica della linguetta Controlli, con le sue scelte (ricordate): sugli album dati (chosen: quelli
+        dei problemi scelti nei risultati del controllo), altrimenti su quelli scelti nella scheda PC."""
+        albums = chosen if chosen else self._albums_to_check()
         options = self.checks_panel.album_options
         if self._album_job is not None and self._album_job.running:
             QMessageBox.information(self, "Verifica album online", "La verifica è già in corso: aspetta la fine o "

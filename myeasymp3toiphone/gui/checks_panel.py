@@ -84,7 +84,12 @@ class ChecksPanel(QWidget):
         window = self._window
         name = window.scan_launcher.profile_name()
         self.scan_options.refresh(window, len(window.phone_tracks), name)
-        self.album_options.refresh(len(window.albums_to_check()), name, window.app_settings.album_ai)
+        albums = window.albums_to_check()
+        single = ""
+        if len(albums) == 1:
+            artist, album = albums[0][0].album_key
+            single = f"{artist} — {album}"
+        self.album_options.refresh(len(albums), name, window.app_settings.album_ai, single)
 
     def showEvent(self, event) -> None:
         super().showEvent(event)

@@ -73,7 +73,6 @@ ORIGIN_AI = "AI"
 FIX_TAGS = "tags"            # modifiche dei tag: restano in sospeso (overlay), i file sul PC non cambiano
 
 VARIOUS_ARTISTS = "Artisti vari"
-AI_CHUNK_ALBUMS = 100
 DISC_MARKER = re.compile(r"[\s\-–,:]*[\(\[]?\s*(?:disc|disco|disk|cd)\s*(\d{1,2})\s*[\)\]]?\s*$", re.IGNORECASE)
 NUMBERED_COPY = re.compile(r"^(.*) \((\d+)\)$")
 YEAR_SUFFIX = re.compile(r"^(.*?)\s*\((\d{4})\)$")
@@ -1278,10 +1277,34 @@ def _rule_issue_albums(issue: Issue, path_to_key: dict) -> set:
     return keys
 
 
+def album_batches(keys: list, groups: dict, max_albums: int, max_tracks: int) -> list:
+    """Gli album (keys, in ordine) divisi nelle richieste all'AI: in ognuna al massimo max_albums album e max_tracks
+    brani. Un album non si divide mai: se da solo supera max_tracks va in una richiesta sua, intero."""
+    albums_limit = max(1, int(max_albums))
+    tracks_limit = max(1, int(max_tracks))
+    batches = []
+    current = []
+    counted = 0
+    for key in keys:
+        size = len(groups[key])
+        if current and (len(current) >= albums_limit or counted + size > tracks_limit):
+            batches.append(current)
+            current = []
+            counted = 0
+        current.append(key)
+        counted += size
+    if current:
+        batches.append(current)
+    result = batches
+    return result
+
+
 def ai_review(provider, tracks: list, issues: list, progress: Optional[ProgressFn] = None,
               cancel: Optional[threading.Event] = None) -> tuple:
-    """(nuovi problemi dell'AI, errori). Segna sulle regole che l'AI scarta il suo motivo (Issue.ai_note)."""
+    """(nuovi problemi dell'AI, errori). Segna sulle regole che l'AI scarta il suo motivo (Issue.ai_note). Le
+    richieste rispettano i limiti del profilo (batch_albums, batch_tracks)."""
     from .ai import AIError
+    from .config import ProviderProfile
 
     groups = group_by_album(tracks)
     keys = sorted(groups, key=lambda k: (album_norm(k[1]), artist_norm(k[0])))
@@ -1292,11 +1315,9 @@ def ai_review(provider, tracks: list, issues: list, progress: Optional[ProgressF
     by_rule_id = {issue.rule_id: issue for issue in issues if issue.rule_id}
     found = []
     errors = []
-    chunks = []
-    start = 0
-    while start < len(keys):
-        chunks.append(keys[start:start + AI_CHUNK_ALBUMS])
-        start += AI_CHUNK_ALBUMS
+    max_albums = getattr(provider.profile, "batch_albums", ProviderProfile.batch_albums)
+    max_tracks = getattr(provider.profile, "batch_tracks", ProviderProfile.batch_tracks)
+    chunks = album_batches(keys, groups, max_albums, max_tracks)
     index = 0
     while index < len(chunks) and not is_cancelled(cancel):
         chunk = chunks[index]
@@ -1392,6 +1413,80 @@ def scan_tracks(tracks: list, target: str, provider=None, check_files: bool = Tr
     return report
 
 
+# --------------------------------------------------------------------------- cosa fare
+
+CHECK_ONLINE = "Verifica online questi album"
+_MANUAL_DUPLICATE = ("Mostra i brani e decidi tu: l'album originale e una raccolta, o un MP3 e un FLAC tenuti apposta, "
+                     "vanno bene così. Un doppione vero spostalo fuori dalle cartelle della musica con Esplora file "
+                     "(il programma non cancella i file del PC). Per i doppioni sull'iPhone: scheda iPhone, Mostra → "
+                     "\"Doppioni: stessa canzone nello stesso album\".")
+_MANUAL_UNREADABLE = ("Mostra i brani e prova ad aprirli in Esplora file. Se sono su OneDrive: tasto destro → Mantieni "
+                      "sempre su questo dispositivo. Se sono danneggiati, ricopiali dall'originale o riscaricali, poi "
+                      "Rileggi (F5).")
+_MANUAL_TAGS = "Mostra i brani, poi Cambia i tag (tasto E) e scrivi titolo, album e artista."
+_ONLY_ON_DEVICE = ("Per tenerli: scheda iPhone, tasto destro → Copia da iPhone a PC. Se non servono: Elimina "
+                   "dall'iPhone, poi Applica. Se sul PC ci sono ma scritti in modo diverso, correggi i tag sul PC.")
+# il suggerimento di ogni regola (rule_id senza il numero), anche quando non c'è una correzione automatica
+ADVICE = {
+    "R2": "Niente di urgente: le copie inviate all'iPhone sono già senza il vecchio tag. Per pulire anche i file del PC "
+          "togli il tag ID3v1 con un programma di tag (per esempio Mp3tag): questo programma non li cambia.",
+    "R3": "Niente di urgente: le copie inviate all'iPhone sono già senza il tag APE. Per pulire anche i file del PC "
+          "toglilo con un programma di tag (per esempio Mp3tag): questo programma non li cambia.",
+    "R5": _MANUAL_UNREADABLE,
+    "R6": "Applica la correzione (se c'è) ricava i tag dai nomi di file e cartelle. Altrimenti Mostra i brani, poi "
+          "Cambia i tag (tasto E) e scrivi titolo, album e artista.",
+    "R7": "Mostra i brani e confronta le due copie (tag, durata, qualità nell'editor dei tag). Tieni la migliore e "
+          "sposta l'altra fuori dalle cartelle della musica con Esplora file (il programma non cancella i file del PC).",
+    "R8": "Mostra i brani. Se sono lo stesso brano, tieni una copia e sposta l'altra fuori dalle cartelle della musica "
+          "con Esplora file. Se sono brani diversi, titolo o numero di traccia sono sbagliati: correggili con Cambia i "
+          "tag (tasto E).",
+    "R9": "Premi Verifica online questi album: i cataloghi dicono quali brani mancano e quali sono i tag giusti. Se i brani mancano "
+          "davvero, aggiungili alla cartella; se è sbagliato il numero di traccia, correggilo con Cambia i tag.",
+    "R10": "Se è un singolo, o vuoi solo questi brani, va bene così. Se sono brani di un album più grande, rendi album e "
+           "artista dell'album uguali a quelli degli altri brani (Cambia i tag), oppure premi Verifica online questi "
+           "album.",
+    "R11": "Applica la correzione mette lo stesso album e lo stesso artista dell'album su tutti i brani della cartella. "
+           "Se la cartella contiene davvero album diversi, ignora.",
+    "R12": "Applica la correzione unifica il nome dell'album e sposta \"CD 1\" / \"Disc 2\" nel numero del disco.",
+    "R13": "Se è una compilation: Applica la correzione (se c'è), oppure Mostra i brani e Cambia i tag con artista "
+           "dell'album \"Artisti vari\" su tutti. Se sono album diversi che si chiamano allo stesso modo, ignora.",
+    "R14": "Applica la correzione scrive ovunque la forma più usata. Per sceglierne un'altra: Mostra i brani e Cambia i "
+           "tag.",
+    "R15": _MANUAL_DUPLICATE,
+    "R16": "Se è davvero lo stesso artista: Applica la correzione (vince la forma più usata). Se non sei sicuro, accendi "
+           "MusicBrainz o l'AI e ripeti il controllo. Se sono artisti diversi, ignora.",
+    "R17": "Applica la correzione lascia l'artista principale e porta gli ospiti nel titolo (feat. …). Se il nome è "
+           "quello di un gruppo (\"Simon & Garfunkel\"), ignora.",
+    "I1": "Mostra i brani, poi nella scheda PC Usa i tag da PC a iPhone e Applica. Se sono giusti quelli dell'iPhone: "
+          "scheda iPhone, Usa i tag da iPhone a PC.",
+    "I2": "Mostra i brani, poi Copia da PC a iPhone e Applica. Se sull'iPhone non li vuoi, ignora.",
+    "I3": _ONLY_ON_DEVICE,
+    "I4": "Scheda iPhone: Mostra → \"Senza file sull'iPhone (fantasmi)\", seleziona i brani, Elimina dall'iPhone e "
+          "Applica.",
+}
+# i problemi trovati dall'AI (senza una regola): per tipo
+KIND_ADVICE = {
+    KIND_NOT_UPDATED: "Mostra i brani e confronta i tag con Cambia i tag (tasto E).",
+    KIND_FEW_TRACKS: "Premi Verifica online questi album: i cataloghi dicono quali brani mancano.",
+    KIND_SPLIT: "Applica la correzione (se c'è); altrimenti Mostra i brani e rendi uguali album e artista dell'album "
+                "con Cambia i tag. Se l'AI si sbaglia, ignora.",
+    KIND_DUPLICATE: _MANUAL_DUPLICATE,
+    KIND_MISSING_TAGS: _MANUAL_TAGS,
+    KIND_UNREADABLE: _MANUAL_UNREADABLE,
+    KIND_ONLY_ON_DEVICE: _ONLY_ON_DEVICE,
+}
+
+
+def advice(issue: Issue) -> str:
+    """Cosa fare per il problema, in una o due frasi: con la sua regola, altrimenti con il suo tipo; "" se non c'è."""
+    rule = issue.rule_id.split(".", 1)[0]
+    if rule in ADVICE:
+        result = ADVICE[rule]
+    else:
+        result = KIND_ADVICE.get(issue.kind, "")
+    return result
+
+
 def report_text(report: ScanReport) -> str:
     lines = [f"Controllo di {report.target} — {time.strftime('%Y-%m-%d %H:%M')}",
              f"{report.tracks_scanned} brani, {report.albums_scanned} album, {len(report.issues)} problemi"]
@@ -1408,6 +1503,9 @@ def report_text(report: ScanReport) -> str:
             lines.append(f"    AI: {issue.ai_note}")
         if issue.fix is not None:
             lines.append(f"    Correzione proposta: {issue.fix.description}")
+        suggestion = advice(issue)
+        if suggestion:
+            lines.append(f"    Cosa fare: {suggestion}")
         for path in issue.files[:50]:
             lines.append(f"    - {path}")
         if len(issue.files) > 50:
