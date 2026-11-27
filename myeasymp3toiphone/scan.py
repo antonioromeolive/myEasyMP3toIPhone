@@ -104,16 +104,14 @@ CHECKS = (
     (CHECK_UNREADABLE, "File illeggibili", "file danneggiati, bloccati o disponibili solo online"),
     (CHECK_DUPLICATES, "Brani duplicati",
      "lo stesso brano due volte nello stesso album e formato: stesso audio anche con tag diversi, oppure stessa "
-     "durata, titolo e artista; una copia in un altro formato (FLAC e MP3) o in un altro album va bene; l'AI guarda "
-     "solo le coppie sospette"),
+     "durata, titolo e artista; vanno bene una copia in un altro formato (FLAC e MP3) o in un altro album, e le "
+     "versioni nominate nel titolo (Unplugged, Live, Remix…)"),
 )
 ALL_CHECKS = frozenset(check_id for check_id, _label, _note in CHECKS)
 KIND_CHECK = {KIND_NOT_UPDATED: CHECK_FILES, KIND_FEW_TRACKS: CHECK_FEW, KIND_SPLIT: CHECK_SPLIT,
               KIND_DUPLICATE: CHECK_DUPLICATES, KIND_MISSING_TAGS: CHECK_MISSING, KIND_UNREADABLE: CHECK_UNREADABLE}
 AI_REVIEW_CHECKS = frozenset({CHECK_FILES, CHECK_FEW, CHECK_SPLIT, CHECK_VARIANTS, CHECK_MISSING})  # per album
 SAME_SONG_TOLERANCE = 2.0     # secondi: lo stesso brano in due file ha quasi la stessa durata
-AI_PAIRS_BATCH = 25
-AI_MAX_PAIRS = 400            # oltre, le coppie restano "da controllare" senza AI (un'AI locale è lenta)
 TITLE_EXTRA = re.compile(r"\s*[\(\[][^\)\]]*[\)\]]|\s+-\s+.*$")
 
 ProgressFn = Callable[[int, int, str], None]
@@ -896,78 +894,6 @@ def suspicious_pairs(tracks: list, fingerprints: dict) -> list:
     return result
 
 
-AI_PAIRS_SYSTEM = """You help find duplicate songs in a personal music library. Each line is a pair of files with \
-the same artist, a similar title and almost the same duration, but different audio data and different version \
-words. Decide for each pair whether both files are the SAME recording (same performance: another format, bitrate or \
-encoding, a remaster of the same master, the same track on an album and on a compilation) or DIFFERENT versions \
-(live, remix, edit, acoustic, demo, re-recording, cover, another language). Use title details, album names and \
-folder names. Answer for every pair; confidence "high" only when the details agree. Write the reason in Italian, \
-short and concrete."""
-
-AI_PAIRS_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "pairs": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "pair": {"type": "string"},
-                    "same": {"type": "boolean"},
-                    "confidence": {"type": "string", "enum": ["high", "medium", "low"]},
-                    "reason": {"type": "string"},
-                },
-                "required": ["pair", "same", "confidence", "reason"],
-                "additionalProperties": False,
-            },
-        },
-    },
-    "required": ["pairs"],
-    "additionalProperties": False,
-}
-
-
-def _pair_side(track) -> str:
-    tags = track.tags
-    folder = "/".join(Path(track.path).parent.parts[-2:])
-    total = int(round(track.length))
-    result = (f"{tags.title} | artist: {tags.artist or tags.album_artist} | album: {tags.album} | "
-              f"{total // 60}:{total % 60:02d} | {Path(track.path).suffix.lower().lstrip('.')} | folder: {folder}")
-    return result
-
-
-def ai_pairs(provider, pairs: list, progress: Optional[ProgressFn] = None,
-             cancel: Optional[threading.Event] = None) -> tuple:
-    """({indice della coppia: (stesso brano, motivo)}, errori). Le coppie senza risposta non ci sono."""
-    from .ai import AIError
-    verdicts = {}
-    errors = []
-    start = 0
-    while start < len(pairs) and not is_cancelled(cancel) and not errors:
-        batch = pairs[start:start + AI_PAIRS_BATCH]
-        if progress is not None:
-            progress(start, len(pairs), f"l'AI confronta {len(batch)} coppie di versioni forse diverse")
-        lines = []
-        for offset, (first, second) in enumerate(batch):
-            lines.append(f"P{start + offset + 1}\n   A: {_pair_side(first)}\n   B: {_pair_side(second)}")
-        try:
-            reply = provider.ask_json(AI_PAIRS_SYSTEM, "PAIRS\n" + "\n".join(lines), AI_PAIRS_SCHEMA)
-            for answer in reply.get("pairs", []):
-                label = str(answer.get("pair", ""))
-                if label.startswith("P") and label[1:].isdigit():
-                    index = int(label[1:]) - 1
-                    if start <= index < start + len(batch):
-                        confidence = str(answer.get("confidence", "low"))
-                        reason = f"AI ({confidence}): {str(answer.get('reason', '')).strip()}"
-                        verdicts[index] = (bool(answer.get("same")), reason)
-        except AIError as exc:
-            errors.append(f"brani duplicati: {exc}")
-            log.warning("Confronto dei brani duplicati con l'AI non riuscito: %s", exc)
-        start += AI_PAIRS_BATCH
-    result = (verdicts, errors)
-    return result
-
-
 class _Clusters:
     """Gruppi di file dello stesso brano (unione di coppie)."""
 
@@ -1031,15 +957,15 @@ def _copy_line(tracks: list, prints: dict) -> str:
 
 def detect_same_songs(tracks: list, fingerprints: dict, provider=None, progress: Optional[ProgressFn] = None,
                       cancel: Optional[threading.Event] = None, skip: frozenset = frozenset()) -> tuple:
-    """Lo stesso brano in più file, anche in album diversi: (problemi, errori dell'AI). Una copia per formato (lo
-    stesso brano in FLAC e in MP3) non si segnala: tenere un album in più formati va bene.
+    """Lo stesso brano più volte nello stesso album e nello stesso formato: (problemi, errori). Una copia in un altro
+    formato (FLAC e MP3) o in un altro album (una raccolta) non si segnala.
       * stesso audio (impronta): certo;
-      * stesso artista e titolo, durata entro 2 secondi, audio diverso (un MP3 e un FLAC, due codifiche): lo stesso
-        brano, se titolo e album non nominano versioni diverse (live, remix, demo…);
-      * con versioni diverse nominate la coppia è dubbia: decide l'AI, se c'è (solo queste coppie, mai tutti i brani);
-        senza AI resta "da controllare".
-    Un problema per artista, una riga per brano; nessuna correzione: quale copia tenere lo decide l'utente. skip: i
-    file già segnalati come doppi nello stesso album."""
+      * stesso artista e titolo, durata entro 2 secondi, audio diverso (due codifiche): lo stesso brano, se titolo e
+        album non nominano versioni diverse (live, unplugged, remix, demo…);
+      * con versioni diverse nominate sono due registrazioni (tenute apposta): non si segnalano.
+    provider non si usa più (le coppie dubbie le decideva l'AI): resta per chi chiama. Un problema per artista, una
+    riga per brano; nessuna correzione: quale copia tenere lo decide l'utente. skip: i file già segnalati come doppi
+    nello stesso album."""
     clusters = _Clusters()
     by_print = {}
     for track in tracks:
@@ -1049,21 +975,13 @@ def detect_same_songs(tracks: list, fingerprints: dict, provider=None, progress:
     for group in by_print.values():
         for other in group[1:]:
             clusters.join(group[0], other)
-    doubtful = []
-    for first, second in suspicious_pairs(tracks, fingerprints):
-        if str(first.path) not in skip and str(second.path) not in skip:
-            if version_marks(first) == version_marks(second):
-                clusters.join(first, second)
-            elif _same_place(first, second):          # le altre coppie dubbie non sarebbero comunque un doppione
-                doubtful.append((first, second))
-    verdicts = {}
     errors = []
-    if provider is not None and doubtful and not is_cancelled(cancel):
-        verdicts, errors = ai_pairs(provider, doubtful[:AI_MAX_PAIRS], progress, cancel)
-    for index, (first, second) in enumerate(doubtful):
-        same, reason = verdicts.get(index, (True, "da controllare: forse versioni diverse"))
-        if same:
-            clusters.join(first, second, reason)
+    for first, second in suspicious_pairs(tracks, fingerprints):
+        # versioni diverse nominate nel titolo o nell'album ("Piove" e "Piove (Unplugged)"): due registrazioni,
+        # tenute apposta; non è un doppione e non serve chiedere all'AI
+        same_version = version_marks(first) == version_marks(second)
+        if str(first.path) not in skip and str(second.path) not in skip and same_version:
+            clusters.join(first, second)
     by_artist = {}
     for members, notes in clusters.groups():
         # un doppione è lo stesso brano due volte nello stesso album e nello stesso formato: una copia in un altro
@@ -1103,9 +1021,6 @@ def detect_same_songs(tracks: list, fingerprints: dict, provider=None, progress:
                   f"lo stesso brano in un altro album (una raccolta) non si segnalano.\n{listed}")
         issues.append(Issue(KIND_DUPLICATE, SEVERITY_LOW, f"{artist}: {_tracks_text(len(songs))} in più copie",
                             detail, files, origin=ORIGIN_AI if used_ai else ORIGIN_RULE, rule_id=f"R15.{number}"))
-    if len(doubtful) > AI_MAX_PAIRS and provider is not None:
-        errors.append(f"brani duplicati: l'AI ha visto le prime {AI_MAX_PAIRS} coppie dubbie su {len(doubtful)}; le "
-                      "altre sono segnate \"da controllare\"")
     result = (issues, errors)
     return result
 
@@ -1586,10 +1501,11 @@ def _stopped(report: ScanReport, stage: str) -> None:
 # --------------------------------------------------------------------------- cosa fare
 
 CHECK_ONLINE = "Verifica online questi album"
-_MANUAL_DUPLICATE = ("Mostra i brani e decidi tu: l'album originale e una raccolta, o un MP3 e un FLAC tenuti apposta, "
-                     "vanno bene così. Un doppione vero spostalo fuori dalle cartelle della musica con Esplora file "
-                     "(il programma non cancella i file del PC). Per i doppioni sull'iPhone: scheda iPhone, Mostra → "
-                     "\"Doppioni: stessa canzone nello stesso album\".")
+_MANUAL_DUPLICATE = ("Mostra i brani. Se sono davvero lo stesso brano, tieni una copia e sposta l'altra fuori dalle "
+                     "cartelle della musica con Esplora file (il programma non cancella i file del PC). Se sono due "
+                     "versioni diverse tenute apposta, scrivi la versione nel titolo (Cambia i tag: \"(Live)\", "
+                     "\"(Unplugged)\"…) e non saranno più segnalate. Per i doppioni sull'iPhone: scheda iPhone, "
+                     "Mostra → \"Doppioni: stessa canzone nello stesso album\".")
 _MANUAL_UNREADABLE = ("Mostra i brani e prova ad aprirli in Esplora file. Se sono su OneDrive: tasto destro → Mantieni "
                       "sempre su questo dispositivo. Se sono danneggiati, ricopiali dall'originale o riscaricali, poi "
                       "Rileggi (F5).")

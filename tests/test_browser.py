@@ -293,3 +293,26 @@ def test_clipboard_menu_copies_folder_names_and_paths():
     actions["Percorso della cartella (2)"].trigger()
     assert app.clipboard().text().splitlines() == [str(paths[0].parent), str(paths[2].parent)]
     assert said[-1] == "Copiati negli appunti i percorsi di 2 cartelle"
+
+
+def test_changing_an_album_row_is_not_a_click_on_its_iphone_tick():
+    """Una spunta "sull'iPhone" a metà (album solo in parte sull'iPhone) non deve diventare "toglilo" quando la riga
+    cambia per altro (l'icona della Verifica online): era successo, con 45 brani messi in coda da eliminare."""
+    from types import SimpleNamespace
+    _app = QApplication.instance() or QApplication([])
+    browser = LibraryBrowser()
+    browser.phone_state = lambda tracks: (Qt.PartiallyChecked, False)
+    browser.set_data(group_by_album(_tracks()), {})
+    emitted = []
+    browser.phone_toggled.connect(lambda tracks, checked: emitted.append((len(tracks), checked)))
+    result = SimpleNamespace(status="incomplete", status_text=lambda: "Incompleto")
+    browser.refresh_check_icons({("Queen", "Innuendo"): result})
+    item = None
+    for index in range(browser.albums.topLevelItemCount()):
+        if browser.albums.topLevelItem(index).data(0, KEY_ROLE) == ("Queen", "Innuendo"):
+            item = browser.albums.topLevelItem(index)
+    item.setToolTip(0, "un altro cambio della riga")                 # anche senza segnali fermi: niente
+    item.setText(0, "Innuendo")
+    assert emitted == []
+    item.setCheckState(0, Qt.Unchecked)                              # il clic vero sulla spunta
+    assert emitted == [(3, False)]

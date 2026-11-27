@@ -32,6 +32,7 @@ from ..i18n import tr
 
 SORT_ROLE = Qt.UserRole + 1    # il valore con cui si ordina una colonna (testo minuscolo o numero)
 KEY_ROLE = Qt.UserRole         # l'artista, o la coppia (artista, album)
+SHOWN_CHECK_ROLE = Qt.UserRole + 2   # lo stato della spunta "sull'iPhone" com'è stato mostrato (per riconoscere un clic)
 
 
 class SortableItem(QTreeWidgetItem):
@@ -180,8 +181,10 @@ class LibraryBrowser(QWidget):
         self.albums.blockSignals(False)
 
     def refresh_check_icons(self, check_results: dict) -> None:
-        """Le icone di Verifica album online, man mano che arrivano gli esiti (senza rifare gli elenchi)."""
+        """Le icone di Verifica album online, man mano che arrivano gli esiti (senza rifare gli elenchi). Con i segnali
+        fermi: cambiare l'icona di una riga non è un clic sulla sua spunta "sull'iPhone"."""
         self._check_results = check_results
+        self.albums.blockSignals(True)
         for index in range(self.albums.topLevelItemCount()):
             item = self.albums.topLevelItem(index)
             key = item.data(0, KEY_ROLE)
@@ -189,6 +192,7 @@ class LibraryBrowser(QWidget):
             if result is not None:
                 item.setIcon(0, status_icon(self, result.status))
                 item.setToolTip(0, result.status_text())
+        self.albums.blockSignals(False)
 
     # ------------------------------------------------------------------ spunte "sull'iPhone"
 
@@ -215,12 +219,14 @@ class LibraryBrowser(QWidget):
         if state is None:
             item.setFlags(item.flags() & ~Qt.ItemIsUserCheckable)
             item.setData(0, Qt.CheckStateRole, None)
+            item.setData(0, SHOWN_CHECK_ROLE, None)
             font.setItalic(False)
             item.setForeground(0, QBrush())
         else:
             check, waiting = state
             item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
             item.setCheckState(0, check)
+            item.setData(0, SHOWN_CHECK_ROLE, int(check.value if hasattr(check, "value") else check))
             font.setItalic(waiting)
             item.setForeground(0, QBrush(QColor(40, 110, 230)) if waiting else QBrush())
         item.setFont(0, font)
@@ -236,10 +242,16 @@ class LibraryBrowser(QWidget):
             widget.blockSignals(False)
 
     def _item_changed(self, item, column: int) -> None:
+        """La spunta "sull'iPhone" cliccata. Solo se il suo stato è cambiato davvero rispetto a quello mostrato:
+        un'altra modifica della riga (icona, testo, colore) non mette niente in attesa."""
         if column == 0 and self.phone_state is not None and not getattr(item, "pinned", False):
-            tracks = self.tracks_of(item)
+            check = item.checkState(0)
+            now = int(check.value if hasattr(check, "value") else check)
+            shown = item.data(0, SHOWN_CHECK_ROLE)
+            tracks = self.tracks_of(item) if shown is not None and now != shown else []
             if tracks:
-                self.phone_toggled.emit(tracks, item.checkState(0) == Qt.Checked)
+                item.setData(0, SHOWN_CHECK_ROLE, now)
+                self.phone_toggled.emit(tracks, check == Qt.Checked)
 
     # ------------------------------------------------------------------ tasto destro
 

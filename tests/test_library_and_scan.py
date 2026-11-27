@@ -316,32 +316,14 @@ def _song(path, title, artist, album, length):
     return result
 
 
-class PairsProvider:
-    """Un'AI finta per le coppie: "diverse" quando un lato dice live."""
-
-    def __init__(self):
-        self.profile = type("P", (), {"name": "finta"})()
-        self.seen = ""
-
-    def ask_json(self, system, user, schema):
-        self.seen += user
-        answers = []
-        lines = user.splitlines()
-        for index, line in enumerate(lines):
-            if line.startswith("P") and line[1:].isdigit():
-                live = "live" in (lines[index + 1] + lines[index + 2]).lower()
-                answers.append({"pair": line, "same": not live, "confidence": "high", "reason": "finta"})
-        return {"pairs": answers}
-
-
-def test_same_songs_by_fingerprint_and_by_tags_with_ai():
-    """Un doppione è lo stesso brano due volte nello stesso album e nello stesso formato; la copia in FLAC e quella in
-    una raccolta vanno bene."""
+def test_same_songs_by_fingerprint_and_by_tags():
+    """Un doppione è lo stesso brano due volte nello stesso album e nello stesso formato; la copia in FLAC, quella in
+    una raccolta e una versione nominata nel titolo ("Unplugged", "live") vanno bene."""
     tracks = [_song("C:/m/Dalla/Album/01 - Caruso.mp3", "Caruso", "Lucio Dalla", "Album", 300.0),
               _song("C:/m/Raccolte/Hits/07 - Caruso.mp3", "Caruso (remaster)", "Lucio Dalla", "Hits", 300.4),
               _song("C:/m/Dalla/Album/02 - Caruso.flac", "Caruso", "Lucio Dalla", "Album", 301.0),
               _song("C:/m/Dalla/Album/04 - Caruso.mp3", "Caruso", "Lucio Dalla", "Album", 300.1),
-              _song("C:/m/Dalla/Album/05 - Caruso.mp3", "Caruso (live)", "Lucio Dalla", "Album", 301.5),
+              _song("C:/m/Dalla/Album/05 - Caruso.mp3", "Caruso (Unplugged)", "Lucio Dalla", "Album", 301.5),
               _song("C:/m/Dalla/Album/03 - Altro.mp3", "Altro", "Lucio Dalla", "Album", 200.0)]
     prints = {str(tracks[0].path): "mp3:a", str(tracks[1].path): "mp3:a", str(tracks[2].path): "flac:b",
               str(tracks[3].path): "mp3:a", str(tracks[4].path): "mp3:c", str(tracks[5].path): "mp3:d"}
@@ -349,16 +331,12 @@ def test_same_songs_by_fingerprint_and_by_tags_with_ai():
     names = sorted(sorted((a.path.name, b.path.name)) for a, b in pairs)
     assert ["01 - Caruso.mp3", "07 - Caruso.mp3"] not in names                  # stesso audio: non è sospetto
     assert ["02 - Caruso.flac", "05 - Caruso.mp3"] in names                     # entro 2 s, audio diverso
-    provider = PairsProvider()
-    issues, errors = scan.detect_same_songs(tracks, prints, provider)
+    issues, errors = scan.detect_same_songs(tracks, prints)
     assert errors == [] and len(issues) == 1
     issue = issues[0]
     assert issue.kind == scan.KIND_DUPLICATE and issue.fix is None and issue.title.startswith("Lucio Dalla")
     assert {path.name for path in issue.files} == {"01 - Caruso.mp3", "04 - Caruso.mp3"}   # stesso album, MP3
-    assert "07 - Caruso.mp3" not in provider.seen and "Caruso.flac" not in provider.seen  # altri album e formati: no AI
-    plain, _errors = scan.detect_same_songs(tracks, prints)                       # senza AI: da controllare
-    assert "da controllare" in plain[0].detail and "05 - Caruso.mp3" in {p.name for p in plain[0].files}
-    assert "02 - Caruso.flac" not in {p.name for p in plain[0].files}
+    assert "da controllare" not in issue.detail                                # l'Unplugged è un'altra registrazione
 
 
 def test_only_chosen_checks_run(tmp_path):

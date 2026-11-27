@@ -1527,10 +1527,10 @@ CATALOG = {
         "tracks without title, album or artist",
     "file danneggiati, bloccati o disponibili solo online":
         "damaged, locked or online-only files",
-    "lo stesso brano due volte nello stesso album e formato: stesso audio anche con tag diversi, oppure stessa durata, titolo e artista; una copia in un altro formato (FLAC e MP3) o in un altro album va bene; l'AI guarda solo le coppie sospette":
+    "lo stesso brano due volte nello stesso album e formato: stesso audio anche con tag diversi, oppure stessa durata, titolo e artista; vanno bene una copia in un altro formato (FLAC e MP3) o in un altro album, e le versioni nominate nel titolo (Unplugged, Live, Remix…)":
         "the same track twice in the same album and format: same audio even with different tags, or same duration, "
-        "title and artist; a copy in another format (FLAC and MP3) or in another album is fine; the AI looks only at "
-        "the suspicious pairs",
+        "title and artist; a copy in another format (FLAC and MP3) or in another album is fine, and so are the "
+        "versions named in the title (Unplugged, Live, Remix…)",
     "Lo stesso brano più volte nello stesso album e nello stesso formato: di solito una copia in più da togliere; quale tenere lo decidi tu (Mostra i brani). Le copie in un altro formato (FLAC e MP3) e lo stesso brano in un altro album (una raccolta) non si segnalano.\n{0}":
         "The same track several times in the same album and the same format: usually an extra copy to remove; you "
         "decide which one to keep (Show the tracks). Copies in another format (FLAC and MP3) and the same track in "
@@ -1999,10 +1999,12 @@ CATALOG = {
     "<br>Per gli album dei problemi trovati da Controlla la musica: selezionali nei risultati e premi <i>Verifica online questi album</i>.":
         "<br>For the albums of the problems found by Check the music: select them in the results and press <i>Check "
         "these albums online</i>.",
-    "Mostra i brani e decidi tu: l'album originale e una raccolta, o un MP3 e un FLAC tenuti apposta, vanno bene così. Un doppione vero spostalo fuori dalle cartelle della musica con Esplora file (il programma non cancella i file del PC). Per i doppioni sull'iPhone: scheda iPhone, Mostra → \"Doppioni: stessa canzone nello stesso album\".":
-        "Show the tracks and decide: the original album and a compilation, or an MP3 and a FLAC kept on purpose, are "
-        "fine. Move a real duplicate out of the music folders with File Explorer (the program never deletes files on "
-        "the PC). For the duplicates on the iPhone: iPhone tab, Show → \"Duplicates: same song in the same album\".",
+    "Mostra i brani. Se sono davvero lo stesso brano, tieni una copia e sposta l'altra fuori dalle cartelle della musica con Esplora file (il programma non cancella i file del PC). Se sono due versioni diverse tenute apposta, scrivi la versione nel titolo (Cambia i tag: \"(Live)\", \"(Unplugged)\"…) e non saranno più segnalate. Per i doppioni sull'iPhone: scheda iPhone, Mostra → \"Doppioni: stessa canzone nello stesso album\".":
+        "Show the tracks. If they really are the same track, keep one copy and move the other out of the music "
+        "folders with File Explorer (the program never deletes files on the PC). If they are two different versions "
+        "kept on purpose, write the version in the title (Change the tags: \"(Live)\", \"(Unplugged)\"…) and they will "
+        "not be reported any more. For the duplicates on the iPhone: iPhone tab, Show → \"Duplicates: same song in "
+        "the same album\".",
     "Mostra i brani e prova ad aprirli in Esplora file. Se sono su OneDrive: tasto destro → Mantieni sempre su questo dispositivo. Se sono danneggiati, ricopiali dall'originale o riscaricali, poi Rileggi (F5).":
         "Show the tracks and try to open them in File Explorer. If they are on OneDrive: right click → Always keep on "
         "this device. If they are damaged, copy them again from the original or download them again, then Reload "
