@@ -453,3 +453,31 @@ def test_an_album_chosen_in_part_is_judged_whole():
     assert scan.detect_few_tracks(chosen, everything) == []
     report = scan.scan_tracks(chosen, "prova", check_files=False, album_context=everything)
     assert [issue.rule_id for issue in report.issues if issue.kind == scan.KIND_FEW_TRACKS] == []
+
+
+def test_the_same_box_set_in_two_formats_numbered_differently():
+    """Lo stesso cofanetto in FLAC (ogni disco da 1) e in MP3 (numerato di seguito): ogni copia è completa, insieme
+    sembrerebbero centinaia di numeri mancanti. Si conta copia per copia, vale la più completa."""
+    from pathlib import Path
+    from myeasymp3toiphone.library import Track
+
+    tracks = []
+    running = 0
+    for disc, size in ((1, 4), (2, 5), (3, 3)):
+        for number in range(1, size + 1):
+            running += 1
+            for suffix, track_number, total in ((".flac", number, size), (".mp3", running, 12)):
+                tags = TrackTags(title=f"Brano {running}", artist="Artisti vari", album="Successi Finti",
+                                 track_number=track_number, track_total=total, disc_number=disc, disc_total=3)
+                tracks.append(Track(path=Path(f"C:/m/Successi/{disc}-{number:02d}{suffix}"), tags=tags))
+    assert scan.track_gaps(tracks) != []                                       # mescolate: "mancano" numeri
+    gaps, copy = scan.album_gaps(tracks)
+    assert gaps == [] and len(copy) == 12
+    assert scan.detect_few_tracks(tracks) == []
+    incomplete = [track for track in tracks if not (track.path.suffix == ".mp3" and track.tags.track_number == 7)]
+    gaps, copy = scan.album_gaps(incomplete)
+    assert gaps == [] and copy[0].path.suffix == ".flac"                       # il FLAC è completo: vale quello
+    single = [Track(path=Path(f"C:/m/Singolo/01{suffix}"), tags=TrackTags(title="Uno", artist="Cantante Finto",
+                                                                           album="Singolo Finto", track_number=1))
+              for suffix in (".flac", ".mp3")]
+    assert [issue.title for issue in scan.detect_few_tracks(single)] == ["Cantante Finto — Singolo Finto: solo 1 brano"]

@@ -465,6 +465,27 @@ def track_gaps(album_tracks: list) -> list:
     return result
 
 
+def album_gaps(album_tracks: list) -> tuple:
+    """(numeri mancanti, brani della copia contata): un album tenuto in più formati (FLAC e MP3) sono più copie,
+    magari numerate in modo diverso (una disco per disco, l'altra di seguito): i numeri si contano copia per copia e
+    vale la più completa (a parità, quella con più brani)."""
+    by_format = {}
+    for track in album_tracks:
+        by_format.setdefault(track.path.suffix.casefold(), []).append(track)
+    best_gaps = None
+    best_copy = album_tracks
+    for suffix in sorted(by_format):
+        copy = by_format[suffix]
+        gaps = track_gaps(copy)
+        better = best_gaps is None or len(gaps) < len(best_gaps) or \
+            (len(gaps) == len(best_gaps) and len(copy) > len(best_copy))
+        if better:
+            best_gaps = gaps
+            best_copy = copy
+    result = (best_gaps or [], best_copy)
+    return result
+
+
 def _with_context(album_tracks: list, context: dict) -> list:
     """I brani dell'album controllati e quelli dello stesso album fuori dalla scelta (context: {(artista, album) in
     minuscolo: [brani]}), una volta sola."""
@@ -496,8 +517,8 @@ def detect_few_tracks(tracks: list, context: Optional[list] = None) -> list:
         album_tracks = _with_context(groups[key], by_key) if by_key else groups[key]
         if album != UNKNOWN_ALBUM:
             number += 1
-            gaps = track_gaps(album_tracks)
-            count = len(album_tracks)
+            gaps, copy = album_gaps(album_tracks)
+            count = len(copy)
             files = [track.path for track in album_tracks]
             # FLAC + CUE: un file solo con tutte le tracce, i numeri "mancanti" sono dentro (cue.py)
             whole_disc = bool(gaps or count <= 2) and cue.all_images(album_tracks)
@@ -1218,7 +1239,7 @@ def album_lines(groups: dict, keys: list) -> list:
         declared = max([t.tags.track_total or 0 for t in album_tracks] + [0])
         artists = sorted({t.tags.artist for t in album_tracks if t.tags.artist and t.tags.artist != key[0]})
         folder = "/".join(album_tracks[0].path.parent.parts[-2:])
-        missing = ",".join(track_gaps(album_tracks)[:20]) or "nessuno"
+        missing = ",".join(album_gaps(album_tracks)[0][:20]) or "nessuno"
         text = (f"A{index} | album artist: {key[0]} | album: {key[1]} | anni: {','.join(years) or '-'} | brani: "
                 f"{len(album_tracks)} | numeri: {_numbers_text(album_tracks)} | totale dichiarato: {declared or '-'} "
                 f"| mancanti: {missing} | cartella: {folder} | generi: {','.join(genres) or '-'}")
