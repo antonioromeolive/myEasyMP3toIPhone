@@ -51,6 +51,7 @@ KIND_DUPLICATE = "duplicato"
 KIND_MISSING_TAGS = "tag_mancanti"
 KIND_UNREADABLE = "illeggibile"
 KIND_ONLY_ON_DEVICE = "solo_su_iphone"
+KIND_ONLINE = "catalogo_online"          # Verifica online: tag diversi da quelli del catalogo
 KIND_LABELS = {
     KIND_NOT_UPDATED: "File che non si aggiornano",
     KIND_FEW_TRACKS: "Album con pochi brani",
@@ -59,6 +60,7 @@ KIND_LABELS = {
     KIND_MISSING_TAGS: "Tag mancanti",
     KIND_UNREADABLE: "File illeggibili",
     KIND_ONLY_ON_DEVICE: "Solo sull'iPhone",
+    KIND_ONLINE: "Diversi dal catalogo online",
 }
 AI_KINDS = (KIND_NOT_UPDATED, KIND_FEW_TRACKS, KIND_SPLIT, KIND_DUPLICATE, KIND_MISSING_TAGS)
 
@@ -69,6 +71,7 @@ SEVERITY_ORDER = {SEVERITY_HIGH: 0, SEVERITY_MEDIUM: 1, SEVERITY_LOW: 2}
 
 ORIGIN_RULE = "regola"
 ORIGIN_AI = "AI"
+ORIGIN_ONLINE = "online"
 
 FIX_TAGS = "tags"            # modifiche dei tag: restano in sospeso (overlay), i file sul PC non cambiano
 
@@ -1357,25 +1360,56 @@ def ai_review(provider, tracks: list, issues: list, progress: Optional[ProgressF
 
 # --------------------------------------------------------------------------- scansione completa
 
+def albums_of_issues(issues: list, tracks: list) -> set:
+    """Gli album (album_key) dei brani toccati dai problemi."""
+    by_path = {}
+    for track in tracks:
+        by_path[str(track.path)] = track
+    result = set()
+    for issue in issues:
+        for path in issue.files:
+            track = by_path.get(str(path))
+            if track is not None:
+                result.add(track.album_key)
+    return result
+
+
+def tracks_of_albums(tracks: list, albums: set) -> list:
+    result = []
+    for track in tracks:
+        if track.album_key in albums:
+            result.append(track)
+    return result
+
+
 def scan_tracks(tracks: list, target: str, provider=None, check_files: bool = True,
                 phone_tracks: Optional[list] = None, library_tracks: Optional[list] = None,
                 progress: Optional[ProgressFn] = None, cancel: Optional[threading.Event] = None,
                 checks: frozenset = ALL_CHECKS, fingerprints: Optional[dict] = None,
-                musicbrainz=None) -> ScanReport:
+                musicbrainz=None, ai_flagged_only: bool = False, keep_phone_fixes: bool = False) -> ScanReport:
     """Il controllo: le regole dei controlli scelti (checks), poi l'AI se c'è un fornitore. Con phone_tracks (la
     musica dell'app Musica, i cui brani sono anche tracks) è dell'iPhone, confrontato con library_tracks.
     fingerprints: {percorso: impronta dell'audio} per i brani duplicati (senza, solo quelli sospetti per i tag).
-    musicbrainz: un albumcheck.MusicBrainzClient per controllare anche lì i nomi d'artista dubbi (lento)."""
+    musicbrainz: un albumcheck.MusicBrainzClient per controllare anche lì i nomi d'artista dubbi (lento).
+    ai_flagged_only: l'AI guarda solo gli album dove le regole hanno trovato qualcosa (nessuno: niente AI). Senza
+    controlli scelti (Solo AI) l'AI guarda tutti gli album e ogni suo problema si tiene.
+    keep_phone_fixes: le correzioni dei brani dell'iPhone restano (la linguetta Controlli le applica dalla parte giusta);
+    senza, si tolgono e il dettaglio dice di correggere sul PC."""
     assign_groups(tracks)
     report = ScanReport(target=target, tracks_scanned=len(tracks), albums_scanned=len(group_by_album(tracks)))
     issues = rule_issues(tracks, check_files, progress, cancel, checks)
-    if provider is not None and not is_cancelled(cancel) and checks & AI_REVIEW_CHECKS:
-        report.ai_profile = provider.profile.name
-        found, errors = ai_review(provider, tracks, issues, progress, cancel)
-        for issue in drop_repeated(found, issues):
-            if enabled(issue, checks):
-                issues.append(issue)
-        report.ai_errors = errors
+    only_ai = not checks
+    if provider is not None and not is_cancelled(cancel) and (checks & AI_REVIEW_CHECKS or only_ai):
+        reviewed = tracks
+        if ai_flagged_only and not only_ai:
+            reviewed = tracks_of_albums(tracks, albums_of_issues(issues, tracks))
+        if reviewed:
+            report.ai_profile = provider.profile.name
+            found, errors = ai_review(provider, reviewed, issues, progress, cancel)
+            for issue in drop_repeated(found, issues):
+                if only_ai or enabled(issue, checks):
+                    issues.append(issue)
+            report.ai_errors = errors
     if CHECK_VARIANTS in checks and not is_cancelled(cancel):
         if progress is not None:
             progress(0, 0, "nomi d'artista dubbi")
@@ -1396,11 +1430,12 @@ def scan_tracks(tracks: list, target: str, provider=None, check_files: bool = Tr
         if provider is not None:
             report.ai_profile = provider.profile.name
     if phone_tracks is not None:
-        # sull'iPhone il programma non scrive: le correzioni si fanno sui brani del PC
-        for issue in issues:
-            if issue.fix is not None:
-                issue.fix = None
-                issue.detail += " Correggi i brani sul PC (scheda PC)."
+        if not keep_phone_fixes:
+            # senza la linguetta Controlli (console): le correzioni si fanno sui brani del PC
+            for issue in issues:
+                if issue.fix is not None:
+                    issue.fix = None
+                    issue.detail += " Correggi i brani sul PC (scheda PC)."
         if library_tracks is not None:
             for issue in compare_with_library(phone_tracks, library_tracks):
                 if enabled(issue, checks):
@@ -1463,6 +1498,11 @@ ADVICE = {
     "I3": _ONLY_ON_DEVICE,
     "I4": "Scheda iPhone: Mostra → \"Senza file sull'iPhone (fantasmi)\", seleziona i brani, Elimina dall'iPhone e "
           "Applica.",
+    "W1": "Se i brani ti servono, aggiungili alla cartella dell'album. Se l'edizione trovata non è la tua, Dettagli "
+          "della verifica online per sceglierne un'altra.",
+    "W2": "Applica le correzioni scelte scrive i tag del catalogo. Controlla prima l'edizione (Dettagli della verifica "
+          "online): se non è la tua, sceglierne un'altra cambia le correzioni.",
+    "W3": "Controlla che artista e album siano scritti bene, poi riprova; oppure prova un altro catalogo.",
 }
 # i problemi trovati dall'AI (senza una regola): per tipo
 KIND_ADVICE = {
@@ -1474,6 +1514,7 @@ KIND_ADVICE = {
     KIND_MISSING_TAGS: _MANUAL_TAGS,
     KIND_UNREADABLE: _MANUAL_UNREADABLE,
     KIND_ONLY_ON_DEVICE: _ONLY_ON_DEVICE,
+    KIND_ONLINE: "Applica le correzioni scelte scrive i tag del catalogo; controlla prima l'edizione.",
 }
 
 

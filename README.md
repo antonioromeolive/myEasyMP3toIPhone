@@ -6,7 +6,7 @@ trovare i problemi della libreria (anche con l'AI) e trasferire la musica da e v
 - [Installazione](#installazione)
 - [Funzioni](#funzioni)
 - [Controlla la musica](#controlla-la-musica)
-- [Verifica album online](#verifica-album-online)
+- [Verifica online](#verifica-online)
 - [L'iPhone](#liphone)
 - [Le suonerie](#le-suonerie)
 - [L'AI: profili e chiavi](#lai-profili-e-chiavi)
@@ -33,7 +33,7 @@ Per l'iPhone serve l'app gratuita **Dispositivi Apple** dal Microsoft Store (opp
 ## Funzioni
 
 > **I file sul PC cambiano solo se lo approvi.** Il programma non sposta e non cancella mai i file delle cartelle che
-> apri (compresa la Libreria). Le modifiche dei tag, fatte a mano, dalla scansione o da *Verifica album online*, restano
+> apri (compresa la Libreria). Le modifiche dei tag, fatte a mano, dai Controlli o dalla *Verifica online*, restano
 > **in sospeso** nella cartella dati e valgono per le **copie**: quelle inviate all'iPhone, esportate o importate.
 > Si scrive in un file del PC solo con **Usa i tag da iPhone a PC** (scheda iPhone) e con la scelta **Anche nei
 > file del PC…** delle correzioni (*Applica la correzione* di Controlla la musica, *Correggi tag* di Verifica album
@@ -57,8 +57,8 @@ Per l'iPhone serve l'app gratuita **Dispositivi Apple** dal Microsoft Store (opp
 
 Quattro linguette: **PC** (i brani delle cartelle aperte), **iPhone** (la musica dell'app *Musica* dell'iPhone, vedi
 [L'iPhone](#liphone)), **Suonerie** (i `.m4r` del PC e le suonerie dell'iPhone, vedi [Le suonerie](#le-suonerie)) e
-**Controlli** (*Controlla la musica* e *Verifica album online*, con i loro risultati: vedi
-[Controlla la musica](#controlla-la-musica) e [Verifica album online](#verifica-album-online)).
+**Controlli** (*Controlla la musica*, con l'AI e la Verifica online, e i risultati per album: vedi
+[Controlla la musica](#controlla-la-musica) e [Verifica online](#verifica-online)).
 
 | Pulsante | Cosa fa |
 |---|---|
@@ -87,7 +87,7 @@ sull'intestazione:
 
 - **Artisti** (artista, numero di album, numero di brani): sceglierne uno (o più, con Ctrl/Maiusc) filtra l'elenco
   Album sui suoi album e la tabella sui suoi brani;
-- **Album** (album, artista, anno, brani; l'icona dice l'esito di *Verifica album online*): sceglierne uno (o più) mostra
+- **Album** (album, artista, anno, brani; l'icona dice l'esito della *Verifica online*): sceglierne uno (o più) mostra
   solo quei brani; con un album solo scelto e nessun brano selezionato in tabella, a destra compaiono la sua
   copertina e il suo nome (quella del primo dei suoi brani che ne ha una);
 - la riga **(Tutti …)**, sempre in cima, toglie il filtro; scegliere un artista (o "(Tutti)") azzera l'album scelto
@@ -106,7 +106,7 @@ sull'intestazione:
 - gli stessi due elenchi ci sono anche nella scheda iPhone, sopra i brani, con le voci del tasto destro sui brani
   dell'iPhone (vedi [L'iPhone](#liphone));
 - **Formato** (accanto a *Cerca*): solo MP3, FLAC, M4A, OGG/Opus o WMA/WAV/AIFF, con il numero di brani di
-  ciascuno. Vale per gli elenchi, la tabella, *Esporta*, *Verifica album online*, *Controlla la musica* e l'invio
+  ciascuno. Vale per gli elenchi, la tabella, *Esporta*, i *Controlli* e l'invio
   all'app Musica.
 - **Rileggi** (F5, in alto a destra): rilegge la cartella aperta, cioè i file nuovi, tolti o cambiati (gli altri dalla
   cache dei tag); con **Maiusc** premuto rilegge tutti i file da zero.
@@ -133,7 +133,7 @@ attesa e quanti sono abbinati solo per i tag (≈). L'**editor dei tag** si chiu
 *Cambia i tag* o il tasto **E**.
 
 La tabella dei brani si ordina cliccando sull'intestazione di una colonna (Artista, Album, Titolo, Anno…); finché non
-la clicchi i brani sono in ordine di artista, album, disco e traccia. *Esporta*, *Verifica album online* e *Invia all'app Musica*
+la clicchi i brani sono in ordine di artista, album, disco e traccia. *Esporta*, i *Controlli* e *Invia all'app Musica*
 senza brani selezionati in tabella usano l'artista o l'album scelti negli elenchi.
 
 **Scorciatoie** sulla tabella dei brani (per i brani selezionati o, se non ce n'è nessuno, per quello su cui sei;
@@ -143,7 +143,7 @@ mentre scrivi in *Cerca* o nell'editor valgono come tasti normali):
 - **Canc**: **Elimina dall'iPhone**, in attesa fino ad *Applica* (nella scheda PC i brani che ci sono con la
   sorgente associata). I file del PC non si cancellano mai;
 - **F5**, in tutta la finestra: **Rileggi** della scheda che vedi (PC: rilegge la cartella; iPhone: rilegge la sua
-  musica). *Verifica album online* è **F7**, *Controlla la musica* **F6**.
+  musica). **F6** apre i *Controlli* (dalla scheda iPhone, sull'iPhone), **F7** li apre con la *Verifica online* accesa.
 
 Artisti e album che differiscono solo per maiuscole, accenti o spazi ("Queen" e "queen") sono un gruppo solo, mostrato
 con la grafia più usata (a parità, quella con le maiuscole). Anche "AA.VV.", "Artisti vari", "Various Artists", "VA" e
@@ -298,40 +298,70 @@ OneDrive…) compare in rosso, con il motivo nel suggerimento, e non interrompe 
 
 ## Controlla la musica
 
-*Controlla la musica* (linguetta **Controlli**, riquadro a sinistra; **F6** la apre, la "scansione") analizza i brani
-aperti nella scheda PC, oppure la musica dell'app *Musica* dell'iPhone confrontata con le cartelle della musica del PC
-(si può fare anche a iPhone disconnesso, con l'ultimo elenco letto). Nel riquadro scegli **quali controlli
-fare** (le caselle della tabella qui sotto, ognuna con una riga di spiegazione; le scelte si ricordano). Prima
-applica delle regole locali, veloci e gratuite; poi, se scegli di usarla, l'AI. Il rapporto resta in
-`.myEasyMP3toIPhone\scansioni\`; **Avvia il controllo** lo fa partire e i risultati compaiono sotto, in *Risultati del
-controllo*. Ogni problema può avere una **correzione**: si applica dai risultati, dopo
-una conferma, come **modifiche in sospeso** (vanno sulle copie inviate all'iPhone). La conferma chiede dove: **Solo
-per l'iPhone** (i file sul PC non cambiano) o **Anche nei file del PC…**, che mostra prima l'elenco dei file e dei
-campi da approvare, così PC e iPhone restano allineati. Lo stesso vale per *Correggi tag* di Verifica album online; *Mostra
-i brani* li seleziona nella scheda PC. I problemi trovati sull'iPhone non hanno correzioni automatiche: si correggono i
-brani sul PC e poi si usa *Usa i tag da PC a iPhone* o *Ricopia da PC a iPhone*, o si cambiano dalla scheda iPhone
-(tasto destro → *Cambia i tag*).
+La linguetta **Controlli** (**F6**; **F7** la apre con la *Verifica online* accesa) ha in alto le scelte e sotto i
+risultati.
 
-Ogni problema dice **Cosa fare** (nel dettaglio sotto l'elenco e nel rapporto), anche quando non c'è una correzione
-automatica: quale pulsante usare, quando si può ignorare, cosa fare a mano (per esempio spostare un doppione fuori
-dalle cartelle della musica: il programma non cancella i file del PC). **Verifica online questi album** fa partire
-*Verifica album online*, con le scelte del suo riquadro, sugli album interi dei problemi selezionati: utile per gli
-album con pochi brani, per sapere quali mancano.
+**Su cosa.** *PC* (i brani della scheda PC) o *iPhone* (la musica dell'app *Musica*, confrontata con le cartelle della
+musica del PC; anche a iPhone disconnesso, con l'ultimo elenco letto). F6 dalla scheda iPhone sceglie l'iPhone, dalla
+scheda PC il PC. Si controlla **quello che è scelto in quella scheda**, con la regola della barra delle azioni: i brani
+selezionati nella lista; se non ce ne sono, gli artisti o gli album scelti negli elenchi; se non c'è niente, tutto. Il
+riquadro azzurro dice cosa si controlla (per esempio *l'album X scelto nella scheda PC (12 brani)*), con
+**Modifica la selezione nella scheda PC/iPhone** (porta alla scheda) e **Tutto il PC / Tutto l'iPhone** (ignora la
+selezione senza toccarla).
+
+**Cosa controllare** (le scelte si ricordano):
+
+- le **regole** della tabella qui sotto: locali, veloci e gratuite;
+- l'**Analisi AI** (vedi sotto), con la casella **solo sugli album con problemi**: gli album dove le regole non hanno
+  trovato niente non vanno all'AI;
+- la **Verifica online** (i cataloghi su internet, vedi [Verifica online](#verifica-online)), con la stessa casella:
+  accesa è un rimedio per gli album con problemi; spenta controlla tutti gli album (lento);
+- **Solo AI** spegne le regole e la Verifica online e fa partire l'AI su tutto quello che si controlla (senza regole
+  nessun album ha "problemi", quindi la casella *solo sugli album con problemi* non vale).
+
+**Avvia il controllo** lo fa partire (l'avanzamento è nella barra di stato, *Annulla* lo ferma). Il rapporto resta in
+`.myEasyMP3toIPhone\scansioni\`.
+
+**I risultati sono per album**, dal più grave: sotto ogni album i suoi problemi (con la gravità e l'origine: regola, AI,
+online) e, sotto ogni problema, le **correzioni proposte**, una riga per brano e campo (*Ora* → *Diventa*), ognuna con
+la sua casella; la casella del problema e quella dell'album accendono o spengono tutte le loro righe. Un problema che
+tocca più album compare sotto ognuno, con le righe di quell'album. *Dove* dice dove c'è il brano: **PC e iPhone**
+(collegato: il registro della provenienza dice che il brano dell'iPhone viene da quel file), **solo PC**, **solo
+iPhone**. Selezionando un album o un problema, sotto si vedono il dettaglio e **Cosa fare** (anche quando non c'è una
+correzione automatica: quale pulsante usare, quando si può ignorare, cosa fare a mano; per esempio spostare un
+doppione fuori dalle cartelle della musica: il programma non cancella i file del PC). Le correzioni dell'AI su un
+problema che l'AI stessa ritiene falso partono spente.
+
+**Applica le correzioni scelte…** manda ogni correzione dalla parte giusta:
+
+| Il brano è | Sul PC | Sull'iPhone |
+|---|---|---|
+| **PC e iPhone** (collegato) | in sospeso e, con *scrivi nei file* (acceso di serie), nei file dopo l'elenco di ogni file e campo da approvare | *Usa i tag da PC a iPhone*, in attesa (casella, accesa di serie) |
+| **solo PC** | come sopra | — |
+| **solo iPhone** | — | *Cambia i tag sull'iPhone*, in attesa: solo titolo, album, genere, anno, numeri e compilation, e solo per i brani messi da un computer (gli altri campi e brani la finestra li elenca come non possibili) |
+
+Tutto ciò che va sull'iPhone parte con **Applica** (barra blu). Le righe applicate restano, grigie e con ✔. Gli altri
+pulsanti: **Mostra i brani** (li seleziona nella loro scheda), **Controlla di nuovo questi album** (lo stesso controllo,
+solo sugli album scelti nei risultati), **Dettagli della verifica online** (per un album del PC verificato online: le
+tracce dell'edizione e i tuoi file, un'altra edizione, la copertina), **Apri il rapporto**.
 
 | Sintomo | Cosa cerca | Correzione |
 |---|---|---|
 | **File che non si aggiornano** | sull'iPhone, brani con tag diversi da quelli del PC (o delle modifiche in sospeso); MP3 con un vecchio tag ID3v1 diverso o con un tag APE (solo informazione: le copie inviate ne sono ripulite) | sull'iPhone nessuna (la colonna *iPhone* della scheda PC mostra le differenze) |
-| **Album con pochi brani** | numeri di traccia mancanti, meno brani del totale dichiarato, album di 1-2 brani; sull'iPhone, album con meno brani che sul PC | (Verifica album online trova i titoli mancanti) |
+| **Album con pochi brani** | numeri di traccia mancanti, meno brani del totale dichiarato, album di 1-2 brani; sull'iPhone, album con meno brani che sul PC | (la Verifica online trova i titoli mancanti) |
 | **Collezioni divise su più album** | una cartella con brani in album diversi; lo stesso album scritto in modi diversi o con "CD 1"/"Disc 2" nel nome; una compilation senza *Artista album* | unifica album e artista album ("Artisti vari" e la spunta *Compilation* per le compilation), sposta il numero del disco in *N. disco* |
-| **Artisti scritti in modi diversi** | **certo**: le stesse parole a parte maiuscole, accenti, punteggiatura, "The" e ordine ("Battiato Franco" = "Franco Battiato", "AC/DC" = "ACDC"); **dubbio**: solo il cognome ("Battiato"), le iniziali ("F. Battiato"), un errore di battitura: decide l'AI (con album e anni) e, se lo chiedi, MusicBrainz (nomi e alias dell'artista), solo per questi gruppi; senza nessuno dei due restano "forse lo stesso artista", da controllare. **Duetti** ("A & B", "A feat. B", "A, B"): se A c'è anche da solo, artista e artista album diventano A e gli ospiti vanno nel titolo, "Titolo (feat. B)" (l'app Musica non gestisce più artisti); un nome come "Simon & Garfunkel" resta com'è | scrive ovunque la forma **più usata** (quella con più brani); per l'iPhone poi *Usa i tag da PC a iPhone* e *Applica* |
+| **Artisti scritti in modi diversi** | **certo**: le stesse parole a parte maiuscole, accenti, punteggiatura, "The" e ordine ("Battiato Franco" = "Franco Battiato", "AC/DC" = "ACDC"); **dubbio**: solo il cognome ("Battiato"), le iniziali ("F. Battiato"), un errore di battitura: decide l'AI (con album e anni) e, se lo chiedi, MusicBrainz (nomi e alias dell'artista), solo per questi gruppi; senza nessuno dei due restano "forse lo stesso artista", da controllare. **Duetti** ("A & B", "A feat. B", "A, B"): se A c'è anche da solo, artista e artista album diventano A e gli ospiti vanno nel titolo, "Titolo (feat. B)" (l'app Musica non gestisce più artisti); un nome come "Simon & Garfunkel" resta com'è | scrive ovunque la forma **più usata** (quella con più brani) |
 | **Solo sull'iPhone** | brani dell'app Musica senza un brano uguale (artista, album, titolo) nella Libreria del PC | nessuna: salvali sul PC dalla scheda iPhone (tasto destro → *Copia da iPhone a PC*) |
 | **Brani duplicati** | **lo stesso brano**, non per forza lo stesso file: nello stesso album una copia "Titolo (2)" o lo stesso numero e titolo due volte; ovunque, i file con lo **stesso audio** (impronta, anche con tag e nomi diversi) e i file con stesso artista e titolo e durata entro 2 secondi ma audio diverso (un MP3 e un FLAC, due codifiche). Se titolo o album nominano versioni diverse (live, remix, demo…) la coppia è dubbia e la guarda l'AI, se è accesa: solo quelle coppie, mai tutti i brani; senza AI resta "da controllare". Un problema per artista, una riga per brano. Può essere giusto (l'album e una raccolta): decidi tu | nessuna automatica: quale copia tenere lo decidi tu (*Mostra i brani*) |
 | Tag mancanti, file illeggibili | brani senza titolo/album/artista, file danneggiati | ricava i tag mancanti dai nomi di cartelle e file |
+| **Diversi dal catalogo online** (Verifica online) | brani che mancano rispetto all'edizione trovata (anche quando i numeri tornano); tag diversi da quelli del catalogo; album non trovato | i tag del catalogo: titolo, numeri di traccia e disco, totali, album, artista album, anno |
 
 **Con l'AI** l'AI riceve una tabella compatta degli album (artista album, album, anni, numero di brani, numeri presenti,
 totale dichiarato, nome della cartella, generi) e i problemi trovati dalle regole. Scarta quelli che non sono problemi
-(per esempio album diversi con lo stesso nome, "Greatest Hits"), ne aggiunge altri e propone le correzioni. Non riceve
-né i file né i percorsi completi. Con un'AI nel cloud questi dati escono dal computer; con Ollama no.
+(per esempio album diversi con lo stesso nome, "Greatest Hits"), ne aggiunge altri e propone le correzioni. Con la
+Verifica online sceglie anche tra due edizioni ugualmente probabili di un album (riceve titoli e numero dei brani e le
+edizioni trovate; il motivo si vede nei risultati). Non riceve né i file né i percorsi completi. Con un'AI nel cloud
+questi dati escono dal computer; con Ollama no.
 
 La tabella va all'AI a pezzi: il profilo AI dice quanti album e quanti brani al massimo per richiesta (*Al massimo per
 richiesta*, di base **25 album e 400 brani**); ci si ferma al primo dei due limiti. Un album non si divide mai: se da
@@ -346,18 +376,16 @@ modelli installati usa `llama3.1:8b` (da scaricare con `ollama pull llama3.1:8b`
 scansione*. Per cambiarla: *Impostazioni → Generale → AI della scansione*, oppure *(nessuna: solo le regole)*. Le
 tue scelte non vengono mai cambiate.
 
-In console: `myEasyMP3toIPhone-cli --scan <cartella> [--ai "<profilo>"]`.
+In console: `myEasyMP3toIPhone-cli --scan <cartella> [--ai "<profilo>"]` (le regole e l'AI; né la Verifica online né
+le correzioni).
 
-## Verifica album online
+## Verifica online
 
-*Verifica album online* (linguetta **Controlli**, riquadro a destra; **F7** la apre) confronta gli album scelti negli
-elenchi della scheda PC (o tutti; il riquadro dice quanti, o il nome se è uno solo) con un **catalogo su internet**,
-oppure, con **Verifica online questi album** nei risultati di *Controlla la musica*, gli album dei problemi
-selezionati: dice
-se manca qualche brano e propone i tag giusti e la copertina. È diverso da *Controlla la musica*, che confronta i tuoi
-brani tra loro (e con l'iPhone), senza cataloghi.
-
-Nel riquadro si scelgono i **cataloghi** (le scelte si ricordano), poi **Avvia la verifica**:
+La **Verifica online** è uno dei controlli della linguetta **Controlli** (casella *Verifica online*): confronta gli
+album con un **catalogo su internet**, dice se manca qualche brano (anche quando i numeri di traccia tornano: solo il
+catalogo sa quanti brani ha l'album) e propone i tag giusti. Con *solo sugli album con problemi* guarda solo gli album
+dove le regole hanno trovato qualcosa (un rimedio); spenta, tutti quelli che si controllano (una diagnosi, lenta).
+Sotto la casella si scelgono i **cataloghi** (le scelte si ricordano):
 
 | Catalogo | Com'è | Predefinito |
 |---|---|---|
@@ -367,19 +395,15 @@ Nel riquadro si scelgono i **cataloghi** (le scelte si ricordano), poi **Avvia l
 | **MusicBrainz** | il più completo, ma una richiesta al secondo | spento |
 
 Con più cataloghi scelti **si provano in quest'ordine** (dal più veloce), album per album, **finché uno dà l'album
-completo**; se nessuno lo dà, vale il risultato migliore (quello con meno brani mancanti) e i risultati dicono quali
-cataloghi sono stati provati e con che esito. La casella **AI per scegliere tra edizioni dubbie** (spenta di
-base) interviene solo quando due edizioni di un album sono ugualmente probabili: l'AI della scansione riceve titoli e
-numero dei brani e le edizioni trovate, e ne sceglie una (il motivo si vede nei risultati). CDDB/freedb ha chiuso nel
-2020; il suo erede gnudb vuole la struttura del CD (TOC), che dei file non hanno.
+completo**; se nessuno lo dà, vale il risultato migliore (quello con meno brani mancanti) e il dettaglio dice quali
+cataloghi sono stati provati e con che esito. Con l'*Analisi AI* accesa, l'AI sceglie tra due edizioni ugualmente
+probabili. CDDB/freedb ha chiuso nel 2020; il suo erede gnudb vuole la struttura del CD (TOC), che dei file non hanno.
 
-**In background.** La verifica non blocca il programma: il riquadro e la barra di stato dicono a che punto è
-(*Ferma*, nel riquadro, la interrompe; i risultati già trovati restano; *Vedi*, nella barra di stato, porta alla
-linguetta) e l'icona di ogni album nell'elenco *Album* ne mostra l'esito man mano. Alla fine, o quando la fermi, i
-**risultati** compaiono sotto, in *Risultati della verifica*: per ogni album le tracce dell'edizione trovata e i tuoi file, le **mancanti in rosso** e quelle non
-riconosciute in grigio. Si può scegliere un'altra edizione, *Correggere i tag con questi dati* (titolo, numeri di
-traccia e disco, album, artista album, anno, e la copertina: tutto in sospeso, per le copie) e *Apri su …* la pagina
-dell'edizione nel catalogo. Aprire un'altra cartella ferma la verifica in corso.
+I risultati stanno con gli altri, per album: *mancano N di M brani* (con i titoli), *tag diversi dal catalogo* (con le
+correzioni, da applicare come le altre), *non trovato*. Per un album del PC, **Dettagli della verifica online** mostra
+le tracce dell'edizione trovata e i tuoi file (le **mancanti in rosso**, quelle non riconosciute in grigio); lì si può
+scegliere un'altra edizione, *Correggere i tag con questi dati* (anche la copertina, che va solo sulle copie) e aprire
+la pagina dell'edizione nel catalogo. L'icona di ogni album nell'elenco *Album* della scheda PC ne mostra l'esito.
 
 ## L'iPhone
 
@@ -513,7 +537,7 @@ Tutte vanno **in attesa** e partono con **Applica** (vedi [Le azioni in attesa](
   ciascun brano, così lo rimetti a mano (le playlist smart si aggiornano da sole). Lo stesso vale per gli album
   ricopiati interi per la grafia.
 - **Una modifica da una parte non cambia l'altra.** Cambiando i tag nella scheda **PC** (editor, scansione,
-  *Verifica album online*, *Torna ai tag del file*) l'iPhone resta com'è; con **Cambia i tag** nella scheda **iPhone**
+  *Verifica online*, *Torna ai tag del file*) l'iPhone resta com'è; con **Cambia i tag** nella scheda **iPhone**
   i file del PC restano come sono. I brani con la sorgente su questo PC diventano ⟳, con il nome del file **in
   giallo** (scheda iPhone, colonne della sorgente; scheda PC, colonne Cartella e File), e restano associati. Si
   allineano solo con un'azione tua: **Usa i tag da PC a iPhone** / **da iPhone a PC** (tasto destro), oppure le caselle
@@ -892,7 +916,7 @@ stesso schema di nomi: `MYCALIBRETOOLS_HOME` → `MYEASYMP3TOIPHONE_HOME`, `CALI
 | `OPENAI_API_KEY` | la chiave dei profili OpenAI (nome standard: myCalibreTools non ha profili OpenAI) | — |
 | `ANTHROPIC_API_KEY` | la chiave dei profili Anthropic (nome standard: myCalibreTools non ha profili Anthropic) | — |
 | `MYCALIBRETOOLS_HOME` | dove cercare i profili di myCalibreTools per *Importa da myCalibreTools* | `%USERPROFILE%\.myCalibreTools` |
-| `DISCOGS_TOKEN` | il token personale di Discogs, per *Verifica album online* con il catalogo Discogs; si manda solo nell'intestazione delle richieste a Discogs, mai altrove | Discogs non si usa (la casella è spenta) |
+| `DISCOGS_TOKEN` | il token personale di Discogs, per la *Verifica online* con il catalogo Discogs; si manda solo nell'intestazione delle richieste a Discogs, mai altrove | Discogs non si usa (la casella è spenta) |
 | `MYEASYMP3TOIPHONE_HOME` | **solo nel sistema**: un'altra cartella dati (percorso completo) | `%USERPROFILE%\.myEasyMP3toIPhone` |
 
 **Un profilo AI nuovo** (*Impostazioni → Profili AI → Aggiungi*, o cambiando il tipo di un profilo appena aggiunto)
@@ -912,7 +936,7 @@ programma. La musica invece sta nella Libreria.
 | File | Contenuto |
 |---|---|
 | `myEasyMP3toIPhone.env` | le variabili d'ambiente (sopra) |
-| `settings.json` | cartella della Libreria, ultime cartelle usate, AI della scansione e controlli tolti, lingua, percorso completo delle cartelle, cartelle nascoste, cataloghi di *Verifica album online*, posizione della finestra |
+| `settings.json` | cartella della Libreria, ultime cartelle usate, AI della scansione, controlli tolti, Analisi AI e Verifica online (con i cataloghi), lingua, percorso completo delle cartelle, cartelle nascoste, posizione della finestra |
 | `ai_profiles.json` | i profili AI (senza chiavi e senza indirizzi privati: quelli sono nella Gestione credenziali) |
 | `secrets.json` | solo senza credential store: le chiavi |
 | `scansioni\scansione_<data>.txt` | il rapporto di ogni scansione |
@@ -1003,8 +1027,9 @@ predefinita resta su questo computer.
 ### L'AI della scansione
 
 1. Il profilo scelto in *Impostazioni → Generale → AI della scansione* (salvato in `settings.json`); *(nessuna)* = solo
-   le regole. La casella *Usa l'AI* della finestra *Controlla la musica* vale per quel controllo ed è ricordata per
-   la prossima.
+   le regole. La casella *Analisi AI* della linguetta Controlli vale per quel controllo e si ricorda per la prossima
+   (`scan_use_ai`), come *solo sugli album con problemi* (`scan_ai_flagged`, accesa di serie; non vale senza
+   regole scelte, per esempio con *Solo AI*).
 2. Al primo avvio senza profili: "Ollama locale", creato e scelto automaticamente (vedi
    [Controlla la musica](#controlla-la-musica)).
    Se cancelli tutti i profili non viene ricreato.
@@ -1016,7 +1041,7 @@ richiesta*, in `ai_profiles.json` come `batch_albums` e `batch_tracks`); un prof
 
 ### I controlli di "Controlla la musica"
 
-1. Le caselle della finestra: valgono per quel controllo; quelle tolte si ricordano in `settings.json`
+1. Le caselle della linguetta Controlli: valgono per quel controllo; quelle tolte si ricordano in `settings.json`
    (`scan_checks_off`), così un controllo nuovo di una versione futura parte acceso.
 2. Al primo uso, e con un `settings.json` senza `scan_checks_off`: tutti i controlli.
 
@@ -1025,6 +1050,10 @@ La casella *…e i nomi dubbi anche su MusicBrainz* (sotto *Artisti scritti in m
 3. In console `--scan`: sempre tutti i controlli.
 
 *File che non si aggiornano* sui file del PC si controlla solo per la cartella aperta, non per l'iPhone.
+
+Su cosa: *PC* o *iPhone* (F6 sceglie la scheda da cui parti), poi la selezione di quella scheda: i brani
+selezionati nella lista, altrimenti gli artisti o gli album scelti negli elenchi, altrimenti tutto; *Tutto il PC*
+/ *Tutto l'iPhone* la ignora per quel controllo (non si ricorda).
 
 ### Le cartelle della musica e la Libreria
 
@@ -1082,14 +1111,16 @@ Le colonne dei file mostrano sempre il solo nome; il suggerimento delle celle mo
    "Vari". Solo questi valgono nel confronto con l'iPhone (colonna *Sul PC*), perché l'iPhone non conosce gli altri. In
    console i nomi aggiunti non valgono.
 
-### I cataloghi di "Verifica album online"
+### La Verifica online e i suoi cataloghi
 
-1. Le caselle della finestra di *Verifica album online*: valgono per quella verifica e si ricordano in `settings.json`
-   (`album_services`, nell'ordine fisso Deezer, Apple Music, Discogs, MusicBrainz; `album_ai` per l'AI).
-2. Al primo uso, e con un `settings.json` senza `album_services`: Deezer e Apple Music; l'AI spenta.
+1. Le caselle della linguetta Controlli: *Verifica online* (`scan_online`, spenta di serie), *solo sugli album con
+   problemi* (`scan_online_flagged`, accesa di serie; non vale senza regole scelte) e i cataloghi (`album_services`,
+   nell'ordine fisso Deezer, Apple Music, Discogs, MusicBrainz), ricordate in `settings.json`.
+2. Al primo uso, e con un `settings.json` senza `album_services`: Deezer e Apple Music. `album_ai` (l'AI per le
+   edizioni dubbie delle versioni precedenti) non si legge più: l'AI sceglie l'edizione quando c'è l'*Analisi AI*.
 3. Discogs vale solo con `DISCOGS_TOKEN` impostata (file delle variabili o sistema, come ogni variabile); senza, la
    casella è spenta anche se era scelta.
-4. L'AI è quella della scansione (*Impostazioni → Generale → AI della scansione*); senza un profilo la casella è spenta.
+4. L'AI è quella della scansione (*Impostazioni → Generale → AI della scansione*), quando l'*Analisi AI* è accesa.
 5. Il paese del negozio di Apple Music è quello delle impostazioni internazionali di Windows (`it-IT` → `IT`); se non
    si legge, `US`.
 
@@ -1185,8 +1216,9 @@ L'icona si rigenera con `.venv\Scripts\python tools\make_icon.py`.
 |---|---|
 | `myeasymp3toiphone/tags.py` | lettura di tutti i tipi di tag (ID3v2, APEv2, ID3v1, MP4, Vorbis, ASF, RIFF INFO), scrittura dei tag e delle copertine (mutagen), ID3 v2.3 |
 | `myeasymp3toiphone/library.py` | scansione delle cartelle, raggruppamento, nomi dei file, copia e spostamento |
-| `myeasymp3toiphone/albumcheck.py` | *Verifica album online*: i cataloghi (Deezer, Apple Music, Discogs, MusicBrainz e Cover Art Archive), l'ordine dei servizi, l'abbinamento delle tracce |
+| `myeasymp3toiphone/albumcheck.py` | *Verifica online*: i cataloghi (Deezer, Apple Music, Discogs, MusicBrainz e Cover Art Archive), l'ordine dei servizi, l'abbinamento delle tracce |
 | `myeasymp3toiphone/scan.py` | *Controlla la musica*: regole, brani duplicati, confronto con l'iPhone, analisi AI, correzioni |
+| `myeasymp3toiphone/check_flow.py` | la linguetta Controlli senza interfaccia: la Verifica online come problemi, i risultati per album, da che parte sta ogni brano e dove va ogni correzione |
 | `myeasymp3toiphone/artist_names.py` | le forme dei nomi d'artista: varianti certe, dubbi (AI, MusicBrainz), duetti |
 | `myeasymp3toiphone/overlay.py`, `tag_cache.py` | le modifiche dei tag in sospeso; la cache dei tag e delle impronte |
 | `myeasymp3toiphone/ai.py` | i fornitori di AI (Ollama, Azure, OpenAI via HTTP; Anthropic con l'SDK ufficiale) |

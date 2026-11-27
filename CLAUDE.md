@@ -19,11 +19,16 @@ vanno in `overlay.TagOverlay` (cartella dati) e si applicano solo alle copie: in
 `tags.prepare_copy` / `write_tags(..., new_copy=True)`. `tags.protect_folder` blocca le scritture dentro le cartelle
 aperte: non aggirarlo.
 
-Le eccezioni passano tutte da `gui/pc_write.py`: **Usa i tag da iPhone a PC** (scheda iPhone) e la scelta **Anche nei
-file del PC…** delle correzioni (*Correggi tag* di Verifica album online, *Applica la correzione* di Controlla la
-musica; di serie *Solo per l'iPhone*) scrivono i tag nei file originali con `tags.write_tags_approved`, solo dopo
-`PcWriteDialog`, che elenca ogni file e ogni campo che cambia (ora → diventa) e dice che non si può annullare. Ogni
-nuova scrittura nei file del PC deve passare da una finestra così: chiara e approvata, mai automatica.
+Le eccezioni passano tutte da `gui/pc_write.py`: **Usa i tag da iPhone a PC** (scheda iPhone), **Applica le correzioni
+scelte** dei Controlli (casella *Sul PC: scrivi nei file*, per i brani collegati e per quelli solo sul PC) e *Correggi
+tag* di Dettagli della verifica online (scelta *Anche nei file del PC…*) scrivono i tag nei file originali con
+`tags.write_tags_approved`, solo dopo `PcWriteDialog`, che elenca ogni file e ogni campo che cambia (ora → diventa) e
+dice che non si può annullare. Ogni nuova scrittura nei file del PC deve passare da una finestra così: chiara e
+approvata, mai automatica.
+
+Le correzioni dei Controlli vanno dalla parte dove c'è il brano (`check_flow.plan_apply`): un brano collegato (registro)
+sul PC e sull'iPhone (*Usa i tag da PC a iPhone*, in attesa), uno solo sul PC solo sul PC, uno solo sull'iPhone solo
+sull'iPhone (*Cambia i tag*, in attesa; solo `pending.EDIT_FIELDS`, solo brani messi da un computer).
 
 Le suonerie hanno la loro cartella (`settings.ringtone_folder`, esclusa dalla scheda PC): **Crea una suoneria** vi
 scrive solo file nuovi (ffmpeg `-n`, `ringtones.unique_target`) e il brano di partenza non cambia; **Rinomina** e

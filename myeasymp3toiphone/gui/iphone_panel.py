@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
 )
 
 from .. import adoption, estimate, iphone, phone_actions, phone_duplicates, phone_ringtones, provenance
+from ..check_flow import HOW_ALBUMS, HOW_ALL, HOW_ARTISTS, HOW_SELECTED, SIDE_PHONE, scope_text
 from ..config import config_dir
 from ..i18n import tr
 from ..library import Track, album_folder, album_groups, copy_organized, group_name, scan_folder, short_folder
@@ -564,6 +565,34 @@ class IPhonePanel(QWidget):
         cover, note = self._cover_for(items)
         self._tag_panel.set_tracks(items, len(linked), cover, note)
 
+    def check_scope(self) -> tuple:
+        """(brani dell'iPhone, descrizione) per la linguetta Controlli, con la regola della barra delle azioni: i
+        brani selezionati; altrimenti quelli degli artisti o degli album scelti negli elenchi; altrimenti tutti."""
+        selected = self._selected_phone_tracks()
+        track_filter = self._browser.track_filter()
+        if selected:
+            items = selected
+            how = HOW_SELECTED
+        elif track_filter is not None:
+            items = self._bar_items()
+            how = HOW_ALBUMS if track_filter[1] else HOW_ARTISTS
+        else:
+            items = list(self._phone_tracks)
+            how = HOW_ALL
+        albums = []
+        for item in items:
+            key = (item.tags.album_artist or item.display_artist, item.tags.album)
+            if key not in albums:
+                albums.append(key)
+        result = (items, scope_text("iPhone", how, items, albums))
+        return result
+
+    def linked_pc(self, item):
+        """Il brano del PC (Track, tra quelli aperti) collegato con certezza al brano dell'iPhone, o None."""
+        state, track = self._pc_states.get(item.pid, (PC_NONE, None))
+        result = track if state in (PC_SAME, PC_STALE) else None
+        return result
+
     def _linked_tracks(self, items: list) -> list:
         """I file del PC (Track) associati con certezza ai brani dell'iPhone items."""
         result = []
@@ -1024,6 +1053,29 @@ class IPhonePanel(QWidget):
             self._set_pc_cell(row, pid)
         view.setSortingEnabled(True)
         self._apply_search()
+
+    def show_pids(self, pids: set) -> None:
+        """Dai risultati dei Controlli: la scheda iPhone con tutti i brani e selezionati quelli indicati."""
+        self._window.show_side_tab(SIDE_PHONE)
+        self._search.blockSignals(True)
+        self._search.clear()
+        self._search.blockSignals(False)
+        self._browser.blockSignals(True)
+        self._browser.clear_selection()
+        self._browser.blockSignals(False)
+        self._show.setCurrentIndex(0)
+        self._apply_search()
+        view = self._music_view
+        view.clearSelection()
+        first = None
+        for index in range(view.topLevelItemCount()):
+            row = view.topLevelItem(index)
+            if row.data(COL_TITLE, PID_ROLE) in pids:
+                row.setSelected(True)
+                if first is None:
+                    first = row
+        if first is not None:
+            view.scrollToItem(first)
 
     def _apply_search(self) -> None:
         words = self._search.text().casefold().split()

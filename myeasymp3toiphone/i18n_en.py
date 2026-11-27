@@ -1687,6 +1687,188 @@ CATALOG = {
         "Check interrupted: the results are partial",
     "    Correzione proposta: {0}":
         "    Proposed fix: {0}",
+    # la linguetta Controlli: su cosa, cosa controllare, i risultati per album, dove vanno le correzioni
+    "PC e iPhone":
+        "PC and iPhone",
+    "solo PC":
+        "PC only",
+    "solo iPhone":
+        "iPhone only",
+    "misto":
+        "mixed",
+    "Niente da controllare: nella scheda {0} non ci sono brani.":
+        "Nothing to check: there are no tracks in the {0} tab.",
+    "Si controlla: <b>{0} brani</b> selezionati nella lista della scheda {1}, da {2} album.":
+        "Checking: <b>{0} tracks</b> selected in the list of the {1} tab, from {2} albums.",
+    "Si controlla l'album <b>{0} — {1}</b> scelto nella scheda {2} ({3} brani).":
+        "Checking the album <b>{0} — {1}</b> chosen in the {2} tab ({3} tracks).",
+    "Si controlla: <b>{0} album</b> scelti nella scheda {1} ({2} brani).":
+        "Checking: <b>{0} albums</b> chosen in the {1} tab ({2} tracks).",
+    "Si controlla l'artista <b>{0}</b> scelto nella scheda {1}: {2} album, {3} brani.":
+        "Checking the artist <b>{0}</b> chosen in the {1} tab: {2} albums, {3} tracks.",
+    "Si controlla: <b>{0} artisti</b> scelti nella scheda {1}: {2} album, {3} brani.":
+        "Checking: <b>{0} artists</b> chosen in the {1} tab: {2} albums, {3} tracks.",
+    "Si controlla: <b>tutti i brani della scheda PC</b> ({0}): {1} album, {2} brani.":
+        "Checking: <b>all the tracks of the PC tab</b> ({0}): {1} albums, {2} tracks.",
+    "Si controlla: <b>tutta la musica dell'iPhone</b>: {0} album, {1} brani.":
+        "Checking: <b>all the music on the iPhone</b>: {0} albums, {1} tracks.",
+    " · e altri {0}":
+        " · and {0} more",
+    "Nessun catalogo ha dato questo album: {0}.":
+        "No catalog gave this album: {0}.",
+    "Edizione di {0}: {1}.":
+        "Edition from {0}: {1}.",
+    " Scelta dall'AI ({0}).":
+        " Chosen by the AI ({0}).",
+    "{0}: mancano {1} di {2} brani ({3})":
+        "{0}: {1} of {2} tracks missing ({3})",
+    "{0} Mancano: {1}{2}.":
+        "{0} Missing: {1}{2}.",
+    "{0}: tag diversi da {1} su {2} brani":
+        "{0}: tags different from {1} on {2} tracks",
+    "I tag di {0}":
+        "The tags of {0}",
+    "Altri problemi":
+        "Other problems",
+    "non è stato messo da un computer: i suoi tag non si cambiano":
+        "it was not put there by a computer: its tags cannot be changed",
+    "sull'iPhone senza il file sul PC non si cambia: {0}":
+        "on the iPhone without the file on the PC this cannot be changed: {0}",
+    "PC (i brani della scheda PC)":
+        "PC (the tracks of the PC tab)",
+    "iPhone (la musica dell'app Musica)":
+        "iPhone (the music of the Music app)",
+    "<b>Su cosa:</b>":
+        "<b>On what:</b>",
+    "solo sugli album con problemi (gli altri si saltano)":
+        "only on the albums with problems (the others are skipped)",
+    "l'AI guarda la tabella degli album: conferma o scarta i problemi delle regole, ne trova altri e propone le correzioni; con la Verifica online sceglie tra edizioni dubbie":
+        "the AI looks at the table of the albums: it confirms or discards the problems found by the rules, finds "
+        "others and proposes the fixes; with the Online check it chooses between doubtful editions",
+    "Verifica online":
+        "Online check",
+    "solo sugli album con problemi (spenta: tutti gli album, è lento)":
+        "only on the albums with problems (off: all the albums, it is slow)",
+    "confronta gli album con i cataloghi su internet: brani che mancano anche se i numeri tornano, i tag giusti":
+        "compares the albums with the catalogs on the internet: tracks missing even when the numbers add up, the "
+        "right tags",
+    "Cataloghi, in quest'ordine finché uno dà l'album completo:":
+        "Catalogs, in this order until one gives the whole album:",
+    "Senza regole nessun album ha \"problemi\": l'AI e la Verifica online guardano tutti gli album di quello che si controlla.":
+        "Without rules no album has \"problems\": the AI and the Online check look at all the albums being checked.",
+    "Solo AI":
+        "AI only",
+    "Spegne gli altri controlli, accende l'Analisi AI su tutto quello che si controlla e parte":
+        "Turns off the other checks, turns on the AI analysis on everything being checked and starts",
+    "<b>Cosa controllare</b>":
+        "<b>What to check</b>",
+    "Modifica la selezione nella scheda {0}":
+        "Change the selection in the {0} tab",
+    "Usa la selezione della scheda {0}":
+        "Use the selection of the {0} tab",
+    "Tutto il PC":
+        "The whole PC",
+    "Tutto l'iPhone":
+        "The whole iPhone",
+    "Come la barra delle azioni: i brani selezionati nella lista della scheda {0}; se non ce ne sono, gli artisti o gli album scelti negli elenchi; se non c'è niente, tutto.":
+        "Like the action bar: the tracks selected in the list of the {0} tab; if there are none, the artists or "
+        "albums chosen in the lists; if there is nothing, everything.",
+    "Analisi AI ({0})":
+        "AI analysis ({0})",
+    "Analisi AI (scegli un profilo in Impostazioni → Generale)":
+        "AI analysis (choose a profile in Settings → General)",
+    "Imposta la variabile {0} (nel file delle variabili o in Windows) con un token personale di Discogs, poi riavvia":
+        "Set the variable {0} (in the variables file or in Windows) to a personal Discogs token, then restart",
+    "Album, problema, brano":
+        "Album, problem, track",
+    "Dove":
+        "Where",
+    "Ora":
+        "Now",
+    "Applica le correzioni scelte":
+        "Apply the chosen fixes",
+    "Dove va ogni correzione dipende da dove c'è il brano.":
+        "Where each fix goes depends on where the track is.",
+    "Sul PC: scrivi nei file (prima vedi l'elenco di ogni file e campo, da approvare)":
+        "On the PC: write into the files (first you see the list of every file and field, to approve)",
+    "Sull'iPhone: Usa i tag da PC a iPhone, in attesa (parte con Applica)":
+        "On the iPhone: Use the tags from PC to iPhone, waiting (starts with Apply)",
+    "Spenta: sul PC le correzioni restano in sospeso, solo per le copie (i file non cambiano).":
+        "Off: on the PC the fixes stay pending, only for the copies (the files do not change).",
+    "{0} brani sul PC e sull'iPhone (collegati)":
+        "{0} tracks on the PC and on the iPhone (linked)",
+    "{0} brani solo sul PC":
+        "{0} tracks only on the PC",
+    "{0} brani solo sull'iPhone":
+        "{0} tracks only on the iPhone",
+    "Cambia i tag sull'iPhone, in attesa (parte con Applica). Sul PC non c'è niente da cambiare.":
+        "Change the tags on the iPhone, waiting (starts with Apply). There is nothing to change on the PC.",
+    "Non si possono fare:\n{0}":
+        "These cannot be done:\n{0}",
+    "Ogni scrittura sull'iPhone va in attesa e parte con Applica (barra blu), dove ogni azione si toglie con la ✕. Nei file del PC si scrive solo dopo l'elenco di ogni file e campo (Modifica N file; non si può annullare).":
+        "Every write to the iPhone waits and starts with Apply (blue bar), where each action can be removed with the "
+        "✕. The PC files are written only after the list of every file and field (Change N files; it cannot be "
+        "undone).",
+    "Continua":
+        "Continue",
+    "Applica le correzioni scelte…":
+        "Apply the chosen fixes…",
+    "Seleziona i brani degli album o dei problemi scelti nella loro scheda":
+        "Select the tracks of the chosen albums or problems in their tab",
+    "Controlla di nuovo questi album":
+        "Check these albums again",
+    "Lo stesso controllo, con le scelte di sopra, solo sugli album scelti qui":
+        "The same check, with the choices above, only on the albums chosen here",
+    "Dettagli della verifica online":
+        "Details of the online check",
+    "Le tracce dell'edizione trovata e i tuoi file; un'altra edizione, la copertina":
+        "The tracks of the edition found and your files; another edition, the cover",
+    "<b>{0} album con problemi</b> su {1} controllati ({2} brani, {3}): {4} problemi":
+        "<b>{0} albums with problems</b> out of {1} checked ({2} tracks, {3}): {4} problems",
+    "{0} correzioni scelte":
+        "{0} fixes chosen",
+    "Nessuna correzione scelta":
+        "No fix chosen",
+    "<br><i>Cosa fare:</i> {0}":
+        "<br><i>What to do:</i> {0}",
+    "<p>Seleziona un album o un problema per vederne i dettagli e cosa fare. Le caselle scelgono le correzioni da applicare.</p>":
+        "<p>Select an album or a problem to see its details and what to do. The boxes choose the fixes to apply.</p>",
+    "<p><b>L'AI ritiene che non sia un problema:</b> {0} (le sue correzioni sono spente)</p>":
+        "<p><b>The AI thinks it is not a problem:</b> {0} (its fixes are off)</p>",
+    "<p><b>{0} file in questo album:</b></p><ul>{1}</ul>{2}":
+        "<p><b>{0} files in this album:</b></p><ul>{1}</ul>{2}",
+    "Applica le correzioni":
+        "Apply the fixes",
+    "Correzioni salvate in sospeso su {0} brani del PC: i file non cambiano":
+        "Fixes saved as pending on {0} PC tracks: the files do not change",
+    "Correzione applicata":
+        "Fix applied",
+    "Controlla la musica  <span style='color: gray; font-weight: normal'>F6</span>":
+        "Check the music  <span style='color: gray; font-weight: normal'>F6</span>",
+    "Qui compaiono i risultati del controllo, per album: i problemi, cosa fare e le correzioni da applicare.":
+        "The results of the check appear here, by album: the problems, what to do and the fixes to apply.",
+    "verifica online: {0} — {1}":
+        "online check: {0} — {1}",
+    "Non c'è niente da controllare.":
+        "There is nothing to check.",
+    "PC, {0} brani":
+        "PC, {0} tracks",
+    "iPhone, {0} brani ({1})":
+        "iPhone, {0} tracks ({1})",
+    "Diversi dal catalogo online":
+        "Different from the online catalog",
+    "online":
+        "online",
+    "Se i brani ti servono, aggiungili alla cartella dell'album. Se l'edizione trovata non è la tua, Dettagli della verifica online per sceglierne un'altra.":
+        "If you need the tracks, add them to the album folder. If the edition found is not yours, Details of the "
+        "online check to choose another one.",
+    "Applica le correzioni scelte scrive i tag del catalogo. Controlla prima l'edizione (Dettagli della verifica online): se non è la tua, sceglierne un'altra cambia le correzioni.":
+        "Apply the chosen fixes writes the tags of the catalog. Check the edition first (Details of the online "
+        "check): if it is not yours, choosing another one changes the fixes.",
+    "Controlla che artista e album siano scritti bene, poi riprova; oppure prova un altro catalogo.":
+        "Check that artist and album are written correctly, then try again; or try another catalog.",
+    "Applica le correzioni scelte scrive i tag del catalogo; controlla prima l'edizione.":
+        "Apply the chosen fixes writes the tags of the catalog; check the edition first.",
     "Nessuna copertina disponibile per questa edizione":
         "No cover available for this edition",
     "si scrivono nel file i tag di {0} dei campi scelti (la copertina va solo sulle copie per l'iPhone)":

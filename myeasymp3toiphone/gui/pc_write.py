@@ -22,7 +22,7 @@ PHONE_ONLY = "solo_iphone"
 ALSO_PC = "anche_pc"
 
 
-def _shown(name: str, value) -> str:
+def shown_value(name: str, value) -> str:
     """Un valore come si mostra: "" per un tag vuoto, sì/no per la compilation."""
     if name == "compilation":
         result = "sì" if value else "no"
@@ -119,7 +119,7 @@ class PcWriteDialog(QDialog):
             base = self._base(track)
             for name in fields:
                 row = QTreeWidgetItem([str(track.path) if first else "", tr(self._labels.get(name, name)),
-                                       _shown(name, getattr(base, name)), _shown(name, getattr(new_tags, name))])
+                                       shown_value(name, getattr(base, name)), shown_value(name, getattr(new_tags, name))])
                 row.setToolTip(0, str(track.path))
                 rows.append(row)
                 first = False

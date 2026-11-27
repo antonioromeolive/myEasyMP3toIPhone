@@ -539,6 +539,9 @@ class AppSettings:
     scan_use_ai: bool = True
     scan_checks_off: list = field(default_factory=list)   # i controlli tolti in "Controlla la musica"
     scan_musicbrainz: bool = False  # i nomi d'artista dubbi anche su MusicBrainz (lento)
+    scan_ai_flagged: bool = True    # Analisi AI solo sugli album dove le regole hanno trovato qualcosa
+    scan_online: bool = False       # Verifica online tra i controlli (cataloghi: album_services)
+    scan_online_flagged: bool = True   # Verifica online solo sugli album con problemi
     window_geometry: str = ""       # base64 di QMainWindow.saveGeometry
     language: str = "it"            # la lingua dell'interfaccia (i18n.LANGUAGES), dal prossimo avvio
     show_full_path: bool = False    # colonne Cartella (scheda PC) e Cartella della sorgente (iPhone): percorso completo

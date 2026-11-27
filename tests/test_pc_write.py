@@ -2,8 +2,8 @@
 # Author: Antonio Romeo (with Claude Code et al.)
 # SPDX-License-Identifier: MIT (see the LICENSE file for the full terms)
 
-"""Le correzioni: "Solo per l'iPhone" (in sospeso, i file non cambiano) o "Anche nei file del PC" (solo dopo l'elenco
-dei file e dei campi approvato; i campi spenti restano in sospeso). Nomi e valori inventati."""
+"""Le correzioni sul PC: solo in sospeso (i file non cambiano) o anche nei file (solo dopo l'elenco dei file e dei
+campi approvato; i campi spenti restano in sospeso). Nomi e valori inventati."""
 
 import os
 import time
@@ -19,10 +19,11 @@ def _tagged(path, **values):
     write_tags(path, TrackTags(**values))
 
 
-def test_fix_only_for_the_iphone_or_also_in_the_pc_files(tmp_path, monkeypatch):
+def test_fix_only_in_suspense_or_also_in_the_pc_files(tmp_path, monkeypatch):
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     from PySide6.QtWidgets import QApplication
-    from myeasymp3toiphone.gui import pc_write, scan_dialog
+    from myeasymp3toiphone.check_flow import SIDE_PC, group_by_album
+    from myeasymp3toiphone.gui import check_results, pc_write
     from myeasymp3toiphone.gui.main_window import MainWindow
     app = QApplication.instance() or QApplication([])
     folder = tmp_path / "Raccolta"
@@ -38,27 +39,35 @@ def test_fix_only_for_the_iphone_or_also_in_the_pc_files(tmp_path, monkeypatch):
             time.sleep(0.01)
         app.processEvents()
 
-    def dialog_for(changes):
+    def view_for(changes):
         issue = scan.Issue(scan.KIND_SPLIT, scan.SEVERITY_HIGH, "Raccolta divisa", "d", [one, two],
                            scan.Fix(scan.FIX_TAGS, "Artista album \"Artisti vari\"", changes=changes), rule_id="R11.1")
         report = scan.ScanReport(target="prova", issues=[issue], tracks_scanned=2, albums_scanned=2)
-        dialog = scan_dialog.ScanDialog(report, None, window.scan_launcher, embedded=True)
-        dialog.tree.topLevelItem(0).child(0).setSelected(True)
-        return dialog
+        launcher = window.scan_launcher
+        entries = group_by_album(report.issues, launcher._resolver(SIDE_PC, window.tracks, []))
+        result = check_results.CheckResultsView(launcher, report, entries, None, {}, SIDE_PC)
+        return result
+
+    def files_too(on):
+        def answer(dialog):
+            dialog.pc_files.setChecked(on)
+            return True
+        return answer
 
     try:
         window.tracks = scan_folder(folder)
+        window._rebuild_views()
         changes = [(one, {"album_artist": "Artisti vari", "year": "1999"}), (two, {"album_artist": "Artisti vari"})]
 
-        # solo per l'iPhone: in sospeso, i file non cambiano
-        monkeypatch.setattr(scan_dialog, "ask_where", lambda *args: pc_write.PHONE_ONLY)
-        dialog = dialog_for(changes)
-        dialog.fix_button.click()
+        # nei file no: in sospeso, i file non cambiano
+        monkeypatch.setattr(check_results.ApplyDestinationsDialog, "exec", files_too(False))
+        view = view_for(changes)
+        view.apply_button.click()
         wait_idle()
         assert read_tags(one)[0].album_artist == "" and window.overlay.is_edited(one)
-        dialog.close()
+        view.close()
 
-        # anche nei file del PC: l'elenco, con l'anno spento; si scrive solo l'artista dell'album
+        # anche nei file: l'elenco, con l'anno spento; si scrive solo l'artista dell'album
         shown = []
 
         def approve(pc_dialog):
@@ -66,25 +75,26 @@ def test_fix_only_for_the_iphone_or_also_in_the_pc_files(tmp_path, monkeypatch):
             pc_dialog._boxes["year"].setChecked(False)
             return True
 
-        monkeypatch.setattr(scan_dialog, "ask_where", lambda *args: pc_write.ALSO_PC)
+        monkeypatch.setattr(check_results.ApplyDestinationsDialog, "exec", files_too(True))
         monkeypatch.setattr(pc_write.PcWriteDialog, "exec", approve)
-        dialog = dialog_for(changes)
-        dialog.fix_button.click()
+        view = view_for(changes)
+        view.apply_button.click()
         wait_idle()
         assert len(shown) == 1 and set(shown[0]._boxes) == {"album_artist", "year"}
         assert [read_tags(path)[0].album_artist for path in (one, two)] == ["Artisti vari", "Artisti vari"]
         assert read_tags(one)[0].year == "2001"                     # campo spento: il file non cambia
         assert window.overlay.is_edited(one) and not window.overlay.is_edited(two)   # l'anno resta per l'iPhone
-        dialog.close()
+        view.close()
 
         # Annulla nell'elenco: niente cambia nei file
         monkeypatch.setattr(pc_write.PcWriteDialog, "exec", lambda pc_dialog: False)
-        dialog = dialog_for([(two, {"genre": "Pop"})])
-        dialog.fix_button.click()
+        view = view_for([(two, {"genre": "Pop"})])
+        view.apply_button.click()
         wait_idle()
         assert read_tags(two)[0].genre == "" and window.overlay.is_edited(two)
-        dialog.close()
+        view.close()
     finally:
+        window._exit_checked = True
         window.close()
         app.processEvents()
 

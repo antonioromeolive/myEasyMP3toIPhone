@@ -2,37 +2,17 @@
 # Author: Antonio Romeo (with Claude Code et al.)
 # SPDX-License-Identifier: MIT (see the LICENSE file for the full terms)
 
-"""La linguetta Controlli: Controlla la musica (F6) e Verifica album online (F7) affiancati, ognuno con le sue scelte
-e il suo pulsante per partire, e sotto i risultati dell'ultimo controllo e dell'ultima verifica (prima erano finestre
-a parte). Le scelte si rifanno ogni volta che la linguetta si vede: dipendono da cosa è aperto."""
+"""La linguetta Controlli: in alto le scelte (su cosa, cosa controllare: le regole, l'Analisi AI, la Verifica online;
+check_options), sotto i risultati dell'ultimo controllo, per album (check_results). F6 e F7 la aprono; le scelte si
+rifanno ogni volta che la linguetta si vede: dipendono da cosa è scelto nelle schede PC e iPhone."""
 
 from __future__ import annotations
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QSplitter, QTabWidget, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QFrame, QLabel, QSplitter, QVBoxLayout, QWidget
 
-from .album_check_dialog import AlbumCheckOptionsDialog
+from .check_options import CheckOptions
 from .icons import icon
-from .scan_dialog import ScanTargetDialog
-
-SCAN_PAGE, ALBUM_PAGE = 0, 1
-
-
-def _card(title: str, key: str, subtitle: str, content: QWidget) -> QFrame:
-    """Un riquadro con il titolo (e il tasto), una riga di spiegazione e il contenuto."""
-    card = QFrame()
-    card.setObjectName("checkCard")
-    heading = QLabel(f"{title}  <span style='color: gray; font-weight: normal'>{key}</span>")
-    heading.setObjectName("cardTitle")
-    heading.setTextFormat(Qt.RichText)
-    note = QLabel(subtitle)
-    note.setObjectName("deviceInfo")
-    note.setWordWrap(True)
-    layout = QVBoxLayout(card)
-    layout.addWidget(heading)
-    layout.addWidget(note)
-    layout.addWidget(content, 1)
-    return card
 
 
 def _placeholder(text: str) -> QLabel:
@@ -47,74 +27,42 @@ class ChecksPanel(QWidget):
     def __init__(self, window) -> None:
         super().__init__(window)
         self._window = window
-        launcher = window.scan_launcher
-        settings = window.app_settings
-        self.scan_options = ScanTargetDialog(window, len(window.phone_tracks), launcher.profile_name(), embedded=True)
-        self.scan_options.start_requested.connect(lambda: launcher.run(self.scan_options))
-        self.album_options = AlbumCheckOptionsDialog(self, 0, list(settings.album_services), settings.album_ai,
-                                                     launcher.profile_name(), window.album_discogs_ready(),
-                                                     embedded=True)
-        self.album_options.start_requested.connect(window.start_album_check_from_panel)
-        self.album_options.stop_button.clicked.connect(window._stop_album_check)
-        self.scan_options.start_button.setIcon(icon("play", "white"))
-        self.album_options.start_button.setIcon(icon("play", "white"))
-        self.album_options.stop_button.setIcon(icon("stop", "white"))
-        cards = QWidget()
-        row = QHBoxLayout(cards)
-        row.setContentsMargins(0, 0, 0, 0)
-        row.addWidget(_card("Controlla la musica", "F6", "Confronta i tuoi brani tra loro (e con l'iPhone), senza "
-                            "cataloghi online: doppioni, artisti scritti in modi diversi, album divisi, tag mancanti.",
-                            self.scan_options), 1)
-        row.addWidget(_card("Verifica album online", "F7", "Confronta gli album con i cataloghi su internet: brani "
-                            "mancanti, tag giusti, copertina. In background.", self.album_options), 1)
-        self.results = QTabWidget()
-        self.results.addTab(_placeholder("Qui compaiono i risultati di Controlla la musica."), "Risultati del controllo")
-        self.results.addTab(_placeholder("Qui compaiono i risultati di Verifica album online, alla fine o quando la fermi."),
-                            "Risultati della verifica")
-        splitter = QSplitter(Qt.Vertical)
-        splitter.addWidget(cards)
-        splitter.addWidget(self.results)
-        splitter.setSizes([430, 420])
-        splitter.setStretchFactor(1, 1)
+        self.options = CheckOptions(window)
+        self.options.start_requested.connect(lambda: window.scan_launcher.run())
+        self.options.start_button.setIcon(icon("play", "white"))
+        card = QFrame()
+        card.setObjectName("checkCard")
+        heading = QLabel("Controlla la musica  <span style='color: gray; font-weight: normal'>F6</span>")
+        heading.setObjectName("cardTitle")
+        heading.setTextFormat(Qt.RichText)
+        card_layout = QVBoxLayout(card)
+        card_layout.addWidget(heading)
+        card_layout.addWidget(self.options, 1)
+        self.results = _placeholder("Qui compaiono i risultati del controllo, per album: i problemi, cosa fare e le "
+                                    "correzioni da applicare.")
+        self._splitter = QSplitter(Qt.Vertical)
+        self._splitter.addWidget(card)
+        self._splitter.addWidget(self.results)
+        self._splitter.setSizes([400, 450])
+        self._splitter.setStretchFactor(1, 1)
         layout = QVBoxLayout(self)
-        layout.addWidget(splitter, 1)
+        layout.addWidget(self._splitter, 1)
 
     def refresh(self) -> None:
-        """Le scelte che dipendono da cosa è aperto: brani, musica dell'iPhone, album scelti, profilo AI."""
-        window = self._window
-        name = window.scan_launcher.profile_name()
-        self.scan_options.refresh(window, len(window.phone_tracks), name)
-        albums = window.albums_to_check()
-        single = ""
-        if len(albums) == 1:
-            artist, album = albums[0][0].album_key
-            single = f"{artist} — {album}"
-        self.album_options.refresh(len(albums), name, window.app_settings.album_ai, single)
+        """Le scelte che dipendono da cosa è aperto e scelto nelle schede."""
+        self.options.refresh()
 
     def showEvent(self, event) -> None:
         super().showEvent(event)
         self.refresh()
 
-    def _replace_page(self, index: int, widget: QWidget, title: str) -> None:
-        old = self.results.widget(index)
-        self.results.removeTab(index)
-        self.results.insertTab(index, widget, title)
-        if old is not None:
-            old.deleteLater()
-        self.results.setCurrentIndex(index)
-
-    def show_scan_results(self, widget: QWidget) -> None:
-        self._replace_page(SCAN_PAGE, widget, "Risultati del controllo")
+    def show_results(self, widget: QWidget) -> None:
+        """I risultati nuovi al posto di quelli di prima."""
+        old = self.results
+        self._splitter.replaceWidget(1, widget)
+        self.results = widget
+        old.deleteLater()
         self._window.show_checks()
 
-    def show_album_results(self, widget: QWidget) -> None:
-        self._replace_page(ALBUM_PAGE, widget, "Risultati della verifica")
-
-    def album_state(self, running: bool, text: str) -> None:
-        self.album_options.set_running(running, text)
-
     def focus_scan(self) -> None:
-        self.scan_options.start_button.setFocus()
-
-    def focus_album(self) -> None:
-        self.album_options.start_button.setFocus()
+        self.options.start_button.setFocus()
