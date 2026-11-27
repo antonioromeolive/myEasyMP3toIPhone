@@ -150,7 +150,8 @@ class ScanReport:
     albums_scanned: int = 0
     ai_profile: str = ""
     ai_errors: list = field(default_factory=list)
-    cancelled: bool = False
+    cancelled: bool = False         # annullato durante le regole: i loro risultati sono parziali
+    stopped: list = field(default_factory=list)   # annullati dopo le regole (AI, MusicBrainz, Verifica online): senza
 
     def counts(self) -> dict:
         result = Counter()
@@ -1398,25 +1399,37 @@ def scan_tracks(tracks: list, target: str, provider=None, check_files: bool = Tr
     assign_groups(tracks)
     report = ScanReport(target=target, tracks_scanned=len(tracks), albums_scanned=len(group_by_album(tracks)))
     issues = rule_issues(tracks, check_files, progress, cancel, checks)
+    rules_cut = is_cancelled(cancel)
     only_ai = not checks
-    if provider is not None and not is_cancelled(cancel) and (checks & AI_REVIEW_CHECKS or only_ai):
+    if provider is not None and not rules_cut and (checks & AI_REVIEW_CHECKS or only_ai):
         reviewed = tracks
         if ai_flagged_only and not only_ai:
             reviewed = tracks_of_albums(tracks, albums_of_issues(issues, tracks))
         if reviewed:
-            report.ai_profile = provider.profile.name
             found, errors = ai_review(provider, reviewed, issues, progress, cancel)
-            for issue in drop_repeated(found, issues):
-                if only_ai or enabled(issue, checks):
-                    issues.append(issue)
-            report.ai_errors = errors
-    if CHECK_VARIANTS in checks and not is_cancelled(cancel):
+            if is_cancelled(cancel):
+                # Annulla durante l'AI: come se non fosse stata scelta (anche i suoi giudizi sulle regole)
+                _stopped(report, "Analisi AI")
+                for issue in issues:
+                    issue.ai_note = ""
+            else:
+                report.ai_profile = provider.profile.name
+                for issue in drop_repeated(found, issues):
+                    if only_ai or enabled(issue, checks):
+                        issues.append(issue)
+                report.ai_errors = errors
+    if CHECK_VARIANTS in checks and not rules_cut:
         if progress is not None:
             progress(0, 0, "nomi d'artista dubbi")
-        found, errors = detect_artist_doubts(tracks, provider, musicbrainz, progress, cancel)
+        helper = provider if not is_cancelled(cancel) else None
+        catalog = musicbrainz if not is_cancelled(cancel) else None
+        found, errors = detect_artist_doubts(tracks, helper, catalog, progress, cancel)
+        if (helper is not None or catalog is not None) and is_cancelled(cancel):
+            _stopped(report, "Analisi AI" if helper is not None else "MusicBrainz")
+            found, errors = detect_artist_doubts(tracks, None, None, progress, None)    # solo le regole
         issues += found
         report.ai_errors += errors
-    if CHECK_DUPLICATES in checks and not is_cancelled(cancel):
+    if CHECK_DUPLICATES in checks and not rules_cut:
         skip = set()
         for issue in issues:
             if issue.kind == KIND_DUPLICATE:
@@ -1424,10 +1437,14 @@ def scan_tracks(tracks: list, target: str, provider=None, check_files: bool = Tr
                     skip.add(str(path))
         if progress is not None:
             progress(0, 0, "brani duplicati")
-        found, errors = detect_same_songs(tracks, fingerprints or {}, provider, progress, cancel, frozenset(skip))
+        helper = provider if not is_cancelled(cancel) else None
+        found, errors = detect_same_songs(tracks, fingerprints or {}, helper, progress, cancel, frozenset(skip))
+        if helper is not None and is_cancelled(cancel):
+            _stopped(report, "Analisi AI")
+            found, errors = detect_same_songs(tracks, fingerprints or {}, None, progress, None, frozenset(skip))
         issues += found
         report.ai_errors += errors
-        if provider is not None:
+        if helper is not None and not is_cancelled(cancel):
             report.ai_profile = provider.profile.name
     if phone_tracks is not None:
         if not keep_phone_fixes:
@@ -1444,8 +1461,15 @@ def scan_tracks(tracks: list, target: str, provider=None, check_files: bool = Tr
             issues += detect_phantoms(phone_tracks)
     issues.sort(key=lambda issue: issue.sort_key())
     report.issues = issues
-    report.cancelled = is_cancelled(cancel)
+    report.cancelled = rules_cut
+    if report.stopped:
+        report.ai_errors = []          # gli errori di un passo annullato non contano
     return report
+
+
+def _stopped(report: ScanReport, stage: str) -> None:
+    if stage not in report.stopped:
+        report.stopped.append(stage)
 
 
 # --------------------------------------------------------------------------- cosa fare
@@ -1537,6 +1561,8 @@ def report_text(report: ScanReport) -> str:
         lines.append(f"Errore AI: {error}")
     if report.cancelled:
         lines.append("Controllo interrotto: i risultati sono parziali")
+    if report.stopped:
+        lines.append(f"Annullati: {', '.join(report.stopped)} (i risultati sono quelli senza)")
     for issue in report.issues:
         lines += ["", f"[{issue.severity}] {KIND_LABELS.get(issue.kind, issue.kind)} ({issue.origin}): {issue.title}",
                   f"    {issue.detail}"]

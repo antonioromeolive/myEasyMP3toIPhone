@@ -44,6 +44,7 @@ def test_fix_only_in_suspense_or_also_in_the_pc_files(tmp_path, monkeypatch):
                            scan.Fix(scan.FIX_TAGS, "Artista album \"Artisti vari\"", changes=changes), rule_id="R11.1")
         report = scan.ScanReport(target="prova", issues=[issue], tracks_scanned=2, albums_scanned=2)
         launcher = window.scan_launcher
+        launcher.applied = set()                 # ogni vista come dopo un controllo nuovo
         entries = group_by_album(report.issues, launcher._resolver(SIDE_PC, window.tracks, []))
         result = check_results.CheckResultsView(launcher, report, entries, None, {}, SIDE_PC)
         return result

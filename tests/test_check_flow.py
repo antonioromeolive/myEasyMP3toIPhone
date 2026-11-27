@@ -240,3 +240,107 @@ def test_phone_only_fixes_go_to_the_queue_and_linked_ones_both_ways(monkeypatch)
         window._exit_checked = True
         window.close()
         app.processEvents()
+
+
+class CancellingProvider(SeeingProvider):
+    """Un'AI che a metà della prima richiesta riceve Annulla."""
+
+    def __init__(self, cancel):
+        super().__init__()
+        self.cancel = cancel
+
+    def ask_json(self, system, user, schema):
+        self.cancel.set()
+        result = super().ask_json(system, user, schema)
+        return result
+
+
+def test_cancel_during_the_ai_keeps_every_rule_and_drops_the_ai(tmp_path):
+    import threading
+
+    def tagged(path, frames=40, **values):
+        write_mp3(path, frames)
+        write_tags(path, TrackTags(**values))
+
+    tagged(tmp_path / "Buchi" / "1.mp3", title="X", artist="Gruppo", album="Buchi", track_number=1, track_total=3)
+    tagged(tmp_path / "Buchi" / "3.mp3", title="Y", artist="Gruppo", album="Buchi", track_number=3, track_total=3)
+    tagged(tmp_path / "Raccolta" / "1.mp3", title="X", artist="Gruppo", album="Raccolta", track_number=1,
+           track_total=1)
+    tracks = scan_folder(tmp_path)
+    cancel = threading.Event()
+    checks = frozenset({scan.CHECK_FEW, scan.CHECK_MISSING, scan.CHECK_DUPLICATES})
+    report = scan.scan_tracks(tracks, "prova", CancellingProvider(cancel), check_files=False, checks=checks,
+                              cancel=cancel)
+    without_ai = scan.scan_tracks(tracks, "prova", None, check_files=False, checks=checks)
+    assert report.stopped == ["Analisi AI"] and not report.cancelled and not report.ai_profile
+    assert [issue.rule_id for issue in report.issues] == [issue.rule_id for issue in without_ai.issues]
+    assert any(issue.rule_id.startswith("R15") for issue in report.issues)     # i doppioni, dopo l'AI, ci sono
+    assert all(issue.origin != scan.ORIGIN_AI and not issue.ai_note for issue in report.issues)
+    assert "Annullati: Analisi AI" in scan.report_text(report)
+
+
+def test_cancel_during_the_online_check_and_check_again_from_the_results(monkeypatch):
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtWidgets import QApplication
+    from myeasymp3toiphone.gui import scan_dialog
+    from myeasymp3toiphone.gui.main_window import MainWindow
+    app = QApplication.instance() or QApplication([])
+    window = MainWindow()
+
+    class SlowService(FakeService):
+        def search_releases(self, artist, album):
+            time.sleep(0.3)
+            return super().search_releases(artist, album)
+
+    try:
+        window.tracks = _album(["Uno", "Due"], album="Primo") + _album(["Tre"], album="Secondo")
+        window._rebuild_views()
+        window._scan()
+        options = window.checks_panel.options
+        for check_id, box in options.boxes.items():
+            box.setChecked(check_id in (scan.CHECK_FEW, scan.CHECK_MISSING))
+        options.ai_box.setChecked(False)
+        options.online_box.setChecked(True)
+        options.online_flagged.setChecked(False)
+        window.album_clients["deezer"] = SlowService("deezer", ["Uno", "Due", "Tre"])
+        for service, box in options.service_boxes.items():
+            box.setChecked(service == "deezer")
+        options.start_button.click()
+        deadline = time.monotonic() + 0.2
+        while time.monotonic() < deadline:
+            app.processEvents()
+            time.sleep(0.01)
+        window.runner.cancel()                                          # Annulla durante la verifica online
+        _wait(window, app)
+        view = window.checks_panel.results
+        assert view.report.stopped == ["Verifica online"] and "Annullati: Verifica online" in view.header.text()
+        assert all(issue.origin != scan.ORIGIN_ONLINE for issue in view.report.issues)
+        assert {entry.key[1] for entry in view.entries} == {"Primo", "Secondo"}   # le regole: 1-2 brani
+        second = [entry.key for entry in view.entries if entry.key[1] == "Secondo"][0]
+
+        # tasto destro: Controlla online, solo su "Secondo"
+        launcher = window.scan_launcher
+        launcher.recheck(scan_dialog.STAGE_ONLINE, {second})
+        _wait(window, app)
+        view = window.checks_panel.results
+        online = [issue for issue in view.report.issues if issue.origin == scan.ORIGIN_ONLINE]
+        assert online and all("Secondo" in issue.title for issue in online)
+        assert view.report.stopped == []
+
+        # tasto destro: Controlla con l'AI, solo su "Secondo"
+        provider = SeeingProvider()
+        monkeypatch.setattr(launcher, "_profile", lambda: object())
+        monkeypatch.setattr(scan_dialog, "make_provider", lambda profile: provider)
+        launcher.recheck(scan_dialog.STAGE_AI, {second})
+        _wait(window, app)
+        assert len(provider.seen) == 1 and "Secondo" in provider.seen[0] and "Primo" not in provider.seen[0]
+        view = window.checks_panel.results
+        assert any(issue.origin == scan.ORIGIN_AI for issue in view.report.issues)
+        launcher.recheck(scan_dialog.STAGE_AI, {second})        # di nuovo: si sostituisce, non si somma
+        _wait(window, app)
+        assert len([issue for issue in window.checks_panel.results.report.issues
+                    if issue.origin == scan.ORIGIN_AI]) == 1
+    finally:
+        window._exit_checked = True
+        window.close()
+        app.processEvents()

@@ -26,6 +26,8 @@ CLI_HELP = __doc__.split("Console", 1)[1]
 
 
 CRASH_FILE = "crash.log"
+FREEZE_FILE = "blocchi.log"
+FREEZE_SECONDS = 15       # l'interfaccia ferma più di così: in blocchi.log dove si trova ogni thread
 INSTANCE_LOCK = "myEasyMP3toIPhone.instance.lock"   # una sola finestra alla volta (home_backup non copia i .lock)
 STREAMS_FILE = "myEasyMP3toIPhone.output.log"
 _crash_file = None
@@ -72,6 +74,31 @@ def install_error_handlers(home: Path) -> None:
     qInstallMessageHandler(log_qt_message)
 
 
+def install_freeze_watch(home: Path):
+    """Se l'interfaccia resta ferma più di FREEZE_SECONDS, faulthandler scrive in blocchi.log (cartella dati) dove si
+    trova ogni thread: un timer dell'interfaccia lo riarma ogni secondo, quindi scatta solo quando l'interfaccia non
+    risponde (anche se il programma è fermo dentro una libreria). Restituisce il timer (va tenuto)."""
+    import faulthandler
+    import time
+
+    from PySide6.QtCore import QTimer
+
+    handle = open(home / FREEZE_FILE, "a", encoding="utf-8")  # noqa: SIM115 - resta aperto per faulthandler
+
+    def rearm():
+        faulthandler.dump_traceback_later(FREEZE_SECONDS, repeat=False, file=handle)
+
+    handle.write(f"\n=== avvio {time.strftime('%Y-%m-%d %H:%M:%S')}: qui sotto, se ci sono, i blocchi dell'interfaccia "
+                 f"(più di {FREEZE_SECONDS} s) ===\n")
+    handle.flush()
+    timer = QTimer()
+    timer.timeout.connect(rearm)
+    timer.start(1000)
+    rearm()
+    result = timer
+    return result
+
+
 def main() -> int:
     """La finestra: una sola copia alla volta (un lucchetto nella cartella dati)."""
     result = startup.FAILED
@@ -103,7 +130,11 @@ def main() -> int:
             if folder:
                 window.open_on_start = Path(folder)
             window.show()
+            watch = install_freeze_watch(config_dir())
             result = app.exec()
+            watch.stop()
+            import faulthandler
+            faulthandler.cancel_dump_traceback_later()
             instance_lock.unlock()
         else:
             QMessageBox.information(None, PRODUCT, "myEasyMP3toIPhone è già aperto: usa la finestra che c'è già.\n\n"

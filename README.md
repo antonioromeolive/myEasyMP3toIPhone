@@ -319,7 +319,10 @@ selezione senza toccarla).
 - **Solo AI** spegne le regole e la Verifica online e fa partire l'AI su tutto quello che si controlla (senza regole
   nessun album ha "problemi", quindi la casella *solo sugli album con problemi* non vale).
 
-**Avvia il controllo** lo fa partire (l'avanzamento è nella barra di stato, *Annulla* lo ferma). Il rapporto resta in
+**Avvia il controllo** lo fa partire (l'avanzamento è nella barra di stato). **Annulla** durante l'AI o la Verifica
+online ferma solo quelle: le regole vanno comunque fino in fondo e i risultati sono come se AI e Verifica online non
+fossero state scelte (l'intestazione dice cosa è stato annullato; le risposte già arrivate si scartano). *Annulla*
+durante le regole (o le impronte dell'audio) ferma tutto: risultati parziali. Il rapporto resta in
 `.myEasyMP3toIPhone\scansioni\`.
 
 **I risultati sono per album**, dal più grave: sotto ogni album i suoi problemi (con la gravità e l'origine: regola, AI,
@@ -344,6 +347,11 @@ Tutto ciò che va sull'iPhone parte con **Applica** (barra blu). Le righe applic
 pulsanti: **Mostra i brani** (li seleziona nella loro scheda), **Controlla di nuovo questi album** (lo stesso controllo,
 solo sugli album scelti nei risultati), **Dettagli della verifica online** (per un album del PC verificato online: le
 tracce dell'edizione e i tuoi file, un'altra edizione, la copertina), **Apri il rapporto**.
+
+**Tasto destro sui risultati**, per gli album scelti: **Controlla con l'AI** e **Controlla online** rifanno l'Analisi AI
+o la Verifica online solo su quegli album (anche se erano già state fatte, o annullate, o non scelte): i loro risultati
+di prima si sostituiscono, quelli degli altri album restano, e le correzioni già applicate restano segnate. *Annulla*
+lascia i risultati di prima. La Verifica online usa i cataloghi scelti sotto la sua casella, anche se è spenta.
 
 | Sintomo | Cosa cerca | Correzione |
 |---|---|---|
@@ -950,6 +958,7 @@ programma. La musica invece sta nella Libreria.
 | `modifiche_tag.json`, `copertine\` | le modifiche dei tag in sospeso, per percorso del file, e le copertine nuove: i file sul PC non cambiano |
 | `crash.log`, `myEasyMP3toIPhone.output.log` | solo se qualcosa va storto: la traccia di un arresto improvviso e quello che il programma avrebbe scritto su una console (la finestra non ne ha) |
 | `myEasyMP3toIPhone.log` | cosa è successo, comprese le richieste all'AI (a rotazione: 5 MB, 3 file vecchi) |
+| `blocchi.log` | se la finestra resta ferma più di 15 secondi, dove si trovava ogni parte del programma (per capire un blocco) |
 | `myEasyMP3toIPhone.home.txt` | versione e formato dei dati dell'ultimo programma avviato su questa cartella |
 | `Backup\` | le copie di questa cartella fatte prima che una nuova versione ne cambi il formato; il programma non le cancella mai |
 

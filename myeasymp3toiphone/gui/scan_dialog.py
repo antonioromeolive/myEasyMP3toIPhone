@@ -8,6 +8,8 @@ online (anche solo sugli album con problemi), il rapporto nella cartella dati e 
 
 from __future__ import annotations
 
+import copy
+
 from PySide6.QtWidgets import QMessageBox
 
 from ..ai import make_provider
@@ -17,11 +19,14 @@ from ..config import config_dir, load_profiles
 from ..library import UNKNOWN_ALBUM, group_by_album, scan_folder
 from ..phone_library import tracks_for_scan
 from ..scan import (
-    CHECK_DUPLICATES, CHECK_FILES, CHECK_VARIANTS, albums_of_issues, is_cancelled, save_report, scan_tracks,
+    CHECK_DUPLICATES, CHECK_FILES, CHECK_VARIANTS, ORIGIN_AI, ORIGIN_ONLINE, ai_review, albums_of_issues,
+    drop_repeated, enabled, is_cancelled, report_text, save_report, scan_tracks,
 )
 from .check_options import SIDE_PC, SIDE_PHONE
 
 TITLE = "Controlla la musica"
+STAGE_AI = "di_nuovo_ai"
+STAGE_ONLINE = "di_nuovo_online"
 REPORTS_FOLDER = "scansioni"
 
 
@@ -49,6 +54,9 @@ class ScanLauncher:
         self.window = window
         self.library_tracks = []
         self._last_phone = []          # [(Track della scansione, PhoneTrack)] dell'ultimo controllo dell'iPhone
+        self._last = {}                # l'ultimo controllo: rapporto, brani, risultati online (_show)
+        self.applied = set()           # le correzioni già applicate dei suoi risultati (check_results)
+        self._online_count = 0         # per i rule_id W*.N della Verifica online
 
     def _profile(self):
         result = None
@@ -148,7 +156,7 @@ class ScanLauncher:
             value = (report, results)
             return value
 
-        window.runner.run(TITLE, work, lambda value: self._show(value[0], value[1], SIDE_PC, tracks, []))
+        window.runner.run(TITLE, work, lambda value: self._show(value[0], value[1], SIDE_PC, tracks, [], checks))
 
     def _start_device(self, items: list, choices: dict) -> None:
         from ..provenance import PhoneFingerprints
@@ -186,24 +194,164 @@ class ScanLauncher:
         def done(value):
             report, results, scanned, library_tracks = value
             self.library_tracks = library_tracks
-            self._show(report, results, SIDE_PHONE, scanned, list(zip(scanned, items)))
+            self._show(report, results, SIDE_PHONE, scanned, list(zip(scanned, items)), checks)
 
         window.runner.run(f"{TITLE} (iPhone)", work, done)
 
     @staticmethod
     def _online(scanned: list, report, choices: dict, progress, cancel) -> list:
-        """La Verifica online, se è scelta: i suoi problemi entrano nel rapporto; restituisce i risultati."""
+        """La Verifica online, se è scelta: i suoi problemi entrano nel rapporto; restituisce i risultati. Annullata
+        (anche prima di cominciare, durante l'AI) è come non scelta: niente risultati, e il rapporto lo dice."""
         results = []
-        if choices["clients"] and not is_cancelled(cancel):
-            results = online_check(scanned, report.issues, choices["clients"], choices["online_flagged"],
-                                   choices["chooser"], progress, cancel)
+        if choices["clients"]:
+            if not is_cancelled(cancel):
+                results = online_check(scanned, report.issues, choices["clients"], choices["online_flagged"],
+                                       choices["chooser"], progress, cancel)
+            if is_cancelled(cancel):
+                results = []
+                if "Verifica online" not in report.stopped:
+                    report.stopped.append("Verifica online")
             number = 0
             for result in results:
                 number += 1
                 report.issues.extend(online_issues(result, number))
             report.issues.sort(key=lambda issue: issue.sort_key())
-            report.cancelled = report.cancelled or is_cancelled(cancel)
         return results
+
+    # ------------------------------------------------------------------ di nuovo, solo l'AI o solo online
+
+    def online_clients(self) -> list:
+        """I cataloghi scelti nella linguetta (anche con la Verifica online spenta), per Controlla online."""
+        options = self._options()
+        result = []
+        for service, box in options.service_boxes.items():
+            if box.isChecked() and box.isEnabled():
+                result.append(self.window.album_clients[service])
+        return result
+
+    def _inside(self, issue, keys: set) -> bool:
+        """Tutti i file del problema sono brani degli album keys (dell'ultimo controllo)."""
+        by_path = self._last["by_path"]
+        result = bool(issue.files)
+        for path in issue.files:
+            track = by_path.get(str(path))
+            if track is None or track.album_key not in keys:
+                result = False
+        return result
+
+    def recheck(self, stage: str, keys: set) -> None:
+        """Dai risultati, tasto destro: di nuovo l'Analisi AI (STAGE_AI) o la Verifica online (STAGE_ONLINE), solo
+        sugli album keys; i loro risultati di prima si sostituiscono. Annullato: restano quelli di prima."""
+        window = self.window
+        last = self._last
+        scanned = []
+        for track in last["scanned"]:
+            if track.album_key in keys:
+                scanned.append(track)
+        profile = self._profile()
+        if window.runner.is_busy:
+            QMessageBox.information(window, TITLE, "Aspetta la fine dell'operazione in corso.")
+        elif not scanned:
+            QMessageBox.information(window, TITLE, "Questi album non sono tra quelli controllati.")
+        elif stage == STAGE_AI and profile is None:
+            QMessageBox.information(window, TITLE, "Scegli l'AI della scansione in Impostazioni → Generale.")
+        elif stage == STAGE_AI:
+            self._recheck_ai(make_provider(profile), scanned, keys)
+        elif not self.online_clients():
+            QMessageBox.information(window, TITLE, "Scegli almeno un catalogo sotto Verifica online.")
+        else:
+            self._recheck_online(scanned, keys)
+
+    def _recheck_ai(self, provider, scanned: list, keys: set) -> None:
+        report = self._last["report"]
+        pairs = []
+        for issue in report.issues:
+            if issue.rule_id and issue.origin != ORIGIN_AI and self._touches(issue, keys):
+                copied = copy.copy(issue)
+                copied.ai_note = ""
+                pairs.append((issue, copied))
+        copies = []
+        for _original, copied in pairs:
+            copies.append(copied)
+
+        def work(progress, cancel):
+            found, errors = ai_review(provider, scanned, copies, progress, cancel)
+            value = (found, errors, is_cancelled(cancel))
+            return value
+
+        def done(value):
+            found, errors, cancelled = value
+            if cancelled:
+                self.window.statusBar().showMessage("Analisi AI annullata: i risultati restano quelli di prima", 8000)
+            else:
+                for original, copied in pairs:
+                    original.ai_note = copied.ai_note
+                kept = []
+                for issue in report.issues:
+                    if not (issue.origin == ORIGIN_AI and not issue.rule_id and self._inside(issue, keys)):
+                        kept.append(issue)
+                checks = self._last["checks"]
+                for issue in drop_repeated(found, kept):
+                    if not checks or enabled(issue, checks):
+                        kept.append(issue)
+                kept.sort(key=lambda issue: issue.sort_key())
+                report.issues = kept
+                report.ai_profile = provider.profile.name
+                report.ai_errors = errors
+                self._refresh()
+
+        self.window.runner.run(f"Analisi AI di {len(keys)} album", work, done)
+
+    def _recheck_online(self, scanned: list, keys: set) -> None:
+        report = self._last["report"]
+        clients = self.online_clients()
+        profile = self._profile()
+        options = self._options()
+        chooser = ai_chooser(make_provider(profile)) if profile is not None and options.ai_on() else None
+
+        def work(progress, cancel):
+            results = online_check(scanned, [], clients, False, chooser, progress, cancel)
+            value = (results, is_cancelled(cancel))
+            return value
+
+        def done(value):
+            results, cancelled = value
+            if cancelled:
+                self.window.statusBar().showMessage("Verifica online annullata: i risultati restano quelli di prima",
+                                                    8000)
+            else:
+                kept = []
+                for issue in report.issues:
+                    if not (issue.origin == ORIGIN_ONLINE and self._inside(issue, keys)):
+                        kept.append(issue)
+                for result in results:
+                    self._online_count += 1
+                    kept.extend(online_issues(result, self._online_count))
+                    self._remember_online(result)
+                kept.sort(key=lambda issue: issue.sort_key())
+                report.issues = kept
+                if "Verifica online" in report.stopped:
+                    report.stopped.remove("Verifica online")
+                self._refresh()
+
+        self.window.runner.run(f"Verifica online di {len(keys)} album", work, done)
+
+    def _touches(self, issue, keys: set) -> bool:
+        by_path = self._last["by_path"]
+        result = False
+        for path in issue.files:
+            track = by_path.get(str(path))
+            if track is not None and track.album_key in keys:
+                result = True
+        return result
+
+    def _remember_online(self, result) -> None:
+        if result.local_tracks:
+            self._last["online"][result.local_tracks[0].album_key] = result
+            if self._last["side"] == SIDE_PC:
+                self.window.store_check_result(result)           # l'icona accanto all'album negli elenchi
+
+    # ------------------------------------------------------------------ i risultati
 
     def _resolver(self, side: str, scanned: list, phone_pairs: list):
         """resolve(percorso) -> check_flow.Target (sempre lo stesso per lo stesso file), con il brano dell'altra parte
@@ -237,22 +385,39 @@ class ScanLauncher:
 
         return resolve
 
-    def _show(self, report, results: list, side: str, scanned: list, phone_pairs: list) -> None:
-        from .check_results import CheckResultsView
+    def _show(self, report, results: list, side: str, scanned: list, phone_pairs: list, checks=frozenset()) -> None:
+        """I risultati di un controllo nuovo: si ricordano (per Controlla con l'AI / online) e si mostrano."""
         window = self.window
         self._last_phone = phone_pairs
-        saved = None
+        by_path = {}
+        for track in scanned:
+            by_path[str(track.path)] = track
+        self._last = {"report": report, "side": side, "scanned": scanned, "phone_pairs": phone_pairs, "online": {},
+                      "by_path": by_path, "checks": checks, "saved": None,
+                      "resolve": self._resolver(side, scanned, phone_pairs)}
+        self.applied = set()
+        self._online_count = len(results)
         try:
-            saved = save_report(report, config_dir() / REPORTS_FOLDER)
+            self._last["saved"] = save_report(report, config_dir() / REPORTS_FOLDER)
         except OSError as exc:
             QMessageBox.warning(window, TITLE, f"Rapporto non salvato: {exc}")
-        online = {}
         for result in results:
-            if result.local_tracks:
-                online[result.local_tracks[0].album_key] = result
-            if side == SIDE_PC:
-                window.store_check_result(result)           # l'icona accanto all'album negli elenchi
-        if results and side == SIDE_PC:
+            self._remember_online(result)
+        self._refresh(save=False)
+
+    def _refresh(self, save: bool = True) -> None:
+        """I risultati per album rifatti dal rapporto (dopo un controllo, o dopo Controlla con l'AI / online)."""
+        from .check_results import CheckResultsView
+        window = self.window
+        last = self._last
+        report = last["report"]
+        if save and last["saved"] is not None:
+            try:
+                last["saved"].write_text(report_text(report), encoding="utf-8")
+            except OSError as exc:
+                QMessageBox.warning(window, TITLE, f"Rapporto non salvato: {exc}")
+        if last["online"] and last["side"] == SIDE_PC:
             window.browser.refresh_check_icons(window.check_results)
-        entries = entries_by_album(report.issues, self._resolver(side, scanned, phone_pairs))
-        window.checks_panel.show_results(CheckResultsView(self, report, entries, saved, online, side))
+        entries = entries_by_album(report.issues, last["resolve"])
+        window.checks_panel.show_results(CheckResultsView(self, report, entries, last["saved"], last["online"],
+                                                          last["side"]))

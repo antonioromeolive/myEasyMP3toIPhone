@@ -14,7 +14,8 @@ from html import escape
 from PySide6.QtCore import QUrl, Qt
 from PySide6.QtGui import QBrush, QColor, QDesktopServices
 from PySide6.QtWidgets import (
-    QAbstractItemView, QCheckBox, QDialog, QDialogButtonBox, QGroupBox, QHBoxLayout, QHeaderView, QLabel, QMessageBox,
+    QAbstractItemView, QCheckBox, QDialog, QDialogButtonBox, QGroupBox, QHBoxLayout, QHeaderView, QLabel, QMenu,
+    QMessageBox,
     QPushButton, QSplitter, QStyle, QTextBrowser, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget,
 )
 
@@ -96,6 +97,12 @@ class ApplyDestinationsDialog(QDialog):
         layout.addWidget(buttons)
 
 
+def _row_key(row) -> tuple:
+    """Una correzione, riconoscibile anche nei risultati rifatti: il file, il campo, il valore nuovo."""
+    result = (str(row.target.scanned.path), row.name, repr(row.new))
+    return result
+
+
 def _gray(text: str) -> QLabel:
     label = QLabel(text)
     label.setWordWrap(True)
@@ -132,6 +139,8 @@ class CheckResultsView(QWidget):
             self.tree.setColumnWidth(column, width)
         self.tree.itemSelectionChanged.connect(self._show_detail)
         self.tree.itemChanged.connect(self._item_changed)
+        self.tree.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.tree.customContextMenuRequested.connect(self._menu)
         self.detail = QTextBrowser()
         splitter = QSplitter(Qt.Vertical)
         splitter.addWidget(self.tree)
@@ -186,6 +195,12 @@ class CheckResultsView(QWidget):
             text += f" — analisi AI con {escape(report.ai_profile)}"
         if report.cancelled:
             text += " — <b>controllo interrotto: risultati parziali</b>"
+        if report.stopped:
+            names = []
+            for stage in report.stopped:
+                names.append(tr(stage))
+            text += (f"<br><b>Annullati: {escape(', '.join(names))}</b> — i risultati sono quelli senza "
+                     "(tasto destro sugli album: Controlla con l'AI, Controlla online)")
         for error in report.ai_errors[:3]:
             text += f"<br><span style='color:#c33'>Errore AI: {escape(error)}</span>"
         self.header.setText(text)
@@ -253,6 +268,38 @@ class CheckResultsView(QWidget):
         if self.tree.topLevelItemCount():
             self.tree.topLevelItem(0).setExpanded(True)
         self.tree.blockSignals(False)
+        done = []
+        for index, row in enumerate(self._rows):
+            if _row_key(row) in self.launcher.applied:       # già applicata prima di rifare i risultati
+                done.append(index)
+        if done:
+            self._mark_applied(done)
+
+    def _menu(self, position) -> None:
+        """Tasto destro sui risultati: di nuovo l'AI o la Verifica online, solo sugli album scelti; e le azioni dei
+        pulsanti."""
+        from .scan_dialog import STAGE_AI, STAGE_ONLINE
+        keys = set()
+        for entry in self._selected_entries():
+            if entry.key != OTHER_KEY:
+                keys.add(entry.key)
+        launcher = self.launcher
+        menu = QMenu(self)
+        ai = menu.addAction(f"Controlla con l'AI ({len(keys)} album)")
+        ai.setEnabled(bool(keys) and bool(launcher.profile_name()))
+        ai.setToolTip("Di nuovo l'Analisi AI, solo su questi album: i loro risultati dell'AI si sostituiscono")
+        ai.triggered.connect(lambda: launcher.recheck(STAGE_AI, keys))
+        online = menu.addAction(f"Controlla online ({len(keys)} album)")
+        online.setEnabled(bool(keys) and bool(launcher.online_clients()))
+        online.setToolTip("Di nuovo la Verifica online, con i cataloghi scelti sopra, solo su questi album")
+        online.triggered.connect(lambda: launcher.recheck(STAGE_ONLINE, keys))
+        menu.addSeparator()
+        for button in (self.show_button, self.again_button, self.online_button):
+            action = menu.addAction(button.text())
+            action.setEnabled(button.isEnabled())
+            action.triggered.connect(button.click)
+        menu.setToolTipsVisible(True)
+        menu.exec(self.tree.viewport().mapToGlobal(position))
 
     def _item_changed(self, item, column: int) -> None:
         """La casella di un album accende o spegne tutte le sue correzioni; quella di una correzione o di un problema
@@ -481,6 +528,7 @@ class CheckResultsView(QWidget):
         self.tree.blockSignals(True)
         for index in indexes:
             self._applied.add(index)
+            self.launcher.applied.add(_row_key(self._rows[index]))
             item = self._row_items[index]
             item.setCheckState(COL_NAME, Qt.Unchecked)
             item.setFlags(item.flags() & ~Qt.ItemIsUserCheckable & ~Qt.ItemIsEnabled)

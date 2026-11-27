@@ -1687,6 +1687,37 @@ CATALOG = {
         "Check interrupted: the results are partial",
     "    Correzione proposta: {0}":
         "    Proposed fix: {0}",
+    "\n=== avvio {0}: qui sotto, se ci sono, i blocchi dell'interfaccia (più di {1} s) ===\n":
+        "\n=== start {0}: below, if any, the freezes of the interface (more than {1} s) ===\n",
+    "<br><b>Annullati: {0}</b> — i risultati sono quelli senza (tasto destro sugli album: Controlla con l'AI, Controlla online)":
+        "<br><b>Cancelled: {0}</b> — the results are those without (right click on the albums: Check with the AI, "
+        "Check online)",
+    "Controlla con l'AI ({0} album)":
+        "Check with the AI ({0} albums)",
+    "Di nuovo l'Analisi AI, solo su questi album: i loro risultati dell'AI si sostituiscono":
+        "The AI analysis again, only on these albums: their AI results are replaced",
+    "Controlla online ({0} album)":
+        "Check online ({0} albums)",
+    "Di nuovo la Verifica online, con i cataloghi scelti sopra, solo su questi album":
+        "The Online check again, with the catalogs chosen above, only on these albums",
+    "Questi album non sono tra quelli controllati.":
+        "These albums are not among the ones checked.",
+    "Scegli l'AI della scansione in Impostazioni → Generale.":
+        "Choose the scan AI in Settings → General.",
+    "Scegli almeno un catalogo sotto Verifica online.":
+        "Choose at least one catalog under Online check.",
+    "Analisi AI annullata: i risultati restano quelli di prima":
+        "AI analysis cancelled: the results stay as before",
+    "Analisi AI di {0} album":
+        "AI analysis of {0} albums",
+    "Verifica online annullata: i risultati restano quelli di prima":
+        "Online check cancelled: the results stay as before",
+    "Verifica online di {0} album":
+        "Online check of {0} albums",
+    "Analisi AI":
+        "AI analysis",
+    "Annullati: {0} (i risultati sono quelli senza)":
+        "Cancelled: {0} (the results are those without)",
     # la linguetta Controlli: su cosa, cosa controllare, i risultati per album, dove vanno le correzioni
     "PC e iPhone":
         "PC and iPhone",
