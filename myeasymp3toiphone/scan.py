@@ -103,8 +103,9 @@ CHECKS = (
     (CHECK_MISSING, "Tag mancanti", "brani senza titolo, album o artista"),
     (CHECK_UNREADABLE, "File illeggibili", "file danneggiati, bloccati o disponibili solo online"),
     (CHECK_DUPLICATES, "Brani duplicati",
-     "lo stesso brano in più file: stesso audio anche con tag diversi, oppure stessa durata, titolo e artista in "
-     "file diversi; una copia per formato (FLAC e MP3) va bene; l'AI guarda solo le coppie sospette"),
+     "lo stesso brano due volte nello stesso album e formato: stesso audio anche con tag diversi, oppure stessa "
+     "durata, titolo e artista; una copia in un altro formato (FLAC e MP3) o in un altro album va bene; l'AI guarda "
+     "solo le coppie sospette"),
 )
 ALL_CHECKS = frozenset(check_id for check_id, _label, _note in CHECKS)
 KIND_CHECK = {KIND_NOT_UPDATED: CHECK_FILES, KIND_FEW_TRACKS: CHECK_FEW, KIND_SPLIT: CHECK_SPLIT,
@@ -345,6 +346,12 @@ def detect_missing_tags(tracks: list) -> list:
             "collezione appare divisa.",
             [track.path for track in folder_tracks], fix, rule_id=f"R6.{number}"))
     return issues
+
+
+def _same_place(first: Track, second: Track) -> bool:
+    """Due brani dello stesso album e dello stesso formato: solo lì due copie dello stesso brano sono un doppione."""
+    result = first.album_key == second.album_key and first.path.suffix.lower() == second.path.suffix.lower()
+    return result
 
 
 def one_per_format(paths: list) -> bool:
@@ -1047,7 +1054,7 @@ def detect_same_songs(tracks: list, fingerprints: dict, provider=None, progress:
         if str(first.path) not in skip and str(second.path) not in skip:
             if version_marks(first) == version_marks(second):
                 clusters.join(first, second)
-            else:
+            elif _same_place(first, second):          # le altre coppie dubbie non sarebbero comunque un doppione
                 doubtful.append((first, second))
     verdicts = {}
     errors = []
@@ -1059,11 +1066,18 @@ def detect_same_songs(tracks: list, fingerprints: dict, provider=None, progress:
             clusters.join(first, second, reason)
     by_artist = {}
     for members, notes in clusters.groups():
-        paths = []
+        # un doppione è lo stesso brano due volte nello stesso album e nello stesso formato: una copia in un altro
+        # formato (FLAC e MP3) o in un altro album (una raccolta) va bene
+        counts = {}
         for track in members:
-            paths.append(track.path)
-        if not one_per_format(paths):         # lo stesso brano in FLAC e in MP3 (una copia per formato): va bene
-            by_artist.setdefault(members[0].display_artist, []).append((members, notes))
+            place = (track.album_key, track.path.suffix.lower())
+            counts[place] = counts.get(place, 0) + 1
+        repeated = []
+        for track in members:
+            if counts[(track.album_key, track.path.suffix.lower())] > 1:
+                repeated.append(track)
+        if repeated:
+            by_artist.setdefault(repeated[0].display_artist, []).append((repeated, notes))
     issues = []
     number = 0
     for artist in sorted(by_artist, key=str.lower):
@@ -1083,9 +1097,10 @@ def detect_same_songs(tracks: list, fingerprints: dict, provider=None, progress:
         shown = lines[:10]
         if len(lines) > 10:
             shown.append(f"… e altri {len(lines) - 10}")
-        detail = ("Lo stesso brano in più file. Può essere giusto (l'album originale e una raccolta, un MP3 e un FLAC "
-                  "tenuti apposta) oppure un doppione da togliere: quale tenere lo decidi tu (Mostra i brani).\n"
-                  + "\n".join(shown))
+        listed = "\n".join(shown)
+        detail = (f"Lo stesso brano più volte nello stesso album e nello stesso formato: di solito una copia in più da "
+                  f"togliere; quale tenere lo decidi tu (Mostra i brani). Le copie in un altro formato (FLAC e MP3) e "
+                  f"lo stesso brano in un altro album (una raccolta) non si segnalano.\n{listed}")
         issues.append(Issue(KIND_DUPLICATE, SEVERITY_LOW, f"{artist}: {_tracks_text(len(songs))} in più copie",
                             detail, files, origin=ORIGIN_AI if used_ai else ORIGIN_RULE, rule_id=f"R15.{number}"))
     if len(doubtful) > AI_MAX_PAIRS and provider is not None:

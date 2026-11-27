@@ -265,7 +265,9 @@ def test_cancel_during_the_ai_keeps_every_rule_and_drops_the_ai(tmp_path):
     tagged(tmp_path / "Buchi" / "1.mp3", title="X", artist="Gruppo", album="Buchi", track_number=1, track_total=3)
     tagged(tmp_path / "Buchi" / "3.mp3", title="Y", artist="Gruppo", album="Buchi", track_number=3, track_total=3)
     tagged(tmp_path / "Raccolta" / "1.mp3", title="X", artist="Gruppo", album="Raccolta", track_number=1,
-           track_total=1)
+           track_total=2)
+    tagged(tmp_path / "Raccolta" / "2.mp3", title="X", artist="Gruppo", album="Raccolta", track_number=2,
+           track_total=2)                                       # lo stesso brano due volte: un doppione
     tracks = scan_folder(tmp_path)
     cancel = threading.Event()
     checks = frozenset({scan.CHECK_FEW, scan.CHECK_MISSING, scan.CHECK_DUPLICATES})

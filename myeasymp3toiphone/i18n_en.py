@@ -1527,9 +1527,14 @@ CATALOG = {
         "tracks without title, album or artist",
     "file danneggiati, bloccati o disponibili solo online":
         "damaged, locked or online-only files",
-    "lo stesso brano in più file: stesso audio anche con tag diversi, oppure stessa durata, titolo e artista in file diversi; una copia per formato (FLAC e MP3) va bene; l'AI guarda solo le coppie sospette":
-        "the same track in several files: same audio even with different tags, or same duration, title and artist in "
-        "different files; one copy per format (FLAC and MP3) is fine; the AI looks only at the suspicious pairs",
+    "lo stesso brano due volte nello stesso album e formato: stesso audio anche con tag diversi, oppure stessa durata, titolo e artista; una copia in un altro formato (FLAC e MP3) o in un altro album va bene; l'AI guarda solo le coppie sospette":
+        "the same track twice in the same album and format: same audio even with different tags, or same duration, "
+        "title and artist; a copy in another format (FLAC and MP3) or in another album is fine; the AI looks only at "
+        "the suspicious pairs",
+    "Lo stesso brano più volte nello stesso album e nello stesso formato: di solito una copia in più da togliere; quale tenere lo decidi tu (Mostra i brani). Le copie in un altro formato (FLAC e MP3) e lo stesso brano in un altro album (una raccolta) non si segnalano.\n{0}":
+        "The same track several times in the same album and the same format: usually an extra copy to remove; you "
+        "decide which one to keep (Show the tracks). Copies in another format (FLAC and MP3) and the same track in "
+        "another album (a compilation) are not reported.\n{0}",
     "1 brano":
         "1 track",
     "controllo file: {0}":
