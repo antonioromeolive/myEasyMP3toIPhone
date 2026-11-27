@@ -5,13 +5,13 @@ import os
 import re
 import shutil
 import threading
-import unicodedata
 from collections import Counter
 from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path, PureWindowsPath
 from typing import Callable, Optional
 
+from .names import LEVEL_ACCENTS, fold
 from .tags import TagError, TrackTags, is_audio_file, read_tags
 
 log = logging.getLogger(__name__)
@@ -330,12 +330,7 @@ def scan_folder(folder: Path, progress: Optional[ProgressFn] = None,
 def group_name(text: str) -> str:
     """Il nome che decide il gruppo: senza differenze di maiuscole, accenti e spazi. Ricordato: gli stessi artisti
     e album tornano su migliaia di brani a ogni apertura."""
-    decomposed = unicodedata.normalize("NFKD", text.casefold())
-    kept = ""
-    for char in decomposed:
-        if not unicodedata.combining(char):
-            kept += char
-    result = re.sub(r"\s+", " ", kept).strip()
+    result = fold(text, LEVEL_ACCENTS)
     return result
 
 

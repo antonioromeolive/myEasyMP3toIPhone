@@ -2,17 +2,23 @@
 # Author: Antonio Romeo (with Claude Code et al.)
 # SPDX-License-Identifier: MIT (see the LICENSE file for the full terms)
 
-"""La scansione della libreria (sul PC, sul posto) o della musica sull'iPhone, per trovare i problemi tipici:
+"""La scansione della libreria (sul PC, sul posto) o della musica sull'iPhone, per trovare i problemi tipici. L'elenco
+completo delle regole, il loro ordine e il perché sono in checks_requirements.md; in breve, a livelli:
 
-  * file che non vengono aggiornati: sola lettura, tag ID3v1 o APE con valori vecchi che alcuni lettori leggono per
-    primi, ID3 v2.4/v2.2 che Windows e diverse app non leggono, copie doppie "Titolo (2)", brani nell'app Musica
-    dell'iPhone con tag diversi da quelli del PC;
-  * album con pochi brani: numeri di traccia mancanti, meno brani del totale dichiarato, album di uno o due brani;
-  * collezioni divise su più album: la stessa cartella con album diversi, lo stesso album scritto in modi diversi
-    (maiuscole, "CD1"/"Disc 2"), compilation senza "Artista album", lo stesso artista scritto in modi diversi.
+  1. file: illeggibili (R5), percorsi troppo lunghi (R19), vecchi tag ID3v1/APE (R2, R3), formati non supportati (R18);
+  2. campi del brano: tag mancanti o segnaposto (R6), numero o artista nel titolo (R20), spazi in più (R21), lettere
+     accentate rovinate (R22);
+  3. nomi: lo stesso artista scritto in modi diversi (R23 maiuscole/accenti/spazi, R14 punteggiatura/ordine, R16
+     forse lo stesso), in tutta la musica;
+  4. coerenza dell'album: cartella divisa (R11), album scritto in modi diversi (R12, R13, R24), artista dell'album
+     (R25, R26), spunta Compilation (R27), album che l'iPhone unisce (R28), numeri e totali (R30, R31);
+  5. completezza: numeri di traccia mancanti (R9), album di 1-2 brani (R10);
+  6. doppioni: copie "(2)" (R7), stesso numero e titolo (R8), stesso numero e titoli diversi (R29), stesso brano
+     (R15).
 
-Prima le regole (locali, veloci e gratuite), poi, se c'è un profilo AI, l'AI riceve una tabella compatta degli album e
-i problemi trovati: li conferma o li scarta, ne aggiunge altri e propone le correzioni dei tag.
+Ogni livello vede le correzioni di quelli prima come già fatte (scan_rules.RuleView). Sull'iPhone girano le regole
+di prima (fino a R16), più il confronto con il PC (I1-I4). Poi, se c'è un profilo AI, l'AI riceve una tabella compatta
+degli album e i problemi trovati: li conferma o li scarta, ne aggiunge altri e propone le correzioni dei tag.
 """
 
 from __future__ import annotations
@@ -22,7 +28,6 @@ import os
 import re
 import threading
 import time
-import unicodedata
 from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -40,6 +45,7 @@ from .artist_names import (
 from .artist_names import ask_ai as ask_ai_names
 from . import cue
 from .i18n import tr
+from .names import LEVEL_PUNCT, POLICY_MOST, choose_spelling, fold
 from .phone_library import DEVICE_ABSENT, DEVICE_STALE, PhoneIndex, device_status
 from .tags import OLD_APE, OLD_ID3V1, OLD_TAG_REMOVED, TrackTags
 
@@ -53,15 +59,19 @@ KIND_MISSING_TAGS = "tag_mancanti"
 KIND_UNREADABLE = "illeggibile"
 KIND_ONLY_ON_DEVICE = "solo_su_iphone"
 KIND_ONLINE = "catalogo_online"          # Verifica online: tag diversi da quelli del catalogo
+KIND_FORMAT = "formato_non_supportato"
+KIND_NAMES = "nomi_scritti_diversi"
 KIND_LABELS = {
     KIND_NOT_UPDATED: "File che non si aggiornano",
-    KIND_FEW_TRACKS: "Album con pochi brani",
-    KIND_SPLIT: "Collezioni divise su più album",
+    KIND_FEW_TRACKS: "Album con pochi brani o numeri sbagliati",
+    KIND_SPLIT: "Album divisi o incoerenti",
     KIND_DUPLICATE: "Brani duplicati",
-    KIND_MISSING_TAGS: "Tag mancanti",
+    KIND_MISSING_TAGS: "Tag mancanti o scritti male",
     KIND_UNREADABLE: "File illeggibili",
     KIND_ONLY_ON_DEVICE: "Solo sull'iPhone",
     KIND_ONLINE: "Diversi dal catalogo online",
+    KIND_FORMAT: "Formati non supportati",
+    KIND_NAMES: "Nomi scritti in modi diversi",
 }
 AI_KINDS = (KIND_NOT_UPDATED, KIND_FEW_TRACKS, KIND_SPLIT, KIND_DUPLICATE, KIND_MISSING_TAGS)
 
@@ -76,7 +86,7 @@ ORIGIN_ONLINE = "online"
 
 FIX_TAGS = "tags"            # modifiche dei tag: restano in sospeso (overlay), i file sul PC non cambiano
 
-VARIOUS_ARTISTS = "Artisti vari"
+VARIOUS_ARTISTS = "Artisti Vari"      # con le iniziali maiuscole (D-1), come quello che l'iPhone ha già
 DISC_MARKER = re.compile(r"[\s\-–,:]*[\(\[]?\s*(?:disc|disco|disk|cd)\s*(\d{1,2})\s*[\)\]]?\s*$", re.IGNORECASE)
 NUMBERED_COPY = re.compile(r"^(.*) \((\d+)\)$")
 YEAR_SUFFIX = re.compile(r"^(.*?)\s*\((\d{4})\)$")
@@ -92,17 +102,23 @@ CHECK_MISSING = "tag_mancanti"
 CHECK_UNREADABLE = "illeggibili"
 CHECK_DUPLICATES = "duplicati"
 CHECKS = (
-    (CHECK_FILES, "File che non si aggiornano",
-     "MP3 con un vecchio tag ID3v1 diverso o un tag APE; sull'iPhone, brani con tag diversi da quelli del PC"),
-    (CHECK_FEW, "Album con pochi brani",
-     "numeri di traccia mancanti, meno brani del totale dichiarato, album di 1-2 brani"),
-    (CHECK_SPLIT, "Collezioni divise su più album",
-     "una cartella con album diversi, lo stesso album scritto in modi diversi o con \"CD 1\" nel nome, "
-     "compilation senza artista dell'album"),
-    (CHECK_VARIANTS, "Artisti scritti in modi diversi",
-     "\"The Beatles\" e \"Beatles\", \"AC/DC\" e \"ACDC\", accenti (le maiuscole da sole non contano)"),
-    (CHECK_MISSING, "Tag mancanti", "brani senza titolo, album o artista"),
-    (CHECK_UNREADABLE, "File illeggibili", "file danneggiati, bloccati o disponibili solo online"),
+    (CHECK_FILES, "File: vecchi tag e formati",
+     "MP3 con un vecchio tag ID3v1 diverso o un tag APE; file che non sono MP3, FLAC o M4A; sull'iPhone, brani con "
+     "tag diversi da quelli del PC"),
+    (CHECK_FEW, "Album con pochi brani o numeri sbagliati",
+     "numeri di traccia mancanti, meno brani del totale dichiarato, album di 1-2 brani, numeri di disco mancanti, "
+     "totali diversi tra i brani"),
+    (CHECK_SPLIT, "Album divisi o incoerenti",
+     "una cartella con album diversi, lo stesso album scritto in modi diversi o con \"CD 1\" nel nome, artista "
+     "dell'album diverso o mancante, spunta Compilation, album che l'iPhone unirebbe"),
+    (CHECK_VARIANTS, "Nomi scritti in modi diversi",
+     "lo stesso artista con maiuscole, accenti o spazi diversi (\"Queen\" e \"queen\"), \"The Beatles\" e "
+     "\"Beatles\", \"AC/DC\" e \"ACDC\": una grafia sola in tutta la musica"),
+    (CHECK_MISSING, "Tag mancanti o scritti male",
+     "brani senza titolo, album o artista o con un segnaposto (\"Unknown Artist\", \"Track 01\"), numero o artista "
+     "nel titolo, spazi in più, lettere accentate rovinate"),
+    (CHECK_UNREADABLE, "File illeggibili", "file danneggiati, bloccati, disponibili solo online o con il percorso "
+     "troppo lungo"),
     (CHECK_DUPLICATES, "Brani duplicati",
      "lo stesso brano due volte nello stesso album e formato: stesso audio anche con tag diversi, oppure stessa "
      "durata, titolo e artista; vanno bene una copia in un altro formato (FLAC e MP3) o in un altro album, e le "
@@ -110,7 +126,8 @@ CHECKS = (
 )
 ALL_CHECKS = frozenset(check_id for check_id, _label, _note in CHECKS)
 KIND_CHECK = {KIND_NOT_UPDATED: CHECK_FILES, KIND_FEW_TRACKS: CHECK_FEW, KIND_SPLIT: CHECK_SPLIT,
-              KIND_DUPLICATE: CHECK_DUPLICATES, KIND_MISSING_TAGS: CHECK_MISSING, KIND_UNREADABLE: CHECK_UNREADABLE}
+              KIND_DUPLICATE: CHECK_DUPLICATES, KIND_MISSING_TAGS: CHECK_MISSING, KIND_UNREADABLE: CHECK_UNREADABLE,
+              KIND_FORMAT: CHECK_FILES, KIND_NAMES: CHECK_VARIANTS}
 AI_REVIEW_CHECKS = frozenset({CHECK_FILES, CHECK_FEW, CHECK_SPLIT, CHECK_VARIANTS, CHECK_MISSING})  # per album
 SAME_SONG_TOLERANCE = 2.0     # secondi: lo stesso brano in due file ha quasi la stessa durata
 TITLE_EXTRA = re.compile(r"\s*[\(\[][^\)\]]*[\)\]]|\s+-\s+.*$")
@@ -137,6 +154,7 @@ class Issue:
     origin: str = ORIGIN_RULE
     rule_id: str = ""
     ai_note: str = ""
+    step: int = 99         # il passo delle regole che l'ha trovato (rule_issues): a parità di campo vince il passo dopo
 
     def sort_key(self) -> tuple:
         result = (SEVERITY_ORDER.get(self.severity, 3), self.kind, self.title.lower())
@@ -164,12 +182,8 @@ class ScanReport:
 # --------------------------------------------------------------------------- testi
 
 def _plain(text: str) -> str:
-    decomposed = unicodedata.normalize("NFKD", text.casefold())
-    kept = ""
-    for char in decomposed:
-        if not unicodedata.combining(char):
-            kept += char
-    result = re.sub(r"[^a-z0-9]+", " ", kept.replace("&", " and ")).strip()
+    """Senza maiuscole, accenti e punteggiatura (names.LEVEL_PUNCT)."""
+    result = fold(text, LEVEL_PUNCT)
     return result
 
 
@@ -306,9 +320,11 @@ def detect_file_problems(tracks: list, progress: Optional[ProgressFn] = None,
 
 
 def detect_unreadable(tracks: list) -> list:
+    """R5: i file che non si leggono. Quelli con il percorso troppo lungo li spiega R19 (scan_rules)."""
+    from .scan_rules import MAX_PATH
     broken = []
     for track in tracks:
-        if track.error:
+        if track.error and len(str(track.path)) < MAX_PATH:
             broken.append(track.path)
     issues = []
     if broken:
@@ -318,32 +334,64 @@ def detect_unreadable(tracks: list) -> list:
     return issues
 
 
+PLACEHOLDER_KEYS = frozenset({
+    "unknown", "unknown artist", "unknown album", "unknown title", "no artist", "no album", "artist", "album",
+    "sconosciuto", "artista sconosciuto", "album sconosciuto", "artista", "senza titolo", "senza nome", "untitled",
+    "various", "title", "titolo",
+})
+PLACEHOLDER_TITLE = re.compile(r"^(?:track|traccia|brano|pista|audio track|titolo|title|untitled|senza titolo)"
+                               r"(?: ?\d+)?$")
+
+
+def is_placeholder(name: str, value: str) -> bool:
+    """Un valore che tiene il posto di quello vero: "Unknown Artist", "Album sconosciuto", "Track 01"."""
+    plain = _plain(value or "")
+    if name == "title":
+        result = bool(PLACEHOLDER_TITLE.match(plain))
+    else:
+        result = plain in PLACEHOLDER_KEYS and plain != "various"
+    return result
+
+
+def _empty(track: Track, name: str) -> bool:
+    value = getattr(track.tags, name) or ""
+    result = not value or is_placeholder(name, value)
+    return result
+
+
 def _guess_from_path(track: Track) -> dict:
-    """Album e artista dalle cartelle (…/Artista/Album/file), titolo dal nome del file senza "NN - "."""
+    """Album e artista dalle cartelle (…/Artista/Album/file), titolo dal nome del file senza "NN - ", al posto dei
+    campi vuoti o segnaposto; mai un segnaposto né il valore che c'è già."""
     guessed = {}
     folder = track.path.parent.name
     match = YEAR_SUFFIX.match(folder)
     if match:
         folder = match.group(1)
     artist_folder = track.path.parent.parent.name
-    if not track.tags.album and folder:
+    if _empty(track, "album") and folder:
         guessed["album"] = folder
-    if not track.tags.artist and not track.tags.album_artist and artist_folder:
+    if _empty(track, "artist") and _empty(track, "album_artist") and artist_folder:
         guessed["artist"] = artist_folder
-    if not track.tags.title:
+    if _empty(track, "title"):
         title_match = TRACK_PREFIX.match(track.path.stem)
         if title_match:
             guessed["title"] = title_match.group(3).strip()
         else:
             guessed["title"] = track.path.stem
-    return guessed
+    result = {}
+    for name, value in guessed.items():
+        if value != (getattr(track.tags, name) or "") and not is_placeholder(name, value):
+            result[name] = value
+    return result
 
 
 def detect_missing_tags(tracks: list) -> list:
+    """R6: brani senza titolo, album o artista, o con un segnaposto ("Unknown Artist", "Track 01"); la correzione li
+    ricava dai nomi di cartelle e file, quando ci sono."""
     by_folder = {}
     for track in tracks:
-        missing = not track.error and (not track.tags.title or not track.tags.album
-                                       or not (track.tags.artist or track.tags.album_artist))
+        missing = not track.error and (_empty(track, "title") or _empty(track, "album")
+                                       or (_empty(track, "artist") and _empty(track, "album_artist")))
         if missing:
             by_folder.setdefault(track.path.parent, []).append(track)
     issues = []
@@ -361,7 +409,8 @@ def detect_missing_tags(tracks: list) -> list:
         issues.append(Issue(
             KIND_MISSING_TAGS, SEVERITY_MEDIUM, f"{len(folder_tracks)} brani senza titolo, album o artista in "
             f"{_short(folder)}",
-            "Senza album o artista i brani finiscono in \"Album sconosciuto\" / \"Artista sconosciuto\" e la "
+            "Titolo, album o artista mancano o sono un segnaposto (\"Unknown Artist\", \"Album sconosciuto\", "
+            "\"Track 01\"): sull'iPhone i brani finiscono in \"Album sconosciuto\" / \"Artista sconosciuto\" e la "
             "collezione appare divisa.",
             [track.path for track in folder_tracks], fix, rule_id=f"R6.{number}"))
     return issues
@@ -598,16 +647,39 @@ def detect_split_folders(tracks: list) -> list:
                 else:
                     album_artist = _most_common([t.tags.artist for t in folder_tracks])
             names = sorted({f"{k[0]} — {k[1]}" for k in keys})
+            changes = _with_disc_numbers(_unify_changes(folder_tracks, {"album": album, "album_artist": album_artist}),
+                                         folder_tracks)
             issues.append(Issue(
                 KIND_SPLIT, SEVERITY_HIGH, f"{_short(folder)}: un album diviso in {len(keys)}",
                 "I brani di questa cartella risultano in album diversi: " + "; ".join(names) + ". Di solito "
-                "l'\"Artista album\" manca o è scritto in modo diverso: per una compilation va messo \"Artisti "
-                "vari\" su tutti i brani.",
+                f"l'\"Artista album\" manca o è scritto in modo diverso: per una compilation va messo \"{VARIOUS_ARTISTS}\" "
+                "su tutti i brani. Un \"CD 1\"/\"Disc 2\" nel nome passa nel campo N. disco.",
                 [t.path for t in folder_tracks],
                 Fix(FIX_TAGS, f"Album \"{album}\", artista album \"{album_artist}\" su tutti i brani",
-                    changes=_unify_changes(folder_tracks, {"album": album, "album_artist": album_artist})),
+                    changes=changes),
                 rule_id=f"R11.{number}"))
     return issues
+
+
+def _with_disc_numbers(changes: list, tracks: list) -> list:
+    """Le correzioni con in più il numero del disco preso dal nome dell'album ("Album (CD 2)" → N. disco 2), per i
+    brani che lo hanno nel nome: togliere "CD 2" dal nome senza scriverlo nel numero lo perderebbe."""
+    by_path = {}
+    order = []
+    for path, values in changes:
+        by_path[path] = dict(values)
+        order.append(path)
+    for track in tracks:
+        _base, disc = split_disc_marker(track.tags.album or "")
+        if disc is not None and track.tags.disc_number != disc:
+            if track.path not in by_path:
+                by_path[track.path] = {}
+                order.append(track.path)
+            by_path[track.path]["disc_number"] = disc
+    result = []
+    for path in order:
+        result.append((path, by_path[path]))
+    return result
 
 
 def _spellings_title(album: str, keys: list) -> str:
@@ -627,8 +699,18 @@ def _spellings_title(album: str, keys: list) -> str:
     return result
 
 
-def detect_split_names(tracks: list) -> list:
-    """Lo stesso album scritto in modi diversi (maiuscole, "CD 2", punteggiatura) o diviso per artista."""
+def _touches(tracks: list, selected: Optional[set]) -> bool:
+    """Qualcuno dei brani è tra quelli controllati (selected: i percorsi; None: tutti)."""
+    result = selected is None
+    for track in tracks:
+        if not result and str(track.path) in selected:
+            result = True
+    return result
+
+
+def detect_split_names(tracks: list, selected: Optional[set] = None) -> list:
+    """Lo stesso album scritto in modi diversi (punteggiatura, "CD 2") o diviso per artista. tracks: tutta la musica;
+    selected: i percorsi dei brani controllati (None: tutti), i soli problemi che li toccano."""
     groups = group_by_album(tracks)
     by_name = {}
     for key, album_tracks in groups.items():
@@ -637,17 +719,26 @@ def detect_split_names(tracks: list) -> list:
     issues = []
     number = 0
     for norm, keys in sorted(by_name.items()):
-        if len(keys) > 1:
+        all_tracks = []
+        for key in keys:
+            all_tracks += groups[key]
+        if len(keys) > 1 and _touches(all_tracks, selected):
             number += 1
-            all_tracks = []
-            for key in keys:
-                all_tracks += groups[key]
             same_artist = len({artist_norm(key[0]) for key in keys}) == 1
             album = _most_common([split_disc_marker(t.tags.album)[0] for t in all_tracks])
             names = "; ".join(sorted(f"{k[0]} — {k[1]}" for k in keys))
             changes = []
             if same_artist:
-                album_artist = _most_common([t.tags.album_artist or t.tags.artist for t in all_tracks])
+                spellings = []
+                counts = {}
+                for track in all_tracks:
+                    value = track.tags.album_artist or track.tags.artist
+                    if value:
+                        if value not in counts:
+                            spellings.append(value)
+                            counts[value] = 0
+                        counts[value] += 1
+                album_artist = choose_spelling(spellings, counts, POLICY_MOST).spelling
                 for track in all_tracks:
                     wanted = {}
                     base, disc = split_disc_marker(track.tags.album)
@@ -661,8 +752,8 @@ def detect_split_names(tracks: list) -> list:
                         changes.append((track.path, wanted))
                 issues.append(Issue(
                     KIND_SPLIT, SEVERITY_HIGH, _spellings_title(album, keys),
-                    f"Lo stesso album compare come: {names}. Maiuscole, punteggiatura o un \"CD 1\"/\"Disc 2\" nel "
-                    "nome lo dividono; il numero del disco va nel campo N. disco.",
+                    f"Lo stesso album compare come: {names}. La punteggiatura o un \"CD 1\"/\"Disc 2\" nel nome lo "
+                    "dividono; il numero del disco va nel campo N. disco.",
                     [t.path for t in all_tracks],
                     Fix(FIX_TAGS, f"Album \"{album}\" e artista album \"{album_artist}\" su tutti i brani, numero "
                         "del disco dal nome", changes=changes), rule_id=f"R12.{number}"))
@@ -684,37 +775,33 @@ def detect_split_names(tracks: list) -> list:
     return issues
 
 
-def detect_artist_variants(tracks: list) -> list:
-    """Lo stesso artista scritto in modi diversi, certo: "The Beatles"/"Beatles", "AC/DC"/"ACDC", maiuscole, accenti,
-    "Battiato Franco"/"Franco Battiato" (artist_names.variant_key)."""
-    by_norm = {}
-    for track in tracks:
-        name = track.display_artist
-        if name != UNKNOWN_ARTIST:
-            by_norm.setdefault(variant_key(name), []).append(track)
+def detect_artist_variants(tracks: list, selected: Optional[set] = None) -> list:
+    """R14: lo stesso artista scritto in modi diversi, certo: "The Beatles"/"Beatles", "AC/DC"/"ACDC", "Battiato
+    Franco"/"Franco Battiato" (names.LEVEL_WORDS), nell'artista dei brani e nell'artista dell'album. Le differenze di
+    sole maiuscole, accenti e spazi le trova R23 (scan_rules), che gira prima. tracks: tutta la musica; selected: i
+    percorsi dei brani controllati (None: tutti). Vince la grafia con le iniziali maiuscole più usata (D-2)."""
+    from .scan_rules import _name_usage, _rename_changes
+    usage = _name_usage(tracks, variant_key)
     issues = []
     number = 0
-    for norm, artist_tracks in sorted(by_norm.items()):
-        written = {t.display_artist for t in artist_tracks}
-        folded = set()
-        for name in written:
-            folded.add(name.casefold())
-        if len(folded) > 1 and norm:              # diversi solo per le maiuscole: uguali
+    for norm in sorted(usage):
+        spellings, counts, paths = usage[norm]
+        forms = set()
+        for spelling in spellings:
+            forms.add(_plain(spelling))
+        touched = selected is None or bool(paths & selected)
+        if len(spellings) > 1 and len(forms) > 1 and touched:
             number += 1
-            chosen = _most_common([t.display_artist for t in artist_tracks])
-            changes = []
-            for track in artist_tracks:
-                wanted = {}
-                if track.tags.album_artist and track.tags.album_artist != chosen:
-                    wanted["album_artist"] = chosen
-                if track.tags.artist and variant_key(track.tags.artist) == norm and track.tags.artist != chosen:
-                    wanted["artist"] = chosen
-                if wanted:
-                    changes.append((track.path, wanted))
+            chosen = choose_spelling(spellings, counts, POLICY_MOST).spelling
+            changes = _rename_changes(tracks, set(spellings), chosen)
+            files = []
+            for track in tracks:
+                if str(track.path) in paths:
+                    files.append(track.path)
             issues.append(Issue(
-                KIND_SPLIT, SEVERITY_MEDIUM, f"Artista scritto in {len(written)} modi: " + ", ".join(sorted(written)),
-                "Le varianti dividono la collezione dell'artista negli elenchi e sull'iPhone.",
-                [t.path for t in artist_tracks],
+                KIND_NAMES, SEVERITY_MEDIUM, f"Artista scritto in {len(spellings)} modi: " + ", ".join(sorted(spellings)),
+                "Le varianti dividono la collezione dell'artista negli elenchi e sull'iPhone. Vince la grafia con le "
+                "iniziali maiuscole, la più usata.", files,
                 Fix(FIX_TAGS, f"Scrivi ovunque \"{chosen}\"", changes=changes), rule_id=f"R14.{number}"))
     return issues
 
@@ -729,7 +816,14 @@ def _artist_context(tracks: list) -> tuple:
     names = {}
     context = {}
     for key, key_tracks in by_key.items():
-        names[key] = _most_common([track.display_artist for track in key_tracks])
+        spellings = []
+        counts = {}
+        for track in key_tracks:
+            if track.display_artist not in counts:
+                spellings.append(track.display_artist)
+                counts[track.display_artist] = 0
+            counts[track.display_artist] += 1
+        names[key] = choose_spelling(spellings, counts, POLICY_MOST).spelling      # come R14 e R23 (D-2)
         albums = []
         for track in key_tracks:
             label = f"{track.tags.album} ({track.tags.year})" if track.tags.year else track.tags.album
@@ -741,12 +835,14 @@ def _artist_context(tracks: list) -> tuple:
 
 
 def _unify_artist(keys: list, names: dict, context: dict, by_key: dict) -> tuple:
-    """(grafia scelta, file, modifiche) per unire i nomi delle chiavi nella forma più usata (più brani)."""
-    chosen_key = keys[0]
+    """(grafia scelta, file, modifiche) per unire i nomi delle chiavi: la grafia con le iniziali maiuscole più usata
+    (più brani, D-2)."""
+    spellings = []
+    counts = {}
     for key in keys:
-        if context[key][0] > context[chosen_key][0]:
-            chosen_key = key
-    chosen = names[chosen_key]
+        spellings.append(names[key])
+        counts[names[key]] = context[key][0]
+    chosen = choose_spelling(spellings, counts, POLICY_MOST).spelling
     files = []
     changes = []
     for key in keys:
@@ -765,13 +861,34 @@ def _unify_artist(keys: list, names: dict, context: dict, by_key: dict) -> tuple
 
 
 def detect_artist_doubts(tracks: list, provider=None, musicbrainz=None, progress: Optional[ProgressFn] = None,
-                         cancel: Optional[threading.Event] = None) -> tuple:
-    """I nomi forse dello stesso artista: solo il cognome ("Battiato"), iniziali ("F. Battiato"), errori di battitura.
-    Decide MusicBrainz (se chiesto: nome e alias dello stesso artista), poi l'AI (con album e anni); senza nessuno
-    dei due restano "da controllare". (problemi con la correzione verso la forma più usata, errori)."""
+                         cancel: Optional[threading.Event] = None, context: Optional[list] = None) -> tuple:
+    """R16: i nomi forse dello stesso artista: solo il cognome ("Battiato"), iniziali ("F. Battiato"), errori di
+    battitura. Decide MusicBrainz (se chiesto: nome e alias dello stesso artista), poi l'AI (con album e anni); senza
+    nessuno dei due restano "da controllare". context: tutta la musica, quando tracks è una parte: i nomi si cercano
+    in tutta, ma si tengono solo i gruppi con un nome dei brani controllati. (problemi con la correzione verso la
+    forma con le iniziali maiuscole più usata, errori)."""
     from .albumcheck import AlbumCheckError
-    names, context, by_key = _artist_context(tracks)
-    groups = clusters(candidate_pairs(names))
+    everything = list(tracks)
+    if context:
+        seen = set()
+        for track in tracks:
+            seen.add(str(track.path))
+        for track in context:
+            if str(track.path) not in seen:
+                everything.append(track)
+    names, context_of, by_key = _artist_context(everything)
+    mine = set()
+    for track in tracks:
+        mine.add(variant_key(track.display_artist))
+    groups = []
+    for members, why in clusters(candidate_pairs(names)):
+        touched = False
+        for key in members:
+            if key in mine:
+                touched = True
+        if touched:
+            groups.append((members, why))
+    context = context_of
     decided = {}
     errors = []
     if musicbrainz is not None:
@@ -824,9 +941,9 @@ def detect_artist_doubts(tracks: list, provider=None, musicbrainz=None, progress
             title = ("Lo stesso artista scritto in modi diversi: " if confirmed else "Forse lo stesso artista: ") \
                 + ", ".join(written)
             issues.append(Issue(
-                KIND_SPLIT, SEVERITY_MEDIUM if confirmed else SEVERITY_LOW, title,
+                KIND_NAMES, SEVERITY_MEDIUM if confirmed else SEVERITY_LOW, title,
                 f"Le varianti dividono la collezione dell'artista negli elenchi e sull'iPhone ({reason}). Vince la "
-                "forma più usata.", files,
+                "grafia con le iniziali maiuscole, la più usata.", files,
                 Fix(FIX_TAGS, f"Scrivi ovunque \"{chosen}\"", changes=changes) if changes else None,
                 origin=origin, rule_id=f"R16.{number}"))
     result = (issues, errors)
@@ -853,7 +970,10 @@ def merge_overlapping(issues: list) -> list:
     contiene "diviso tra artisti" (R13); un album di 1-2 brani che fa parte di una collezione divisa (R10) non è un
     problema a sé; un album incompleto che è anche diviso lo dice."""
     folders = [issue for issue in issues if issue.rule_id.startswith("R11")]
-    splits = [issue for issue in issues if issue.kind == KIND_SPLIT]
+    splits = []                    # le collezioni divise: non R24-R28, che guardano un album intero
+    for issue in issues:
+        if issue.rule_id.split(".", 1)[0] in ("R11", "R12", "R13"):
+            splits.append(issue)
     kept = []
     for issue in issues:
         drop = ((issue.rule_id.startswith("R13") and _covered(issue, folders))
@@ -876,25 +996,63 @@ def drop_repeated(ai_issues: list, found_by_rules: list) -> list:
     return kept
 
 
+def rule_steps(view, check_files: bool, progress: Optional[ProgressFn] = None,
+               cancel: Optional[threading.Event] = None, pc: bool = True) -> list:
+    """I passi delle regole, nell'ordine dei livelli (checks_requirements.md, sezione 6): [(controllo, si fa,
+    funzione che restituisce i problemi)]. view: scan_rules.RuleView. pc: le regole nuove (R18-R31) solo sul PC."""
+    from . import scan_rules as more
+    selected = view.selected_paths() if view.partial else None
+    whole = view.all if view.partial else None
+    result = [
+        # 1. file
+        (CHECK_UNREADABLE, True, lambda: detect_unreadable(view.selected)),
+        (CHECK_UNREADABLE, pc, lambda: more.detect_long_paths(view.selected)),
+        (CHECK_FILES, check_files, lambda: detect_file_problems(view.selected, progress, cancel)),
+        (CHECK_FILES, check_files and pc, lambda: more.detect_unsupported_formats(view.selected)),
+        # 2. campi del brano
+        (CHECK_MISSING, True, lambda: detect_missing_tags(view.selected)),
+        (CHECK_MISSING, pc, lambda: more.detect_title_prefixes(view.selected)),
+        (CHECK_MISSING, pc, lambda: more.detect_spaces(view.selected)),
+        (CHECK_MISSING, pc, lambda: more.detect_mojibake(view.selected)),
+        # 3. nomi, in tutta la musica
+        (CHECK_VARIANTS, pc, lambda: more.detect_spelling_variants(view)),
+        (CHECK_VARIANTS, True, lambda: detect_artist_variants(view.all, selected)),
+        # 4. coerenza dell'album
+        (CHECK_SPLIT, True, lambda: detect_split_folders(view.selected)),
+        (CHECK_SPLIT, True, lambda: detect_split_names(view.all, selected)),
+        (CHECK_SPLIT, pc, lambda: more.detect_album_name_spellings(view)),
+        (CHECK_SPLIT, pc, lambda: more.detect_album_artist_spellings(view)),
+        (CHECK_SPLIT, pc, lambda: more.detect_album_artist_from_artist(view)),
+        (CHECK_SPLIT, pc, lambda: more.detect_compilation_flags(view)),
+        (CHECK_SPLIT, pc, lambda: more.detect_phone_merges(view)),
+        (CHECK_FEW, pc, lambda: more.detect_track_numbers(view)),
+        # 5. completezza
+        (CHECK_FEW, True, lambda: detect_few_tracks(view.selected, whole)),
+        # 6. doppioni (R15, lo stesso brano con l'impronta, gira dopo: scan_tracks)
+        (CHECK_DUPLICATES, True, lambda: detect_duplicates(view.selected)),
+        (CHECK_DUPLICATES, pc, lambda: more.detect_number_clashes(view)),
+    ]
+    return result
+
+
 def rule_issues(tracks: list, check_files: bool, progress: Optional[ProgressFn] = None,
                 cancel: Optional[threading.Event] = None, checks: frozenset = ALL_CHECKS,
-                context: Optional[list] = None) -> list:
+                context: Optional[list] = None, pc: bool = True) -> list:
+    """I problemi delle regole dei controlli scelti, a livelli: ogni passo vede le correzioni dei passi prima come
+    già fatte (scan_rules.RuleView), e ogni problema ricorda il suo passo (Issue.step). context: tutta la musica,
+    quando tracks è una parte (nomi e album si giudicano interi). pc: False per la musica dell'iPhone."""
+    from .scan_rules import RuleView
+    view = RuleView(tracks, context)
     issues = []
-    if CHECK_UNREADABLE in checks:
-        issues += detect_unreadable(tracks)
-    if check_files and CHECK_FILES in checks:
-        issues += detect_file_problems(tracks, progress, cancel)
-    if CHECK_DUPLICATES in checks:
-        issues += detect_duplicates(tracks)
-    if CHECK_MISSING in checks:
-        issues += detect_missing_tags(tracks)
-    if CHECK_FEW in checks:
-        issues += detect_few_tracks(tracks, context)
-    if CHECK_SPLIT in checks:
-        issues += detect_split_folders(tracks)
-        issues += detect_split_names(tracks)
-    if CHECK_VARIANTS in checks:
-        issues += detect_artist_variants(tracks)
+    step = 0
+    for check, wanted, find in rule_steps(view, check_files, progress, cancel, pc):
+        step += 1
+        if wanted and check in checks:
+            found = find()
+            for issue in found:
+                issue.step = step
+            view.apply(found)
+            issues += found
     result = merge_overlapping(issues)
     return result
 
@@ -1489,7 +1647,7 @@ def scan_tracks(tracks: list, target: str, provider=None, check_files: bool = Tr
     album_context: tutti i brani della musica quando tracks è una parte: gli album incompleti si giudicano interi."""
     assign_groups(tracks)
     report = ScanReport(target=target, tracks_scanned=len(tracks), albums_scanned=len(group_by_album(tracks)))
-    issues = rule_issues(tracks, check_files, progress, cancel, checks, album_context)
+    issues = rule_issues(tracks, check_files, progress, cancel, checks, album_context, pc=phone_tracks is None)
     rules_cut = is_cancelled(cancel)
     if partial is not None:
         partial(list(issues))
@@ -1532,10 +1690,10 @@ def scan_tracks(tracks: list, target: str, provider=None, check_files: bool = Tr
             progress(0, 0, "nomi d'artista dubbi")
         helper = provider if not is_cancelled(cancel) else None
         catalog = musicbrainz if not is_cancelled(cancel) else None
-        found, errors = detect_artist_doubts(tracks, helper, catalog, progress, cancel)
+        found, errors = detect_artist_doubts(tracks, helper, catalog, progress, cancel, album_context)
         if (helper is not None or catalog is not None) and is_cancelled(cancel):
             _stopped(report, "Analisi AI" if helper is not None else "MusicBrainz")
-            found, errors = detect_artist_doubts(tracks, None, None, progress, None)    # solo le regole
+            found, errors = detect_artist_doubts(tracks, None, None, progress, None, album_context)  # solo regole
         issues += found
         report.ai_errors += errors
     if CHECK_DUPLICATES in checks and not rules_cut:
@@ -1607,8 +1765,9 @@ ADVICE = {
     "R3": "Niente di urgente: le copie inviate all'iPhone sono già senza il tag APE. Per pulire anche i file del PC: "
           "Applica la correzione, poi approva l'elenco dei file (il tag APE si toglie, i valori restano nell'ID3v2).",
     "R5": _MANUAL_UNREADABLE,
-    "R6": "Applica la correzione (se c'è) ricava i tag dai nomi di file e cartelle. Altrimenti Mostra i brani, poi "
-          "Cambia i tag (tasto E) e scrivi titolo, album e artista.",
+    "R6": "Applica la correzione (se c'è) ricava i tag dai nomi di file e cartelle: controlla la colonna Diventa. "
+          "Altrimenti Mostra i brani, poi Cambia i tag (tasto E) e scrivi titolo, album e artista al posto di quelli "
+          "vuoti o segnaposto (\"Unknown Artist\", \"Track 01\").",
     "R7": "Mostra i brani e confronta le due copie (tag, durata, qualità nell'editor dei tag). Tieni la migliore e "
           "sposta l'altra fuori dalle cartelle della musica con Esplora file (il programma non cancella i file del PC).",
     "R8": "Mostra i brani. Se sono lo stesso brano, tieni una copia e sposta l'altra fuori dalle cartelle della musica "
@@ -1616,19 +1775,59 @@ ADVICE = {
           "tag (tasto E).",
     "R9": "Premi Verifica online questi album: i cataloghi dicono quali brani mancano e quali sono i tag giusti. Se i brani mancano "
           "davvero, aggiungili alla cartella; se è sbagliato il numero di traccia, correggilo con Cambia i tag.",
-    "R10": "Se è un singolo, o vuoi solo questi brani, va bene così. Se sono brani di un album più grande, rendi album e "
-           "artista dell'album uguali a quelli degli altri brani (Cambia i tag), oppure premi Verifica online questi "
-           "album.",
+    "R10": "Se è un singolo, o vuoi solo questi brani: tasto destro sull'album → Va bene così, e non sarà più segnalato. "
+           "Se sono brani di un album più grande finiti a parte, Mostra i brani e con Cambia i tag (tasto E) scrivi "
+           "album e artista dell'album uguali a quelli degli altri brani; per sapere com'è l'album intero: tasto destro "
+           "→ Controlla online.",
     "R11": "Applica la correzione mette lo stesso album e lo stesso artista dell'album su tutti i brani della cartella. "
            "Se la cartella contiene davvero album diversi, ignora.",
     "R12": "Applica la correzione unifica il nome dell'album e sposta \"CD 1\" / \"Disc 2\" nel numero del disco.",
-    "R13": "Se è una compilation: Applica la correzione (se c'è), oppure Mostra i brani e Cambia i tag con artista "
-           "dell'album \"Artisti vari\" su tutti. Se sono album diversi che si chiamano allo stesso modo, ignora.",
-    "R14": "Applica la correzione scrive ovunque la forma più usata. Per sceglierne un'altra: Mostra i brani e Cambia i "
-           "tag.",
+    "R13": "Se è una compilation: Applica la correzione (se c'è), oppure Mostra i brani e Cambia i tag (tasto E) con "
+           f"artista dell'album \"{VARIOUS_ARTISTS}\" su tutti. Se sono album diversi che si chiamano allo stesso modo: "
+           "tasto destro sull'album → Va bene così.",
+    "R14": "Applica la correzione scrive ovunque la grafia scelta (anche negli album fuori dalla selezione: compaiono "
+           "nei risultati). Per sceglierne un'altra: Mostra i brani, Cambia i tag (tasto E) e scrivila su tutti, poi "
+           "Controlla di nuovo questi album.",
     "R15": _MANUAL_DUPLICATE,
     "R16": "Se è davvero lo stesso artista: Applica la correzione (vince la forma più usata). Se non sei sicuro, accendi "
            "MusicBrainz o l'AI e ripeti il controllo. Se sono artisti diversi, ignora.",
+    "R18": "Converti questi file in MP3 (320 kbps) o in FLAC con un programma di conversione (per esempio foobar2000 o "
+           "fre:ac), controllando che copi anche i tag. Metti i file convertiti nella stessa cartella, sposta gli "
+           "originali fuori dalle cartelle della musica con Esplora file (il programma non cancella i file del PC) e "
+           "premi Rileggi (F5). Se non ti servono sull'iPhone: tasto destro sull'album → Va bene così.",
+    "R19": "Accorcia il percorso: in Esplora file rinomina con un nome più corto la cartella dell'artista o dell'album "
+           "(o spostala più vicino alla cartella della musica), poi premi Rileggi (F5). Per arrivare alla cartella: "
+           "tasto destro sul problema → Apri la cartella in Esplora risorse.",
+    "R20": "Applica la correzione lascia nel titolo solo il titolo. Se il numero o il nome fa parte del titolo vero "
+           "(per esempio \"1999 - …\"), togli la casella di quella riga prima di applicare.",
+    "R21": "Applica la correzione: cambiano solo gli spazi in più, nessun rischio.",
+    "R22": "Con la correzione (lettere rovinate come \"Ã©\"): controlla la colonna Diventa e Applica. Con il carattere "
+           "\"�\" la lettera è persa: Mostra i brani, Cambia i tag (tasto E) e riscrivi a mano titolo, artista o "
+           "album; oppure tasto destro sull'album → Controlla online, per prendere i tag dal catalogo.",
+    "R23": "Applica la correzione scrive ovunque la grafia scelta (anche negli album fuori dalla selezione: compaiono "
+           "nei risultati). Con \"Accenti diversi\" controlla prima quale accento è giusto. Per un'altra grafia: "
+           "Mostra i brani, Cambia i tag (tasto E) e scrivila su tutti, poi Controlla di nuovo questi album.",
+    "R24": "Applica la correzione scrive il nome più usato su tutti i brani dell'album. Per un'altra grafia: Mostra i "
+           "brani, Cambia i tag (tasto E) e scrivi il nome dell'album su tutti i brani.",
+    "R25": "Applica la correzione scrive lo stesso artista dell'album su tutti i brani. Per un'altra grafia: Mostra i "
+           "brani, seleziona tutti i brani dell'album e in Cambia i tag (tasto E) scrivi l'artista dell'album.",
+    "R26": "Applica la correzione. Se è davvero una compilation di un solo artista: tasto destro sull'album → Va bene "
+           "così.",
+    "R27": f"Applica la correzione. Se l'album è davvero una compilation ma la correzione spegne la spunta, scrivi "
+           f"\"{VARIOUS_ARTISTS}\" come artista dell'album (Mostra i brani, Cambia i tag, tasto E) e Controlla di nuovo "
+           "questi album.",
+    "R28": "Se sono lo stesso album: Applica la correzione. Se sono album diversi: non applicare; Mostra i brani, "
+           "Cambia i tag (tasto E) e dai a uno dei due un nome che resti diverso anche senza gli zeri (per esempio "
+           "con l'anno: \"Raccolta 1 (1998)\").",
+    "R29": "Mostra i brani e guarda le cartelle. Se sono due album diversi con lo stesso nome (due \"Greatest Hits\", "
+           "due edizioni), dai a uno dei due un nome diverso con Cambia i tag (tasto E), per esempio con l'anno o "
+           "l'edizione: \"Greatest Hits (1981)\". Se è lo stesso album con i numeri sbagliati, correggi N. traccia (e "
+           "N. disco) dei brani sbagliati. Poi Controlla di nuovo questi album.",
+    "R30": "Mostra i brani e correggi con Cambia i tag (tasto E): il N. disco dei brani che non l'hanno (lo dicono di "
+           "solito la cartella o il nome del file, \"CD2\"), oppure il numero o il totale sbagliato. I numeri giusti "
+           "dell'edizione: tasto destro sull'album → Controlla online.",
+    "R31": "Applica la correzione scrive su tutti i brani il totale più frequente. Se è sbagliato proprio quello: "
+           "Mostra i brani e scrivi il totale giusto con Cambia i tag (tasto E) su tutti.",
     "I1": "Mostra i brani, poi nella scheda PC Usa i tag da PC a iPhone e Applica. Se sono giusti quelli dell'iPhone: "
           "scheda iPhone, Usa i tag da iPhone a PC.",
     "I2": "Mostra i brani, poi Copia da PC a iPhone e Applica. Se sull'iPhone non li vuoi, ignora.",
@@ -1652,6 +1851,9 @@ KIND_ADVICE = {
     KIND_UNREADABLE: _MANUAL_UNREADABLE,
     KIND_ONLY_ON_DEVICE: _ONLY_ON_DEVICE,
     KIND_ONLINE: "Applica le correzioni scelte scrive i tag del catalogo; controlla prima l'edizione.",
+    KIND_FORMAT: "Converti i file in MP3 o FLAC con un programma di conversione, poi Rileggi (F5).",
+    KIND_NAMES: "Applica la correzione (se c'è); altrimenti Mostra i brani e scrivi lo stesso nome su tutti con Cambia "
+                "i tag (tasto E).",
 }
 
 

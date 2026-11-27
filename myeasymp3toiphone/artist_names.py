@@ -18,9 +18,10 @@ from __future__ import annotations
 import logging
 import re
 import threading
-import unicodedata
 from difflib import SequenceMatcher
 from typing import Callable, Optional
+
+from .names import LEVEL_PUNCT, LEVEL_WORDS, fold
 
 log = logging.getLogger(__name__)
 
@@ -36,22 +37,14 @@ ProgressFn = Callable[[int, int, str], None]
 
 
 def plain_words(text: str) -> list:
-    decomposed = unicodedata.normalize("NFKD", (text or "").casefold())
-    kept = ""
-    for char in decomposed:
-        if not unicodedata.combining(char):
-            kept += char
-    result = re.sub(r"[^a-z0-9]+", " ", kept.replace("&", " and ")).split()
+    result = fold(text, LEVEL_PUNCT).split()
     return result
 
 
 def variant_key(name: str) -> str:
     """La chiave delle varianti certe: parole senza maiuscole, accenti e punteggiatura, senza "the" iniziale, in
-    ordine alfabetico, attaccate."""
-    words = plain_words(name)
-    if len(words) > 1 and words[0] == "the":
-        words = words[1:]
-    result = "".join(sorted(words))
+    ordine alfabetico, attaccate (names.LEVEL_WORDS)."""
+    result = fold(name, LEVEL_WORDS)
     return result
 
 

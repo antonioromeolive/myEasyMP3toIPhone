@@ -3839,4 +3839,228 @@ CATALOG = {
         '; bought or downloaded on the phone: a computer cannot remove it',
     'Da togliere: ':
         'To remove: ',
+    "formato non supportato":
+        "unsupported format",
+    "percorso troppo lungo":
+        "path too long",
+    "numero o artista nel titolo":
+        "number or artist in the title",
+    "spazi in più":
+        "extra spaces",
+    "lettere accentate rovinate":
+        "garbled accented letters",
+    "nome scritto con maiuscole o accenti diversi":
+        "name written with different capitals or accents",
+    "nome dell'album diverso tra i brani":
+        "album name different between tracks",
+    "artista dell'album diverso tra i brani":
+        "album artist different between tracks",
+    "artista dell'album da completare":
+        "album artist to fill in",
+    "spunta Compilation":
+        "Compilation flag",
+    "album che l'iPhone unisce":
+        "albums the iPhone merges",
+    "stesso numero di traccia, titoli diversi":
+        "same track number, different titles",
+    "numeri di traccia o di disco sbagliati":
+        "wrong track or disc numbers",
+    "totali diversi tra i brani":
+        "totals different between tracks",
+    "• {0}, {1}: {2} → vale «{3}»":
+        "• {0}, {1}: {2} → «{3}» wins",
+    "Due correzioni scelte vogliono valori diversi nello stesso campo:\n{0}\nSe vuoi l'altro valore: Annulla, togli la casella della riga che non vuoi (nei risultati) e premi di nuovo Applica le correzioni scelte.":
+        "Two chosen fixes want different values in the same field:\n{0}\nIf you want the other value: Cancel, clear the box of the row you do not want (in the results) and press Apply the chosen fixes again.",
+    "Album con pochi brani o numeri sbagliati":
+        "Albums with few tracks or wrong numbers",
+    "Album divisi o incoerenti":
+        "Split or inconsistent albums",
+    "Tag mancanti o scritti male":
+        "Missing or badly written tags",
+    "Formati non supportati":
+        "Unsupported formats",
+    "Nomi scritti in modi diversi":
+        "Names written in different ways",
+    "Artisti Vari":
+        "Various Artists",
+    "File: vecchi tag e formati":
+        "Files: old tags and formats",
+    "MP3 con un vecchio tag ID3v1 diverso o un tag APE; file che non sono MP3, FLAC o M4A; sull'iPhone, brani con tag diversi da quelli del PC":
+        "MP3s with a different old ID3v1 tag or an APE tag; files that are not MP3, FLAC or M4A; on the iPhone, tracks with tags different from the PC",
+    "numeri di traccia mancanti, meno brani del totale dichiarato, album di 1-2 brani, numeri di disco mancanti, totali diversi tra i brani":
+        "missing track numbers, fewer tracks than the declared total, albums of 1-2 tracks, missing disc numbers, totals different between tracks",
+    "una cartella con album diversi, lo stesso album scritto in modi diversi o con \"CD 1\" nel nome, artista dell'album diverso o mancante, spunta Compilation, album che l'iPhone unirebbe":
+        "a folder with different albums, the same album written in different ways or with \"CD 1\" in the name, album artist different or missing, Compilation flag, albums the iPhone would merge",
+    "lo stesso artista con maiuscole, accenti o spazi diversi (\"Queen\" e \"queen\"), \"The Beatles\" e \"Beatles\", \"AC/DC\" e \"ACDC\": una grafia sola in tutta la musica":
+        "the same artist with different capitals, accents or spaces (\"Queen\" and \"queen\"), \"The Beatles\" and \"Beatles\", \"AC/DC\" and \"ACDC\": one spelling in all the music",
+    "brani senza titolo, album o artista o con un segnaposto (\"Unknown Artist\", \"Track 01\"), numero o artista nel titolo, spazi in più, lettere accentate rovinate":
+        "tracks without title, album or artist or with a placeholder (\"Unknown Artist\", \"Track 01\"), number or artist in the title, extra spaces, garbled accented letters",
+    "file danneggiati, bloccati, disponibili solo online o con il percorso troppo lungo":
+        "damaged, locked or online-only files, or with a path that is too long",
+    "Titolo, album o artista mancano o sono un segnaposto (\"Unknown Artist\", \"Album sconosciuto\", \"Track 01\"): sull'iPhone i brani finiscono in \"Album sconosciuto\" / \"Artista sconosciuto\" e la collezione appare divisa.":
+        "Title, album or artist are missing or are a placeholder (\"Unknown Artist\", \"Album sconosciuto\", \"Track 01\"): on the iPhone the tracks end up in \"Unknown album\" / \"Unknown artist\" and the collection looks split.",
+    ". Di solito l'\"Artista album\" manca o è scritto in modo diverso: per una compilation va messo \"{0}\" su tutti i brani. Un \"CD 1\"/\"Disc 2\" nel nome passa nel campo N. disco.":
+        ". Usually the \"Album artist\" is missing or written differently: for a compilation put \"{0}\" on all the tracks. A \"CD 1\"/\"Disc 2\" in the name goes into the Disc no. field.",
+    "Lo stesso album compare come: {0}. La punteggiatura o un \"CD 1\"/\"Disc 2\" nel nome lo dividono; il numero del disco va nel campo N. disco.":
+        "The same album appears as: {0}. Punctuation or a \"CD 1\"/\"Disc 2\" in the name splits it; the disc number goes into the Disc no. field.",
+    "Le varianti dividono la collezione dell'artista negli elenchi e sull'iPhone. Vince la grafia con le iniziali maiuscole, la più usata.":
+        "The variants split the artist's collection in the lists and on the iPhone. The spelling with capital initials wins, the most used.",
+    "Le varianti dividono la collezione dell'artista negli elenchi e sull'iPhone ({0}). Vince la grafia con le iniziali maiuscole, la più usata.":
+        "The variants split the artist's collection in the lists and on the iPhone ({0}). The spelling with capital initials wins, the most used.",
+    "Applica la correzione (se c'è) ricava i tag dai nomi di file e cartelle: controlla la colonna Diventa. Altrimenti Mostra i brani, poi Cambia i tag (tasto E) e scrivi titolo, album e artista al posto di quelli vuoti o segnaposto (\"Unknown Artist\", \"Track 01\").":
+        "Apply the fix (if there is one) takes the tags from the names of files and folders: check the Becomes column. Otherwise Show the tracks, then Change the tags (E key) and write title, album and artist instead of the empty or placeholder ones (\"Unknown Artist\", \"Track 01\").",
+    "Se è un singolo, o vuoi solo questi brani: tasto destro sull'album → Va bene così, e non sarà più segnalato. Se sono brani di un album più grande finiti a parte, Mostra i brani e con Cambia i tag (tasto E) scrivi album e artista dell'album uguali a quelli degli altri brani; per sapere com'è l'album intero: tasto destro → Controlla online.":
+        "If it is a single, or you want only these tracks: right click on the album → Fine as it is, and it will not be reported again. If they are tracks of a bigger album that ended up apart, Show the tracks and with Change the tags (E key) write album and album artist equal to those of the other tracks; to know the whole album: right click → Check online.",
+    "Se è una compilation: Applica la correzione (se c'è), oppure Mostra i brani e Cambia i tag (tasto E) con artista dell'album \"{0}\" su tutti. Se sono album diversi che si chiamano allo stesso modo: tasto destro sull'album → Va bene così.":
+        "If it is a compilation: Apply the fix (if there is one), or Show the tracks and Change the tags (E key) with album artist \"{0}\" on all. If they are different albums with the same name: right click on the album → Fine as it is.",
+    "Applica la correzione scrive ovunque la grafia scelta (anche negli album fuori dalla selezione: compaiono nei risultati). Per sceglierne un'altra: Mostra i brani, Cambia i tag (tasto E) e scrivila su tutti, poi Controlla di nuovo questi album.":
+        "Apply the fix writes the chosen spelling everywhere (also in albums outside the selection: they appear in the results). To choose another one: Show the tracks, Change the tags (E key) and write it on all, then Check these albums again.",
+    "Converti questi file in MP3 (320 kbps) o in FLAC con un programma di conversione (per esempio foobar2000 o fre:ac), controllando che copi anche i tag. Metti i file convertiti nella stessa cartella, sposta gli originali fuori dalle cartelle della musica con Esplora file (il programma non cancella i file del PC) e premi Rileggi (F5). Se non ti servono sull'iPhone: tasto destro sull'album → Va bene così.":
+        "Convert these files to MP3 (320 kbps) or FLAC with a conversion program (for example foobar2000 or fre:ac), making sure it copies the tags too. Put the converted files in the same folder, move the originals out of the music folders with File Explorer (the program does not delete PC files) and press Reload (F5). If you do not need them on the iPhone: right click on the album → Fine as it is.",
+    "Accorcia il percorso: in Esplora file rinomina con un nome più corto la cartella dell'artista o dell'album (o spostala più vicino alla cartella della musica), poi premi Rileggi (F5). Per arrivare alla cartella: tasto destro sul problema → Apri la cartella in Esplora risorse.":
+        "Shorten the path: in File Explorer rename the artist or album folder with a shorter name (or move it closer to the music folder), then press Reload (F5). To reach the folder: right click on the problem → Open the folder in File Explorer.",
+    "Applica la correzione lascia nel titolo solo il titolo. Se il numero o il nome fa parte del titolo vero (per esempio \"1999 - …\"), togli la casella di quella riga prima di applicare.":
+        "Apply the fix leaves only the title in the title. If the number or the name is part of the real title (for example \"1999 - …\"), clear the box of that row before applying.",
+    "Applica la correzione: cambiano solo gli spazi in più, nessun rischio.":
+        "Apply the fix: only the extra spaces change, no risk.",
+    "Con la correzione (lettere rovinate come \"Ã©\"): controlla la colonna Diventa e Applica. Con il carattere \"�\" la lettera è persa: Mostra i brani, Cambia i tag (tasto E) e riscrivi a mano titolo, artista o album; oppure tasto destro sull'album → Controlla online, per prendere i tag dal catalogo.":
+        "With the fix (garbled letters like \"Ã©\"): check the Becomes column and Apply. With the character \"�\" the letter is lost: Show the tracks, Change the tags (E key) and rewrite title, artist or album by hand; or right click on the album → Check online, to take the tags from the catalog.",
+    "Applica la correzione scrive ovunque la grafia scelta (anche negli album fuori dalla selezione: compaiono nei risultati). Con \"Accenti diversi\" controlla prima quale accento è giusto. Per un'altra grafia: Mostra i brani, Cambia i tag (tasto E) e scrivila su tutti, poi Controlla di nuovo questi album.":
+        "Apply the fix writes the chosen spelling everywhere (also in albums outside the selection: they appear in the results). With \"Different accents\" first check which accent is right. For another spelling: Show the tracks, Change the tags (E key) and write it on all, then Check these albums again.",
+    "Applica la correzione scrive il nome più usato su tutti i brani dell'album. Per un'altra grafia: Mostra i brani, Cambia i tag (tasto E) e scrivi il nome dell'album su tutti i brani.":
+        "Apply the fix writes the most used name on all the tracks of the album. For another spelling: Show the tracks, Change the tags (E key) and write the album name on all the tracks.",
+    "Applica la correzione scrive lo stesso artista dell'album su tutti i brani. Per un'altra grafia: Mostra i brani, seleziona tutti i brani dell'album e in Cambia i tag (tasto E) scrivi l'artista dell'album.":
+        "Apply the fix writes the same album artist on all the tracks. For another spelling: Show the tracks, select all the tracks of the album and in Change the tags (E key) write the album artist.",
+    "Applica la correzione. Se è davvero una compilation di un solo artista: tasto destro sull'album → Va bene così.":
+        "Apply the fix. If it really is a compilation of a single artist: right click on the album → Fine as it is.",
+    "Applica la correzione. Se l'album è davvero una compilation ma la correzione spegne la spunta, scrivi \"{0}\" come artista dell'album (Mostra i brani, Cambia i tag, tasto E) e Controlla di nuovo questi album.":
+        "Apply the fix. If the album really is a compilation but the fix clears the flag, write \"{0}\" as album artist (Show the tracks, Change the tags, E key) and Check these albums again.",
+    "Se sono lo stesso album: Applica la correzione. Se sono album diversi: non applicare; Mostra i brani, Cambia i tag (tasto E) e dai a uno dei due un nome che resti diverso anche senza gli zeri (per esempio con l'anno: \"Raccolta 1 (1998)\").":
+        "If they are the same album: Apply the fix. If they are different albums: do not apply; Show the tracks, Change the tags (E key) and give one of the two a name that stays different even without the zeros (for example with the year: \"Raccolta 1 (1998)\").",
+    "Mostra i brani e guarda le cartelle. Se sono due album diversi con lo stesso nome (due \"Greatest Hits\", due edizioni), dai a uno dei due un nome diverso con Cambia i tag (tasto E), per esempio con l'anno o l'edizione: \"Greatest Hits (1981)\". Se è lo stesso album con i numeri sbagliati, correggi N. traccia (e N. disco) dei brani sbagliati. Poi Controlla di nuovo questi album.":
+        "Show the tracks and look at the folders. If they are two different albums with the same name (two \"Greatest Hits\", two editions), give one of them a different name with Change the tags (E key), for example with the year or the edition: \"Greatest Hits (1981)\". If it is the same album with wrong numbers, correct Track no. (and Disc no.) of the wrong tracks. Then Check these albums again.",
+    "Mostra i brani e correggi con Cambia i tag (tasto E): il N. disco dei brani che non l'hanno (lo dicono di solito la cartella o il nome del file, \"CD2\"), oppure il numero o il totale sbagliato. I numeri giusti dell'edizione: tasto destro sull'album → Controlla online.":
+        "Show the tracks and correct with Change the tags (E key): the Disc no. of the tracks that lack it (usually the folder or the file name says it, \"CD2\"), or the wrong number or total. The right numbers of the edition: right click on the album → Check online.",
+    "Applica la correzione scrive su tutti i brani il totale più frequente. Se è sbagliato proprio quello: Mostra i brani e scrivi il totale giusto con Cambia i tag (tasto E) su tutti.":
+        "Apply the fix writes the most frequent total on all the tracks. If that very one is wrong: Show the tracks and write the right total with Change the tags (E key) on all.",
+    "Converti i file in MP3 o FLAC con un programma di conversione, poi Rileggi (F5).":
+        "Convert the files to MP3 or FLAC with a conversion program, then Reload (F5).",
+    "Applica la correzione (se c'è); altrimenti Mostra i brani e scrivi lo stesso nome su tutti con Cambia i tag (tasto E).":
+        "Apply the fix (if there is one); otherwise Show the tracks and write the same name on all with Change the tags (E key).",
+    "{0} in un formato non supportato ({1})":
+        "{0} in an unsupported format ({1})",
+    "Il programma lavora con MP3, FLAC e M4A. Gli altri formati non si inviano all'iPhone come si deve: l'app Musica non suona OGG, Opus e WMA, e in WAV e AIFF i tag (titolo, artista, album) non arrivano.":
+        "The program works with MP3, FLAC and M4A. The other formats do not go to the iPhone properly: the Music app does not play OGG, Opus and WMA, and in WAV and AIFF the tags (title, artist, album) do not arrive.",
+    "{0} con il percorso troppo lungo":
+        "{0} with a path that is too long",
+    "Il percorso completo (cartelle + nome del file) supera i {0} caratteri, il limite di Windows: molti programmi non aprono questi file, e copiarli o inviarli può non riuscire.":
+        "The full path (folders + file name) is over {0} characters, the Windows limit: many programs do not open these files, and copying or sending them may fail.",
+    "{0} con il percorso vicino al limite":
+        "{0} with a path close to the limit",
+    "Il percorso completo supera i {0} caratteri: un nome di cartella un po' più lungo lo porta oltre il limite di Windows ({1}).":
+        "The full path is over {0} characters: a slightly longer folder name takes it over the Windows limit ({1}).",
+    "{0} con il numero o l'artista nel titolo":
+        "{0} with the number or the artist in the title",
+    "Il titolo comincia con il numero di traccia (\"05 - Titolo\") o con il nome dell'artista (\"Artista - Titolo\"): sull'iPhone si vede due volte. La correzione lascia solo il titolo.":
+        "The title starts with the track number (\"05 - Title\") or with the artist's name (\"Artist - Title\"): on the iPhone it shows twice. The fix leaves only the title.",
+    "Togli numero e artista dal titolo":
+        "Remove number and artist from the title",
+    "{0} con spazi in più nei tag":
+        "{0} with extra spaces in the tags",
+    "Titolo, artista, artista dell'album o album hanno spazi all'inizio, alla fine o doppi (o una lettera accentata salvata in un modo diverso dal solito, che a schermo non si vede). Il programma li considera uguali agli altri, ma l'iPhone tiene la grafia del primo brano che riceve: meglio che sia pulita.":
+        "Title, artist, album artist or album have spaces at the start, at the end or doubled (or an accented letter stored in an unusual way, invisible on screen). The program considers them equal to the others, but the iPhone keeps the spelling of the first track it receives: better if it is clean.",
+    "Togli gli spazi in più":
+        "Remove the extra spaces",
+    "{0} con lettere accentate rovinate":
+        "{0} with garbled accented letters",
+    "Testi come \"PerchÃ©\" invece di \"Perché\": il tag è stato scritto con una codifica e letto con un'altra. Sull'iPhone diventano un artista o un album in più. La correzione rimette le lettere giuste.":
+        "Texts like \"PerchÃ©\" instead of \"Perché\": the tag was written with one encoding and read with another. On the iPhone they become one more artist or album. The fix puts back the right letters.",
+    "Rimetti le lettere accentate":
+        "Put back the accented letters",
+    "{0} con il carattere \"{1}\" nei tag":
+        "{0} with the character \"{1}\" in the tags",
+    "Al posto di qualche lettera (di solito accentata) c'è \"{0}\": la lettera giusta è persa e il programma non la può indovinare.":
+        "Instead of some letter (usually accented) there is \"{0}\": the right letter is lost and the program cannot guess it.",
+    "Lo stesso nome compare come {0}. Il programma li mostra insieme, ma l'iPhone tiene la grafia del primo brano che riceve e non la cambia più: meglio una grafia sola. Vince quella con le iniziali maiuscole, la più usata.":
+        "The same name appears as {0}. The program shows them together, but the iPhone keeps the spelling of the first track it receives and never changes it: better a single spelling. The one with capital initials wins, the most used.",
+    "\"{0}\" scritto anche come {1}":
+        "\"{0}\" also written as {1}",
+    "Accenti diversi: {0}":
+        "Different accents: {0}",
+    " Attenzione: le grafie hanno accenti diversi e il programma non sa quale è giusto: ha scelto \"{0}\". Controlla prima di applicare.":
+        " Warning: the spellings have different accents and the program does not know which is right: it chose \"{0}\". Check before applying.",
+    "{0}: il nome dell'album scritto anche come {1}":
+        "{0}: the album name also written as {1}",
+    "I brani dello stesso album hanno il nome scritto con maiuscole, accenti o spazi diversi. L'iPhone tiene la grafia del primo brano che riceve: meglio una sola. Vince la più usata nell'album.":
+        "The tracks of the same album have the name written with different capitals, accents or spaces. The iPhone keeps the spelling of the first track it receives: better a single one. The most used in the album wins.",
+    "Album \"{0}\" su tutti i brani":
+        "Album \"{0}\" on all the tracks",
+    "scritto in modi diversi: ":
+        "written in different ways: ",
+    "vuoto su {0}":
+        "empty on {0}",
+    "{0}: artista dell'album {1}":
+        "{0}: album artist {1}",
+    "L'artista dell'album deve essere identico su tutti i brani dell'album, anche nelle maiuscole: con grafie diverse (per esempio \"AA.VV.\" e \"Artisti Vari\") l'iPhone divide l'album in due. Vince la grafia con le iniziali maiuscole; i brani senza artista dell'album lo ricevono.":
+        "The album artist must be identical on all the tracks of the album, capitals included: with different spellings (for example \"AA.VV.\" and \"Artisti Vari\") the iPhone splits the album in two. The spelling with capital initials wins; the tracks without album artist get it.",
+    "Artista dell'album \"{0}\" su tutti i brani":
+        "Album artist \"{0}\" on all the tracks",
+    "{0}: \"artisti vari\" ma i brani sono tutti di {1}":
+        "{0}: \"various artists\" but the tracks are all by {1}",
+    "L'artista dell'album dice che è una compilation, ma tutti i brani sono dello stesso artista: sull'iPhone l'album finisce tra le compilation invece che sotto l'artista. La correzione mette \"{0}\" come artista dell'album e toglie la spunta Compilation.":
+        "The album artist says it is a compilation, but all the tracks are by the same artist: on the iPhone the album ends up among the compilations instead of under the artist. The fix sets \"{0}\" as album artist and clears the Compilation flag.",
+    "{0}: senza artista dell'album":
+        "{0}: without album artist",
+    "Nessun brano ha l'artista dell'album e sono tutti dello stesso artista: la correzione lo scrive anche come artista dell'album, così l'album resta intero anche se un brano un giorno avrà un ospite.":
+        "No track has the album artist and they are all by the same artist: the fix writes it as album artist too, so the album stays whole even if one day a track has a guest.",
+    "Artista dell'album \"{0}\"":
+        "Album artist \"{0}\"",
+    "l'artista dell'album è \"{0}\": è una compilation":
+        "the album artist is \"{0}\": it is a compilation",
+    "i brani sono tutti dello stesso artista: non è una compilation":
+        "the tracks are all by the same artist: it is not a compilation",
+    "vale quello che ha la maggior parte dei brani":
+        "the value of most tracks wins",
+    "{0}: la spunta Compilation c'è su {1} brani su {2}":
+        "{0}: the Compilation flag is on {1} tracks out of {2}",
+    "{0}: manca la spunta Compilation":
+        "{0}: the Compilation flag is missing",
+    "{0}: spunta Compilation su un album di un solo artista":
+        "{0}: Compilation flag on an album by a single artist",
+    "La correzione la accende su tutti i brani ({0}).":
+        "The fix turns it on on all the tracks ({0}).",
+    "Compilation accesa su tutti i brani":
+        "Compilation on on all the tracks",
+    "La correzione la spegne su tutti i brani ({0}).":
+        "The fix turns it off on all the tracks ({0}).",
+    "Compilation spenta su tutti i brani":
+        "Compilation off on all the tracks",
+    "Sull'iPhone la spunta Compilation decide se l'album sta tra le compilation; diversa tra i brani, l'album può dividersi. {0}":
+        "On the iPhone the Compilation flag decides whether the album is among the compilations; different between the tracks, the album can split. {0}",
+    "\"{0}\": {1} album che sull'iPhone diventano uno":
+        "\"{0}\": {1} albums that become one on the iPhone",
+    "Sul PC sono album diversi ({0}), ma l'iPhone non conta gli zeri davanti ai numeri (\"01\" = \"1\") e li mette in un album solo, con il nome arrivato per primo. Se sono lo stesso album, la correzione scrive \"{1}\" su tutti.":
+        "On the PC they are different albums ({0}), but the iPhone ignores leading zeros in numbers (\"01\" = \"1\") and puts them in a single album, with the name that arrived first. If they are the same album, the fix writes \"{1}\" on all.",
+    "{0}: numeri di traccia o di disco sbagliati":
+        "{0}: wrong track or disc numbers",
+    "{0}: totale delle tracce o dei dischi diverso tra i brani":
+        "{0}: total of tracks or discs different between tracks",
+    "Il totale delle tracce (o il numero di dischi) cambia da un brano all'altro dello stesso disco: la correzione scrive su tutti il valore più frequente.":
+        "The total of tracks (or the number of discs) changes from one track to another of the same disc: the fix writes the most frequent value on all.",
+    "Lo stesso totale su tutti i brani":
+        "The same total on all the tracks",
+    "L'album ha più dischi, ma {0} non ha il numero del disco: sull'iPhone finiscono nel disco 1, mescolati.":
+        "The album has several discs, but {0} has no disc number: on the iPhone they end up in disc 1, mixed.",
+    "{0} (traccia {1} di {2})":
+        "{0} (track {1} of {2})",
+    "{0} (disco {1} di {2})":
+        "{0} (disc {1} of {2})",
+    "Numero più alto del totale: {0}.":
+        "Number higher than the total: {0}.",
+    " I brani sono in {0} cartelle: è probabile che siano due album con lo stesso nome.":
+        " The tracks are in {0} folders: probably they are two albums with the same name.",
+    "{0}: {1} numeri di traccia usati da brani diversi":
+        "{0}: {1} track numbers used by different tracks",
+    "Nello stesso album lo stesso numero di traccia (e disco) ha titoli diversi: {0}.{1} Sull'iPhone diventano un album solo con i brani mescolati.":
+        "In the same album the same track (and disc) number has different titles: {0}.{1} On the iPhone they become a single album with the tracks mixed.",
 }

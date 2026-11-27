@@ -56,6 +56,15 @@ dall'iPhone* della scheda Suonerie sono voci `RING_SEND` / `RING_DELETE` della s
 Usa i tag da iPhone a PC, le associazioni (solo il registro), Playlist per artista (anteprima e prova). I nomi delle
 azioni dicono il verso a parole ("da PC a iPhone", "da iPhone a PC").
 
+## Controlli (linguetta Controlli, `scan.py`)
+
+`checks_requirements.md` è il riferimento: elenco delle regole, ordine a livelli, decisioni dell'utente (D-1…D-9).
+Un modo solo di confrontare i nomi: `names.fold` a livelli (non scrivere altre normalizzazioni). Le regole girano in
+`scan.rule_steps`, ognuna sulle copie di `scan_rules.RuleView` con le correzioni dei passi prima; una regola nuova va
+nel suo livello, con il suo `rule_id`, il nome in `accepted.TYPE_LABELS` e un *Cosa fare* in `scan.ADVICE` che dice
+esattamente cosa fare a mano (quale pulsante, quale campo). Le maiuscole contano (D-1): vince la grafia con le
+iniziali maiuscole (`names.choose_spelling`).
+
 ## Regole per ogni commit
 
 - **Una nuova impostazione, opzione della console o variabile d'ambiente, o un ordine di precedenza cambiato,

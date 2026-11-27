@@ -18,6 +18,7 @@ from typing import Callable, Optional
 
 from . import cue
 from .albumcheck import STATUS_ERROR, STATUS_NOT_FOUND, corrected_tags
+from .names import LEVEL_CASE, fold
 from .pending import EDIT_FIELDS
 from .scan import (
     FIX_TAGS, KIND_FEW_TRACKS, KIND_ONLINE, ORIGIN_ONLINE, SEVERITY_LOW, SEVERITY_MEDIUM, SEVERITY_ORDER, Fix, Issue,
@@ -83,12 +84,22 @@ def scope_text(where: str, how: str, tracks: list, albums: list, opened: str = "
 
 
 def same_value(first, second) -> bool:
-    """Due valori di un tag sono uguali, anche se diversi solo per le maiuscole ("uno" e "Uno"): nei Controlli una
-    differenza così non è un problema e non si corregge."""
+    """Due valori di un tag uguali per la Verifica online: le maiuscole e gli spazi in più non contano ("uno" e "Uno"),
+    il catalogo non decide la grafia (la decidono i controlli sui nomi, D-1 e D-2 di checks_requirements.md)."""
     if isinstance(first, str) and isinstance(second, str):
-        result = first.casefold() == second.casefold()
+        result = fold(first, LEVEL_CASE) == fold(second, LEVEL_CASE)
     else:
         result = first == second
+    return result
+
+
+def differs(old, new) -> bool:
+    """Una correzione cambia davvero il valore: carattere per carattere, maiuscole comprese (D-1); vuoto e None sono
+    lo stesso."""
+    if isinstance(new, bool):
+        result = bool(old) != new
+    else:
+        result = (old or None) != (new or None)
     return result
 
 
@@ -186,6 +197,7 @@ class Row:
     old: object
     new: object
     issue: int
+    step: int = 99                 # il passo delle regole (Issue.step): nello stesso campo vince il passo dopo
 
 
 @dataclass
@@ -278,8 +290,8 @@ def group_by_album(issues: list, resolve: Callable[[object], Optional[Target]]) 
                             old = OLD_TAG_PRESENT
                         else:
                             old = getattr(target.scanned.tags, name, None)
-                        if not same_value(old, value):          # solo le maiuscole: niente da correggere
-                            problem.rows.append(Row(target, name, old, value, index))
+                        if differs(old, value):
+                            problem.rows.append(Row(target, name, old, value, index, issue.step))
         fixed_in = []
         for key, problem in per_album.items():
             if problem.rows:
@@ -329,6 +341,8 @@ class ApplyPlan:
     blocked: list = field(default_factory=list)   # [(brano, motivo)]: correzioni che sull'iPhone non si possono fare
     old_tags: list = field(default_factory=list)  # [(Track del PC, [OLD_ID3V1, OLD_APE])]: vecchi tag da togliere
     #                                               dai file del PC (le copie per l'iPhone ne sono già senza)
+    conflicts: list = field(default_factory=list)  # [(brano, campo, [valori])]: correzioni diverse dello stesso campo
+    #                                                dallo stesso passo delle regole (vale l'ultima)
 
     def count(self, side: str) -> int:
         if side == SIDE_PHONE:
@@ -353,23 +367,35 @@ def _edit_value(name: str, value):
 
 
 def plan_apply(rows: list) -> ApplyPlan:
-    """Le correzioni scelte (Row), unite per brano, divise per parte. Due correzioni dello stesso campo: vince
-    l'ultima."""
+    """Le correzioni scelte (Row), unite per brano, divise per parte. Due correzioni dello stesso campo: vince quella
+    del passo delle regole che viene dopo (Row.step: ha già visto l'altra come fatta); dallo stesso passo, l'ultima, e
+    il piano lo dice (conflicts)."""
     merged = []
     values_of = {}
+    step_of = {}
     old_of = {}
-    for row in rows:
+    plan = ApplyPlan()
+    clashes = {}
+    for row in sorted(rows, key=lambda r: r.step):
         key = id(row.target)
         if key not in values_of:
             values_of[key] = {}
+            step_of[key] = {}
             old_of[key] = []
             merged.append(row.target)
         if row.name in OLD_TAG_NAMES:
             if row.name not in old_of[key]:
                 old_of[key].append(row.name)
         else:
+            previous = values_of[key].get(row.name)
+            if row.name in values_of[key] and step_of[key][row.name] == row.step and previous != row.new:
+                clash = clashes.setdefault((key, row.name), (row.target, row.name, [previous]))
+                if row.new not in clash[2]:
+                    clash[2].append(row.new)
             values_of[key][row.name] = row.new
-    plan = ApplyPlan()
+            step_of[key][row.name] = row.step
+    for target, name, values in clashes.values():
+        plan.conflicts.append((target.name, FIELD_LABELS.get(name, name), values))
     for target in merged:
         values = values_of[id(target)]
         side = target.side

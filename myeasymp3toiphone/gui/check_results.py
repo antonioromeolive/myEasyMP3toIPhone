@@ -98,6 +98,20 @@ class ApplyDestinationsDialog(QDialog):
             note = QLabel(f"Non si possono fare:\n{joined}")
             note.setWordWrap(True)
             layout.addWidget(note)
+        if plan.conflicts:
+            lines = []
+            for name, field_label, values in plan.conflicts[:8]:
+                shown = " / ".join(f"«{value}»" for value in values)
+                lines.append(f"• {name}, {field_label}: {shown} → vale «{values[-1]}»")
+            if len(plan.conflicts) > 8:
+                lines.append(f"… e altri {len(plan.conflicts) - 8}")
+            joined = "\n".join(lines)
+            note = QLabel(f"Due correzioni scelte vogliono valori diversi nello stesso campo:\n{joined}\nSe vuoi l'altro "
+                          "valore: Annulla, togli la casella della riga che non vuoi (nei risultati) e premi di nuovo "
+                          "Applica le correzioni scelte.")
+            note.setWordWrap(True)
+            note.setStyleSheet("color: rgb(210, 130, 0)")
+            layout.addWidget(note)
         layout.addWidget(_gray("Ogni scrittura sull'iPhone va in attesa e parte con Applica (barra blu), dove ogni "
                                "azione si toglie con la ✕. Nei file del PC si scrive solo dopo l'elenco di ogni file e "
                                "campo (Modifica N file; non si può annullare)."))

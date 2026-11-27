@@ -89,7 +89,9 @@ def test_few_tracks_and_split_collections(tmp_path):
     tracks = scan_folder(tmp_path)
     issues = scan.rule_issues(tracks, check_files=False)
     titles = " | ".join(issue.title for issue in issues)
-    assert "mancano 9 numeri di traccia (1 brano qui, l'album ne ha almeno 10)" in titles
+    # a livelli: i brani mancanti si contano sull'album già riunito dalla correzione della cartella (R11)
+    assert "mancano 8 numeri di traccia (2 brani qui, l'album ne ha almeno 10)" in titles
+    assert "\"The Band\" scritto anche come \"the band\"" in titles                  # R23: le maiuscole contano
     folder_split = [i for i in issues if i.rule_id.startswith("R11")]
     assert folder_split and folder_split[0].fix is not None
     name_split = [i for i in issues if i.rule_id.startswith("R12")]
@@ -173,8 +175,13 @@ def test_case_variants_are_one_group_shown_with_capitals(tmp_path):
     from myeasymp3toiphone.library import group_by_album
     groups = group_by_album(scan_folder(tmp_path))
     assert list(groups) == [("Queen", "Live at Wembley")]
-    # diversi solo per le maiuscole: per i Controlli sono uguali, niente da segnalare
+    # diversi solo per le maiuscole: R14 no (punteggiatura e ordine), li trova R23, e R24 il nome dell'album (D-1, D-2)
     assert scan.detect_artist_variants(scan_folder(tmp_path)) == []
+    issues = scan.rule_issues(scan_folder(tmp_path), check_files=False)
+    by_rule = {issue.rule_id.split(".")[0]: issue for issue in issues}
+    assert {"R21", "R23", "R24"} <= set(by_rule)
+    assert by_rule["R23"].fix.description == "Scrivi ovunque \"Queen\""
+    assert [values for _path, values in by_rule["R24"].fix.changes] == [{"album": "Live at Wembley"}]
 
 
 def test_same_song_on_different_albums_is_not_a_duplicate(tmp_path):

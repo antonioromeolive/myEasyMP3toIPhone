@@ -22,6 +22,7 @@ ACCEPTED_VERSION = 1
 WHOLE_ALBUM = "tutto_l_album"
 ONLINE_TYPE = "W"              # tutte le differenze con il catalogo online: brani mancanti, tag diversi, non trovato
 AI_PREFIX = "AI_"
+SPELLING_TYPES = frozenset({"R23", "R24", "R25"})     # grafie dello stesso nome: "tutto l'album" non le nasconde
 TIME_FORMAT = "%Y-%m-%d %H:%M"
 # il nome di ogni tipo di problema (la regola senza il numero), per i menu e per Impostazioni
 TYPE_LABELS = {
@@ -42,6 +43,20 @@ TYPE_LABELS = {
     "R15": "brani duplicati",
     "R16": "forse lo stesso artista",
     "R17": "duetti",            # regola tolta: resta per i "va bene così" già salvati
+    "R18": "formato non supportato",
+    "R19": "percorso troppo lungo",
+    "R20": "numero o artista nel titolo",
+    "R21": "spazi in più",
+    "R22": "lettere accentate rovinate",
+    "R23": "nome scritto con maiuscole o accenti diversi",
+    "R24": "nome dell'album diverso tra i brani",
+    "R25": "artista dell'album diverso tra i brani",
+    "R26": "artista dell'album da completare",
+    "R27": "spunta Compilation",
+    "R28": "album che l'iPhone unisce",
+    "R29": "stesso numero di traccia, titoli diversi",
+    "R30": "numeri di traccia o di disco sbagliati",
+    "R31": "totali diversi tra i brani",
     "I1": "tag diversi tra PC e iPhone",
     "I2": "brani che mancano sull'iPhone",
     "I4": "brani fantasma sull'iPhone",
@@ -90,9 +105,13 @@ class Accepted:
                                                    "types": dict(entry["types"])}
 
     def is_accepted(self, key: tuple, kind: str) -> bool:
-        """Quel tipo di problema va bene così per l'album (o tutto l'album)."""
+        """Quel tipo di problema va bene così per l'album (o tutto l'album). I problemi di grafia (SPELLING_TYPES) non
+        li nasconde "tutto l'album": l'album si riconosce senza maiuscole e accenti, e un "va bene così" dato per
+        altro non deve nascondere due grafie dello stesso nome (checks_requirements.md, REQ-27); si nascondono solo
+        segnando il loro tipo."""
         entry = self.items.get(album_id(key))
-        result = entry is not None and (WHOLE_ALBUM in entry["types"] or kind in entry["types"])
+        whole = entry is not None and WHOLE_ALBUM in entry["types"] and kind not in SPELLING_TYPES
+        result = entry is not None and (whole or kind in entry["types"])
         return result
 
     def skip_online(self, key: tuple) -> bool:

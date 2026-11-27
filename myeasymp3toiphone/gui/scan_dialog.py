@@ -317,6 +317,9 @@ class ScanLauncher:
             for _original, copied in pairs:
                 copies.append(copied)
             doubts = CHECK_VARIANTS in checks
+            context = None              # sul PC, una parte: i nomi si cercano in tutta la musica (come le regole)
+            if last["side"] == SIDE_PC and len(scanned) < len(self.window.tracks):
+                context = list(self.window.tracks)
 
             def work(progress, cancel, emit):
                 found, errors = ai_review(provider, kept, copies, progress, cancel,
@@ -324,7 +327,7 @@ class ScanLauncher:
                 names = None
                 if doubts and not is_cancelled(cancel) and not getattr(provider, "gave_up", False):
                     progress(0, 0, "nomi d'artista dubbi")
-                    names, more = detect_artist_doubts(scanned, provider, None, progress, cancel)
+                    names, more = detect_artist_doubts(scanned, provider, None, progress, cancel, context)
                     errors = errors + more
                 emit((AI_END, found, errors, names, is_cancelled(cancel)))
 
@@ -716,6 +719,9 @@ class ScanLauncher:
         else:
             for track in scanned:
                 by_path[str(track.path)] = (track, track, None)
+            # le correzioni dei nomi e degli album valgono in tutta la musica: anche i brani fuori dalla selezione
+            for track in window.tracks:
+                by_path.setdefault(str(track.path), (track, track, None))
         cache = {}
 
         def resolve(path):

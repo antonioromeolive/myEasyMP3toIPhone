@@ -167,8 +167,13 @@ def test_services_in_order_until_one_is_complete():
 
 def test_every_rule_says_what_to_do():
     from myeasymp3toiphone import scan
-    for rule in ("R2", "R3", "R5", "R6", "R7", "R8", "R9", "R10", "R11", "R12", "R13", "R14", "R15", "R16",
-                 "I1", "I2", "I3", "I4"):
+    from myeasymp3toiphone.accepted import TYPE_LABELS
+    rules = ["R2", "R3", "R5", "R6", "R7", "R8", "R9", "R10", "R11", "R12", "R13", "R14", "R15", "R16",
+             "I1", "I2", "I3", "I4"]
+    for number in range(18, 32):                 # le regole di checks_requirements.md: anche il nome per "va bene così"
+        rules.append(f"R{number}")
+        assert f"R{number}" in TYPE_LABELS
+    for rule in rules:
         assert scan.advice(scan.Issue(scan.KIND_SPLIT, scan.SEVERITY_LOW, "t", "d", rule_id=f"{rule}.1")), rule
     for kind in scan.AI_KINDS:
         assert scan.advice(scan.Issue(kind, scan.SEVERITY_LOW, "t", "d", origin=scan.ORIGIN_AI)), kind
