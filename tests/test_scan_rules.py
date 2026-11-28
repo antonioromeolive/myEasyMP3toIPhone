@@ -360,3 +360,55 @@ def test_two_real_albums_with_a_common_name_are_not_a_split_compilation():
               _track("b/1.mp3", title="Quattro", artist="Bianchi", album="Estate", year="1999")]
     splits = _rules(tracks).get("R13", [])
     assert [issue.title for issue in splits] == ["\"Estate\" diviso tra 2 artisti"]      # solo la raccolta probabile
+
+
+def _copy(folder: str, suffix: str, titles: list, artist: str = "Gruppo", album_artist: str = "Gruppo",
+          album: str = "Ricordi") -> list:
+    result = []
+    for number, title in enumerate(titles, start=1):
+        result.append(_track(f"{folder}/{number:02d} - {title}{suffix}", title=title, artist=artist,
+                             album_artist=album_artist, album=album, track_number=number))
+    return result
+
+
+def test_the_worse_copy_of_an_album_is_a_duplicate(monkeypatch):
+    rates = {"mp3_192": 192, "mp3_128": 128, "mp3_320": 320}
+    monkeypatch.setattr(scan_rules, "mp3_bitrate", lambda track: rates[track.path.parent.name])
+    flac = _copy("flac", ".flac", ["Alba", "Sera", "Notte"])
+    mp3 = _copy("mp3_192", ".mp3", ["Alba", "Sera", "Notte", "Bonus"])
+    found = _rules(flac + mp3)
+    worse = found["R32"][0]
+    assert "copia in MP3 192 kbps, c'è anche in FLAC" in worse.title
+    assert len(worse.files) == 4 and "1 brano ci sono solo in questa copia (bonus)" in worse.detail
+    assert worse.fix is None                                        # niente di automatico
+    best = _copy("mp3_320", ".mp3", ["Alba", "Sera", "Notte"])
+    assert "R32" not in _rules(flac + best)                         # FLAC e MP3 a 320: versioni, non si dice niente
+    low = _copy("mp3_128", ".mp3", ["Alba", "Sera", "Notte"])
+    found = _rules(mp3 + low)
+    assert [issue.title.split(": ")[1] for issue in found["R32"]] == ["copia in MP3 128 kbps, c'è anche in MP3 192 kbps"]
+    assert "R8" not in found                                        # i brani doppi li dice la copia, non uno per uno
+    twice = _rules(flac + _copy("flac_bis", ".flac", ["Alba", "Sera", "Notte"]))["R33"][0]
+    assert "l'album c'è due volte (FLAC)" in twice.title and len(twice.files) == 6
+
+
+def test_two_compilations_with_the_same_name_are_not_copies(monkeypatch):
+    monkeypatch.setattr(scan_rules, "mp3_bitrate", lambda track: 128 if "a" in track.path.parent.name else 320)
+    first = _copy("a", ".mp3", ["Uno", "Due", "Tre"], artist="Rossi", album_artist="Artisti Vari", album="Hits")
+    second = _copy("b", ".mp3", ["Quattro", "Cinque", "Sei"], artist="Bianchi", album_artist="Artisti Vari",
+                   album="Hits")
+    found = _rules(first + second)
+    assert "R32" not in found and "R33" not in found and "R29" in found     # due raccolte diverse
+    same = _copy("b", ".mp3", ["Uno", "Due", "Tre"], artist="Rossi", album_artist="Artisti Vari", album="Hits")
+    assert "R32" in _rules(first + same)                            # le stesse canzoni: è la stessa raccolta
+
+
+def test_the_catalog_disproves_a_split_compilation():
+    tracks = [_track("s/1.mp3", title="Uno", artist="Supertramp", album="Essentials"),
+              _track("g/1.mp3", title="Due", artist="Gruppo", album="Essentials")]
+    split = _rules(tracks)["R13"][0]
+    assert "Non verificato online" in split.detail and split.fix is not None
+    release = type("R", (), {"artist": "Supertramp"})()
+    result = type("A", (), {"release": release, "local_tracks": [tracks[0]]})()
+    assert check_flow.drop_disproved_compilations([split], [result]) == []
+    various = type("A", (), {"release": type("R", (), {"artist": "Various Artists"})(), "local_tracks": tracks})()
+    assert check_flow.drop_disproved_compilations([split], [various]) == [split]

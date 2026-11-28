@@ -17,7 +17,9 @@ from PySide6.QtWidgets import QMessageBox
 from ..accepted import Accepted
 from ..ai import make_provider
 from ..albumcheck import ai_chooser, check_album_services
-from ..check_flow import Target, filter_accepted, group_by_album as entries_by_album, online_issues, online_note
+from ..check_flow import (
+    Target, drop_disproved_compilations, filter_accepted, group_by_album as entries_by_album, online_issues, online_note,
+)
 from ..config import config_dir, load_profiles
 from ..library import UNKNOWN_ALBUM, group_by_album, scan_folder
 from ..phone_library import tracks_for_scan
@@ -278,6 +280,7 @@ class ScanLauncher:
             for result in results:
                 number += 1
                 report.issues.extend(online_issues(result, number))
+            report.issues = drop_disproved_compilations(report.issues, results)
             report.issues.sort(key=lambda issue: issue.sort_key())
         return results
 
@@ -656,6 +659,7 @@ class ScanLauncher:
                     self._online_count += 1
                     kept.extend(online_issues(result, self._online_count))
                     self._remember_online(result)
+                kept = drop_disproved_compilations(kept, results)
                 kept.sort(key=lambda issue: issue.sort_key())
                 report.issues = kept
                 if "Verifica online" in report.stopped:

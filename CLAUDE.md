@@ -13,7 +13,7 @@ una build vera. Nomi e valori inventati.
 
 ## I file sul PC cambiano solo con l'approvazione dell'utente
 
-Il programma non sposta e non cancella mai i file delle cartelle aperte (compresa la Libreria). Le modifiche dei tag
+Il programma non sposta e non cancella mai i file delle cartelle aperte (compresa la Libreria), salvo le copie doppie di un album nel Cestino (sotto). Le modifiche dei tag
 vanno in `overlay.TagOverlay` (cartella dati) e si applicano solo alle copie: invio all'iPhone
 (`iphone.UploadItem.prepare`), esportazione e importazione (`copy_organized(prepare=…)`), con
 `tags.prepare_copy` / `write_tags(..., new_copy=True)`. `tags.protect_folder` blocca le scritture dentro le cartelle
@@ -31,6 +31,10 @@ e approvata, mai automatica.
 Le correzioni dei Controlli vanno dalla parte dove c'è il brano (`check_flow.plan_apply`): un brano collegato (registro)
 sul PC e sull'iPhone (*Usa i tag da PC a iPhone*, in attesa), uno solo sul PC solo sul PC, uno solo sull'iPhone solo
 sull'iPhone (*Cambia i tag*, in attesa; solo `pending.EDIT_FIELDS`, solo brani messi da un computer).
+
+Unica eccezione per i file della musica: le **copie doppie di un album** (Controlli, R32/R33: una copia MP3 sotto 320
+kbps quando c'è quella migliore, o la stessa copia due volte) si possono mettere nel **Cestino di Windows** dal tasto
+destro sul problema, solo dopo l'elenco dei file e la conferma (`check_results._trash_copy`). Mai in automatico.
 
 Le suonerie hanno la loro cartella (`settings.ringtone_folder`, esclusa dalla scheda PC): **Crea una suoneria** vi
 scrive solo file nuovi (ffmpeg `-n`, `ringtones.unique_target`) e il brano di partenza non cambia; **Rinomina** e

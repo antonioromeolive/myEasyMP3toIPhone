@@ -543,9 +543,13 @@ def test_the_same_album_in_flac_and_mp3_is_not_a_duplicate(tmp_path):
     assert scan.detect_duplicates([flac, mp3]) == []                                   # FLAC e MP3: va bene
     issues, _errors = scan.detect_same_songs([flac, mp3], {})
     assert issues == []
+    tagged(tmp_path / "Disco" / "Altra copia" / "01.mp3", title="Uno", artist="Gruppo", album="Disco", track_number=1)
     again = Track(path=tmp_path / "Disco" / "Altra copia" / "01.mp3", tags=mp3.tags.copy(), length=mp3.length)
     assign_groups([flac, mp3, again])
-    assert [issue.rule_id for issue in scan.detect_duplicates([flac, mp3, again])] == ["R8"]   # due MP3: doppione
+    assert scan.detect_duplicates([flac, mp3, again]) == []      # due copie MP3 in cartelle diverse: le dice R33
+    from myeasymp3toiphone.scan_rules import RuleView, detect_album_copies
+    rules = [issue.rule_id.split(".")[0] for issue in detect_album_copies(RuleView([flac, mp3, again]))]
+    assert rules == ["R33"]                                      # l'album c'è due volte (la stessa qualità)
     lines = scan.album_lines({mp3.album_key: [flac, mp3]}, [mp3.album_key])
     assert "formati: flac,mp3" in lines[0][1]                                          # l'AI vede i formati
 
@@ -753,6 +757,54 @@ def test_a_problem_fixed_in_the_other_album_is_not_manual_here():
             texts[top.text(0)] = (top.text(COL_FIX), top.child(0).text(COL_FIX))
         assert texts["Cantante Finto — …Ultime Parole"] == ("1 automatiche", "automatica (1)")
         assert texts["Cantante Finto — Ultime Parole"] == ("si corregge nell'altro album", "nell'altro album")
+        view.close()
+    finally:
+        window._exit_checked = True
+        window.close()
+        app.processEvents()
+
+
+def test_the_worse_copy_goes_to_the_recycle_bin_only_after_the_confirmation(tmp_path, monkeypatch):
+    """Copia doppia di un album (R32): dal tasto destro sul problema, Sposta nel cestino questa copia; i file vanno
+    nel Cestino solo con Sì nella finestra di conferma, mai con No."""
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtCore import QFile
+    from PySide6.QtWidgets import QApplication, QMenu, QMessageBox
+    from myeasymp3toiphone.gui import check_results
+    from myeasymp3toiphone.gui.check_results import COL_NAME, CheckResultsView
+    from myeasymp3toiphone.gui.main_window import MainWindow
+    app = QApplication.instance() or QApplication([])
+    worse = []
+    for number in (1, 2):
+        path = tmp_path / "Disco MP3" / f"0{number}.mp3"
+        write_mp3(path, 20)
+        worse.append(Track(path=path, tags=TrackTags(title=f"T{number}", artist="Gruppo", album="Disco")))
+    issue = scan.Issue(scan.KIND_DUPLICATE, scan.SEVERITY_LOW, "Gruppo — Disco: copia in MP3 128 kbps", "dettaglio",
+                       [track.path for track in worse], rule_id="R32.1")
+    targets = {}
+    for track in worse:
+        targets[str(track.path)] = check_flow.Target(track, pc=track)
+    entries = check_flow.group_by_album([issue], lambda path: targets.get(str(path)))
+    trashed = []
+    monkeypatch.setattr(QFile, "moveToTrash", staticmethod(lambda path: trashed.append(path) or True))
+    window = MainWindow()
+    monkeypatch.setattr(window, "reload_folder", lambda: None)
+    try:
+        report = scan.ScanReport(target="prova", issues=[issue], tracks_scanned=2, albums_scanned=1)
+        view = CheckResultsView(window.scan_launcher, report, entries, None, {}, check_flow.SIDE_PC)
+        problem_item = view.tree.topLevelItem(0).child(0)
+        problem_item.setSelected(True)
+        menu = QMenu()
+        view._trash_entries(menu)
+        texts = [action.text() for action in menu.actions()]
+        assert texts == ["Sposta nel cestino questa copia (2 file)…"]
+        monkeypatch.setattr(QMessageBox, "exec", lambda self: QMessageBox.No)
+        menu.actions()[0].trigger()
+        assert trashed == []                                        # No: niente nel Cestino
+        monkeypatch.setattr(QMessageBox, "exec", lambda self: QMessageBox.Yes)
+        menu.actions()[0].trigger()
+        assert sorted(trashed) == sorted(str(track.path) for track in worse)
+        assert problem_item.data(COL_NAME, check_results.KIND_ROLE) == check_results.ROW_PROBLEM
         view.close()
     finally:
         window._exit_checked = True

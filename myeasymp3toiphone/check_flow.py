@@ -117,6 +117,28 @@ def online_note(result) -> str:
     return result_text
 
 
+def drop_disproved_compilations(issues: list, results: list) -> list:
+    """I problemi senza le compilation divise (R13) che la Verifica online smentisce: il catalogo ha trovato uno dei
+    loro album con un artista preciso (non "artisti vari"), che la correzione online (W2) propone."""
+    from .library import is_various_artists
+    specific = set()
+    for result in results:
+        release = result.release
+        if release is not None and release.artist and not is_various_artists(release.artist):
+            for track in result.local_tracks:
+                specific.add(str(track.path))
+    result_list = []
+    for issue in issues:
+        disproved = False
+        if issue.rule_id.split(".", 1)[0] == "R13":
+            for path in issue.files:
+                if str(path) in specific:
+                    disproved = True
+        if not disproved:
+            result_list.append(issue)
+    return result_list
+
+
 def online_issues(result, number: int) -> list:
     """I problemi di un album verificato online (albumcheck.AlbumCheckResult): brani che mancano rispetto
     all'edizione, tag diversi da quelli del catalogo (con la correzione). Un album non trovato non è un problema:

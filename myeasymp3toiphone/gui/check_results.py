@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from difflib import SequenceMatcher
 from html import escape
+from pathlib import Path
 
 from PySide6.QtCore import QPointF, QUrl, Qt
 from PySide6.QtGui import QBrush, QColor, QDesktopServices, QTextDocument
@@ -593,6 +594,7 @@ class CheckResultsView(QWidget):
         online.triggered.connect(lambda: launcher.recheck(STAGE_ONLINE, keys))
         menu.addSeparator()
         self._accept_entries(menu)
+        self._trash_entries(menu)
         menu.addSeparator()
         # i file del PC dei brani scelti (di un problema o di un album: tutti i suoi): copiare il percorso della
         # cartella per correggere a mano, o aprirla
@@ -606,6 +608,67 @@ class CheckResultsView(QWidget):
             action.triggered.connect(button.click)
         menu.setToolTipsVisible(True)
         menu.exec(self.tree.viewport().mapToGlobal(position))
+
+    def _trash_entries(self, menu) -> None:
+        """Per le copie doppie di un album (R32: qualità peggiore; R33: la stessa copia due volte) scelte nei
+        risultati: Sposta nel cestino la copia in …, una voce per copia. È l'unico caso in cui il programma toglie
+        file del PC, e sempre dopo l'elenco dei file e la conferma, nel Cestino di Windows."""
+        from ..library import album_folder, short_folder
+        seen = set()
+        for item in self.tree.selectedItems():
+            if item.data(COL_NAME, KIND_ROLE) == ROW_PROBLEM:
+                _entry_index, problem = self._problems[item.data(COL_NAME, REF_ROLE)]
+                rule = problem.issue.rule_id.split(".", 1)[0]
+                if rule in ("R32", "R33") and not problem.accepted:
+                    copies = {}
+                    for path in problem.files:
+                        copies.setdefault((album_folder(path), Path(path).suffix.casefold()), []).append(Path(path))
+                    for (folder, _suffix), paths in sorted(copies.items()):
+                        key = tuple(sorted(str(path) for path in paths))
+                        if key not in seen:
+                            seen.add(key)
+                            text = (f"Sposta nel cestino questa copia ({len(paths)} file)…" if rule == "R32" else
+                                    f"Sposta nel cestino la copia in {short_folder(folder)} ({len(paths)} file)…")
+                            action = menu.addAction(text)
+                            action.setToolTip("Mostra l'elenco dei file e chiede conferma; si recuperano dal Cestino "
+                                              "di Windows")
+                            action.triggered.connect(
+                                lambda _checked=False, chosen=paths, issue=problem.issue: self._trash_copy(chosen, issue))
+
+    def _trash_copy(self, paths: list, issue) -> None:
+        """Sposta nel Cestino di Windows i file di una copia doppia, dopo l'elenco e la conferma; poi Rileggi."""
+        from PySide6.QtCore import QFile
+        existing = []
+        for path in paths:
+            if path.is_file():
+                existing.append(path)
+        if not existing:
+            QMessageBox.information(self, "Sposta nel cestino", "I file non ci sono più su questo PC.")
+        else:
+            names = []
+            for path in existing[:15]:
+                names.append(f"• {path}")
+            if len(existing) > 15:
+                names.append(f"… e altri {len(existing) - 15}")
+            box = QMessageBox(QMessageBox.Warning, "Sposta nel cestino",
+                              f"Spostare nel Cestino di Windows {len(existing)} file di questa copia dell'album?",
+                              QMessageBox.Yes | QMessageBox.No, self)
+            box.setInformativeText(issue.detail + "\n\n" + "\n".join(names) + "\n\nSi recuperano dal Cestino. "
+                                   "Sull'iPhone non cambia niente.")
+            box.setDefaultButton(QMessageBox.No)
+            if box.exec() == QMessageBox.Yes:
+                failed = []
+                moved = 0
+                for path in existing:
+                    if QFile.moveToTrash(str(path)):
+                        moved += 1
+                    else:
+                        failed.append(str(path))
+                if failed:
+                    QMessageBox.warning(self, "Sposta nel cestino", "Non spostati nel Cestino:\n" + "\n".join(failed))
+                self.window.statusBar().showMessage(f"{moved} file nel Cestino. Rileggo la cartella: poi Controlla di "
+                                                    "nuovo questi album per aggiornare i risultati.", 10000)
+                self.window.reload_folder()
 
     @staticmethod
     def _add_accepted_rows(child, problem) -> None:

@@ -4113,4 +4113,44 @@ CATALOG = {
         "<br><span style='color: gray'>{0} albums not found in the online catalogs: they are not problems, the list is in the report (Open the report).</span>",
     "Verifica online: {0} album non trovati nei cataloghi (non sono problemi)":
         "Online check: {0} albums not found in the catalogs (they are not problems)",
+    "copia dell'album in qualità peggiore":
+        "lower-quality copy of the album",
+    "album presente due volte":
+        "album present twice",
+    "Sposta nel cestino questa copia ({0} file)…":
+        "Move this copy to the recycle bin ({0} files)…",
+    "Sposta nel cestino la copia in {0} ({1} file)…":
+        "Move the copy in {0} to the recycle bin ({1} files)…",
+    "Mostra l'elenco dei file e chiede conferma; si recuperano dal Cestino di Windows":
+        "Shows the list of files and asks for confirmation; they can be recovered from the Windows Recycle Bin",
+    "I file non ci sono più su questo PC.":
+        "The files are no longer on this PC.",
+    "Spostare nel Cestino di Windows {0} file di questa copia dell'album?":
+        "Move {0} files of this copy of the album to the Windows Recycle Bin?",
+    "\n\nSi recuperano dal Cestino. Sull'iPhone non cambia niente.":
+        "\n\nThey can be recovered from the Recycle Bin. Nothing changes on the iPhone.",
+    "{0} file nel Cestino. Rileggo la cartella: poi Controlla di nuovo questi album per aggiornare i risultati.":
+        "{0} files in the Recycle Bin. Reloading the folder: then Check these albums again to update the results.",
+    "L'album compare come: {0}. Senza artista dell'album, sull'iPhone ogni cantante forma un album a parte: la correzione mette \"{1}\" e la spunta Compilation. Con la Verifica online, se il catalogo trova l'album di un artista preciso, questo problema sparisce e la correzione online propone quell'artista.":
+        "The album appears as: {0}. Without album artist, on the iPhone each singer forms a separate album: the fix sets \"{1}\" and the Compilation flag. With the online check, if the catalog finds the album of a specific artist, this problem disappears and the online fix proposes that artist.",
+    "Se non ti servono i brani che ci sono solo in questa copia (il dettaglio li nomina): tasto destro sul problema → Sposta nel cestino questa copia, controlla l'elenco dei file e conferma (si recuperano dal Cestino di Windows). Oppure spostala a mano fuori dalle cartelle della musica con Esplora file. Se la vuoi tenere: tasto destro sull'album → Va bene così.":
+        "If you do not need the tracks that are only in this copy (the detail names them): right click on the problem → Move this copy to the recycle bin, check the list of files and confirm (they can be recovered from the Windows Recycle Bin). Or move it by hand out of the music folders with File Explorer. If you want to keep it: right click on the album → Fine as it is.",
+    "Tasto destro sul problema → Sposta nel cestino la copia in … (scegli quale togliere), controlla l'elenco dei file e conferma (si recuperano dal Cestino di Windows). Se le vuoi tenere tutte e due: tasto destro sull'album → Va bene così.":
+        "Right click on the problem → Move the copy in … to the recycle bin (choose which one to remove), check the list of files and confirm (they can be recovered from the Windows Recycle Bin). If you want to keep both: right click on the album → Fine as it is.",
+    "MP3 {0} kbps":
+        "MP3 {0} kbps",
+    "Dell'album ci sono due copie: questa ({0}, in {1}) e una migliore ({2}, in {3}). Questa è un doppione: sull'iPhone basta la migliore.":
+        "There are two copies of the album: this one ({0}, in {1}) and a better one ({2}, in {3}). This one is a duplicate: on the iPhone the better one is enough.",
+    " Attenzione: {0} ci sono solo in questa copia ({1}{2}): togliendola li perdi.":
+        " Warning: {0} are only in this copy ({1}{2}): removing it you lose them.",
+    "{0}: copia in {1}, c'è anche in {2}":
+        "{0}: copy in {1}, also available in {2}",
+    "{0}: l'album c'è due volte ({1})":
+        "{0}: the album is there twice ({1})",
+    "Due copie con la stessa qualità: in {0} e in {1}. Ne basta una.":
+        "Two copies with the same quality: in {0} and in {1}. One is enough.",
+    " Le cartelle e gli anni sono diversi: forse sono album diversi con lo stesso nome.":
+        " The folders and the years are different: maybe they are different albums with the same name.",
+    " Non verificato online: se non hai fatto la Verifica online, tasto destro → Controlla online per esserne sicuro.":
+        " Not checked online: if you did not run the online check, right click → Check online to be sure.",
 }

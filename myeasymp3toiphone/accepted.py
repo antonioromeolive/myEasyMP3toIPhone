@@ -57,6 +57,8 @@ TYPE_LABELS = {
     "R29": "stesso numero di traccia, titoli diversi",
     "R30": "numeri di traccia o di disco sbagliati",
     "R31": "totali diversi tra i brani",
+    "R32": "copia dell'album in qualità peggiore",
+    "R33": "album presente due volte",
     "I1": "tag diversi tra PC e iPhone",
     "I2": "brani che mancano sull'iPhone",
     "I4": "brani fantasma sull'iPhone",

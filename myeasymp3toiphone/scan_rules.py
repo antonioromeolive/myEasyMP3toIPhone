@@ -14,9 +14,10 @@ from __future__ import annotations
 
 import re
 from dataclasses import replace
+from functools import lru_cache
 
 from . import cue
-from .library import UNKNOWN_ALBUM, assign_groups, group_by_album, is_various_artists, phone_group_key
+from .library import UNKNOWN_ALBUM, album_folder, assign_groups, group_by_album, is_various_artists, phone_group_key
 from .names import (
     LEVEL_ACCENTS, LEVEL_CASE, LEVEL_PUNCT, POLICY_FIRST, POLICY_MOST, REPLACEMENT_CHAR, choose_spelling,
     clean_spaces, fold, repaired_mojibake,
@@ -35,6 +36,8 @@ ARTIST_FIELDS = ("artist", "album_artist")
 NUMBERED_TITLE = re.compile(r"^\s*0*(\d{1,3})\s*[-–._]\s+(\S.*)$")
 FILE_NUMBER = re.compile(r"^\s*(?:(\d{1,2})-)?(\d{1,3})(?=[\s._-])")    # "05 - …", "05. …", "1-05 - …" (disco 1)
 MANY = 15                                             # quanti nomi o brani si elencano nel dettaglio
+MP3_TOP = 315                    # kbps: da qui un MP3 è "a 320" (i 320 kbps veri a volte si leggono un po' sotto)
+BITRATE_MARGIN = 16              # kbps: due MP3 sono di qualità diversa solo con almeno questa differenza
 
 
 # --------------------------------------------------------------------------- i brani visti dalle regole
@@ -799,4 +802,144 @@ def detect_number_clashes(view: RuleView) -> list:
                     KIND_FEW_TRACKS, SEVERITY_MEDIUM,
                     f"{_album_label(key)}: {len(clashes)} numeri di traccia usati da brani diversi", detail, files, fix,
                     rule_id=f"R29.{number}"))
+    return issues
+
+
+# --------------------------------------------------------------------------- livello 6: copie dello stesso album
+
+@lru_cache(maxsize=4096)
+def _mp3_bitrate(path: str) -> int:
+    """Il bitrate di un MP3 in kbps (la media, per i VBR); 0 se non si legge."""
+    from mutagen import MutagenError
+    from mutagen.mp3 import MP3
+    try:
+        result = int(MP3(path).info.bitrate // 1000)
+    except (MutagenError, OSError, ValueError):
+        result = 0
+    return result
+
+
+def mp3_bitrate(track) -> int:
+    result = _mp3_bitrate(str(track.path))
+    return result
+
+
+def album_copies(album_tracks: list) -> list:
+    """Le copie di un album: i suoi brani divisi per cartella dell'album (library.album_folder: CD1 e CD2 sono la
+    stessa) e per formato. [(cartella, estensione, [brani])], in ordine."""
+    by_copy = {}
+    for track in album_tracks:
+        key = (album_folder(track.path), track.path.suffix.casefold())
+        by_copy.setdefault(key, []).append(track)
+    result = []
+    for (folder, suffix), tracks in sorted(by_copy.items()):
+        result.append((folder, suffix, tracks))
+    return result
+
+
+def copy_quality(suffix: str, tracks: list) -> tuple:
+    """(rango, kbps, nome) della qualità di una copia: FLAC (rango 2) meglio degli MP3 (rango 1, poi il bitrate, la
+    mediana dei brani); gli altri formati (None) non si confrontano."""
+    if suffix == ".flac":
+        result = (2, 0, "FLAC")
+    elif suffix == ".mp3":
+        rates = []
+        for track in tracks:
+            rate = mp3_bitrate(track)
+            if rate:
+                rates.append(rate)
+        rates.sort()
+        rate = rates[len(rates) // 2] if rates else 0
+        result = (1, rate, f"MP3 {rate} kbps") if rate else None
+    else:
+        result = None
+    return result
+
+
+def _better(first: tuple, second: tuple) -> bool:
+    """La qualità first è migliore di second (FLAC di un MP3; un MP3 di un altro con almeno BITRATE_MARGIN in più)."""
+    if first[0] != second[0]:
+        result = first[0] > second[0]
+    else:
+        result = first[1] >= second[1] + BITRATE_MARGIN
+    return result
+
+
+def _song_keys(tracks: list) -> set:
+    """Le canzoni di una copia: il titolo senza aggiunte (scan.title_core)."""
+    from .scan import title_core
+    result = set()
+    for track in tracks:
+        key = title_core(track.tags.title)
+        if key:
+            result.add(key)
+    return result
+
+
+def _same_songs(first: list, second: list) -> bool:
+    """Due copie hanno quasi le stesse canzoni: almeno metà di quelle della copia più piccola."""
+    one = _song_keys(first)
+    two = _song_keys(second)
+    smaller = min(len(one), len(two))
+    result = smaller > 0 and len(one & two) * 2 >= smaller
+    return result
+
+
+def _short_folder(folder: str) -> str:
+    from .library import short_folder
+    result = short_folder(folder)
+    return result
+
+
+def detect_album_copies(view: RuleView) -> list:
+    """R32: una copia dell'album in qualità peggiore di un'altra (un MP3 sotto 320 kbps quando c'è il FLAC, l'MP3 a
+    320 o un MP3 a bitrate più alto): un doppione da togliere a mano, o con Sposta nel cestino questa copia (tasto
+    destro). R33: la stessa copia due volte, in cartelle diverse, con la stessa qualità. Due copie dello stesso album
+    sono versioni (FLAC e MP3 a 320 vanno bene insieme, non si segnalano); con artista dell'album "artisti vari"
+    contano come lo stesso album solo se hanno quasi le stesse canzoni (altrimenti sono due raccolte con lo stesso
+    nome: R29)."""
+    issues = []
+    number = 0
+    albums = view.selected_albums()
+    for key in sorted(albums, key=lambda k: (k[0].casefold(), k[1].casefold())):
+        copies = album_copies(albums[key]) if key[1] != UNKNOWN_ALBUM else []
+        various = is_various_artists(key[0])
+        rated = []
+        for folder, suffix, tracks in copies:
+            quality = copy_quality(suffix, tracks)
+            if quality is not None:
+                rated.append((folder, suffix, tracks, quality))
+        twice = []
+        for index, (folder, suffix, tracks, quality) in enumerate(rated):
+            best = None
+            for other_index, (other_folder, _other_suffix, other_tracks, other_quality) in enumerate(rated):
+                comparable = other_index != index and (not various or _same_songs(tracks, other_tracks))
+                if comparable and quality[0] == 1 and quality[1] < MP3_TOP and _better(other_quality, quality):
+                    if best is None or _better(other_quality, best[2]):
+                        best = (other_folder, other_tracks, other_quality)
+                same_quality = (comparable and other_index > index and not _better(quality, other_quality)
+                                and not _better(other_quality, quality) and suffix == _other_suffix)
+                if same_quality:
+                    twice.append((folder, tracks, other_folder, other_tracks, quality))
+            if best is not None:
+                number += 1
+                only_here = sorted(_song_keys(tracks) - _song_keys(best[1]))
+                detail = (f"Dell'album ci sono due copie: questa ({quality[2]}, in {_short_folder(folder)}) e una "
+                          f"migliore ({best[2][2]}, in {_short_folder(best[0])}). Questa è un doppione: sull'iPhone "
+                          "basta la migliore.")
+                if only_here:
+                    names = []
+                    for title in only_here[:MANY]:
+                        names.append(title)
+                    detail += (f" Attenzione: {_tracks_text(len(only_here))} ci sono solo in questa copia ("
+                               f"{', '.join(names)}{'…' if len(only_here) > MANY else ''}): togliendola li perdi.")
+                issues.append(Issue(
+                    KIND_DUPLICATE, SEVERITY_LOW, f"{_album_label(key)}: copia in {quality[2]}, c'è anche in "
+                    f"{best[2][2]}", detail, [track.path for track in tracks], rule_id=f"R32.{number}"))
+        for folder, tracks, other_folder, other_tracks, quality in twice:
+            number += 1
+            issues.append(Issue(
+                KIND_DUPLICATE, SEVERITY_LOW, f"{_album_label(key)}: l'album c'è due volte ({quality[2]})",
+                f"Due copie con la stessa qualità: in {_short_folder(folder)} e in {_short_folder(other_folder)}. "
+                "Ne basta una.", [track.path for track in tracks + other_tracks], rule_id=f"R33.{number}"))
     return issues

@@ -37,7 +37,8 @@ import mutagen
 from mutagen.apev2 import APENoHeaderError, APEv2
 
 from .library import (
-    UNKNOWN_ALBUM, UNKNOWN_ARTIST, Track, assign_groups, best_spelling, group_by_album, is_cancelled,
+    UNKNOWN_ALBUM, UNKNOWN_ARTIST, Track, album_folder, assign_groups, best_spelling, group_by_album,
+    is_cancelled,
 )
 from .artist_names import (
     candidate_pairs, clusters, duet_parts, musicbrainz_keys, variant_key,
@@ -448,7 +449,9 @@ def detect_duplicates(tracks: list) -> list:
     same = {}
     for track in tracks:
         if not track.error and track.tags.album and track.tags.title:
-            key = (track.album_key, track.tags.disc_number or 1, track.tags.track_number, _plain(track.tags.title))
+            # nella stessa cartella dell'album: due copie in cartelle diverse le dicono R32 e R33 (copie dell'album)
+            key = (track.album_key, album_folder(track.path), track.tags.disc_number or 1, track.tags.track_number,
+                   _plain(track.tags.title))
             same.setdefault(key, []).append(track.path)
     issues = []
     if numbered:
@@ -763,19 +766,26 @@ def detect_split_names(tracks: list, selected: Optional[set] = None) -> list:
                     Fix(FIX_TAGS, f"Album \"{album}\" e artista album \"{album_artist}\" su tutti i brani, numero "
                         "del disco dal nome", changes=changes), rule_id=f"R12.{number}"))
             else:
-                # solo se è probabile una compilation divisa: nessun artista dell'album, e una cartella sola o un
-                # anno solo. Altrimenti sono album diversi con un nome comune ("Essentials", "Greatest Hits")
+                # una compilation senza artista dell'album: sull'iPhone diventa un album per cantante. Si propone
+                # "Artisti Vari", salvo che la Verifica online trovi l'album di un artista preciso (allora il
+                # problema si toglie: check_flow.drop_disproved_compilations, e W2 propone quell'artista)
                 folders = {t.path.parent for t in all_tracks}
                 years = {t.tags.year for t in all_tracks if t.tags.year}
                 no_album_artist = all(not t.tags.album_artist for t in all_tracks)
-                likely = no_album_artist and (len(folders) == 1 or len(years) == 1)
-                if likely:
+                if no_album_artist:
                     fix = Fix(FIX_TAGS, f"Artista album \"{VARIOUS_ARTISTS}\" e album \"{album}\" su tutti i brani",
                               changes=_unify_changes(all_tracks, {"album": album, "album_artist": VARIOUS_ARTISTS}))
+                    detail = (f"L'album compare come: {names}. Senza artista dell'album, sull'iPhone ogni cantante forma "
+                              f"un album a parte: la correzione mette \"{VARIOUS_ARTISTS}\" e la spunta Compilation. "
+                              "Con la Verifica online, se il catalogo trova l'album di un artista preciso, questo "
+                              "problema sparisce e la correzione online propone quell'artista.")
+                    if len(folders) > 1 and len(years) > 1:
+                        detail += (" Le cartelle e gli anni sono diversi: forse sono album diversi con lo stesso "
+                                   "nome.")
+                    detail += (" Non verificato online: se non hai fatto la Verifica online, tasto destro → "
+                               "Controlla online per esserne sicuro.")
                     issues.append(Issue(
-                        KIND_SPLIT, SEVERITY_MEDIUM, f"\"{album}\" diviso tra {len(keys)} artisti",
-                        f"L'album compare come: {names}. Se è una compilation, senza \"Artista album\" ogni artista "
-                        "forma un album a parte. Se invece sono album diversi con lo stesso nome, ignora.",
+                        KIND_SPLIT, SEVERITY_MEDIUM, f"\"{album}\" diviso tra {len(keys)} artisti", detail,
                         [t.path for t in all_tracks], fix, rule_id=f"R13.{number}"))
     return issues
 
@@ -975,6 +985,10 @@ def merge_overlapping(issues: list) -> list:
     contiene "diviso tra artisti" (R13); un album di 1-2 brani che fa parte di una collezione divisa (R10) non è un
     problema a sé; un album incompleto che è anche diviso lo dice."""
     folders = [issue for issue in issues if issue.rule_id.startswith("R11")]
+    copies = []                    # le copie dello stesso album (R32, R33): i loro doppioni brano per brano (R8) no
+    for issue in issues:
+        if issue.rule_id.split(".", 1)[0] in ("R32", "R33"):
+            copies.append(issue)
     splits = []                    # le collezioni divise: non R24-R28, che guardano un album intero
     for issue in issues:
         if issue.rule_id.split(".", 1)[0] in ("R11", "R12", "R13"):
@@ -982,7 +996,8 @@ def merge_overlapping(issues: list) -> list:
     kept = []
     for issue in issues:
         drop = ((issue.rule_id.startswith("R13") and _covered(issue, folders))
-                or (issue.rule_id.startswith("R10") and _covered(issue, splits)))
+                or (issue.rule_id.startswith("R10") and _covered(issue, splits))
+                or (issue.rule_id.split(".", 1)[0] == "R8" and _covered(issue, copies)))
         if issue.rule_id.startswith("R9") and _covered(issue, splits):
             issue.detail += (" L'album è anche diviso in più parti: correggi prima la divisione, poi ripeti la "
                              "scansione.")
@@ -1035,6 +1050,7 @@ def rule_steps(view, check_files: bool, progress: Optional[ProgressFn] = None,
         # 5. completezza
         (CHECK_FEW, True, lambda: detect_few_tracks(view.selected, whole)),
         # 6. doppioni (R15, lo stesso brano con l'impronta, gira dopo: scan_tracks)
+        (CHECK_DUPLICATES, pc, lambda: more.detect_album_copies(view)),
         (CHECK_DUPLICATES, True, lambda: detect_duplicates(view.selected)),
     ]
     return result
@@ -1839,6 +1855,13 @@ ADVICE = {
            "dell'edizione: tasto destro sull'album → Controlla online.",
     "R31": "Applica la correzione scrive su tutti i brani il totale più frequente. Se è sbagliato proprio quello: "
            "Mostra i brani e scrivi il totale giusto con Cambia i tag (tasto E) su tutti.",
+    "R32": "Se non ti servono i brani che ci sono solo in questa copia (il dettaglio li nomina): tasto destro sul "
+           "problema → Sposta nel cestino questa copia, controlla l'elenco dei file e conferma (si recuperano dal "
+           "Cestino di Windows). Oppure spostala a mano fuori dalle cartelle della musica con Esplora file. Se la "
+           "vuoi tenere: tasto destro sull'album → Va bene così.",
+    "R33": "Tasto destro sul problema → Sposta nel cestino la copia in … (scegli quale togliere), controlla l'elenco "
+           "dei file e conferma (si recuperano dal Cestino di Windows). Se le vuoi tenere tutte e due: tasto destro "
+           "sull'album → Va bene così.",
     "I1": "Mostra i brani, poi nella scheda PC Usa i tag da PC a iPhone e Applica. Se sono giusti quelli dell'iPhone: "
           "scheda iPhone, Usa i tag da iPhone a PC.",
     "I2": "Mostra i brani, poi Copia da PC a iPhone e Applica. Se sull'iPhone non li vuoi, ignora.",

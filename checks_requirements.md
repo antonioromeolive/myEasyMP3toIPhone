@@ -4,6 +4,13 @@ Stato al 27/11/2026, letto dal codice (commit b270943). Scopo: rimettere ordine 
 altro codice. Prima l'inventario di quello che c'è, nell'ordine in cui gira; poi l'analisi di cosa manca o non torna;
 in fondo le decisioni da prendere.
 
+## 0. Lo scopo (deciso dall'utente il 28/11/2026)
+
+**Album che sull'iPhone non creano confusione, non album "perfetti".** Un controllo serve se, senza correggere,
+sull'iPhone un album si spezza, si unisce a un altro, compare due volte, ha i brani mescolati o un nome scritto in modi
+diversi. Quello che sull'iPhone non cambia niente (un totale "1 di 12" diverso, l'anno, il genere) non è un problema.
+Lo stesso scopo varrà per i controlli sull'iPhone: tutti gli album a posto, con la copertina, non spezzati.
+
 ## 1. Premesse
 
 - **Perimetro di questo lavoro: solo il PC.** I controlli guardano i brani della scheda PC (la selezione, o tutto) e
@@ -403,6 +410,25 @@ prima della "più usata" della D-9 (`names._short_words_lowercase`).
   (rispetta i titoli italiani con la sola prima maiuscola).
 - D-7: gli altri formati (OGG, Opus, WMA, WAV, AIFF) restano nella scheda PC e i Controlli li segnalano come
   "formato non supportato", spiegando cosa fare. M4A resta supportato come MP3 e FLAC.
+
+**D-11 (28/11/2026) — Stesso album, copie, compilation.**
+- **Stesso album** = stesso titolo e stesso artista dell'album (senza maiuscole, accenti e spazi). Le regole che
+  propongono di unire album scritti male (R11, R12) restano.
+- **Copie dello stesso album**: i suoi brani divisi per cartella dell'album e formato. FLAC e MP3 (anche a 320) sono
+  versioni: non si dice niente. Un MP3 sotto 320 kbps, quando c'è una copia migliore (FLAC, MP3 a 320, o un MP3 a
+  bitrate più alto), è una **copia doppia** (R32): si segnala la copia intera; il dettaglio nomina i brani che ci sono
+  solo lì. La stessa copia due volte con la stessa qualità: R33. Con artista dell'album "artisti vari" due copie sono lo
+  stesso album solo se hanno quasi le stesse canzoni (almeno metà); altrimenti sono due raccolte con lo stesso nome
+  (R29 propone di rinominarne una).
+- **Mai automatico**: tasto destro sul problema → *Sposta nel cestino questa copia* (R33: *la copia in …*), solo dopo
+  l'elenco dei file e la conferma, nel Cestino di Windows. È l'unica eccezione alla regola "il programma non sposta né
+  cancella i file delle cartelle della musica".
+- **R13** (stesso titolo, artisti diversi, nessun artista dell'album): propone "Artisti Vari" e la spunta
+  Compilation; se la Verifica online trova l'album di un artista preciso, R13 sparisce
+  (`check_flow.drop_disproved_compilations`) e la correzione online propone quell'artista. Senza Verifica online il
+  dettaglio dice "non verificato online".
+- **R8** (stesso numero e titolo) guarda solo dentro la stessa cartella dell'album: le copie in cartelle diverse sono
+  R32/R33.
 
 ## 8. Domande ancora aperte
 
