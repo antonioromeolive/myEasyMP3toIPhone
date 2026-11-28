@@ -1312,10 +1312,12 @@ def detect_phantoms(phone_tracks: list) -> list:
     return issues
 
 
-def compare_with_library(phone_tracks: list, library_tracks: list) -> list:
-    """La musica dell'app Musica dell'iPhone (phone_library.PhoneTrack) confrontata con la Libreria del PC, per
-    artista, album e titolo. Sull'iPhone il programma non scrive: i problemi non hanno correzioni automatiche."""
-    index = PhoneIndex(phone_tracks)
+def compare_with_library(phone_tracks: list, library_tracks: list, links: Optional[dict] = None) -> list:
+    """La musica dell'app Musica dell'iPhone (phone_library.PhoneTrack) confrontata con la Libreria del PC, come la
+    scheda PC: prima il registro della provenienza (links: quel file è quel brano), poi artista, album e titolo. Senza
+    il registro ogni copia di un brano sul PC (il FLAC e l'MP3) si abbinerebbe allo stesso brano dell'iPhone e la copia
+    non inviata risulterebbe "con tag diversi". Sull'iPhone il programma non scrive: niente correzioni automatiche."""
+    index = PhoneIndex(phone_tracks, links)
     stale = []
     missing_by_album = {}
     present_albums = set()
@@ -1680,7 +1682,8 @@ def scan_tracks(tracks: list, target: str, provider=None, check_files: bool = Tr
                 partial: Optional[Callable[[list], None]] = None,
                 ai_skip: Optional[Callable[[tuple], bool]] = None,
                 album_context: Optional[list] = None,
-                fingerprint_fn: Optional[Callable[[], dict]] = None) -> ScanReport:
+                fingerprint_fn: Optional[Callable[[], dict]] = None,
+                phone_links: Optional[dict] = None) -> ScanReport:
     """Il controllo: le regole dei controlli scelti (checks), poi l'AI se c'è un fornitore. Con phone_tracks (la
     musica dell'app Musica, i cui brani sono anche tracks) è dell'iPhone, confrontato con library_tracks.
     fingerprints: {percorso: impronta dell'audio} per i brani duplicati (senza, solo quelli sospetti per i tag).
@@ -1693,7 +1696,8 @@ def scan_tracks(tracks: list, target: str, provider=None, check_files: bool = Tr
     senza, si tolgono e il dettaglio dice di correggere sul PC.
     partial(problemi): i risultati man mano (una copia dell'elenco): dopo le regole e dopo l'analisi AI.
     ai_skip(album_key): gli album che l'analisi AI salta (quelli che vanno bene così per intero).
-    album_context: tutti i brani della musica quando tracks è una parte: gli album incompleti si giudicano interi."""
+    album_context: tutti i brani della musica quando tracks è una parte: gli album incompleti si giudicano interi.
+    phone_links: i collegamenti del registro della provenienza (registry.links_here()), per il confronto con il PC."""
     assign_groups(tracks)
     report = ScanReport(target=target, tracks_scanned=len(tracks), albums_scanned=len(group_by_album(tracks)))
     issues = rule_issues(tracks, check_files, progress, cancel, checks, album_context, pc=phone_tracks is None)
@@ -1772,7 +1776,7 @@ def scan_tracks(tracks: list, target: str, provider=None, check_files: bool = Tr
                     issue.fix = None
                     issue.detail += " Correggi i brani sul PC (scheda PC)."
         if library_tracks is not None:
-            for issue in mark_information(compare_with_library(phone_tracks, library_tracks)):
+            for issue in mark_information(compare_with_library(phone_tracks, library_tracks, phone_links)):
                 if enabled(issue, checks):
                     issues.append(issue)
         if CHECK_UNREADABLE in checks:

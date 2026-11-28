@@ -219,6 +219,8 @@ class ScanLauncher:
         loaded = list(window.tracks) if window.showing_music() else None
         target = f"iPhone, {len(items)} brani ({window.phone_label})"
         musicbrainz = choices["musicbrainz"] if CHECK_VARIANTS in checks else None
+        registry = getattr(window, "registry", None)
+        links = registry.links_here() if registry is not None else None   # come la scheda PC (⟳ Tag diversi)
 
         def work(progress, cancel, emit):
             scanned = tracks_for_scan(items)
@@ -241,7 +243,7 @@ class ScanLauncher:
             report = scan_tracks(scanned, target, None, check_files=False, phone_tracks=items,
                                  library_tracks=library_tracks, progress=progress, cancel=cancel, checks=checks,
                                  fingerprints=prints, musicbrainz=musicbrainz, keep_phone_fixes=True,
-                                 partial=lambda issues: emit((LIVE_ISSUES, issues)))
+                                 partial=lambda issues: emit((LIVE_ISSUES, issues)), phone_links=links)
             emit((LIVE_ISSUES, list(report.issues)))
             results = self._online(scanned, report, choices, progress, cancel, emit)
             value = (report, results, scanned, library_tracks)

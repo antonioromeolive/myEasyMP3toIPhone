@@ -1923,3 +1923,19 @@ def _settle(window, app) -> None:
         app.processEvents()
         time.sleep(0.01)
     app.processEvents()
+
+
+def test_the_iphone_check_uses_the_registry_like_the_pc_tab():
+    """Il brano inviato dall'MP3 (collegato nel registro) e una copia FLAC dello stesso brano con un tag diverso: la
+    copia non è "con tag diversi" (come ⟳ della scheda PC); senza il registro lo sembrava."""
+    from myeasymp3toiphone.overlay import path_key
+    sent = _pc("Canzone", "Gruppo", "Disco", year="1991", track_number=1)
+    copy = Track(path=Path("C:/musica/FLAC/Disco/Canzone.flac"),
+                 tags=TrackTags(title="Canzone", artist="Gruppo", album="Disco", year="1990", track_number=1))
+    phone = [_phone(1, "Canzone", "Gruppo", "Disco", year="1991", track_number=1)]
+    phone[0].sync_id = 501
+    without = {issue.rule_id.split(".")[0] for issue in scan.compare_with_library(phone, [sent, copy])}
+    assert "I1" in without                                       # la copia FLAC abbinata per tag: "diversa"
+    links = {path_key(sent.path): 501}
+    found = scan.compare_with_library(phone, [sent, copy], links)
+    assert "I1" not in {issue.rule_id.split(".")[0] for issue in found}
