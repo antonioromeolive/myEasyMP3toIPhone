@@ -171,6 +171,7 @@ class ScanReport:
     ai_errors: list = field(default_factory=list)
     cancelled: bool = False         # annullato durante le regole: i loro risultati sono parziali
     stopped: list = field(default_factory=list)   # annullati dopo le regole (AI, MusicBrainz, Verifica online): senza
+    online_notes: list = field(default_factory=list)   # gli album che la Verifica online non ha trovato (solo rapporto)
 
     def counts(self) -> dict:
         result = Counter()
@@ -762,20 +763,20 @@ def detect_split_names(tracks: list, selected: Optional[set] = None) -> list:
                     Fix(FIX_TAGS, f"Album \"{album}\" e artista album \"{album_artist}\" su tutti i brani, numero "
                         "del disco dal nome", changes=changes), rule_id=f"R12.{number}"))
             else:
+                # solo se è probabile una compilation divisa: nessun artista dell'album, e una cartella sola o un
+                # anno solo. Altrimenti sono album diversi con un nome comune ("Essentials", "Greatest Hits")
                 folders = {t.path.parent for t in all_tracks}
                 years = {t.tags.year for t in all_tracks if t.tags.year}
                 no_album_artist = all(not t.tags.album_artist for t in all_tracks)
                 likely = no_album_artist and (len(folders) == 1 or len(years) == 1)
-                severity = SEVERITY_MEDIUM if likely else SEVERITY_LOW
-                fix = None
                 if likely:
                     fix = Fix(FIX_TAGS, f"Artista album \"{VARIOUS_ARTISTS}\" e album \"{album}\" su tutti i brani",
                               changes=_unify_changes(all_tracks, {"album": album, "album_artist": VARIOUS_ARTISTS}))
-                issues.append(Issue(
-                    KIND_SPLIT, severity, f"\"{album}\" diviso tra {len(keys)} artisti",
-                    f"L'album compare come: {names}. Se è una compilation, senza \"Artista album\" ogni artista "
-                    "forma un album a parte. Se invece sono album diversi con lo stesso nome, ignora.",
-                    [t.path for t in all_tracks], fix, rule_id=f"R13.{number}"))
+                    issues.append(Issue(
+                        KIND_SPLIT, SEVERITY_MEDIUM, f"\"{album}\" diviso tra {len(keys)} artisti",
+                        f"L'album compare come: {names}. Se è una compilation, senza \"Artista album\" ogni artista "
+                        "forma un album a parte. Se invece sono album diversi con lo stesso nome, ignora.",
+                        [t.path for t in all_tracks], fix, rule_id=f"R13.{number}"))
     return issues
 
 
@@ -1888,6 +1889,10 @@ def report_text(report: ScanReport) -> str:
         lines.append("Controllo interrotto: i risultati sono parziali")
     if report.stopped:
         lines.append(f"Annullati: {', '.join(report.stopped)} (i risultati sono quelli senza)")
+    if report.online_notes:
+        lines.append(f"Verifica online: {len(report.online_notes)} album non trovati nei cataloghi (non sono problemi)")
+        for note in report.online_notes:
+            lines.append(f"    - {note}")
     for issue in report.issues:
         lines += ["", f"[{issue.severity}] {KIND_LABELS.get(issue.kind, issue.kind)} ({issue.origin}): {issue.title}",
                   f"    {issue.detail}"]

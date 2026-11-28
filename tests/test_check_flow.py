@@ -35,7 +35,8 @@ def test_online_check_becomes_problems_with_fixes():
     changes = dict((Path(path).name, values) for path, values in by_rule["W2.1"].fix.changes)
     assert "title" not in changes["01 uno.mp3"] and changes["01 uno.mp3"]["track_total"] == 3   # le maiuscole no
     missing = albumcheck.check_album_services([FakeService("deezer", None)], local)
-    assert [issue.rule_id for issue in check_flow.online_issues(missing, 2)] == ["W3.2"]
+    assert check_flow.online_issues(missing, 2) == []                 # non trovato: non è un problema
+    assert "Non trovato" in check_flow.online_note(missing) and check_flow.online_note(result) == ""
     assert scan.advice(by_rule["W2.1"]) and scan.advice(by_rule["W1.1"])
 
 

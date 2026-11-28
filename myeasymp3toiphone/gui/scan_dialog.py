@@ -17,7 +17,7 @@ from PySide6.QtWidgets import QMessageBox
 from ..accepted import Accepted
 from ..ai import make_provider
 from ..albumcheck import ai_chooser, check_album_services
-from ..check_flow import Target, filter_accepted, group_by_album as entries_by_album, online_issues
+from ..check_flow import Target, filter_accepted, group_by_album as entries_by_album, online_issues, online_note
 from ..config import config_dir, load_profiles
 from ..library import UNKNOWN_ALBUM, group_by_album, scan_folder
 from ..phone_library import tracks_for_scan
@@ -760,13 +760,23 @@ class ScanLauncher:
                       "resolve": self._resolver(side, scanned, phone_pairs)}
         self.applied = set()
         self._online_count = len(results)
+        for result in results:
+            self._remember_online(result)
+        self._note_online(report)
         try:
             self._last["saved"] = save_report(report, config_dir() / REPORTS_FOLDER)
         except OSError as exc:
             QMessageBox.warning(window, TITLE, f"Rapporto non salvato: {exc}")
-        for result in results:
-            self._remember_online(result)
         self._refresh(save=False)
+
+    def _note_online(self, report) -> None:
+        """Gli album che la Verifica online non ha trovato: nel rapporto, non tra i problemi."""
+        notes = []
+        for result in self._last["online"].values():
+            note = online_note(result)
+            if note:
+                notes.append(note)
+        report.online_notes = sorted(notes, key=str.casefold)
 
     def _refresh(self, save: bool = True, ai_running: bool = False) -> None:
         """I risultati per album rifatti dal rapporto (dopo un controllo, o dopo Controlla con l'AI / online)."""
@@ -774,6 +784,7 @@ class ScanLauncher:
         window = self.window
         last = self._last
         report = last["report"]
+        self._note_online(report)
         if save and last["saved"] is not None:
             try:
                 last["saved"].write_text(report_text(report), encoding="utf-8")

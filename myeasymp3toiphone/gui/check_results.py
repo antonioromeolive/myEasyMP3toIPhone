@@ -328,6 +328,9 @@ class CheckResultsView(QWidget):
                     "man mano. Intanto puoi già applicare le correzioni.<br>") + text
         if report.ai_profile:
             text += f" — analisi AI con {escape(report.ai_profile)}"
+        if report.online_notes:
+            text += (f"<br><span style='color: gray'>{len(report.online_notes)} album non trovati nei cataloghi "
+                     "online: non sono problemi, l'elenco è nel rapporto (Apri il rapporto).</span>")
         if report.cancelled:
             text += " — <b>controllo interrotto: risultati parziali</b>"
         if report.stopped:

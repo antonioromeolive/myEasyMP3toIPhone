@@ -105,22 +105,28 @@ def differs(old, new) -> bool:
 
 # --------------------------------------------------------------------------- Verifica online
 
+def online_note(result) -> str:
+    """La riga del rapporto per un album che nessun catalogo ha dato (o per un errore), "" se è stato trovato. Non è
+    un problema dell'album: i Controlli non lo mostrano tra i problemi."""
+    result_text = ""
+    if result.status in (STATUS_NOT_FOUND, STATUS_ERROR):
+        tried = []
+        for service, outcome in result.tried:
+            tried.append(f"{service}: {outcome}")
+        result_text = f"{result.artist} — {result.album}: {result.status_text()} ({'; '.join(tried)})"
+    return result_text
+
+
 def online_issues(result, number: int) -> list:
-    """I problemi di un album verificato online (albumcheck.AlbumCheckResult): non trovato, brani che mancano
-    rispetto all'edizione, tag diversi da quelli del catalogo (con la correzione). number: per i rule_id W*.N."""
+    """I problemi di un album verificato online (albumcheck.AlbumCheckResult): brani che mancano rispetto
+    all'edizione, tag diversi da quelli del catalogo (con la correzione). Un album non trovato non è un problema:
+    va nel rapporto (online_note). number: per i rule_id W*.N."""
     label = f"{result.artist} — {result.album}"
     files = []
     for track in result.local_tracks:
         files.append(track.path)
     issues = []
-    if result.status in (STATUS_NOT_FOUND, STATUS_ERROR):
-        tried = []
-        for service, outcome in result.tried:
-            tried.append(f"{service}: {outcome}")
-        issues.append(Issue(KIND_ONLINE, SEVERITY_LOW, f"{label}: {result.status_text()}",
-                            f"Nessun catalogo ha dato questo album: {'; '.join(tried)}.", files, origin=ORIGIN_ONLINE,
-                            rule_id=f"W3.{number}"))
-    else:
+    if result.status not in (STATUS_NOT_FOUND, STATUS_ERROR):
         edition = f"Edizione di {result.service_label}: {result.release.label()}."
         if result.ai_reason:
             edition += f" Scelta dall'AI ({result.ai_reason})."

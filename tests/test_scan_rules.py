@@ -350,3 +350,13 @@ def test_open_in_tagscanner(tmp_path, monkeypatch):
     assert file_actions.open_in_tagscan(program / "Tagscan.exe", paths) == str(album)
     assert started == [[str(program / "Tagscan.exe"), str(album)]]
     assert file_actions.open_in_tagscan(program / "Tagscan.exe", [tmp_path / "manca" / "x.mp3"]) == ""
+
+
+def test_two_real_albums_with_a_common_name_are_not_a_split_compilation():
+    tracks = [_track("s/1.mp3", title="Uno", artist="Supertramp", album_artist="Supertramp", album="Essentials",
+                     year="2019"),
+              _track("g/1.mp3", title="Due", artist="Gruppo", album_artist="Gruppo", album="Essentials", year="2005"),
+              _track("r/1.mp3", title="Tre", artist="Rossi", album="Estate", year="1999"),
+              _track("b/1.mp3", title="Quattro", artist="Bianchi", album="Estate", year="1999")]
+    splits = _rules(tracks).get("R13", [])
+    assert [issue.title for issue in splits] == ["\"Estate\" diviso tra 2 artisti"]      # solo la raccolta probabile

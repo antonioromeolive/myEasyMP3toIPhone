@@ -129,11 +129,11 @@ class FakeProvider:
 
 
 def test_ai_review_maps_albums_and_marks_false_positives(tmp_path):
-    _tagged(tmp_path / "a" / "1.mp3", title="X", artist="Queen", album="Greatest Hits", track_number=1)
-    _tagged(tmp_path / "b" / "1.mp3", title="Y", artist="ABBA", album="Greatest Hits", track_number=1)
+    _tagged(tmp_path / "a" / "1.mp3", title="X", artist="Queen", album="Greatest Hits", track_number=1, year="1981")
+    _tagged(tmp_path / "b" / "1.mp3", title="Y", artist="ABBA", album="Greatest Hits", track_number=1, year="1981")
     tracks = scan_folder(tmp_path)
     rules = scan.rule_issues(tracks, check_files=False)
-    split = [i for i in rules if i.rule_id.startswith("R13")][0]
+    split = [i for i in rules if i.rule_id.startswith("R13")][0]              # lo stesso anno: probabile raccolta
     reply = {"issues": [{"kind": "tag_mancanti", "severity": "bassa", "title": "Genere mancante", "explanation": "e",
                          "albums": ["A1", "A99"], "fix_album": "", "fix_album_artist": "", "fix_artist": "",
                          "fix_year": "19x", "fix_genre": "Pop"}],

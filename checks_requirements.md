@@ -115,7 +115,8 @@ Nell'ordine in cui girano. "Confronta con" rimanda alla sezione 4.
 - Correzione: album = nome più usato senza "CD n"; numero del disco dal nome; artista dell'album = il più usato tra
   "artista dell'album, o artista".
 
-**R13 — Lo stesso album diviso tra artisti** · `scan.py:630` · media con correzione, bassa senza
+**R13 — Lo stesso album diviso tra artisti** · `scan.py:630` · media, solo quando è probabile (dal 28/11/2026: il
+"forse" senza correzione dava falsi allarmi su nomi comuni come "Essentials")
 - Trova: più `album_key` con lo stesso `album_norm` e artisti diversi.
 - Correzione solo se nessun brano ha l'artista dell'album e (una cartella sola o un anno solo): "Artisti vari" +
   spunta compilation + nome unico. Tolto da `merge_overlapping` se è dentro un R11.
@@ -138,7 +139,8 @@ Nell'ordine in cui girano. "Confronta con" rimanda alla sezione 4.
 **W2 — Tag diversi dal catalogo** · `check_flow.py:97` · bassa
 - Campi: titolo, artista, artista dell'album, album, anno, numeri e totali di traccia e disco (CUE: solo album,
   artista dell'album, anno). Le differenze di sole maiuscole non contano (`same_value`).
-**W3 — Album non trovato** · `check_flow.py:97` · bassa · nessuna correzione
+**W3 — Album non trovato** · non è più un problema (28/11/2026): `check_flow.online_note`, una riga del rapporto
+e il conto nell'intestazione dei risultati
 
 ### Analisi AI
 
@@ -442,7 +444,8 @@ Diventa; i risultati delle regole prima delle impronte dell'audio (`scan_tracks(
 Applica dice perché il pulsante è spento e si riaccende da sola. R29 (stesso numero, titoli diversi) passa al
 livello 4, nella casella "Album con pochi brani o numeri sbagliati", e propone i numeri presi dai nomi dei file; R9
 conta "l'album ne ha almeno N" sui numeri diversi, non sui file (una raccolta con i numeri degli album originali
-diceva "almeno 25" su 15).
+diceva "almeno 25" su 15). Un album non trovato online non è più un problema (solo nel rapporto); R13 si segnala solo
+quando la raccolta divisa è probabile (nessun artista dell'album, e una cartella sola o un anno solo).
 
 Restano:
 - R15 (stesso brano, con l'impronta) e R16 girano dopo i livelli, sui tag di partenza: non vedono le correzioni dei

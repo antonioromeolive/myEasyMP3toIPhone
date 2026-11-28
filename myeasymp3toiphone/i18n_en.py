@@ -4109,4 +4109,8 @@ CATALOG = {
         " The file names instead have a different number for each track (\"05 - …\"): the fix writes that as the track number.",
     "Numero di traccia dal nome del file":
         "Track number from the file name",
+    "<br><span style='color: gray'>{0} album non trovati nei cataloghi online: non sono problemi, l'elenco è nel rapporto (Apri il rapporto).</span>":
+        "<br><span style='color: gray'>{0} albums not found in the online catalogs: they are not problems, the list is in the report (Open the report).</span>",
+    "Verifica online: {0} album non trovati nei cataloghi (non sono problemi)":
+        "Online check: {0} albums not found in the catalogs (they are not problems)",
 }
