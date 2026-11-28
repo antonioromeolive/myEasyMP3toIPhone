@@ -135,6 +135,24 @@ def open_in_explorer(paths: list) -> int:
     return opened
 
 
+def track_texts(tracks: list) -> list:
+    """I testi di Copia negli appunti per dei brani (del PC o dell'iPhone), uguali in tutte le schede: [(voce,
+    [righe])] per Titolo, Artista — Titolo (una riga per brano) e Artista — Album (un album una volta sola)."""
+    titles = []
+    artist_titles = []
+    albums = []
+    for track in tracks:
+        tags = track.tags
+        title = tags.title or Path(str(getattr(track, "path", ""))).stem
+        titles.append(title)
+        artist_titles.append(f"{tags.artist or track.display_artist} — {title}")
+        album = f"{tags.album_artist or track.display_artist} — {tags.album}"
+        if album not in albums:
+            albums.append(album)
+    result = [("Titolo", titles), ("Artista — Titolo", artist_titles), ("Artista — Album", albums)]
+    return result
+
+
 def add_section(menu: QMenu, title: str) -> None:
     """Il titolo di un gruppo di voci del menu: una voce grigia in grassetto, non cliccabile (il titolo di
     QMenu.addSection lo stile Fusion non lo mostra), dopo un separatore se il menu ha già delle voci."""

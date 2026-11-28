@@ -623,12 +623,16 @@ class CheckResultsView(QWidget):
         menu.addSeparator()
         self._accept_entries(menu)
         self._trash_entries(menu)
-        menu.addSeparator()
-        # i file del PC dei brani scelti (di un problema o di un album: tutti i suoi): copiare il percorso della
-        # cartella per correggere a mano, o aprirla
+        # i brani scelti (di un problema o di un album: tutti i suoi): Copia negli appunti come nelle schede PC e
+        # iPhone (titoli, artisti, album, i file del PC), aprire la cartella
+        from .file_actions import add_section, track_texts
+        scanned = []
+        for target in self._selected_targets():
+            scanned.append(target.scanned)
+        add_section(menu, "Testi e file")
         add_file_entries(menu, self._pc_paths(),
                          lambda text: self.window.statusBar().showMessage(text, 8000),
-                         tagscan=self.window.app_settings.tagscan_path)
+                         tagscan=self.window.app_settings.tagscan_path, texts=track_texts(scanned))
         menu.addSeparator()
         for button in (self.show_button, self.again_button, self.online_button):
             action = menu.addAction(button.text())

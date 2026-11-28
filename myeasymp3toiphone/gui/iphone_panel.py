@@ -1664,7 +1664,7 @@ class IPhonePanel(QWidget):
     def _tracks_menu(self, where) -> None:
         """Tasto destro sui brani: verso il PC, verso l'iPhone (in attesa), la sorgente sul PC, la suoneria, poi
         Copia negli appunti (titoli, artisti, album e i file della sorgente) e le cartelle delle sorgenti."""
-        from .file_actions import add_section
+        from .file_actions import add_section, track_texts
         items = self._selected_phone_tracks()
         if items:
             menu = QMenu(self)
@@ -1684,20 +1684,9 @@ class IPhonePanel(QWidget):
             add_section(menu, "Altro")
             self._add_ringtone_entry(menu, items)
             add_section(menu, "Testi e file della sorgente")
-            titles = []
-            artist_titles = []
-            albums = []
-            for item in items:
-                titles.append(item.tags.title)
-                artist_titles.append(f"{item.display_artist} — {item.tags.title}")
-                album = f"{item.tags.album_artist or item.display_artist} — {item.tags.album}"
-                if album not in albums:
-                    albums.append(album)
             add_file_entries(menu, self._source_paths(items),
                              lambda text: self._window.statusBar().showMessage(text, 8000),
-                             tagscan=self._window.app_settings.tagscan_path,
-                             texts=[("Titolo", titles), ("Artista — Titolo", artist_titles),
-                                    ("Artista — Album", albums)],
+                             tagscan=self._window.app_settings.tagscan_path, texts=track_texts(items),
                              explorer_text="Apri la cartella della sorgente")
             menu.setToolTipsVisible(True)
             menu.exec(where)

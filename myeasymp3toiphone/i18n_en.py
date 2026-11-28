@@ -4257,4 +4257,6 @@ CATALOG = {
         "Artist — Album",
     "Apri la cartella della sorgente":
         "Open the source folder",
+    "Testi e file":
+        "Texts and files",
 }

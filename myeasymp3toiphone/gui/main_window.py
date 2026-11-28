@@ -1577,7 +1577,7 @@ class MainWindow(QMainWindow):
         sui file e Nascondi la cartella."""
         tracks = self._selected_table_tracks()
         if tracks:
-            from .file_actions import add_section
+            from .file_actions import add_section, track_texts
             menu = QMenu(self)
             add_section(menu, "Verso l'iPhone (in attesa: partono con Applica)")
             for text, enabled, slot in self.pc_entries(tracks):
@@ -1591,15 +1591,10 @@ class MainWindow(QMainWindow):
             self.add_ringtone_entry(menu, tracks[0].path, tracks[0].title, len(tracks) == 1)
             add_section(menu, "File")
             paths = []
-            titles = []
-            artist_titles = []
             for track in tracks:
                 paths.append(track.path)
-                titles.append(track.title)
-                artist_titles.append(f"{track.tags.artist or track.display_artist} — {track.title}")
             add_file_entries(menu, paths, lambda text: self.statusBar().showMessage(text, 8000),
-                             tagscan=self.app_settings.tagscan_path,
-                             texts=[("Titolo", titles), ("Artista — Titolo", artist_titles)])
+                             tagscan=self.app_settings.tagscan_path, texts=track_texts(tracks))
             menu.addSeparator()
             distinct = []
             for path in paths:
