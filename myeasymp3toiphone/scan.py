@@ -572,7 +572,11 @@ def detect_few_tracks(tracks: list, context: Optional[list] = None) -> list:
             # FLAC + CUE: un file solo con tutte le tracce, i numeri "mancanti" sono dentro (cue.py)
             whole_disc = bool(gaps or count <= 2) and cue.all_images(album_tracks)
             if gaps and not whole_disc:
-                expected = count + len(gaps)
+                positions = set()
+                for track in copy:
+                    if track.tags.track_number:
+                        positions.add((track.tags.disc_number or 1, track.tags.track_number))
+                expected = max(count, len(positions) + len(gaps))      # i numeri diversi, non i file
                 severity = SEVERITY_HIGH if count * 2 <= expected else SEVERITY_MEDIUM
                 shown = ", ".join(gaps[:15]) + ("…" if len(gaps) > 15 else "")
                 issues.append(Issue(
@@ -1025,12 +1029,12 @@ def rule_steps(view, check_files: bool, progress: Optional[ProgressFn] = None,
         (CHECK_SPLIT, pc, lambda: more.detect_album_artist_from_artist(view)),
         (CHECK_SPLIT, pc, lambda: more.detect_compilation_flags(view)),
         (CHECK_SPLIT, pc, lambda: more.detect_phone_merges(view)),
+        (CHECK_FEW, pc, lambda: more.detect_number_clashes(view)),
         (CHECK_FEW, pc, lambda: more.detect_track_numbers(view)),
         # 5. completezza
         (CHECK_FEW, True, lambda: detect_few_tracks(view.selected, whole)),
         # 6. doppioni (R15, lo stesso brano con l'impronta, gira dopo: scan_tracks)
         (CHECK_DUPLICATES, True, lambda: detect_duplicates(view.selected)),
-        (CHECK_DUPLICATES, pc, lambda: more.detect_number_clashes(view)),
     ]
     return result
 
@@ -1824,7 +1828,8 @@ ADVICE = {
     "R28": "Se sono lo stesso album: Applica la correzione. Se sono album diversi: non applicare; Mostra i brani, "
            "Cambia i tag (tasto E) e dai a uno dei due un nome che resti diverso anche senza gli zeri (per esempio "
            "con l'anno: \"Raccolta 1 (1998)\").",
-    "R29": "Mostra i brani e guarda le cartelle. Se sono due album diversi con lo stesso nome (due \"Greatest Hits\", "
+    "R29": "Se c'è la correzione (numeri presi dai nomi dei file): controlla la colonna Diventa e Applica. Altrimenti "
+           "Mostra i brani e guarda le cartelle. Se sono due album diversi con lo stesso nome (due \"Greatest Hits\", "
            "due edizioni), dai a uno dei due un nome diverso con Cambia i tag (tasto E), per esempio con l'anno o "
            "l'edizione: \"Greatest Hits (1981)\". Se è lo stesso album con i numeri sbagliati, correggi N. traccia (e "
            "N. disco) dei brani sbagliati. Poi Controlla di nuovo questi album.",

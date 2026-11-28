@@ -33,6 +33,7 @@ NEAR_MAX_PATH = 240
 NAME_FIELDS = ("title", "artist", "album_artist", "album")
 ARTIST_FIELDS = ("artist", "album_artist")
 NUMBERED_TITLE = re.compile(r"^\s*0*(\d{1,3})\s*[-–._]\s+(\S.*)$")
+FILE_NUMBER = re.compile(r"^\s*(?:(\d{1,2})-)?(\d{1,3})(?=[\s._-])")    # "05 - …", "05. …", "1-05 - …" (disco 1)
 MANY = 15                                             # quanti nomi o brani si elencano nel dettaglio
 
 
@@ -705,11 +706,49 @@ def _numbers_of_copy(copy: list) -> tuple:
     return result
 
 
-# --------------------------------------------------------------------------- livello 6: doppioni
+def numbers_from_file_names(copy: list) -> dict:
+    """{brano: (disco o None, numero)} dai nomi dei file ("05 - Titolo.mp3"), se ogni file ha il suo numero e non ce
+    ne sono due uguali (per disco); {} altrimenti."""
+    found = {}
+    places = set()
+    usable = True
+    for track in copy:
+        match = FILE_NUMBER.match(track.path.stem)
+        if match is None:
+            usable = False
+        else:
+            disc = int(match.group(1)) if match.group(1) else None
+            place = (disc or track.tags.disc_number or 1, int(match.group(2)))
+            if place in places or place[1] == 0:
+                usable = False
+            places.add(place)
+            found[id(track)] = (disc, int(match.group(2)))
+    result = found if usable else {}
+    return result
+
+
+def _numbers_fix(copy: list, numbers: dict) -> list:
+    """Le correzioni che scrivono i numeri presi dai nomi dei file (e il totale, se è più basso del numero più alto)."""
+    highest = 0
+    for _disc, value in numbers.values():
+        highest = max(highest, value)
+    wanted = {}
+    for track in copy:
+        disc, value = numbers[id(track)]
+        _set(wanted, track, "track_number", value)
+        if disc is not None:
+            _set(wanted, track, "disc_number", disc)
+        if track.tags.track_total and track.tags.track_total < highest:
+            _set(wanted, track, "track_total", highest)
+    result = _changes_list(wanted)
+    return result
+
 
 def detect_number_clashes(view: RuleView) -> list:
-    """R29: nello stesso album e formato, lo stesso disco e numero di traccia con titoli diversi: due album veri sotto
-    lo stesso nome (due "Greatest Hits", due edizioni) o numeri sbagliati. Con lo stesso titolo è R8."""
+    """R29: nello stesso album e formato, lo stesso disco e numero di traccia con titoli diversi: numeri sbagliati
+    (per esempio quelli degli album originali in una raccolta) o due album veri sotto lo stesso nome (due "Greatest
+    Hits", due edizioni). Se i nomi dei file hanno un numero diverso per ogni brano, la correzione prende quello. Gira
+    prima del conto dei brani mancanti (R9), che così conta sui numeri giusti. Con lo stesso titolo è R8."""
     issues = []
     number = 0
     albums = view.selected_albums()
@@ -718,7 +757,9 @@ def detect_number_clashes(view: RuleView) -> list:
             clashes = []
             files = []
             folders = set()
+            changes = []
             for _suffix, copy in sorted(_by_format(albums[key]).items()):
+                copy_clashes = 0
                 by_number = {}
                 for track in copy:
                     if not track.error and track.tags.track_number:
@@ -737,14 +778,25 @@ def detect_number_clashes(view: RuleView) -> list:
                             folders.add(track.path.parent)
                         prefix = f"{place[0]}-{place[1]}" if place[0] > 1 else str(place[1])
                         clashes.append(f"{prefix}: {', '.join(names)}")
+                        copy_clashes += 1
+                if copy_clashes:
+                    from_names = numbers_from_file_names(copy)
+                    if from_names:
+                        changes += _numbers_fix(copy, from_names)
             if clashes:
                 number += 1
                 shown = "; ".join(clashes[:MANY]) + ("…" if len(clashes) > MANY else "")
                 hint = (f" I brani sono in {len(folders)} cartelle: è probabile che siano due album con lo stesso nome."
                         if len(folders) > 1 else "")
+                detail = (f"Nello stesso album lo stesso numero di traccia (e disco) ha titoli diversi: {shown}.{hint} "
+                          "Sull'iPhone l'album ha i brani mescolati, e i brani che mancano non si possono contare.")
+                fix = None
+                if changes:
+                    detail += (" I nomi dei file hanno invece un numero diverso per ogni brano (\"05 - …\"): la "
+                               "correzione scrive quello come numero di traccia.")
+                    fix = Fix(FIX_TAGS, "Numero di traccia dal nome del file", changes=changes)
                 issues.append(Issue(
-                    KIND_DUPLICATE, SEVERITY_MEDIUM,
-                    f"{_album_label(key)}: {len(clashes)} numeri di traccia usati da brani diversi",
-                    f"Nello stesso album lo stesso numero di traccia (e disco) ha titoli diversi: {shown}.{hint} "
-                    "Sull'iPhone diventano un album solo con i brani mescolati.", files, rule_id=f"R29.{number}"))
+                    KIND_FEW_TRACKS, SEVERITY_MEDIUM,
+                    f"{_album_label(key)}: {len(clashes)} numeri di traccia usati da brani diversi", detail, files, fix,
+                    rule_id=f"R29.{number}"))
     return issues

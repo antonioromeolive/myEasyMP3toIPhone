@@ -366,6 +366,19 @@ class SettingsDialog(QDialog):
         self.g_various.setToolTip("\"AA.VV.\", \"Artisti vari\", \"Various Artists\", \"VA\" e simili sono già un "
                                   "artista solo negli elenchi Artisti. Qui altri nomi che valgono come loro, separati da "
                                   "punto e virgola: valgono anche per le playlist delle compilation.")
+        self.g_tagscan = QLineEdit(self.settings.tagscan_path)
+        self.g_tagscan.setPlaceholderText(tr("vuoto: cercato in Programmi"))
+        self.g_tagscan.setToolTip("Il file Tagscan.exe, o la cartella che lo contiene. Vuoto: si cerca in Programmi "
+                                  "(cartella TagScanner). Serve per Apri in TagScanner, nel tasto destro su brani e "
+                                  "album.")
+        self.g_tagscan.textChanged.connect(lambda _text: self._show_tagscan())
+        tagscan_button = QPushButton("Sfoglia…")
+        tagscan_button.clicked.connect(self._choose_tagscan)
+        tagscan_row = QHBoxLayout()
+        tagscan_row.addWidget(self.g_tagscan, 1)
+        tagscan_row.addWidget(tagscan_button)
+        self.g_tagscan_state = QLabel()
+        self.g_tagscan_state.setWordWrap(True)
         note = QLabel("La scansione usa sempre le regole locali (gratuite). Con un profilo AI, l'AI riceve una tabella "
                       "degli album (artisti, titoli, numeri di traccia, nomi delle cartelle) e propone altri problemi e "
                       "le correzioni. Con un'AI nel cloud questi dati escono dal computer; con Ollama restano qui.")
@@ -377,10 +390,32 @@ class SettingsDialog(QDialog):
         form.addRow("Colonne delle cartelle", self.g_full_path)
         form.addRow("Cartelle preferite", self.g_preferred)
         form.addRow("Altri nomi per \"Artisti vari\"", self.g_various)
+        form.addRow("TagScanner", tagscan_row)
+        form.addRow("", self.g_tagscan_state)
         form.addRow(note)
         widget = QWidget()
         widget.setLayout(form)
+        self._show_tagscan()
         return widget
+
+    def _choose_tagscan(self) -> None:
+        chosen, _filter = QFileDialog.getOpenFileName(self, "Tagscan.exe", self.g_tagscan.text(),
+                                                      "TagScanner (Tagscan.exe);;Programmi (*.exe)")
+        if chosen:
+            self.g_tagscan.setText(os.path.normpath(chosen))
+
+    def _show_tagscan(self) -> None:
+        from .file_actions import find_tagscan
+        found = find_tagscan(self.g_tagscan.text())
+        if found is not None:
+            self.g_tagscan_state.setText(tr(f"✔ trovato: {found}"))
+            self.g_tagscan_state.setStyleSheet("color: #2e8b57")
+        elif self.g_tagscan.text().strip():
+            self.g_tagscan_state.setText(tr("✖ non trovato: scegli il file Tagscan.exe"))
+            self.g_tagscan_state.setStyleSheet("color: #c0392b")
+        else:
+            self.g_tagscan_state.setText(tr("✖ TagScanner non è in Programmi: installalo o scegli il file Tagscan.exe"))
+            self.g_tagscan_state.setStyleSheet("color: #c0392b")
 
     def _build_ringtones_tab(self) -> QWidget:
         """La cartella delle suonerie e ffmpeg (che l'utente installa da sé: il programma non lo contiene)."""
@@ -831,6 +866,7 @@ class SettingsDialog(QDialog):
         self.settings.various_artists = various
         self.settings.ringtone_folder = self.r_folder.text().strip()
         self.settings.ffmpeg_path = self.r_ffmpeg.text().strip()
+        self.settings.tagscan_path = self.g_tagscan.text().strip()
         chosen =self.g_scan_profile.currentText()
         if chosen == tr(NO_AI):
             self.settings.scan_profile = ""

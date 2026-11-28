@@ -428,7 +428,7 @@ Fatto, solo sul PC (sull'iPhone girano le regole di prima, fino a R16, e il conf
 | REQ-17 | R14 e R16 nella stessa casella, con la stessa scelta della grafia | R14, R16 |
 | REQ-18 | R14 e R23 guardano artista dei brani e artista dell'album | R14, R23 |
 | REQ-19 | `scan_rules.detect_phone_merges` | R28 |
-| REQ-20 | `scan_rules.detect_number_clashes` | R29 |
+| REQ-20 | `scan_rules.detect_number_clashes`: nel livello 4, prima di R9; correzione dal nome del file ("05 - …") se ogni file ha il suo numero | R29 |
 | REQ-21, D-7 | `scan_rules.detect_unsupported_formats` | R18 |
 | REQ-22 | `scan_rules.detect_mojibake` | R22 |
 | REQ-25 | `scan_rules.detect_long_paths`; R5 non conta più i percorsi troppo lunghi | R19 |
@@ -439,7 +439,10 @@ Tolti per decisione: REQ-9, REQ-11, REQ-26 (D-4), REQ-12 (D-5).
 
 Aggiunto il 28/11/2026: D-10 (parole corte in minuscolo); i caratteri che cambiano evidenziati nelle colonne Ora e
 Diventa; i risultati delle regole prima delle impronte dell'audio (`scan_tracks(fingerprint_fn=…)`); la finestra di
-Applica dice perché il pulsante è spento e si riaccende da sola.
+Applica dice perché il pulsante è spento e si riaccende da sola. R29 (stesso numero, titoli diversi) passa al
+livello 4, nella casella "Album con pochi brani o numeri sbagliati", e propone i numeri presi dai nomi dei file; R9
+conta "l'album ne ha almeno N" sui numeri diversi, non sui file (una raccolta con i numeri degli album originali
+diceva "almeno 25" su 15).
 
 Restano:
 - R15 (stesso brano, con l'impronta) e R16 girano dopo i livelli, sui tag di partenza: non vedono le correzioni dei

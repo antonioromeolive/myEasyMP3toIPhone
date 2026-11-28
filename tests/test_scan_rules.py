@@ -305,3 +305,48 @@ def test_the_characters_that_change_are_highlighted():
     assert [text for text, changed in old if changed] == ["t"]
     assert [text for text, changed in new if changed] == ["T"]
     assert "".join(text for text, _changed in new) == "Frankie Goes To Hollywood"
+
+
+def test_a_compilation_with_the_numbers_of_the_original_albums():
+    """Una raccolta con nei tag i numeri degli album originali (doppi, oltre il totale) e quelli giusti nei nomi dei
+    file: R29 prende i numeri dai nomi, e R9 conta i brani mancanti su quelli (non "almeno 25" su 15)."""
+    tags = [("01 - Uno", 13), ("04 - Due", 1), ("05 - Tre", 5), ("06 - Quattro", 15), ("09 - Cinque", 21),
+            ("10 - Sei", 3), ("11 - Sette", 15), ("12 - Otto", 8), ("13 - Nove", 13), ("14 - Dieci", 3),
+            ("15 - Undici", 1)]
+    tracks = []
+    for name, wrong in tags:
+        tracks.append(_track(f"Raccolta/{name}.mp3", title=name[5:], artist=f"Cantante {name[5:]}",
+                             album_artist="Artisti Vari", album="Raccolta Inverno", compilation=True,
+                             track_number=wrong, track_total=15, disc_number=1, disc_total=1))
+    found = _rules(tracks)
+    clash = found["R29"][0]
+    assert clash.fix.description == "Numero di traccia dal nome del file"
+    assert _changes(clash)["09 - Cinque.mp3"] == {"track_number": 9}
+    missing = found["R9"][0]
+    assert "mancano 4 numeri di traccia (11 brani qui, l'album ne ha almeno 15)" in missing.title
+    assert "2, 3, 7, 8" in missing.detail
+    assert "R30" not in found                    # 21 di 15 non c'è più: il numero giusto è 9
+
+
+def test_open_in_tagscanner(tmp_path, monkeypatch):
+    from myeasymp3toiphone.gui import file_actions
+    program = tmp_path / "Programmi" / "TagScanner"
+    program.mkdir(parents=True)
+    (program / "Tagscan.exe").write_bytes(b"")
+    monkeypatch.setenv("ProgramFiles", str(tmp_path / "Programmi"))
+    monkeypatch.setenv("ProgramFiles(x86)", str(tmp_path / "nessuno"))
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "nessuno"))
+    assert file_actions.find_tagscan("") == program / "Tagscan.exe"                  # i posti soliti
+    assert file_actions.find_tagscan(str(program)) == program / "Tagscan.exe"         # la cartella
+    assert file_actions.find_tagscan(str(tmp_path / "altro.exe")) is None             # scelto e non c'è
+    album = tmp_path / "Musica" / "Album"
+    for disc in ("CD1", "CD2"):
+        (album / disc).mkdir(parents=True)
+    paths = [album / "CD1" / "01.mp3", album / "CD2" / "01.mp3"]
+    assert file_actions.start_folder(paths) == str(album)                           # la cartella dell'album
+    assert file_actions.start_folder(paths[:1]) == str(album / "CD1")
+    started = []
+    monkeypatch.setattr(file_actions.subprocess, "Popen", lambda arguments: started.append(arguments))
+    assert file_actions.open_in_tagscan(program / "Tagscan.exe", paths) == str(album)
+    assert started == [[str(program / "Tagscan.exe"), str(album)]]
+    assert file_actions.open_in_tagscan(program / "Tagscan.exe", [tmp_path / "manca" / "x.mp3"]) == ""

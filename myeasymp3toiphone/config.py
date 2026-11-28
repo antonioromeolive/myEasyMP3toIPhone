@@ -553,6 +553,7 @@ class AppSettings:
     various_artists: list = field(default_factory=list)    # altri nomi che valgono come "AA.VV." (oltre a quelli fissi)
     ringtone_folder: str = ""       # la cartella delle suonerie (.m4r); "" = non ancora scelta
     ffmpeg_path: str = ""           # ffmpeg.exe (o la sua cartella) per Crea una suoneria; "" = quello nel PATH
+    tagscan_path: str = ""          # Tagscan.exe (o la sua cartella) per Apri in TagScanner; "" = i posti soliti
     # le cartelle della musica di ogni computer: {nome del computer: {"folders": [cartelle], "library": cartella}}
     music_folders: dict = field(default_factory=dict)
     extra: dict = field(default_factory=dict)

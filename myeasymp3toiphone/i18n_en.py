@@ -4077,4 +4077,36 @@ CATALOG = {
         "Wait for the end of \"{0}\" (status bar, at the bottom): the button turns on by itself.",
     "Connetti l'iPhone (scheda iPhone, pulsante Connetti iPhone): il pulsante si accende da solo.":
         "Connect the iPhone (iPhone tab, Connect iPhone button): the button turns on by itself.",
+    "TagScanner non trovato. Se l'hai installato in un posto diverso dal solito, scegli il file Tagscan.exe in Impostazioni → Generale → TagScanner.":
+        "TagScanner not found. If you installed it somewhere unusual, choose the Tagscan.exe file in Settings → General → TagScanner.",
+    "TagScanner aperto su {0}: quando hai finito di cambiare i tag, premi Rileggi (F5)":
+        "TagScanner opened on {0}: when you have finished changing the tags, press Reload (F5)",
+    "La cartella non c'è su questo PC (disco scollegato o file spostati)":
+        "The folder is not on this PC (disconnected disk or moved files)",
+    "Apri in TagScanner (non trovato: Impostazioni → Generale)":
+        "Open in TagScanner (not found: Settings → General)",
+    "Apri in TagScanner":
+        "Open in TagScanner",
+    "Apre TagScanner sulla cartella {0}. TagScanner cambia i file direttamente, fuori da questo programma: quando hai finito, Rileggi (F5) mostra i tag nuovi.":
+        "Opens TagScanner on the folder {0}. TagScanner changes the files directly, outside this program: when you have finished, Reload (F5) shows the new tags.",
+    "vuoto: cercato in Programmi":
+        "empty: searched in Program Files",
+    "Il file Tagscan.exe, o la cartella che lo contiene. Vuoto: si cerca in Programmi (cartella TagScanner). Serve per Apri in TagScanner, nel tasto destro su brani e album.":
+        "The Tagscan.exe file, or the folder that contains it. Empty: it is searched in Program Files (TagScanner folder). Used by Open in TagScanner, in the right click on tracks and albums.",
+    "TagScanner":
+        "TagScanner",
+    "TagScanner (Tagscan.exe);;Programmi (*.exe)":
+        "TagScanner (Tagscan.exe);;Programs (*.exe)",
+    "✖ non trovato: scegli il file Tagscan.exe":
+        "✖ not found: choose the Tagscan.exe file",
+    "✖ TagScanner non è in Programmi: installalo o scegli il file Tagscan.exe":
+        "✖ TagScanner is not in Program Files: install it or choose the Tagscan.exe file",
+    "Se c'è la correzione (numeri presi dai nomi dei file): controlla la colonna Diventa e Applica. Altrimenti Mostra i brani e guarda le cartelle. Se sono due album diversi con lo stesso nome (due \"Greatest Hits\", due edizioni), dai a uno dei due un nome diverso con Cambia i tag (tasto E), per esempio con l'anno o l'edizione: \"Greatest Hits (1981)\". Se è lo stesso album con i numeri sbagliati, correggi N. traccia (e N. disco) dei brani sbagliati. Poi Controlla di nuovo questi album.":
+        "If there is the fix (numbers taken from the file names): check the Becomes column and Apply. Otherwise Show the tracks and look at the folders. If they are two different albums with the same name (two \"Greatest Hits\", two editions), give one of them a different name with Change the tags (E key), for example with the year or the edition: \"Greatest Hits (1981)\". If it is the same album with wrong numbers, correct Track no. (and Disc no.) of the wrong tracks. Then Check these albums again.",
+    "Nello stesso album lo stesso numero di traccia (e disco) ha titoli diversi: {0}.{1} Sull'iPhone l'album ha i brani mescolati, e i brani che mancano non si possono contare.":
+        "In the same album the same track (and disc) number has different titles: {0}.{1} On the iPhone the album has the tracks mixed, and the missing tracks cannot be counted.",
+    " I nomi dei file hanno invece un numero diverso per ogni brano (\"05 - …\"): la correzione scrive quello come numero di traccia.":
+        " The file names instead have a different number for each track (\"05 - …\"): the fix writes that as the track number.",
+    "Numero di traccia dal nome del file":
+        "Track number from the file name",
 }

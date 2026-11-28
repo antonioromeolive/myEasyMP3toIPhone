@@ -1544,8 +1544,28 @@ class MainWindow(QMainWindow):
         return result
 
     def browser_menu_entries(self, tracks: list) -> list:
-        """Le voci del tasto destro su un artista o un album: le stesse dei brani (pc_entries), per tutti i suoi."""
-        result = self.pc_entries(tracks)
+        """Le voci del tasto destro su un artista o un album: le stesse dei brani (pc_entries), per tutti i suoi, e
+        Apri in TagScanner sulla cartella dell'album (o quella che contiene le sue cartelle)."""
+        from .file_actions import find_tagscan, open_in_tagscan, start_folder
+        result = list(self.pc_entries(tracks))
+        paths = []
+        for track in tracks:
+            paths.append(track.path)
+        executable = find_tagscan(self.app_settings.tagscan_path)
+
+        def start() -> None:
+            opened = open_in_tagscan(executable, paths)
+            if opened:
+                self.statusBar().showMessage(f"TagScanner aperto su {opened}: quando hai finito di cambiare i tag, "
+                                             "premi Rileggi (F5)", 8000)
+            else:
+                self.statusBar().showMessage("La cartella non c'è su questo PC (disco scollegato o file spostati)",
+                                             8000)
+
+        if executable is None:
+            result.append(("Apri in TagScanner (non trovato: Impostazioni → Generale)", False, None))
+        else:
+            result.append(("Apri in TagScanner", bool(start_folder(paths)), start))
         return result
 
     def _browser_menu(self, where) -> None:
@@ -1571,7 +1591,8 @@ class MainWindow(QMainWindow):
             paths = []
             for track in tracks:
                 paths.append(track.path)
-            add_file_entries(menu, paths, lambda text: self.statusBar().showMessage(text, 8000))
+            add_file_entries(menu, paths, lambda text: self.statusBar().showMessage(text, 8000),
+                             tagscan=self.app_settings.tagscan_path)
             menu.addSeparator()
             distinct = []
             for path in paths:

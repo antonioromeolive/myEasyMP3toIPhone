@@ -594,7 +594,8 @@ class CheckResultsView(QWidget):
         # i file del PC dei brani scelti (di un problema o di un album: tutti i suoi): copiare il percorso della
         # cartella per correggere a mano, o aprirla
         add_file_entries(menu, self._pc_paths(),
-                         lambda text: self.window.statusBar().showMessage(text, 8000))
+                         lambda text: self.window.statusBar().showMessage(text, 8000),
+                         tagscan=self.window.app_settings.tagscan_path)
         menu.addSeparator()
         for button in (self.show_button, self.again_button, self.online_button):
             action = menu.addAction(button.text())

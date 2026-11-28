@@ -1668,7 +1668,8 @@ class IPhonePanel(QWidget):
             menu.addSeparator()
             sources = QMenu("File della sorgente", menu)
             add_file_entries(sources, self._source_paths(items),
-                             lambda text: self._window.statusBar().showMessage(text, 8000))
+                             lambda text: self._window.statusBar().showMessage(text, 8000),
+                             tagscan=self._window.app_settings.tagscan_path)
             menu.addMenu(sources).setEnabled(bool(self._source_paths(items)))
             menu.setToolTipsVisible(True)
             menu.exec(where)
