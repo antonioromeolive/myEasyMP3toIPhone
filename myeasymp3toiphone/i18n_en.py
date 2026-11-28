@@ -4153,4 +4153,22 @@ CATALOG = {
         " The folders and the years are different: maybe they are different albums with the same name.",
     " Non verificato online: se non hai fatto la Verifica online, tasto destro → Controlla online per esserne sicuro.":
         " Not checked online: if you did not run the online check, right click → Check online to be sure.",
+    "numero più alto del totale":
+        "number higher than the total",
+    " e {0} informazioni (in grigio: album incompleti, dettagli che sull'iPhone non cambiano niente; le loro correzioni partono spente)":
+        " and {0} pieces of information (in grey: incomplete albums, details that change nothing on the iPhone; their fixes start off)",
+    "{0} informazioni":
+        "{0} pieces of information",
+    "Informazione: sull'iPhone non crea confusione. La correzione, se c'è, parte spenta: accendila se vuoi":
+        "Information: it causes no confusion on the iPhone. The fix, if there is one, starts off: turn it on if you want",
+    "informazione":
+        "information",
+    "Niente di urgente: sull'iPhone non cambia niente. Per correggere: Mostra i brani e scrivi il numero o il totale giusto con Cambia i tag (tasto E).":
+        "Nothing urgent: nothing changes on the iPhone. To correct it: Show the tracks and write the right number or total with Change the tags (E key).",
+    "{0}: brani senza numero del disco":
+        "{0}: tracks without disc number",
+    "{0}: numero più alto del totale":
+        "{0}: number higher than the total",
+    "Numero più alto del totale: {0}. Sull'iPhone si vede solo \"traccia 9 di 8\".":
+        "Number higher than the total: {0}. On the iPhone you only see \"track 9 of 8\".",
 }

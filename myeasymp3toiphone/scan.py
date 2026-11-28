@@ -79,7 +79,11 @@ AI_KINDS = (KIND_NOT_UPDATED, KIND_FEW_TRACKS, KIND_SPLIT, KIND_DUPLICATE, KIND_
 SEVERITY_HIGH = "alta"
 SEVERITY_MEDIUM = "media"
 SEVERITY_LOW = "bassa"
-SEVERITY_ORDER = {SEVERITY_HIGH: 0, SEVERITY_MEDIUM: 1, SEVERITY_LOW: 2}
+SEVERITY_INFO = "informazione"      # non è un problema per l'iPhone (album incompleto, estetica): si vede, non conta
+SEVERITY_ORDER = {SEVERITY_HIGH: 0, SEVERITY_MEDIUM: 1, SEVERITY_LOW: 2, SEVERITY_INFO: 3}
+# le regole che danno solo informazioni (checks_requirements.md, D-12): album incompleti (R9, R10, e W1 della
+# Verifica online) e solo estetica (R20 numero o artista nel titolo, R21 spazi, R31 totali, R34 numero oltre il totale)
+INFO_RULES = frozenset({"R9", "R10", "R20", "R21", "R31", "R34", "W1"})
 
 ORIGIN_RULE = "regola"
 ORIGIN_AI = "AI"
@@ -1074,8 +1078,22 @@ def rule_issues(tracks: list, check_files: bool, progress: Optional[ProgressFn] 
                 issue.step = step
             view.apply(found)
             issues += found
-    result = merge_overlapping(issues)
+    result = mark_information(merge_overlapping(issues))
     return result
+
+
+def is_information(issue: Issue) -> bool:
+    result = issue.severity == SEVERITY_INFO
+    return result
+
+
+def mark_information(issues: list) -> list:
+    """Le regole di INFO_RULES diventano informazioni: in grigio, senza contare come problemi, con le correzioni
+    spente di serie."""
+    for issue in issues:
+        if issue.rule_id.split(".", 1)[0] in INFO_RULES:
+            issue.severity = SEVERITY_INFO
+    return issues
 
 
 def enabled(issue: Issue, checks: frozenset) -> bool:
@@ -1626,13 +1644,13 @@ def ai_review(provider, tracks: list, issues: list, progress: Optional[ProgressF
 # --------------------------------------------------------------------------- scansione completa
 
 def albums_of_issues(issues: list, tracks: list) -> set:
-    """Gli album (album_key) dei brani toccati dai problemi."""
+    """Gli album (album_key) dei brani toccati dai problemi (le informazioni non contano)."""
     by_path = {}
     for track in tracks:
         by_path[str(track.path)] = track
     result = set()
     for issue in issues:
-        for path in issue.files:
+        for path in ([] if is_information(issue) else issue.files):
             track = by_path.get(str(path))
             if track is not None:
                 result.add(track.album_key)
@@ -1855,6 +1873,8 @@ ADVICE = {
            "dell'edizione: tasto destro sull'album → Controlla online.",
     "R31": "Applica la correzione scrive su tutti i brani il totale più frequente. Se è sbagliato proprio quello: "
            "Mostra i brani e scrivi il totale giusto con Cambia i tag (tasto E) su tutti.",
+    "R34": "Niente di urgente: sull'iPhone non cambia niente. Per correggere: Mostra i brani e scrivi il numero o il "
+           "totale giusto con Cambia i tag (tasto E).",
     "R32": "Se non ti servono i brani che ci sono solo in questa copia (il dettaglio li nomina): tasto destro sul "
            "problema → Sposta nel cestino questa copia, controlla l'elenco dei file e conferma (si recuperano dal "
            "Cestino di Windows). Oppure spostala a mano fuori dalle cartelle della musica con Esplora file. Se la "

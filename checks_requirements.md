@@ -430,6 +430,18 @@ prima della "più usata" della D-9 (`names._short_words_lowercase`).
 - **R8** (stesso numero e titolo) guarda solo dentro la stessa cartella dell'album: le copie in cartelle diverse sono
   R32/R33.
 
+**D-12 (28/11/2026) — Informazioni, non problemi.** Con lo scopo della sezione 0, queste regole danno solo
+**informazioni** (gravità `informazione`, `scan.INFO_RULES`): in grigio, in fondo all'album, non contano tra i problemi,
+non alzano la gravità dell'album, non fanno partire AI e Verifica online "solo sugli album con problemi", e le loro
+correzioni partono spente.
+- album incompleti: R9 (numeri di traccia mancanti), R10 (album di 1-2 brani), W1 (brani che mancano rispetto al
+  catalogo);
+- solo estetica: R20 (numero o artista nel titolo), R21 (spazi in più: l'iPhone li ignora), R31 (totali diversi), R34
+  (numero più alto del totale: staccato da R30, che resta un problema per i brani senza numero del disco, che
+  sull'iPhone si mescolano).
+
+Restano problemi: R26 con l'artista dell'album vuoto, i vecchi tag (R2, R3), le differenze con il catalogo (W2).
+
 ## 8. Domande ancora aperte
 
 1. **D-8, per album o per brano** (fase iPhone): si sceglie una copia intera dell'album (tutto MP3 320, o tutto

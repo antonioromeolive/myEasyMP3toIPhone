@@ -59,6 +59,7 @@ TYPE_LABELS = {
     "R31": "totali diversi tra i brani",
     "R32": "copia dell'album in qualità peggiore",
     "R33": "album presente due volte",
+    "R34": "numero più alto del totale",
     "I1": "tag diversi tra PC e iPhone",
     "I2": "brani che mancano sull'iPhone",
     "I4": "brani fantasma sull'iPhone",

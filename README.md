@@ -372,6 +372,13 @@ Nelle colonne *Ora* e *Diventa* i caratteri che cambiano sono **evidenziati** (g
 giallo; uno spazio che cambia si vede come ␣): una differenza di una lettera ("to" → "To") non sfugge. I risultati
 delle regole arrivano **prima** delle impronte dell'audio, che servono solo ai brani duplicati e si calcolano dopo.
 
+**Informazioni, non problemi.** Lo scopo dei controlli sono album che sull'iPhone non creano confusione, non album
+perfetti. Gli album incompleti (numeri di traccia mancanti, album di 1-2 brani, brani che mancano rispetto al
+catalogo) e i dettagli che sull'iPhone non cambiano niente (numero o artista nel titolo, spazi in più, totali diversi,
+numero più alto del totale) sono **informazioni**: in grigio, in fondo all'album, contate a parte nell'intestazione,
+non alzano la gravità dell'album e non fanno partire AI e Verifica online "solo sugli album con problemi". Le loro
+correzioni ci sono ma partono **spente**: accendile se vuoi.
+
 **Quale grafia vince** (nomi d'artista e artista dell'album): quella con le **iniziali maiuscole** (ogni parola di
 almeno 4 lettere con la maiuscola, "Elio e le Storie Tese" va bene; tutto maiuscolo, "AC/DC", solo se non ce n'è
 un'altra), la più usata in tutta la musica; tra grafie che differiscono solo nelle maiuscole delle parole corte vince

@@ -636,23 +636,29 @@ def _most_common_number(values: list) -> int:
 
 
 def detect_track_numbers(view: RuleView) -> list:
-    """R30 (a mano): in un album di più dischi brani senza numero del disco; numero di traccia più alto del totale,
-    numero del disco più alto del numero di dischi. R31 (correzione): il totale delle tracce diverso tra i brani dello
-    stesso disco, il numero di dischi diverso tra i brani dell'album."""
+    """R30 (a mano): in un album di più dischi brani senza numero del disco (sull'iPhone si mescolano). R34
+    (informazione): numero di traccia più alto del totale, numero del disco più alto del numero di dischi. R31
+    (informazione, con la correzione): il totale delle tracce diverso tra i brani dello stesso disco, il numero di
+    dischi diverso tra i brani dell'album."""
     issues = []
     number = 0
     albums = view.selected_albums()
     for key in sorted(albums, key=lambda k: (k[0].casefold(), k[1].casefold())):
         if key[1] != UNKNOWN_ALBUM and not cue.all_images(albums[key]):
             for suffix, copy in sorted(_by_format(albums[key]).items()):
-                manual, changes = _numbers_of_copy(copy)
+                manual, over, changes = _numbers_of_copy(copy)
                 files = [track.path for track in copy]
                 label = _album_label(key) + (f" ({suffix.lstrip('.')})" if len(_by_format(albums[key])) > 1 else "")
                 if manual:
                     number += 1
                     issues.append(Issue(
-                        KIND_FEW_TRACKS, SEVERITY_MEDIUM, f"{label}: numeri di traccia o di disco sbagliati",
+                        KIND_FEW_TRACKS, SEVERITY_MEDIUM, f"{label}: brani senza numero del disco",
                         " ".join(manual), files, rule_id=f"R30.{number}"))
+                if over:
+                    number += 1
+                    issues.append(Issue(
+                        KIND_FEW_TRACKS, SEVERITY_LOW, f"{label}: numero più alto del totale",
+                        over, files, rule_id=f"R34.{number}"))
                 if changes:
                     number += 1
                     issues.append(Issue(
@@ -664,7 +670,8 @@ def detect_track_numbers(view: RuleView) -> list:
 
 
 def _numbers_of_copy(copy: list) -> tuple:
-    """(frasi dei problemi da correggere a mano, correzioni dei totali) di una copia dell'album (un formato)."""
+    """(frasi dei problemi da correggere a mano, frase dei numeri oltre il totale, correzioni dei totali) di una
+    copia dell'album (un formato)."""
     manual = []
     discs = set()
     no_disc = 0
@@ -683,9 +690,10 @@ def _numbers_of_copy(copy: list) -> tuple:
             over.append(f"{tags.title or track.path.name} (traccia {tags.track_number} di {tags.track_total})")
         elif tags.disc_number and tags.disc_total and tags.disc_number > tags.disc_total:
             over.append(f"{tags.title or track.path.name} (disco {tags.disc_number} di {tags.disc_total})")
+    over_text = ""
     if over:
         shown = "; ".join(over[:MANY]) + ("…" if len(over) > MANY else "")
-        manual.append(f"Numero più alto del totale: {shown}.")
+        over_text = f"Numero più alto del totale: {shown}. Sull'iPhone si vede solo \"traccia 9 di 8\"."
     wanted = {}
     by_disc = {}
     for track in copy:
@@ -705,7 +713,7 @@ def _numbers_of_copy(copy: list) -> tuple:
     if disc_total and len(set(disc_totals)) > 1:
         for track in copy:
             _set(wanted, track, "disc_total", disc_total)
-    result = (manual, _changes_list(wanted))
+    result = (manual, over_text, _changes_list(wanted))
     return result
 
 

@@ -21,7 +21,7 @@ from .albumcheck import STATUS_ERROR, STATUS_NOT_FOUND, corrected_tags
 from .names import LEVEL_CASE, fold
 from .pending import EDIT_FIELDS
 from .scan import (
-    FIX_TAGS, KIND_FEW_TRACKS, KIND_ONLINE, ORIGIN_ONLINE, SEVERITY_LOW, SEVERITY_MEDIUM, SEVERITY_ORDER, Fix, Issue,
+    FIX_TAGS, KIND_FEW_TRACKS, KIND_ONLINE, ORIGIN_ONLINE, SEVERITY_INFO, SEVERITY_LOW, SEVERITY_ORDER, Fix, Issue,
     tag_changes_of,
 )
 from .tags import OLD_TAG_FIELDS, OLD_TAG_NAMES, OLD_TAG_PRESENT, TAG_FIELDS
@@ -164,7 +164,7 @@ def online_issues(result, number: int) -> list:
             for expected in missing[:15]:
                 names.append(f"{expected.position_label()} {expected.title}")
             more = "…" if len(missing) > 15 else ""
-            issues.append(Issue(KIND_FEW_TRACKS, SEVERITY_MEDIUM,
+            issues.append(Issue(KIND_FEW_TRACKS, SEVERITY_INFO,
                                 f"{label}: mancano {len(missing)} di {len(result.matches)} brani ({result.service_label})",
                                 f"{edition} Mancano: {', '.join(names)}{more}.", files, origin=ORIGIN_ONLINE,
                                 rule_id=f"W1.{number}"))
@@ -254,11 +254,18 @@ class AlbumEntry:
 
     @property
     def severity(self) -> str:
-        """La gravità del problema più grave, senza quelli che si correggono in un altro album."""
-        result = SEVERITY_LOW
+        """La gravità del problema più grave, senza quelli che si correggono in un altro album; un album con solo
+        informazioni (SEVERITY_INFO) è "informazione"."""
+        result = SEVERITY_INFO
+        only_information = True
         for problem in self.problems:
-            if not problem.elsewhere and \
-                    SEVERITY_ORDER.get(problem.issue.severity, 3) < SEVERITY_ORDER.get(result, 3):
+            if problem.issue.severity != SEVERITY_INFO:
+                only_information = False
+        if not only_information:
+            result = SEVERITY_LOW
+        for problem in self.problems:
+            if not problem.elsewhere and problem.issue.severity != SEVERITY_INFO and \
+                    SEVERITY_ORDER.get(problem.issue.severity, 4) < SEVERITY_ORDER.get(result, 4):
                 result = problem.issue.severity
         return result
 

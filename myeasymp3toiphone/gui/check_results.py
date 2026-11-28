@@ -25,7 +25,7 @@ from PySide6.QtWidgets import (
 from ..check_flow import FIELD_LABELS, OTHER_KEY, SIDE_BOTH, SIDE_LABELS, SIDE_PC, SIDE_PHONE, plan_apply
 from ..i18n import tr
 from ..pending import UPDATE
-from ..scan import ORIGIN_AI, SEVERITY_HIGH, SEVERITY_MEDIUM, advice
+from ..scan import ORIGIN_AI, SEVERITY_HIGH, SEVERITY_INFO, SEVERITY_MEDIUM, advice
 from ..tags import OLD_TAG_NAMES
 from .file_actions import add_file_entries
 from .pc_write import offer_pc_write, shown_value
@@ -320,7 +320,11 @@ class CheckResultsView(QWidget):
             if entry.key != OTHER_KEY:
                 albums += 1
         text = (f"<b>{albums} album con problemi</b> su {report.albums_scanned} controllati ({report.tracks_scanned} "
-                f"brani, {escape(report.target)}): {len(report.issues)} problemi")
+                f"brani, {escape(report.target)}): {self._problem_count()} problemi")
+        information = len(report.issues) - self._problem_count()
+        if information:
+            text += (f" e {information} informazioni (in grigio: album incompleti, dettagli che sull'iPhone non "
+                     "cambiano niente; le loro correzioni partono spente)")
         if self.live:
             text = ("<b style='color:#d28200'>Controllo in corso: i risultati arrivano man mano.</b> Applica le "
                     "correzioni scelte si può usare alla fine.<br>") + text
@@ -344,6 +348,13 @@ class CheckResultsView(QWidget):
             text += f"<br><span style='color:#c33'>Errore AI: {escape(error)}</span>"
         self.header.setText(text)
 
+    def _problem_count(self) -> int:
+        count = 0
+        for issue in self.report.issues:
+            if issue.severity != SEVERITY_INFO:
+                count += 1
+        return count
+
     def _icon(self, severity: str):
         """L'icona della gravità, presa una volta sola per tipo: chiederla al sistema per ogni riga costava secondi
         con migliaia di righe (la finestra non rispondeva durante i risultati man mano)."""
@@ -353,6 +364,8 @@ class CheckResultsView(QWidget):
                 _ICON_CACHE[severity] = style.standardIcon(QStyle.SP_MessageBoxCritical)
             elif severity == SEVERITY_MEDIUM:
                 _ICON_CACHE[severity] = style.standardIcon(QStyle.SP_MessageBoxWarning)
+            elif severity == SEVERITY_INFO:
+                _ICON_CACHE[severity] = style.standardIcon(QStyle.SP_FileDialogInfoView)
             else:
                 _ICON_CACHE[severity] = style.standardIcon(QStyle.SP_MessageBoxInformation)
         result = _ICON_CACHE[severity]
@@ -369,8 +382,12 @@ class CheckResultsView(QWidget):
             manual = 0
             elsewhere = 0
             open_rows = 0
+            information = 0
             for problem in entry.problems:
-                if not problem.accepted and problem.rows:
+                if not problem.accepted and problem.issue.severity == SEVERITY_INFO:
+                    information += 1
+                    open_rows += len(problem.rows)
+                elif not problem.accepted and problem.rows:
                     automatic += 1
                     open_rows += len(problem.rows)
                 elif not problem.accepted and problem.elsewhere:
@@ -382,6 +399,8 @@ class CheckResultsView(QWidget):
                 parts.append(f"{automatic} automatiche")
             if manual:
                 parts.append(f"{manual} a mano")
+            if information:
+                parts.append(f"{information} informazioni")
             if parts:
                 summary = ", ".join(parts)
             elif elsewhere:
@@ -392,7 +411,7 @@ class CheckResultsView(QWidget):
             top.setForeground(COL_FIX, QBrush(GREEN if not manual else ORANGE))
             if not automatic and not manual:
                 for column in range(len(COLUMNS)):
-                    top.setForeground(column, QBrush(GREY))
+                    top.setForeground(column, QBrush(GREY))      # solo informazioni, o niente da fare qui
             top.setToolTip(COL_FIX, "Problemi che si correggono qui (con le caselle) e problemi da sistemare a mano "
                                     "(Cosa fare, nel dettaglio sotto)")
             font = top.font(COL_NAME)
@@ -435,14 +454,18 @@ class CheckResultsView(QWidget):
                 child.setData(COL_NAME, KIND_ROLE, ROW_PROBLEM)
                 child.setData(COL_NAME, REF_ROLE, len(self._problems))
                 self._problems.append((entry_index, problem))
-                if issue.ai_note or problem.accepted:
+                information = issue.severity == SEVERITY_INFO
+                if issue.ai_note or problem.accepted or information:
                     for column in range(len(COLUMNS)):
                         child.setForeground(column, QBrush(GREY))
+                if information:
+                    child.setToolTip(COL_NAME, "Informazione: sull'iPhone non crea confusione. La correzione, se c'è, "
+                                               "parte spenta: accendila se vuoi")
                 if issue.ai_note:
                     child.setToolTip(COL_NAME, f"L'AI ritiene che non sia un problema: {issue.ai_note}")
                 if problem.rows and not problem.accepted:
                     child.setFlags(child.flags() | checkable)
-                    child.setCheckState(COL_NAME, Qt.Checked)
+                    child.setCheckState(COL_NAME, Qt.Unchecked if information else Qt.Checked)
                 top.addChild(child)
                 if problem.accepted:
                     self._add_accepted_rows(child, problem)
@@ -464,7 +487,7 @@ class CheckResultsView(QWidget):
                     leaf.setData(COL_NAME, REF_ROLE, len(self._rows))
                     leaf.setFlags(leaf.flags() | Qt.ItemIsUserCheckable)
                     child.addChild(leaf)
-                    leaf.setCheckState(COL_NAME, Qt.Unchecked if issue.ai_note else Qt.Checked)
+                    leaf.setCheckState(COL_NAME, Qt.Unchecked if issue.ai_note or information else Qt.Checked)
                     self._rows.append(row)
                     self._row_items.append(leaf)
         for index in range(self.tree.topLevelItemCount()):

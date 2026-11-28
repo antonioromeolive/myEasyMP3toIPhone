@@ -185,9 +185,10 @@ def test_disc_numbers_and_totals():
                      disc_number=2),
               _track("d/4.mp3", title="Quattro", artist="Duo", album="Doppio", track_number=4, track_total=3)]
     found = _rules(tracks)
-    manual = found["R30"][0].detail
-    assert "non ha il numero del disco" in manual and "Quattro (traccia 4 di 3)" in manual
+    assert "non ha il numero del disco" in found["R30"][0].detail and found["R30"][0].severity != scan.SEVERITY_INFO
+    assert "Quattro (traccia 4 di 3)" in found["R34"][0].detail and found["R34"][0].severity == scan.SEVERITY_INFO
     assert _changes(found["R31"][0]) == {"4.mp3": {"track_total": 2}}       # disco 1: il totale più frequente
+    assert found["R31"][0].severity == scan.SEVERITY_INFO                    # sull'iPhone non cambia niente
 
 
 def test_split_folder_keeps_the_disc_number():

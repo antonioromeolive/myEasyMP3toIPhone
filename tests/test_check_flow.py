@@ -110,8 +110,11 @@ def test_ai_only_on_albums_with_problems_and_only_ai(tmp_path):
         write_mp3(path)
         write_tags(path, TrackTags(**values))
 
-    tagged(tmp_path / "Buchi" / "1.mp3", title="X", artist="Gruppo", album="Buchi", track_number=1, track_total=3)
+    # "Buchi": un titolo mancante (un problema); il brano 2 che manca è solo un'informazione e da solo non basta
+    tagged(tmp_path / "Buchi" / "1.mp3", title="", artist="Gruppo", album="Buchi", track_number=1, track_total=3)
     tagged(tmp_path / "Buchi" / "3.mp3", title="Y", artist="Gruppo", album="Buchi", track_number=3, track_total=3)
+    tagged(tmp_path / "Incompleto" / "1.mp3", title="W", artist="Gruppo", album="Incompleto", track_number=1,
+           track_total=3)
     for number in (1, 2, 3):
         tagged(tmp_path / "Intero" / f"{number}.mp3", title=f"Z{number}", artist="Gruppo", album="Intero",
                track_number=number, track_total=3, genre="Rock", year="2001")
@@ -120,6 +123,9 @@ def test_ai_only_on_albums_with_problems_and_only_ai(tmp_path):
     report = scan.scan_tracks(tracks, "prova", provider, check_files=False,
                               checks=frozenset({scan.CHECK_FEW, scan.CHECK_MISSING}), ai_flagged_only=True)
     assert len(provider.seen) == 1 and "Buchi" in provider.seen[0] and "Intero" not in provider.seen[0]
+    assert "Incompleto" not in provider.seen[0]                               # le informazioni non contano
+    incomplete = [issue for issue in report.issues if issue.rule_id.startswith(("R9", "R10"))]
+    assert incomplete and all(issue.severity == scan.SEVERITY_INFO for issue in incomplete)
     assert any(issue.origin == scan.ORIGIN_AI for issue in report.issues)
     provider = SeeingProvider()
     report = scan.scan_tracks(tracks, "prova", provider, check_files=False, checks=frozenset(), ai_flagged_only=True)
@@ -805,6 +811,44 @@ def test_the_worse_copy_goes_to_the_recycle_bin_only_after_the_confirmation(tmp_
         menu.actions()[0].trigger()
         assert sorted(trashed) == sorted(str(track.path) for track in worse)
         assert problem_item.data(COL_NAME, check_results.KIND_ROLE) == check_results.ROW_PROBLEM
+        view.close()
+    finally:
+        window._exit_checked = True
+        window.close()
+        app.processEvents()
+
+
+def test_information_is_grey_does_not_count_and_its_fixes_start_off():
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtCore import Qt
+    from PySide6.QtWidgets import QApplication
+    from myeasymp3toiphone.gui.check_results import COL_NAME, CheckResultsView
+    from myeasymp3toiphone.gui.main_window import MainWindow
+    app = QApplication.instance() or QApplication([])
+    tracks = _album(["Uno ", "Due"], album="Disco")
+    targets = {}
+    for track in tracks:
+        targets[str(track.path)] = check_flow.Target(track, pc=track)
+    spaces = scan.Issue(scan.KIND_MISSING_TAGS, scan.SEVERITY_LOW, "spazi", "d", [tracks[0].path],
+                        scan.Fix(scan.FIX_TAGS, "spazi", changes=[(tracks[0].path, {"title": "Uno"})]), rule_id="R21")
+    name = scan.Issue(scan.KIND_SPLIT, scan.SEVERITY_MEDIUM, "album", "d", [tracks[1].path],
+                      scan.Fix(scan.FIX_TAGS, "album", changes=[(tracks[1].path, {"album": "Disco Vero"})]),
+                      rule_id="R24.1")
+    issues = scan.mark_information([spaces, name])
+    assert spaces.severity == scan.SEVERITY_INFO and name.severity == scan.SEVERITY_MEDIUM
+    entries = check_flow.group_by_album(issues, lambda path: targets.get(str(path)))
+    assert entries[0].severity == scan.SEVERITY_MEDIUM                  # l'informazione non alza la gravità
+    only_info = check_flow.group_by_album([spaces], lambda path: targets.get(str(path)))
+    assert only_info[0].severity == scan.SEVERITY_INFO
+    window = MainWindow()
+    try:
+        report = scan.ScanReport(target="prova", issues=issues, tracks_scanned=2, albums_scanned=1)
+        view = CheckResultsView(window.scan_launcher, report, entries, None, {}, check_flow.SIDE_PC)
+        states = {}
+        for row, item in zip(view._rows, view._row_items):
+            states[row.name] = item.checkState(COL_NAME)
+        assert states == {"title": Qt.Unchecked, "album": Qt.Checked}  # l'informazione parte spenta
+        assert "1 problemi" in view.header.text() and "1 informazioni" in view.header.text()
         view.close()
     finally:
         window._exit_checked = True
