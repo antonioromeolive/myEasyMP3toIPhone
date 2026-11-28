@@ -8,6 +8,8 @@ sull'intestazione, che filtrano i brani mostrati in tabella.
     Artisti: un artista (o più, con Ctrl/Maiusc) -> l'elenco Album mostra solo i suoi album, la tabella i suoi brani
     Album:   un album (o più) -> la tabella mostra solo quei brani
     "(Tutti …)", sempre in cima, toglie il filtro di quell'elenco.
+    "(Tutte le compilation)", subito sotto negli Artisti: gli album con la spunta Compilation o con "artisti vari"
+    come artista dell'album.
 
 Tasto destro su una riga: la sceglie (se non lo era già) e chiede alla finestra il menu (menu_requested) per tutti
 i brani della scelta (menu_tracks), interi: artisti o album completi, anche se Cerca ne nasconde una parte.
@@ -29,18 +31,22 @@ from PySide6.QtWidgets import (
 
 from .album_check_dialog import status_icon
 from ..i18n import tr
+from ..library import is_various_artists
 
 SORT_ROLE = Qt.UserRole + 1    # il valore con cui si ordina una colonna (testo minuscolo o numero)
 KEY_ROLE = Qt.UserRole         # l'artista, o la coppia (artista, album)
 SHOWN_CHECK_ROLE = Qt.UserRole + 2   # lo stato della spunta "sull'iPhone" com'è stato mostrato (per riconoscere un clic)
+COMPILATIONS_KEY = "\x00compilation"  # la riga "(Tutte le compilation)" dell'elenco Artisti
 
 
 class SortableItem(QTreeWidgetItem):
-    """Una riga ordinabile per valore; la riga "(Tutti …)" resta sempre in cima, in entrambi i versi."""
+    """Una riga ordinabile per valore; le righe fisse ("(Tutti …)", poi "(Tutte le compilation)": rank) restano
+    sempre in cima, in entrambi i versi."""
 
-    def __init__(self, texts: list, sort_values: list, pinned: bool = False) -> None:
+    def __init__(self, texts: list, sort_values: list, pinned: bool = False, rank: int = 0) -> None:
         super().__init__(texts)
         self.pinned = pinned
+        self.rank = rank
         for column, value in enumerate(sort_values):
             self.setData(column, SORT_ROLE, value)
         for column in range(1, len(texts)):
@@ -50,7 +56,12 @@ class SortableItem(QTreeWidgetItem):
     def __lt__(self, other) -> bool:
         tree = self.treeWidget()
         ascending = tree is None or tree.header().sortIndicatorOrder() == Qt.AscendingOrder
-        if self.pinned or other.pinned:
+        if self.pinned and other.pinned:
+            if ascending:
+                result = self.rank < other.rank
+            else:
+                result = self.rank > other.rank
+        elif self.pinned or other.pinned:
             if ascending:
                 result = self.pinned and not other.pinned
             else:
@@ -95,6 +106,7 @@ class LibraryBrowser(QWidget):
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self._groups = {}
+        self._compilations = set()          # gli album (chiavi) che sono compilation
         self._check_results = {}
         self.phone_state = None            # brani -> (Qt.CheckState, in attesa) o None; lo imposta la finestra
         self.menu_tracks = []              # i brani della scelta su cui si è aperto l'ultimo menu (tasto destro)
@@ -125,6 +137,17 @@ class LibraryBrowser(QWidget):
         self._check_results = check_results
         chosen_artists = self.selected_artists()
         chosen_albums = self.selected_albums()
+        chosen_compilations = self.compilations_chosen()
+        self._compilations = set()
+        compilation_tracks = 0
+        for key, tracks in groups.items():
+            flagged = False
+            for track in tracks:
+                if track.tags.compilation:
+                    flagged = True
+            if flagged or is_various_artists(key[0]):
+                self._compilations.add(key)
+                compilation_tracks += len(tracks)
         by_artist = {}
         for (artist, album), tracks in groups.items():
             entry = by_artist.setdefault(artist, [0, 0])
@@ -138,6 +161,15 @@ class LibraryBrowser(QWidget):
             total += count
         self.artists.addTopLevelItem(SortableItem([tr(f"(Tutti gli artisti: {len(by_artist)})"), str(len(groups)), str(total)],
                                            ["", len(groups), total], pinned=True))
+        if self._compilations:
+            count = len(self._compilations)
+            row = SortableItem([tr(f"(Tutte le compilation: {count})"), str(count), str(compilation_tracks)],
+                               ["", count, compilation_tracks], pinned=True, rank=1)
+            row.setData(0, KEY_ROLE, COMPILATIONS_KEY)
+            row.setToolTip(0, tr("Gli album con la spunta Compilation o con \"artisti vari\" come artista dell'album"))
+            self.artists.addTopLevelItem(row)
+            if chosen_compilations:
+                row.setSelected(True)
         for artist, (album_count, count) in by_artist.items():
             item = SortableItem([artist, str(album_count), str(count)], [artist.lower(), album_count, count])
             item.setData(0, KEY_ROLE, artist)
@@ -151,17 +183,22 @@ class LibraryBrowser(QWidget):
 
     def _fill_albums(self, keep: set) -> None:
         artists = self.selected_artists()
+        compilations = self.compilations_chosen()
         self.albums.blockSignals(True)
         self.albums.setSortingEnabled(False)
         self.albums.clear()
         rows = []
         for key, tracks in self._groups.items():
-            if not artists or key[0] in artists:
+            chosen = key[0] in artists or (compilations and key in self._compilations)
+            if (not artists and not compilations) or chosen:
                 rows.append((key, tracks))
         shown_tracks = 0
         for _key, tracks in rows:
             shown_tracks += len(tracks)
-        label = tr("(Tutti gli album") + (tr(" degli artisti scelti") if artists else "") + f": {len(rows)})"
+        if compilations and not artists:
+            label = tr("(Tutti gli album delle compilation") + f": {len(rows)})"
+        else:
+            label = tr("(Tutti gli album") + (tr(" degli artisti scelti") if artists else "") + f": {len(rows)})"
         self.albums.addTopLevelItem(SortableItem([label, "", "", str(shown_tracks)], ["", "", "", shown_tracks], pinned=True))
         for key, tracks in rows:
             artist, album = key
@@ -207,6 +244,9 @@ class LibraryBrowser(QWidget):
         result = []
         if isinstance(key, tuple):
             result = list(self._groups.get(key, []))
+        elif key == COMPILATIONS_KEY:
+            for album_key in sorted(self._compilations):
+                result += self._groups.get(album_key, [])
         elif key is not None:
             for (artist, _album), tracks in self._groups.items():
                 if artist == key:
@@ -271,12 +311,12 @@ class LibraryBrowser(QWidget):
         dell'elenco."""
         pinned = False
         for item in widget.selectedItems():
-            if getattr(item, "pinned", False):
+            if self._is_all(item):
                 pinned = True
         rows = []
         for index in range(widget.topLevelItemCount()):
             item = widget.topLevelItem(index)
-            if not getattr(item, "pinned", False) and (pinned or item.isSelected()):
+            if not self._is_all(item) and (pinned or item.isSelected()):
                 rows.append(item)
         result = []
         seen = set()
@@ -289,17 +329,35 @@ class LibraryBrowser(QWidget):
 
     # ------------------------------------------------------------------ selezione
 
+    @staticmethod
+    def _is_all(item) -> bool:
+        """La riga "(Tutti …)" (non quella delle compilation, che è una scelta come le altre)."""
+        result = getattr(item, "pinned", False) and item.data(0, KEY_ROLE) != COMPILATIONS_KEY
+        return result
+
     def _selected_keys(self, widget: QTreeWidget) -> set:
         keys = set()
         pinned = False
         for item in widget.selectedItems():
-            if getattr(item, "pinned", False):
+            if self._is_all(item):
                 pinned = True
-            else:
+            elif item.data(0, KEY_ROLE) != COMPILATIONS_KEY:
                 keys.add(item.data(0, KEY_ROLE))
         if pinned:
             keys = set()
         return keys
+
+    def compilations_chosen(self) -> bool:
+        """"(Tutte le compilation)" scelta negli Artisti (e non "(Tutti gli artisti)")."""
+        chosen = False
+        everything = False
+        for item in self.artists.selectedItems():
+            if item.data(0, KEY_ROLE) == COMPILATIONS_KEY:
+                chosen = True
+            elif self._is_all(item):
+                everything = True
+        result = chosen and not everything
+        return result
 
     def selected_artists(self) -> set:
         result = self._selected_keys(self.artists)
@@ -318,6 +376,12 @@ class LibraryBrowser(QWidget):
         """None = tutti i brani; altrimenti (artisti, album): gli album scelti contano più degli artisti."""
         artists = self.selected_artists()
         albums = self.selected_albums()
+        if self.compilations_chosen() and not albums:
+            # le compilation sono album: con gli artisti scelti insieme, anche tutti i loro album
+            albums = set(self._compilations)
+            for key in self._groups:
+                if key[0] in artists:
+                    albums.add(key)
         if not artists and not albums:
             result = None
         else:

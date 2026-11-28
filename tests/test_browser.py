@@ -316,3 +316,32 @@ def test_changing_an_album_row_is_not_a_click_on_its_iphone_tick():
     assert emitted == []
     item.setCheckState(0, Qt.Unchecked)                              # il clic vero sulla spunta
     assert emitted == [(3, False)]
+
+
+def test_all_the_compilations_row():
+    """"(Tutte le compilation)": subito sotto "(Tutti gli artisti)", in entrambi i versi; sceglierla mostra gli album
+    con la spunta Compilation o con "artisti vari" come artista dell'album."""
+    _app = QApplication.instance() or QApplication([])
+    tracks = _tracks()
+    from pathlib import Path
+    for number, artist in enumerate(("Rossi", "Bianchi"), start=1):
+        tracks.append(Track(path=Path(f"C:/m/Estate/{number}.mp3"),
+                            tags=TrackTags(title=f"E{number}", artist=artist, album_artist="AA.VV.", album="Estate")))
+    tracks.append(Track(path=Path("C:/m/Hits/1.mp3"),
+                        tags=TrackTags(title="H1", artist="Queen", album="Hits", compilation=True)))
+    assign_groups(tracks)
+    browser = LibraryBrowser()
+    browser.set_data(group_by_album(tracks), {})
+    texts = _texts(browser.artists)
+    assert texts[0].startswith("(Tutti gli artisti") and texts[1] == "(Tutte le compilation: 2)"
+    browser.artists.sortByColumn(0, Qt.DescendingOrder)
+    assert _texts(browser.artists)[1] == "(Tutte le compilation: 2)"           # anche al contrario
+    row = [browser.artists.topLevelItem(i) for i in range(browser.artists.topLevelItemCount())
+           if browser.artists.topLevelItem(i).text(0).startswith("(Tutte le compilation")][0]
+    row.setSelected(True)
+    assert browser.track_filter() == (set(), {("AA.VV.", "Estate"), ("Queen", "Hits")})
+    assert sorted(_texts(browser.albums)[1:]) == ["Estate", "Hits"]
+    assert _texts(browser.albums)[0].startswith("(Tutti gli album delle compilation: 2)")
+    assert len(browser.tracks_of(row)) == 3
+    browser.set_data(group_by_album(tracks), {})                                 # i dati ricaricati: resta scelta
+    assert browser.compilations_chosen()

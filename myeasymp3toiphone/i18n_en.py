@@ -4179,4 +4179,10 @@ CATALOG = {
         "Only information: it causes no confusion on the iPhone. If you want, What to do says how to fix it",
     "{0} — {1}: {2} sull'iPhone con tag diversi da quelli del PC":
         "{0} — {1}: {2} on the iPhone with tags different from the PC",
+    "(Tutte le compilation: {0})":
+        "(All the compilations: {0})",
+    "Gli album con la spunta Compilation o con \"artisti vari\" come artista dell'album":
+        "The albums with the Compilation flag or with \"various artists\" as album artist",
+    "(Tutti gli album delle compilation":
+        "(All the albums of the compilations",
 }

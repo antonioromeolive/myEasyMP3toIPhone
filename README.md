@@ -92,6 +92,7 @@ sull'intestazione:
   copertina e il suo nome (quella del primo dei suoi brani che ne ha una);
 - la riga **(Tutti …)**, sempre in cima, toglie il filtro; scegliere un artista (o "(Tutti)") azzera l'album scelto
   prima; la casella *Cerca* filtra ancora dentro la scelta;
+- nell'elenco Artisti, subito sotto, la riga **(Tutte le compilation)**: gli album con la spunta *Compilation* o con "artisti vari" ("AA.VV.", "Artisti Vari"…) come artista dell'album; si sceglie come un artista (anche insieme ad altri)
 - **tasto destro** su un artista o un album (anche più righe scelte, o "(Tutti …)"): la riga diventa la scelta e il
   comando vale per **tutti i suoi brani** (artista o album interi, anche quelli che *Cerca* nasconde), con le stesse
   voci del tasto destro sui brani; tutte vanno **in attesa** fino ad *Applica*, anche a iPhone scollegato:
