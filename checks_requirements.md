@@ -442,6 +442,9 @@ correzioni partono spente.
 
 Restano problemi: R26 con l'artista dell'album vuoto, i vecchi tag (R2, R3), le differenze con il catalogo (W2).
 
+Controllo dell'iPhone (in attesa della fase iPhone): anche I2 (album con meno brani sull'iPhone che sul PC) è
+un'informazione; I1 (tag diversi tra PC e iPhone) è un problema per album, non uno solo per tutta la musica.
+
 ## 8. Domande ancora aperte
 
 1. **D-8, per album o per brano** (fase iPhone): si sceglie una copia intera dell'album (tutto MP3 320, o tutto

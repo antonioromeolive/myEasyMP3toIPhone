@@ -83,7 +83,7 @@ SEVERITY_INFO = "informazione"      # non è un problema per l'iPhone (album inc
 SEVERITY_ORDER = {SEVERITY_HIGH: 0, SEVERITY_MEDIUM: 1, SEVERITY_LOW: 2, SEVERITY_INFO: 3}
 # le regole che danno solo informazioni (checks_requirements.md, D-12): album incompleti (R9, R10, e W1 della
 # Verifica online) e solo estetica (R20 numero o artista nel titolo, R21 spazi, R31 totali, R34 numero oltre il totale)
-INFO_RULES = frozenset({"R9", "R10", "R20", "R21", "R31", "R34", "W1"})
+INFO_RULES = frozenset({"R9", "R10", "R20", "R21", "R31", "R34", "W1", "I2"})    # I2: album incompleto sull'iPhone
 
 ORIGIN_RULE = "regola"
 ORIGIN_AI = "AI"
@@ -1331,12 +1331,19 @@ def compare_with_library(phone_tracks: list, library_tracks: list) -> list:
                 if status == DEVICE_STALE:
                     stale.append(track)
     issues = []
-    if stale:
+    stale_by_album = {}
+    for track in stale:
+        stale_by_album.setdefault(track.album_key, []).append(track)
+    number = 0
+    for key in sorted(stale_by_album, key=lambda k: (k[0].lower(), k[1].lower())):
+        number += 1
+        album_stale = stale_by_album[key]
         issues.append(Issue(
-            KIND_NOT_UPDATED, SEVERITY_HIGH, f"{len(stale)} brani sull'iPhone con tag diversi da quelli del PC",
+            KIND_NOT_UPDATED, SEVERITY_HIGH,
+            f"{key[0]} — {key[1]}: {_tracks_text(len(album_stale))} sull'iPhone con tag diversi da quelli del PC",
             "Il brano è nell'app Musica dell'iPhone, ma titolo, artista, album, anno, genere o numeri non sono "
-            "quelli del PC (per esempio dopo una modifica sul PC). Nella scheda PC, la colonna iPhone mostra le "
-            "differenze.", [t.path for t in stale], rule_id="I1"))
+            "quelli del PC (per esempio dopo una modifica sul PC, anche con le correzioni dei Controlli). Nella scheda "
+            "PC, la colonna iPhone mostra le differenze.", [t.path for t in album_stale], rule_id=f"I1.{number}"))
     incomplete = []
     for key, tracks in missing_by_album.items():
         if key in present_albums:
@@ -1765,7 +1772,7 @@ def scan_tracks(tracks: list, target: str, provider=None, check_files: bool = Tr
                     issue.fix = None
                     issue.detail += " Correggi i brani sul PC (scheda PC)."
         if library_tracks is not None:
-            for issue in compare_with_library(phone_tracks, library_tracks):
+            for issue in mark_information(compare_with_library(phone_tracks, library_tracks)):
                 if enabled(issue, checks):
                     issues.append(issue)
         if CHECK_UNREADABLE in checks:

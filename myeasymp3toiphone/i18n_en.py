@@ -4171,4 +4171,12 @@ CATALOG = {
         "{0}: number higher than the total",
     "Numero più alto del totale: {0}. Sull'iPhone si vede solo \"traccia 9 di 8\".":
         "Number higher than the total: {0}. On the iPhone you only see \"track 9 of 8\".",
+    "{0}: {1} sull'iPhone con tag diversi da quelli del PC":
+        "{0}: {1} on the iPhone with tags different from the PC",
+    "Il brano è nell'app Musica dell'iPhone, ma titolo, artista, album, anno, genere o numeri non sono quelli del PC (per esempio dopo una modifica sul PC, anche con le correzioni dei Controlli). Nella scheda PC, la colonna iPhone mostra le differenze.":
+        "The track is in the iPhone Music app, but title, artist, album, year, genre or numbers are not those of the PC (for example after a change on the PC, also with the fixes of the Checks). In the PC tab, the iPhone column shows the differences.",
+    "Solo un'informazione: sull'iPhone non crea confusione. Se vuoi, Cosa fare dice come sistemarla":
+        "Only information: it causes no confusion on the iPhone. If you want, What to do says how to fix it",
+    "{0} — {1}: {2} sull'iPhone con tag diversi da quelli del PC":
+        "{0} — {1}: {2} on the iPhone with tags different from the PC",
 }

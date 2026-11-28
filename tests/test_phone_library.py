@@ -235,8 +235,8 @@ def test_compare_with_library_and_scan(tmp_path):
              _phone(4, "Altra", "Artista Due", "Album Secondo")]
     issues = scan.compare_with_library(phone, library)
     by_rule = {issue.rule_id: issue for issue in issues}
-    assert set(by_rule) == {"I1", "I2.1", "I3"}
-    assert [Path(p).name for p in by_rule["I1"].files] == ["2.mp3"]          # anno diverso
+    assert set(by_rule) == {"I1.1", "I2.1", "I3"}                           # I1 per album
+    assert [Path(p).name for p in by_rule["I1.1"].files] == ["2.mp3"]        # anno diverso
     assert [Path(p).name for p in by_rule["I2.1"].files] == ["3.mp3"]        # manca sull'iPhone
     assert len(by_rule["I3"].files) == 2 and all(issue.fix is None for issue in issues)
     tracks = phone_library.tracks_for_scan(phone)

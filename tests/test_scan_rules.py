@@ -413,3 +413,10 @@ def test_the_catalog_disproves_a_split_compilation():
     assert check_flow.drop_disproved_compilations([split], [result]) == []
     various = type("A", (), {"release": type("R", (), {"artist": "Various Artists"})(), "local_tracks": tracks})()
     assert check_flow.drop_disproved_compilations([split], [various]) == [split]
+
+
+def test_an_album_incomplete_on_the_iphone_is_information():
+    issue = scan.Issue(scan.KIND_FEW_TRACKS, scan.SEVERITY_MEDIUM, "t", "d", rule_id="I2.1")
+    stale = scan.Issue(scan.KIND_NOT_UPDATED, scan.SEVERITY_HIGH, "t", "d", rule_id="I1.1")
+    scan.mark_information([issue, stale])
+    assert issue.severity == scan.SEVERITY_INFO and stale.severity == scan.SEVERITY_HIGH

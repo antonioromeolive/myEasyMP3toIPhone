@@ -35,6 +35,7 @@ COL_NAME, COL_FIX, COL_SIDE, COL_FIELD, COL_OLD, COL_NEW, COL_SEVERITY, COL_ORIG
 ORANGE = QColor(210, 130, 0)
 AUTO_TIP = "Si corregge qui: lascia accese le caselle delle righe che vuoi e premi Applica le correzioni scelte"
 MANUAL_TIP = "Nessuna correzione automatica: leggi Cosa fare (sotto, o qui)"
+INFO_TIP = "Solo un'informazione: sull'iPhone non crea confusione. Se vuoi, Cosa fare dice come sistemarla"
 KIND_ROLE = Qt.UserRole           # ROW_ALBUM, ROW_PROBLEM, ROW_FIX
 ROW_ALBUM = "riga_album"
 ROW_PROBLEM = "riga_problema"
@@ -445,6 +446,10 @@ class CheckResultsView(QWidget):
                                               f"di {_albums_text(problem.elsewhere)}. Qui non c'è niente da fare.")
                     for column in range(len(COLUMNS)):
                         child.setForeground(column, QBrush(GREY))
+                elif issue.severity == SEVERITY_INFO:
+                    child.setText(COL_FIX, "informazione")
+                    suggestion = advice(issue)
+                    child.setToolTip(COL_FIX, f"{tr(INFO_TIP)}\n\n{tr(suggestion)}" if suggestion else INFO_TIP)
                 else:
                     child.setText(COL_FIX, "a mano")
                     child.setForeground(COL_FIX, QBrush(ORANGE))

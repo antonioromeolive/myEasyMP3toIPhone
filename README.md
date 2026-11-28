@@ -374,7 +374,7 @@ delle regole arrivano **prima** delle impronte dell'audio, che servono solo ai b
 
 **Informazioni, non problemi.** Lo scopo dei controlli sono album che sull'iPhone non creano confusione, non album
 perfetti. Gli album incompleti (numeri di traccia mancanti, album di 1-2 brani, brani che mancano rispetto al
-catalogo) e i dettagli che sull'iPhone non cambiano niente (numero o artista nel titolo, spazi in più, totali diversi,
+catalogo, e sull'iPhone gli album con meno brani che sul PC) e i dettagli che sull'iPhone non cambiano niente (numero o artista nel titolo, spazi in più, totali diversi,
 numero più alto del totale) sono **informazioni**: in grigio, in fondo all'album, contate a parte nell'intestazione,
 non alzano la gravità dell'album e non fanno partire AI e Verifica online "solo sugli album con problemi". Le loro
 correzioni ci sono ma partono **spente**: accendile se vuoi.
