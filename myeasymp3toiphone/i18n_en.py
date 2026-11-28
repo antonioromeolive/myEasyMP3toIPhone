@@ -4237,4 +4237,24 @@ CATALOG = {
         "For an album moved to a folder the program did not find (for example outside the open folders): the same album is searched in the chosen folder. If you changed title or artist, better delete it from the iPhone and send it again",
     "lo stesso album (artista e titolo) non c'è in quella cartella":
         "the same album (artist and title) is not in that folder",
+    "Apri la cartella in Esplora risorse":
+        "Open the folder in File Explorer",
+    "Copiati negli appunti: {0} ({1})":
+        "Copied to the clipboard: {0} ({1})",
+    "Verso il PC (subito)":
+        "To the PC (right away)",
+    "Verso l'iPhone (in attesa: partono con Applica)":
+        "To the iPhone (queued: they start with Apply)",
+    "Sorgente sul PC":
+        "Source on the PC",
+    "Altro":
+        "Other",
+    "Testi e file della sorgente":
+        "Texts and source files",
+    "Artista — Titolo":
+        "Artist — Title",
+    "Artista — Album":
+        "Artist — Album",
+    "Apri la cartella della sorgente":
+        "Open the source folder",
 }

@@ -345,3 +345,23 @@ def test_all_the_compilations_row():
     assert len(browser.tracks_of(row)) == 3
     browser.set_data(group_by_album(tracks), {})                                 # i dati ricaricati: resta scelta
     assert browser.compilations_chosen()
+
+
+def test_copy_to_the_clipboard_also_without_files():
+    """Copia negli appunti con i testi (titoli, artisti) anche senza file (un brano dell'iPhone senza sorgente); i
+    titoli di sezione non si cliccano."""
+    app = QApplication.instance() or QApplication([])
+    from PySide6.QtWidgets import QMenu
+    from myeasymp3toiphone.gui.file_actions import add_file_entries, add_section
+    menu = QMenu()
+    add_section(menu, "Testi e file della sorgente")
+    said = []
+    add_file_entries(menu, [], said.append, texts=[("Titolo", ["Uno", "Due"])],
+                     explorer_text="Apri la cartella della sorgente")
+    actions = menu.actions()
+    assert actions[0].text() == "Testi e file della sorgente" and not actions[0].isEnabled()
+    clipboard = actions[1].menu()
+    assert actions[1].isEnabled() and [action.text() for action in clipboard.actions()] == ["Titolo (2)"]
+    clipboard.actions()[0].trigger()
+    assert app.clipboard().text() == "Uno\nDue" and said == ["Copiati negli appunti: Titolo (2)"]
+    assert actions[2].text() == "Apri la cartella della sorgente (0)" and not actions[2].isEnabled()

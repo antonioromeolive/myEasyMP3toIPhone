@@ -135,9 +135,23 @@ def open_in_explorer(paths: list) -> int:
     return opened
 
 
-def add_file_entries(menu: QMenu, paths: list, status=None, tagscan: Optional[str] = None) -> None:
-    """Le voci Copia negli appunti (sottomenu: Nome del file / Percorso completo / Nome e Percorso della cartella),
-    Apri la cartella e, con tagscan (l'impostazione tagscan_path, anche ""), Apri in TagScanner, per i file dati.
+def add_section(menu: QMenu, title: str) -> None:
+    """Il titolo di un gruppo di voci del menu: una voce grigia in grassetto, non cliccabile (il titolo di
+    QMenu.addSection lo stile Fusion non lo mostra), dopo un separatore se il menu ha già delle voci."""
+    if menu.actions():
+        menu.addSeparator()
+    action = menu.addAction(title)
+    font = action.font()
+    font.setBold(True)
+    action.setFont(font)
+    action.setEnabled(False)
+
+
+def add_file_entries(menu: QMenu, paths: list, status=None, tagscan: Optional[str] = None, texts=None,
+                     explorer_text: str = "Apri la cartella in Esplora risorse") -> None:
+    """Le voci Copia negli appunti (sottomenu: prima i testi dati, texts: [(voce, [righe])], come titoli e artisti;
+    poi Nome del file / Percorso completo / Nome e Percorso della cartella), Apri la cartella (explorer_text) e, con
+    tagscan (l'impostazione tagscan_path, anche ""), Apri in TagScanner, per i file dati.
     status(testo): dove dire cosa è successo (la barra di stato)."""
     count = len(paths)
     distinct = folders(paths)
@@ -169,19 +183,29 @@ def add_file_entries(menu: QMenu, paths: list, status=None, tagscan: Optional[st
         elif len(distinct) > opened:
             say(f"Aperte le prime {opened} cartelle di {len(distinct)}")
 
+    def copy_lines(label: str, lines: list) -> None:
+        copy_text("\n".join(lines))
+        say(f"Copiati negli appunti: {label} ({len(lines)})")
+
     # le copie negli appunti stanno in un sottomenu: non si confondono con "Copia da PC a iPhone"
     clipboard = QMenu("Copia negli appunti", menu)
-    entries = [
-        (f"Nome del file ({count})", copy_names),
-        (f"Percorso completo ({count})", copy_paths),
-        (f"Nome della cartella ({len(distinct)})", copy_folder_names),
-        (f"Percorso della cartella ({len(distinct)})", copy_folders),
-    ]
-    for text, slot in entries:
-        action = clipboard.addAction(text)
-        action.triggered.connect(slot)
-    menu.addMenu(clipboard).setEnabled(count > 0)
-    explorer = menu.addAction(f"Apri la cartella in Esplora risorse ({min(len(distinct), MAX_OPENED)})")
+    for label, lines in texts or []:
+        action = clipboard.addAction(f"{label} ({len(lines)})")
+        action.triggered.connect(lambda _checked=False, label=label, lines=lines: copy_lines(label, lines))
+    if count:
+        if texts:
+            clipboard.addSeparator()
+        entries = [
+            (f"Nome del file ({count})", copy_names),
+            (f"Percorso completo ({count})", copy_paths),
+            (f"Nome della cartella ({len(distinct)})", copy_folder_names),
+            (f"Percorso della cartella ({len(distinct)})", copy_folders),
+        ]
+        for text, slot in entries:
+            action = clipboard.addAction(text)
+            action.triggered.connect(slot)
+    menu.addMenu(clipboard).setEnabled(count > 0 or bool(texts))
+    explorer = menu.addAction(f"{explorer_text} ({min(len(distinct), MAX_OPENED)})")
     explorer.setEnabled(count > 0)
     explorer.triggered.connect(open_folders)
     if tagscan is not None:

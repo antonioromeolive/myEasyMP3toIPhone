@@ -156,8 +156,19 @@ def _pc_value(name: str, value):
 
 
 # le voci del tasto destro sui brani dell'iPhone, in ordine (None: separatore)
-PHONE_MENU_ORDER = ("save", "show_pc", None, "replace", "tags", "tags_to_pc", "edit", "complete", "cover", None, "link",
-                    "probable", "proposed", "unlink", None, "keep", "dedupe", "delete", "note")
+# le voci del tasto destro sui brani dell'iPhone, per gruppi (titolo, chiavi di _phone_entry_map)
+PHONE_MENU_GROUPS = (
+    ("Verso il PC (subito)", ("save", "tags_to_pc", "show_pc")),
+    ("Verso l'iPhone (in attesa: partono con Applica)", ("replace", "tags", "edit", "complete", "cover", "keep",
+                                                         "dedupe", "delete")),
+    ("Sorgente sul PC", ("link", "probable", "proposed", "unlink")),
+)
+PHONE_MENU_ORDER = []
+for _title, _keys in PHONE_MENU_GROUPS:
+    if PHONE_MENU_ORDER:
+        PHONE_MENU_ORDER.append(None)
+    PHONE_MENU_ORDER.extend(_keys)
+PHONE_MENU_ORDER = tuple(PHONE_MENU_ORDER + [None, "note"])
 # i pulsanti della barra delle azioni senza brani scelti
 BAR_LABELS = {"save": "Copia da iPhone a PC…", "replace": "Ricopia da PC a iPhone", "tags": "Usa i tag da PC a iPhone",
               "edit": "Cambia i tag…", "link": "Associa al file sul PC…", "delete": "Elimina dall'iPhone"}
@@ -1651,26 +1662,43 @@ class IPhonePanel(QWidget):
         show_entries_menu(self, self.browser_menu_entries(self._browser.menu_tracks), where, True)
 
     def _tracks_menu(self, where) -> None:
+        """Tasto destro sui brani: verso il PC, verso l'iPhone (in attesa), la sorgente sul PC, la suoneria, poi
+        Copia negli appunti (titoli, artisti, album e i file della sorgente) e le cartelle delle sorgenti."""
+        from .file_actions import add_section
         items = self._selected_phone_tracks()
         if items:
             menu = QMenu(self)
-            for entry in self.phone_entries(items):
-                if entry is None:
-                    menu.addSeparator()
-                else:
-                    text, enabled, slot = entry
-                    action = menu.addAction(text)
-                    action.setEnabled(enabled)
-                    if slot is not None:
-                        action.triggered.connect(slot)
-            menu.addSeparator()
+            entries = self._phone_entry_map(items)
+            for title, keys in PHONE_MENU_GROUPS:
+                add_section(menu, title)
+                for key in keys:
+                    if key in entries:
+                        text, enabled, slot = entries[key]
+                        action = menu.addAction(text)
+                        action.setEnabled(enabled)
+                        if slot is not None:
+                            action.triggered.connect(slot)
+            if "note" in entries:
+                note = menu.addAction(entries["note"][0])
+                note.setEnabled(False)
+            add_section(menu, "Altro")
             self._add_ringtone_entry(menu, items)
-            menu.addSeparator()
-            sources = QMenu("File della sorgente", menu)
-            add_file_entries(sources, self._source_paths(items),
+            add_section(menu, "Testi e file della sorgente")
+            titles = []
+            artist_titles = []
+            albums = []
+            for item in items:
+                titles.append(item.tags.title)
+                artist_titles.append(f"{item.display_artist} — {item.tags.title}")
+                album = f"{item.tags.album_artist or item.display_artist} — {item.tags.album}"
+                if album not in albums:
+                    albums.append(album)
+            add_file_entries(menu, self._source_paths(items),
                              lambda text: self._window.statusBar().showMessage(text, 8000),
-                             tagscan=self._window.app_settings.tagscan_path)
-            menu.addMenu(sources).setEnabled(bool(self._source_paths(items)))
+                             tagscan=self._window.app_settings.tagscan_path,
+                             texts=[("Titolo", titles), ("Artista — Titolo", artist_titles),
+                                    ("Artista — Album", albums)],
+                             explorer_text="Apri la cartella della sorgente")
             menu.setToolTipsVisible(True)
             menu.exec(where)
 

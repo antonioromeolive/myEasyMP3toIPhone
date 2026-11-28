@@ -171,10 +171,12 @@ restano un album solo).
 è il nome del file; *Cartella* è il nome della cartella che lo contiene, o il suo percorso completo con *Impostazioni →
 Generale → Mostra il percorso completo delle cartelle*. Il suggerimento di tutte e due mostra il percorso completo.
 
-**Tasto destro sui brani**, oltre ai comandi per l'iPhone: **Copia negli appunti** → *Nome del file*, *Percorso
-completo*, *Nome della cartella*, *Percorso della cartella* (una riga per brano; le cartelle una volta sola; in un sottomenu, per non confonderle con *Copia
-da PC a iPhone*) e **Apri la cartella in Esplora risorse**
-(un file solo: selezionato; più cartelle: le prime 5).
+**Tasto destro sui brani**: le voci sono divise in gruppi con un titolo grigio. *Verso l'iPhone (in attesa: partono
+con Applica)*: Copia, Ricopia, Usa i tag da PC a iPhone, Elimina dall'iPhone; *Sul PC*: Cambia i tag, Crea una
+suoneria; *File*: **Copia negli appunti** → *Titolo*, *Artista — Titolo*, *Nome del file*, *Percorso completo*, *Nome
+della cartella*, *Percorso della cartella* (una riga per brano; le cartelle una volta sola; in un sottomenu, per non
+confonderle con *Copia da PC a iPhone*), **Apri la cartella in Esplora risorse** (un file solo: selezionato; più
+cartelle: le prime 5) e *Apri in TagScanner*; per ultimo *Nascondi la cartella*.
 
 **Nascondi la cartella** (tasto destro sui brani): i brani delle cartelle che li contengono, sottocartelle comprese,
 spariscono dalla scheda PC (elenchi, tabella, controlli) e non si usano per *Associa sorgenti* e *Controlla la
@@ -576,8 +578,11 @@ accenti non sono evidenziati: sull'iPhone sono lo stesso gruppo.
   - **Associa al file sul PC…**, **Associa le probabili ≈** (rende certi i brani ≈ scelti, dopo una conferma),
     **Associa la sorgente proposta in rosso** (come *cartella*), **Togli la sorgente**: subito, solo il registro;
   - **Elimina N brani dall'iPhone** (tasto **Canc**): in attesa;
-  - **File della sorgente** → *Copia negli appunti* (nome del file, percorso completo, nome e percorso della cartella) e *Apri la cartella
-    in Esplora risorse*, come nella scheda PC.
+  - **Copia negli appunti** → *Titolo*, *Artista — Titolo*, *Artista — Album* e, per i brani con la sorgente sul PC,
+    nome del file, percorso completo, nome e percorso della cartella; **Apri la cartella della sorgente** e *Apri in
+    TagScanner*.
+  - Le voci sono divise in gruppi con un titolo grigio: *Verso il PC (subito)*, *Verso l'iPhone (in attesa: partono
+    con Applica)*, *Sorgente sul PC*, *Altro* (Crea una suoneria), *Testi e file della sorgente*.
 - L'elenco letto resta in `iphone_musica.json` nella cartella dati: scheda iPhone, colonna *iPhone* e scansione
   funzionano anche a telefono disconnesso. **Rileggi** lo rilegge dall'iPhone connesso; senza iPhone rifà il
   confronto con il PC.
