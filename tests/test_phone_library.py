@@ -1297,11 +1297,25 @@ def test_moved_sources_are_found_again(tmp_path, monkeypatch):
     assert 4 not in found or found[4].pc is not taken         # un file già associato non si ruba
 
     app = QApplication.instance() or QApplication([])
-    from myeasymp3toiphone.gui.missing_dialog import ACTION_RELINK, MissingSourcesDialog
-    dialog = MissingSourcesDialog(None, missing, False, {1: found[1], 2: found[2]})
-    assert dialog.tree.topLevelItem(0).text(3) == r"nuova\01 Uno.mp3" and dialog.tree.topLevelItem(2).text(3) == ""
-    dialog._choose(ACTION_RELINK)
-    assert dialog.action == ACTION_RELINK and len(dialog.chosen()) == 4
+    from myeasymp3toiphone.gui.missing_dialog import (
+        CHOICE_FOLDER, CHOICE_FORGET, CHOICE_LATER, MissingSourcesDialog,
+    )
+    from myeasymp3toiphone.relocate import missing_albums
+    # per album: una riga sola per "Disco Finto", con la cartella "nuova" proposta (2 brani ritrovati su 4)
+    albums = missing_albums(missing, [moved_print, moved_name, other_audio, taken], Cache(),
+                            taken={path_key(taken.path)}, printer=lambda path: prints.get(path, ""))
+    assert len(albums) == 1 and albums[0].key == ("Gruppo Finto", "Disco Finto")
+    assert albums[0].candidates[0].folder == str(tmp_path / "nuova")
+    assert sorted(albums[0].candidates[0].proposals) == [1, 2]
+    dialog = MissingSourcesDialog(None, albums, False)
+    assert dialog.tree.topLevelItemCount() == 1 and dialog.tree.topLevelItem(0).child(0).text(4) == "01 Uno.mp3"
+    assert "2 ritrovati, 2 no" in dialog.tree.topLevelItem(0).text(4)
+    decisions = dialog.decisions()
+    assert [(kind, sorted(proposals)) for _album, kind, proposals in decisions] == [(CHOICE_FOLDER, [1, 2])]
+    dialog._set_all(CHOICE_FORGET)
+    assert [kind for _album, kind, _proposals in dialog.decisions()] == [CHOICE_FORGET]
+    dialog._set_all(CHOICE_LATER)
+    assert dialog.decisions() == []
     window = MainWindow()
     try:
         registry = provenance.Registry()
@@ -1310,11 +1324,14 @@ def test_moved_sources_are_found_again(tmp_path, monkeypatch):
         window.registry = registry
         saved = []
         monkeypatch.setattr(window.iphone_panel, "_store_registry", lambda reg, message, then=None: saved.append(message))
-        window.iphone_panel._relink(missing, {1: found[1], 2: found[2]}, [phone[0], phone[1], phone[2]])
+        window.iphone_panel._apply_missing(decisions)
         assert registry.get(1).path == str(moved_print.path) and registry.get(1).fingerprint == "impronta-uno"
         assert registry.get(2).path == str(moved_name.path)
         assert registry.get(3).path == str(tmp_path / "vecchia" / "03 Tre.mp3")      # non ritrovato: com'era
-        assert saved == ["Ritrovati e associati 2 file spostati"]
+        assert saved == ["Sorgenti sparite: associati 2 file ritrovati"]
+        album = albums[0]
+        window.iphone_panel._apply_missing([(album, CHOICE_FORGET, {})])
+        assert registry.get(3) is None and saved[-1] == "Sorgenti sparite: 4 brani ora senza sorgente"
     finally:
         window._exit_checked = True
         window.close()
@@ -1939,3 +1956,30 @@ def test_the_iphone_check_uses_the_registry_like_the_pc_tab():
     links = {path_key(sent.path): 501}
     found = scan.compare_with_library(phone, [sent, copy], links)
     assert "I1" not in {issue.rule_id.split(".")[0] for issue in found}
+
+
+def test_an_album_no_longer_on_the_pc_can_be_deleted_from_the_iphone(tmp_path):
+    """Sorgenti sparite di un album che sul PC non c'è più: niente cartelle proposte (un album con lo stesso titolo
+    di un altro artista non conta), e solo lì si può scegliere Elimina dall'iPhone; di serie, più tardi."""
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtWidgets import QApplication
+    from myeasymp3toiphone import provenance
+    from myeasymp3toiphone.gui.missing_dialog import CHOICE_DELETE, MissingSourcesDialog
+    from myeasymp3toiphone.relocate import missing_albums
+    app = QApplication.instance() or QApplication([])
+    item = _phone(1, "Uno", "Gruppo Finto", "Greatest Hits")
+    item.sync_id = 1
+    link = provenance.Link(sync_id=1, pc=provenance.computer_name(), path=str(tmp_path / "via" / "01 Uno.mp3"))
+    other = Track(path=tmp_path / "altro" / "01 Uno.mp3",
+                  tags=TrackTags(title="Uno", artist="Altro Gruppo", album="Greatest Hits"))
+    albums = missing_albums([(item, link)], [other], None)
+    assert albums[0].candidates == []                            # stesso titolo, altro artista: non è lo stesso album
+    dialog = MissingSourcesDialog(None, albums, False)
+    combo = dialog.tree.itemWidget(dialog.tree.topLevelItem(0), 3)
+    kinds = [combo.itemData(index)[0] for index in range(combo.count())]
+    assert CHOICE_DELETE in kinds and dialog.decisions() == []   # di serie: più tardi
+    assert dialog.tree.topLevelItem(0).text(4) == "sul PC l'album non c'è più"
+    combo.setCurrentIndex(kinds.index(CHOICE_DELETE))
+    assert [kind for _album, kind, _proposals in dialog.decisions()] == [CHOICE_DELETE]
+    dialog.close()
+    app.processEvents()

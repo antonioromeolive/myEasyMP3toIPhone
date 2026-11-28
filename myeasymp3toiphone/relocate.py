@@ -12,10 +12,13 @@ chiedere all'utente cosa fare. Si cerca tra i brani della cartella aperta, dal p
   3. per gli altri, l'album intero in una cartella e le regole: le stesse proposte di quelle in rosso
      (adoption.automatic_proposals: nome della cartella, numeri, titoli, durata).
 
-Niente cambia qui: il risultato sono proposte, che l'utente conferma (si scrive solo il registro)."""
+Niente cambia qui: il risultato sono proposte, che l'utente conferma (si scrive solo il registro). missing_albums
+le raccoglie per album, con le cartelle della libreria dove ritrovarli: si sceglie una cartella per album, non un
+file per brano."""
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import adoption, provenance
@@ -113,4 +116,84 @@ def relocate(missing: list, pc_tracks: list, tag_cache, preferred: tuple = (), t
             rest.append(item)
     if rest:
         result.update(adoption.automatic_proposals(rest, pc_tracks, preferred, used))
+    return result
+
+
+# --------------------------------------------------------------------------- per album
+
+MAX_CANDIDATES = 6       # le cartelle proposte per un album
+
+
+@dataclass
+class FolderCandidate:
+    folder: str                                   # la cartella dell'album (library.album_folder)
+    proposals: dict = field(default_factory=dict)  # {pid: adoption.Proposal} dei brani ritrovati lì
+
+
+@dataclass
+class MissingAlbum:
+    key: tuple                                    # (artista, album) sull'iPhone
+    rows: list = field(default_factory=list)      # [(PhoneTrack, provenance.Link)]
+    old_folder: str = ""                          # la cartella dove erano i file
+    candidates: list = field(default_factory=list)   # FolderCandidate, la migliore prima
+
+
+def same_album_key(artist: str, album: str) -> tuple:
+    """Lo stesso album (D-11 di checks_requirements.md): stesso artista dell'album e stesso titolo, senza maiuscole,
+    accenti, spazi e "CD 1"; tutti gli "artisti vari" sono uno."""
+    from .library import artist_group_key
+    from .names import LEVEL_ACCENTS, fold
+    from .scan import split_disc_marker
+    result = (artist_group_key(artist or ""), fold(split_disc_marker(album or "")[0], LEVEL_ACCENTS))
+    return result
+
+
+def folder_tracks(pc_tracks: list, folder: str) -> list:
+    """I brani del PC dentro una cartella (anche nelle sottocartelle: CD1, CD2)."""
+    from .overlay import path_key
+    prefix = path_key(folder).rstrip("\\/") + "\\"
+    result = []
+    for track in pc_tracks:
+        if path_key(track.path).startswith(prefix):
+            result.append(track)
+    return result
+
+
+def missing_albums(rows: list, pc_tracks: list, tag_cache, preferred: tuple = (), taken=frozenset(),
+                   printer=None) -> list:
+    """Le sorgenti sparite (rows: [(PhoneTrack, Link)]) per album. Le cartelle proposte sono solo quelle dello
+    **stesso album** nella libreria (same_album_key: stesso artista dell'album e titolo), una per copia (cartella
+    dell'album e formato), con i brani ritrovati lì (relocate). Nessuna proposta: l'album sul PC non c'è più."""
+    from .library import album_folder
+    by_album = {}
+    order = []
+    for item, link in rows:
+        key = (item.tags.album_artist or item.display_artist, item.tags.album)
+        if key not in by_album:
+            by_album[key] = MissingAlbum(key)
+            order.append(key)
+        by_album[key].rows.append((item, link))
+    copies = {}
+    for track in pc_tracks:
+        if not track.error:
+            album_key = same_album_key(track.display_artist, track.tags.album)
+            copy_key = (album_folder(track.path), track.path.suffix.casefold())
+            copies.setdefault(album_key, {}).setdefault(copy_key, []).append(track)
+    result = []
+    for key in order:
+        album = by_album[key]
+        folders = {}
+        for _item, link in album.rows:
+            old = album_folder(link.path)
+            folders[old] = folders.get(old, 0) + 1
+        album.old_folder = max(folders, key=lambda folder: folders[folder]) if folders else ""
+        candidates = []
+        for (folder, _suffix), tracks in sorted(copies.get(same_album_key(key[0], key[1]), {}).items()):
+            proposals = relocate(album.rows, tracks, tag_cache, preferred, taken, printer)
+            if proposals:
+                candidates.append(FolderCandidate(folder, proposals))
+        candidates.sort(key=lambda candidate: (-len(candidate.proposals), candidate.folder.lower()))
+        album.candidates = candidates[:MAX_CANDIDATES]
+        result.append(album)
+    result.sort(key=lambda album: (album.key[0].lower(), album.key[1].lower()))
     return result

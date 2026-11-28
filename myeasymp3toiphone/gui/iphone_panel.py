@@ -1817,52 +1817,57 @@ class IPhonePanel(QWidget):
             if rows:
                 QTimer.singleShot(0, lambda: self._show_missing(rows))
 
-    def relocated(self, rows: list) -> dict:
-        """{pid: adoption.Proposal}: i file spostati ritrovati nella cartella aperta (relocate.relocate)."""
-        from ..relocate import relocate
-        window = self._window
-        result = relocate(rows, window.tracks, window.tag_cache, window.preferred_order(),
-                          set(window.registry.links_here()))
-        return result
-
     def _show_missing(self, rows: list) -> None:
-        from .missing_dialog import ACTION_DELETE, ACTION_ORPHAN, ACTION_RELINK, ACTION_SEARCH, MissingSourcesDialog
-        found = self.relocated(rows)
-        dialog = MissingSourcesDialog(self, rows, self._connected, found)
-        if dialog.exec() and not self._window.runner.is_busy:
-            chosen = dialog.chosen()
-            if dialog.action == ACTION_RELINK:
-                self._relink(rows, found, chosen)
-            elif dialog.action == ACTION_SEARCH:
-                self._source_queue = chosen[1:]
-                self._link_one(chosen[0])
-            elif dialog.action == ACTION_ORPHAN:
-                registry = self._window.registry
-                for item in chosen:
-                    registry.forget(item.sync_id)
-                self._store_registry(registry, f"{len(chosen)} brani ora sono senza sorgente")
-            elif dialog.action == ACTION_DELETE:
-                self._window.queue_deletes(chosen)
+        """Le sorgenti sparite, per album (missing_dialog): una cartella della libreria per album, togliere
+        l'associazione, eliminare dall'iPhone o più tardi."""
+        from ..relocate import missing_albums
+        from .missing_dialog import MissingSourcesDialog
+        window = self._window
+        albums = missing_albums(rows, window.tracks, window.tag_cache, window.preferred_order(),
+                                set(window.registry.links_here()))
+        dialog = MissingSourcesDialog(self, albums, self._connected)
+        if dialog.exec() and not window.runner.is_busy:
+            self._apply_missing(dialog.decisions())
 
-    def _relink(self, rows: list, found: dict, chosen: list) -> None:
-        """Associa i file ritrovati: per i brani spuntati che ne hanno uno, il file ritrovato diventa la sorgente
-        (registro). Con lo stesso audio l'impronta è quella che il registro aveva già."""
+    def _apply_missing(self, decisions: list) -> None:
+        """Le scelte per album: i file ritrovati diventano la sorgente (registro), "togli" dimentica la sorgente,
+        "elimina" va in attesa. Un file del PC va a un brano solo, anche tra album diversi."""
+        from ..overlay import path_key
+        from .missing_dialog import CHOICE_DELETE, CHOICE_FOLDER, CHOICE_FORGET
         window = self._window
         registry = window.registry
-        old_prints = {}
-        for item, link in rows:
-            old_prints[item.pid] = link.fingerprint
-        count = 0
-        for item in chosen:
-            proposal = found.get(item.pid)
-            if proposal is not None:
-                if proposal.how == provenance.HOW_FINGERPRINT:
-                    printed = old_prints.get(item.pid, "")
-                else:
-                    printed = window.tag_cache.fingerprint(proposal.pc.path)
-                registry.record(adoption.link_for(proposal, window.overlay, printed))
-                count += 1
-        self._store_registry(registry, f"Ritrovati e associati {count} file spostati")
+        used = set(registry.links_here())
+        linked = 0
+        forgotten = 0
+        deleted = []
+        for album, kind, proposals in decisions:
+            if kind == CHOICE_FOLDER:
+                for item, link in album.rows:
+                    proposal = proposals.get(item.pid)
+                    if proposal is not None and path_key(proposal.pc.path) not in used:
+                        used.add(path_key(proposal.pc.path))
+                        if proposal.how == provenance.HOW_FINGERPRINT:
+                            printed = link.fingerprint
+                        else:
+                            printed = window.tag_cache.fingerprint(proposal.pc.path)
+                        registry.record(adoption.link_for(proposal, window.overlay, printed))
+                        linked += 1
+            elif kind == CHOICE_FORGET:
+                for item, _link in album.rows:
+                    registry.forget(item.sync_id)
+                    forgotten += 1
+            elif kind == CHOICE_DELETE:
+                for item, _link in album.rows:
+                    deleted.append(item)
+        if deleted:
+            window.queue_deletes(deleted)
+        if linked or forgotten:
+            parts = []
+            if linked:
+                parts.append(f"associati {linked} file ritrovati")
+            if forgotten:
+                parts.append(f"{forgotten} brani ora senza sorgente")
+            self._store_registry(registry, "Sorgenti sparite: " + ", ".join(parts))
 
     # ------------------------------------------------------------------ scrittura sull'iPhone
 

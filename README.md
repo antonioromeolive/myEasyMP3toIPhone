@@ -790,22 +790,23 @@ anche quando un file con lo stesso audio c'era già. Tasto destro:
   i brani scelti, anche quelli che hanno già una sorgente.
 - **Togli sorgente**: il brano torna *senza sorgente*.
 
-**Sorgenti sparite.** Il programma non cancella mai i file del PC: li cancelli tu (per esempio un doppione). Quando
-apri una cartella o leggi l'iPhone, i brani dell'iPhone il cui file sul PC non c'è più (*file non trovato*) si
-segnalano con un avviso, una volta per sessione. Prima il programma li cerca da solo nella cartella aperta, in
-meno di un secondo anche con migliaia di brani: un file **spostato o rinominato** si ritrova (1) con lo stesso nome
-e la stessa dimensione, e lo stesso audio se il registro ne ha l'impronta; (2) con lo stesso audio e un altro nome
-(tra più copie, quella nella cartella con il nome più simile a prima); (3) per gli altri, l'album intero in una
-cartella e le regole, come le proposte in rosso. La colonna *Ritrovato sul PC* dice dove, il suggerimento come.
-Per il punto (2), dopo l'apertura di una cartella il programma calcola **in sottofondo** l'impronta dei file che non
-ce l'hanno ancora nella cache dei tag (la prima volta tutti, uno o due minuti; poi solo i file nuovi, spostati o
-cambiati): non blocca niente e si ferma se apri un'altra cartella o esci.
-Per quelli spuntati l'avviso offre: **Associa i file ritrovati** (si scrive solo il registro della provenienza),
-**Cerca un'altra sorgente** (la finestra di *Associa sorgente*, uno alla volta, con per prima la copia con lo stesso
-audio),
-**Lascia senza sorgente** o **Elimina dall'iPhone** (in attesa fino ad *Applica*). Un file su un disco che ora non è collegato non
-conta come sparito. Il contrario non succede mai: eliminare un brano dall'iPhone non cambia niente sul PC, e i
-doppioni del PC e quelli dell'iPhone si gestiscono in modo del tutto separato.
+**Sorgenti sparite.** Il programma non cancella mai i file del PC: li cancelli tu (per esempio un doppione), o li
+sposti. Quando apri una cartella o leggi l'iPhone, i brani dell'iPhone il cui file sul PC non c'è più (*file non
+trovato*) si segnalano con un avviso, una volta per sessione, **per album** (non brano per brano). Per ogni album il
+programma propone **lo stesso album nella libreria** (stesso artista dell'album e titolo, senza maiuscole, accenti e
+"CD 1"), una voce per copia (per esempio il FLAC e l'MP3 in cartelle diverse), con quanti brani ci ritrova: un file
+spostato o rinominato si ritrova con lo stesso nome e la stessa dimensione (e lo stesso audio, se il registro ne ha
+l'impronta), con lo stesso audio e un altro nome, o con le regole dell'album intero in una cartella. Un album con lo
+stesso titolo ma di un altro artista, o la stessa canzone in una raccolta, non si propone. Per l'impronta, dopo
+l'apertura di una cartella il programma calcola **in sottofondo** quella dei file che non ce l'hanno ancora nella
+cache dei tag (la prima volta tutti, uno o due minuti; poi solo i file nuovi, spostati o cambiati).
+Nella colonna *Cosa fare* si sceglie per ogni album: **Associa all'album in …** (la prima copia proposta è già
+scelta; si scrive solo il registro della provenienza, i brani non ritrovati restano com'erano), **Togli
+l'associazione** (il brano resta sull'iPhone senza sorgente), **Elimina dall'iPhone** (in attesa fino ad *Applica*;
+solo se sul PC l'album non c'è più) o **Più tardi**; i pulsanti *Tutti: …* scelgono per tutti gli album, e *Applica le
+scelte* le fa insieme. Un file su un disco che ora non è collegato non conta come sparito. Il contrario non succede
+mai: eliminare un brano dall'iPhone non cambia niente sul PC, e i doppioni del PC e quelli dell'iPhone si gestiscono
+in modo del tutto separato.
 
 **Brani fantasma.** A ogni lettura dell'iPhone il programma guarda anche quali file ci sono nelle cartelle della musica
 del telefono (una lettura per cartella, non per brano): un brano dell'elenco il cui file non c'è è un *fantasma*.

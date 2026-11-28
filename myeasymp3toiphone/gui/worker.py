@@ -142,6 +142,10 @@ class TaskRunner(QObject):
         if total > 0:
             self._bar.setRange(0, total)
             self._bar.setValue(index)
+        else:
+            # un passo senza un totale da contare: la barra "in corso", non ferma al numero del passo di prima
+            # (sembrava bloccata al 99% dopo l'ultimo album della Verifica online)
+            self._bar.setRange(0, 0)
         self._label.setText(self._step_text(text))
         self.progressed.emit(tr(text))
 

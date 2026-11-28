@@ -4185,4 +4185,48 @@ CATALOG = {
         "The albums with the Compilation flag or with \"various artists\" as album artist",
     "(Tutti gli album delle compilation":
         "(All the albums of the compilations",
+    "associati {0} file ritrovati":
+        "linked {0} found files",
+    "{0} brani ora senza sorgente":
+        "{0} tracks now without source",
+    "Sorgenti sparite: ":
+        "Missing sources: ",
+    "<b>{0}</b> brani dell'iPhone, in <b>{1}</b> album, vengono da file di questo PC che non ci sono più (spostati o cancellati). Per <b>{2}</b> album c'è nella libreria lo stesso album (stesso artista dell'album e titolo): è già scelto nella colonna <i>Cosa fare</i>. Per ogni album scegli la copia da associare, togli l'associazione, eliminalo dall'iPhone (solo se sul PC l'album non c'è più) o lascia per più tardi; poi <i>Applica le scelte</i>.<br>Se i file sono su un disco che ora non è collegato, collegalo e premi <i>Più tardi</i>.":
+        "<b>{0}</b> iPhone tracks, in <b>{1}</b> albums, come from files of this PC that are no longer there (moved or deleted). For <b>{2}</b> albums the same album is in the library (same album artist and title): it is already chosen in the <i>What to do</i> column. For each album choose the copy to link, remove the link, delete it from the iPhone (only if the album is no longer on the PC) or leave it for later; then <i>Apply the choices</i>.<br>If the files are on a disk that is not connected now, connect it and press <i>Later</i>.",
+    "Album sull'iPhone":
+        "Album on the iPhone",
+    "Cartella di prima":
+        "Previous folder",
+    "Cosa fare":
+        "What to do",
+    "Ritrovato":
+        "Found",
+    "Tutti: lo stesso album nella libreria":
+        "All: the same album in the library",
+    "Per ogni album che c'è nella libreria, la prima copia proposta; gli altri più tardi":
+        "For each album that is in the library, the first proposed copy; the others later",
+    "Tutti: togli l'associazione":
+        "All: remove the link",
+    "Restano sull'iPhone, senza sorgente sul PC":
+        "They stay on the iPhone, without a source on the PC",
+    "Tutti: più tardi":
+        "All: later",
+    "Applica le scelte":
+        "Apply the choices",
+    "Per tutti gli album:":
+        "For all the albums:",
+    "Associare scrive solo il registro della provenienza: i file non cambiano. \"Elimina dall'iPhone\" va in attesa e parte con Applica (barra blu); sul PC non cambia niente. Li ritrovi quando vuoi nella scheda iPhone con il filtro \"File del PC non trovato\".":
+        "Linking writes only the provenance register: the files do not change. \"Delete from the iPhone\" goes in the queue and starts with Apply (blue bar); nothing changes on the PC. You find them whenever you want in the iPhone tab with the \"PC file not found\" filter.",
+    "Associa all'album in {0} ({1} di {2} brani)":
+        "Link to the album in {0} ({1} of {2} tracks)",
+    "Togli l'associazione (resta sull'iPhone senza sorgente)":
+        "Remove the link (stays on the iPhone without a source)",
+    "Elimina dall'iPhone (in attesa)":
+        "Delete from the iPhone (queued)",
+    "{0} ritrovati":
+        "{0} found",
+    ", {0} no (restano così)":
+        ", {0} not (they stay as they are)",
+    "sul PC l'album non c'è più":
+        "the album is no longer on the PC",
 }
