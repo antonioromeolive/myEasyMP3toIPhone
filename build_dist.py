@@ -11,7 +11,8 @@ Si esegue con l'ambiente virtuale del progetto, dove sono installati requirement
 (oppure in VS Code: Terminale -> Esegui attività di compilazione, Ctrl+Shift+B).
 Risultato: dist/myEasyMP3toIPhone (i programmi di myEasyMP3toIPhone.spec con la loro cartella _internal, README.md, LICENSE,
 THIRD_PARTY_NOTICES.md e i
-file di dist_files: READ ME FIRST.txt, Create shortcuts.cmd, Remove shortcuts.cmd) e
+file di dist_files: READ ME FIRST.txt, Create shortcuts.cmd, Remove shortcuts.cmd, più version.txt con il numero
+della versione, version=<versione>, in cima e in _internal) e
 dist/myEasyMP3toIPhone-<versione>-<sistema>-<processore>.zip, con la versione data da git (version.py): 0.1.3, oppure
 0.1.4-dev con modifiche non registrate. Degli zip precedenti in dist resta solo quello della build prima.
 PyInstaller tiene la sua analisi in build/pyinstaller e la riusa: rifà solo quello che è cambiato. La butta e
@@ -67,10 +68,12 @@ def archive_base(version: str) -> str:
 
 
 def add_version_file(built: str, version: str) -> None:
-    """ il file di versione che vscode_deploy.py legge in una cartella installata """
-    path = os.path.join(built, "_internal", vscode_deploy.VERSION_FILE)
-    with open(path, "w", encoding="utf-8") as version_file:
-        version_file.write(f"version={version}\n")
+    """ version.txt con il numero della versione costruita (version=0.1.93): in cima alla cartella, dove si vede
+    aprendo lo zip, e in _internal; vscode_deploy.py li legge tutti e due. Riscritto a ogni build. """
+    for folder in (built, os.path.join(built, "_internal")):
+        path = os.path.join(folder, vscode_deploy.VERSION_FILE)
+        with open(path, "w", encoding="utf-8") as version_file:
+            version_file.write(f"version={version}\n")
 
 
 def write_version() -> str:

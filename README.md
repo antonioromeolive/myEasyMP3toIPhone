@@ -1312,7 +1312,8 @@ versioni dell'ultima build è in `build\pyinstaller\librerie.txt`), alla prima b
 
 **La build** (`build_dist.py`, PyInstaller con `myEasyMP3toIPhone.spec`) crea `dist\myEasyMP3toIPhone\` con
 `myEasyMP3toIPhone.exe` (la finestra), `myEasyMP3toIPhone-cli.exe` (la console), `_internal\`, README.md, LICENSE e i file di
-`dist_files` (READ ME FIRST.txt, Create/Remove shortcuts.cmd); controlla la build con `myEasyMP3toIPhone-cli --selftest`;
+`dist_files` (READ ME FIRST.txt, Create/Remove shortcuts.cmd) e `version.txt` con il numero della versione costruita
+(`version=0.1.93`, riscritto a ogni build; anche in `_internal`); controlla la build con `myEasyMP3toIPhone-cli --selftest`;
 poi crea `dist\myEasyMP3toIPhone-<versione>-windows-x64.zip` (degli zip vecchi in dist resta solo quello precedente).
 Infine `vscode_deploy.py`:
 
