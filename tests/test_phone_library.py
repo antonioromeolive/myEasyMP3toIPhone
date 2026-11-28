@@ -1983,3 +1983,67 @@ def test_an_album_no_longer_on_the_pc_can_be_deleted_from_the_iphone(tmp_path):
     assert [kind for _album, kind, _proposals in dialog.decisions()] == [CHOICE_DELETE]
     dialog.close()
     app.processEvents()
+
+
+def test_choose_a_folder_for_a_missing_album(tmp_path, monkeypatch):
+    """"Scegli una cartella…" per un album spostato fuori dalle cartelle aperte: lo stesso album si cerca lì
+    (propose); la cartella entra in cima, già scelta. Una cartella senza l'album: "più tardi", e lo dice."""
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtWidgets import QApplication, QFileDialog
+    from myeasymp3toiphone import adoption, provenance
+    from myeasymp3toiphone.gui.missing_dialog import CHOICE_BROWSE, CHOICE_FOLDER, MissingSourcesDialog
+    from myeasymp3toiphone.relocate import missing_albums
+    app = QApplication.instance() or QApplication([])
+    item = _phone(1, "Uno", "Gruppo Finto", "Disco")
+    item.sync_id = 1
+    link = provenance.Link(sync_id=1, pc=provenance.computer_name(), path=str(tmp_path / "via" / "01 Uno.mp3"))
+    moved = Track(path=tmp_path / "fuori" / "Disco" / "01 Uno.mp3",
+                  tags=TrackTags(title="Uno", artist="Gruppo Finto", album="Disco"))
+    albums = missing_albums([(item, link)], [], None)            # spostato fuori dalle cartelle aperte
+    assert albums[0].candidates == []
+    asked = []
+
+    def propose(rows, folder):
+        asked.append(folder)
+        found = {}
+        if folder == str(moved.path.parent):
+            found = {1: adoption.Proposal(item, moved, provenance.HOW_RULES, "stesso nome")}
+        return found
+
+    dialog = MissingSourcesDialog(None, albums, False, propose, str(tmp_path))
+    top = dialog.tree.topLevelItem(0)
+    combo = dialog.tree.itemWidget(top, 3)
+    browse = [combo.itemData(index)[0] for index in range(combo.count())].index(CHOICE_BROWSE)
+    monkeypatch.setattr(QFileDialog, "getExistingDirectory", lambda *args: str(tmp_path / "vuota"))
+    combo.setCurrentIndex(browse)
+    assert dialog.decisions() == [] and "non c'è in quella cartella" in top.text(4)
+    monkeypatch.setattr(QFileDialog, "getExistingDirectory", lambda *args: str(moved.path.parent))
+    combo.setCurrentIndex(browse)
+    assert [(kind, sorted(found)) for _album, kind, found in dialog.decisions()] == [(CHOICE_FOLDER, [1])]
+    assert top.child(0).text(4) == "01 Uno.mp3" and asked == [str(tmp_path / "vuota"), str(moved.path.parent)]
+    dialog.close()
+    app.processEvents()
+
+
+def test_the_chosen_folder_only_gives_the_same_album(tmp_path):
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtWidgets import QApplication
+    from myeasymp3toiphone import provenance
+    from myeasymp3toiphone.gui.main_window import MainWindow
+    app = QApplication.instance() or QApplication([])
+    for name, album in (("01 Uno.mp3", "Disco"), ("01 Altro.mp3", "Altro Disco")):
+        path = tmp_path / "fuori" / name
+        write_mp3(path, 30)
+        write_tags(path, TrackTags(title=name[3:-4], artist="Gruppo Finto", album=album, track_number=1))
+    item = _phone(1, "Uno", "Gruppo Finto", "Disco", track_number=1)
+    item.sync_id = 1
+    link = provenance.Link(sync_id=1, pc=provenance.computer_name(), path=str(tmp_path / "via" / "01 Uno.mp3"))
+    window = MainWindow()
+    try:
+        window.registry = provenance.Registry()
+        found = window.iphone_panel._propose_in_folder([(item, link)], str(tmp_path / "fuori"))
+        assert [proposal.pc.path.name for proposal in found.values()] == ["01 Uno.mp3"]
+    finally:
+        window._exit_checked = True
+        window.close()
+        app.processEvents()

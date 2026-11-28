@@ -4,7 +4,9 @@
 
 """L'avviso delle sorgenti sparite: brani dell'iPhone il cui file sul PC non c'è più (spostato o cancellato, per
 esempio un doppione). Si decide **per album**, non brano per brano: per ogni album una copia dello stesso album nella
-libreria (stesso artista dell'album e titolo: relocate.missing_albums, con i brani ritrovati lì), togliere
+libreria (stesso artista dell'album e titolo: relocate.missing_albums, con i brani ritrovati lì) o, per un album
+spostato in una cartella che il programma non ha trovato da solo, "Scegli una cartella…" (vi si cerca lo stesso
+album), togliere
 l'associazione (il brano resta sull'iPhone senza sorgente), eliminarlo dall'iPhone (in attesa: solo se sul PC
 l'album non c'è più) o lasciarlo per più tardi. Cancellare dall'iPhone non tocca mai il PC;
 associare scrive solo il registro della provenienza."""
@@ -13,28 +15,33 @@ from __future__ import annotations
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QAbstractItemView, QComboBox, QDialog, QHBoxLayout, QHeaderView, QLabel, QPushButton, QTreeWidget,
+    QAbstractItemView, QComboBox, QDialog, QFileDialog, QHBoxLayout, QHeaderView, QLabel, QPushButton, QTreeWidget,
     QTreeWidgetItem, QVBoxLayout,
 )
 
 from ..library import short_folder
+from ..relocate import FolderCandidate
 from .theme import set_role
 
 CHOICE_FOLDER = "scelta_cartella"
+CHOICE_BROWSE = "scelta_sfoglia"
 CHOICE_FORGET = "scelta_togli"
 CHOICE_DELETE = "scelta_elimina"
 CHOICE_LATER = "scelta_dopo"
 
 
 class MissingSourcesDialog(QDialog):
-    """albums: relocate.MissingAlbum. decisions(): [(MissingAlbum, scelta, {pid: Proposal})] degli album con una
-    scelta (non "più tardi")."""
+    """albums: relocate.MissingAlbum; propose(righe, cartella) -> {pid: Proposal}: i brani ritrovati in una cartella
+    scelta con "Scegli una cartella…" (start_folder: dove parte la scelta). decisions(): [(MissingAlbum, scelta,
+    {pid: Proposal})] degli album con una scelta (non "più tardi")."""
 
-    def __init__(self, parent, albums: list, connected: bool) -> None:
+    def __init__(self, parent, albums: list, connected: bool, propose=None, start_folder: str = "") -> None:
         super().__init__(parent)
         self.setWindowTitle("Sorgenti sparite dal PC")
         self.resize(1200, 560)
         self._albums = albums
+        self._propose = propose
+        self._start_folder = start_folder
         self._combos = []
         tracks = 0
         found_albums = 0
@@ -121,6 +128,12 @@ class MissingSourcesDialog(QDialog):
             combo.addItem(f"Associa all'album in {short_folder(candidate.folder)} ({len(candidate.proposals)} di "
                           f"{total} brani)", (CHOICE_FOLDER, index))
             combo.setItemData(combo.count() - 1, candidate.folder, Qt.ToolTipRole)
+        if self._propose is not None:
+            combo.addItem("Scegli una cartella…", (CHOICE_BROWSE, -1))
+            combo.setItemData(combo.count() - 1, "Per un album spostato in una cartella che il programma non ha "
+                              "trovato (per esempio fuori dalle cartelle aperte): lo stesso album si cerca nella "
+                              "cartella scelta. Se hai cambiato titolo o artista, meglio eliminarlo dall'iPhone e "
+                              "rimandarlo", Qt.ToolTipRole)
         combo.addItem("Togli l'associazione (resta sull'iPhone senza sorgente)", (CHOICE_FORGET, -1))
         if not album.candidates:                 # sul PC l'album non c'è più
             combo.addItem("Elimina dall'iPhone (in attesa)", (CHOICE_DELETE, -1))
@@ -129,7 +142,26 @@ class MissingSourcesDialog(QDialog):
         combo.blockSignals(False)
 
     def _chosen(self, album, combo: QComboBox, top) -> None:
+        kind, _index = combo.currentData()
+        note = ""
+        if kind == CHOICE_BROWSE:
+            folder = QFileDialog.getExistingDirectory(self, f"La cartella di {album.key[1]}", self._start_folder)
+            proposals = self._propose(album.rows, folder) if folder else {}
+            if proposals:
+                album.candidates.insert(0, FolderCandidate(folder, proposals))
+                self._fill_combo(combo, album)
+                combo.blockSignals(True)
+                combo.setCurrentIndex(0)
+                combo.blockSignals(False)
+            else:
+                combo.blockSignals(True)
+                combo.setCurrentIndex(combo.count() - 1)          # più tardi
+                combo.blockSignals(False)
+                if folder:
+                    note = "lo stesso album (artista e titolo) non c'è in quella cartella"
         self._show_found(album, combo, top)
+        if note:
+            top.setText(4, note)
 
     def _show_found(self, album, combo: QComboBox, top) -> None:
         """La colonna Ritrovato: per ogni brano il file che diventa la sorgente con la scelta di ora."""

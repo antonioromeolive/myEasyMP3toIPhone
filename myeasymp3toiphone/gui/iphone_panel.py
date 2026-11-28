@@ -1825,9 +1825,27 @@ class IPhonePanel(QWidget):
         window = self._window
         albums = missing_albums(rows, window.tracks, window.tag_cache, window.preferred_order(),
                                 set(window.registry.links_here()))
-        dialog = MissingSourcesDialog(self, albums, self._connected)
+        dialog = MissingSourcesDialog(self, albums, self._connected, self._propose_in_folder, str(window.library_dir()))
         if dialog.exec() and not window.runner.is_busy:
             self._apply_missing(dialog.decisions())
+
+    def _propose_in_folder(self, rows: list, folder: str) -> dict:
+        """{pid: Proposal}: i brani spariti ritrovati in una cartella scelta con "Scegli una cartella…" (un album
+        spostato fuori dalle cartelle aperte): solo i brani dello stesso album (stesso artista dell'album e titolo),
+        tra quelli aperti o, se la cartella non è tra quelle aperte, letti lì."""
+        from ..relocate import folder_tracks, relocate, same_album_key
+        window = self._window
+        inside = folder_tracks(window.tracks, folder)
+        if not inside:
+            inside = scan_folder(Path(folder), None, None, window.tag_cache)
+        item = rows[0][0]
+        wanted = same_album_key(item.tags.album_artist or item.display_artist, item.tags.album)
+        same = []
+        for track in inside:
+            if same_album_key(track.display_artist, track.tags.album) == wanted:
+                same.append(track)
+        result = relocate(rows, same, window.tag_cache, window.preferred_order(), set(window.registry.links_here()))
+        return result
 
     def _apply_missing(self, decisions: list) -> None:
         """Le scelte per album: i file ritrovati diventano la sorgente (registro), "togli" dimentica la sorgente,

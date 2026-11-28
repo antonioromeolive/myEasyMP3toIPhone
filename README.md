@@ -801,7 +801,10 @@ stesso titolo ma di un altro artista, o la stessa canzone in una raccolta, non s
 l'apertura di una cartella il programma calcola **in sottofondo** quella dei file che non ce l'hanno ancora nella
 cache dei tag (la prima volta tutti, uno o due minuti; poi solo i file nuovi, spostati o cambiati).
 Nella colonna *Cosa fare* si sceglie per ogni album: **Associa all'album in …** (la prima copia proposta è già
-scelta; si scrive solo il registro della provenienza, i brani non ritrovati restano com'erano), **Togli
+scelta; si scrive solo il registro della provenienza, i brani non ritrovati restano com'erano), **Scegli una
+cartella…** (per un album spostato in una cartella che il programma non ha trovato da solo, per esempio fuori dalle
+cartelle aperte: lì si cerca lo stesso album, e la cartella entra in cima già scelta; se hai cambiato titolo o
+artista, meglio eliminarlo dall'iPhone e rimandarlo), **Togli
 l'associazione** (il brano resta sull'iPhone senza sorgente), **Elimina dall'iPhone** (in attesa fino ad *Applica*;
 solo se sul PC l'album non c'è più) o **Più tardi**; i pulsanti *Tutti: …* scelgono per tutti gli album, e *Applica le
 scelte* le fa insieme. Un file su un disco che ora non è collegato non conta come sparito. Il contrario non succede

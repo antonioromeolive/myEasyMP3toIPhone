@@ -4229,4 +4229,12 @@ CATALOG = {
         ", {0} not (they stay as they are)",
     "sul PC l'album non c'è più":
         "the album is no longer on the PC",
+    "Scegli una cartella…":
+        "Choose a folder…",
+    "La cartella di {0}":
+        "The folder of {0}",
+    "Per un album spostato in una cartella che il programma non ha trovato (per esempio fuori dalle cartelle aperte): lo stesso album si cerca nella cartella scelta. Se hai cambiato titolo o artista, meglio eliminarlo dall'iPhone e rimandarlo":
+        "For an album moved to a folder the program did not find (for example outside the open folders): the same album is searched in the chosen folder. If you changed title or artist, better delete it from the iPhone and send it again",
+    "lo stesso album (artista e titolo) non c'è in quella cartella":
+        "the same album (artist and title) is not in that folder",
 }
